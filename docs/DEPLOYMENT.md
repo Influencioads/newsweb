@@ -6,6 +6,11 @@ The production stack is defined in `docker-compose.prod.yml`. Caddy obtains and
 renews TLS certificates automatically. Only ports 80 and 443 are published;
 MySQL, Redis, Meilisearch, the API, and the static web server stay private.
 
+If the server already runs a shared host Nginx, use
+`infra/nginx/telugunews.influencioweb.com.conf`. The web and API containers are
+available only on `127.0.0.1:8094` and `127.0.0.1:8004`. Caddy is opt-in through
+the `caddy` Compose profile, so it does not contend with an existing proxy.
+
 ## 1. Push the repository
 
 From the project directory:

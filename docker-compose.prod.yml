@@ -22,6 +22,7 @@ x-api-image: &api-image
 services:
   caddy:
     image: caddy:2.8-alpine
+    profiles: ["caddy"]
     restart: unless-stopped
     environment:
       ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env.production}
@@ -41,12 +42,16 @@ services:
     build: ./frontend
     image: telugu-news-web:latest
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:8094:80"
 
   api:
     <<: *api-image
     command: ["sh", "-c", "python -m alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 3 --proxy-headers --forwarded-allow-ips=*"]
     volumes:
       - storage_data:/app/var/storage
+    ports:
+      - "127.0.0.1:8004:8000"
     depends_on:
       mysql: {condition: service_healthy}
       redis: {condition: service_healthy}

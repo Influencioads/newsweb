@@ -1,0 +1,119 @@
+@import './fonts.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+ * Design tokens, mirrored from mockup `1a`.
+ * Tailwind covers most usage; these exist for the places raw CSS is clearer
+ * (the e-paper viewer, the hotspot canvas, printed/exported surfaces).
+ * ------------------------------------------------------------------------- */
+:root {
+  --brand: #a61c24;
+  --brand-dark: #7e1219;
+  --breaking: #c6111f;
+  --ink: #1a1714;
+  --ink-soft: #4a443c;
+  --muted: #6b635a;
+  --muted-light: #8a7f70;
+  --paper: #faf7f2;
+  --canvas: #efebe3;
+  --cms-canvas: #f4f2ed;
+  --rule: #e5dfd6;
+  --ai: #6d4fc4;
+  --exclusive: #b98a2e;
+  --success: #2e7d4f;
+  --info: #1e66c8;
+  --placeholder: #e9e2d6;
+
+  /* Reader font-size switcher (§4.1 A- / A / A+ / A++).
+     The scale multiplies every Telugu text size; it is set on <html> by the
+     font-size store and persisted to localStorage. */
+  --reader-scale: 1;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
+    /* §4.1: Telugu stacks marks above and below the baseline. 1.65 is the floor. */
+    line-height: 1.65;
+  }
+
+  /* --------------------------------------------------------------------- *
+   * Telugu text rules (§4.1). Violating any of these clips vattulu/matras.
+   * --------------------------------------------------------------------- */
+  .te,
+  .telugu {
+    font-family: 'Noto Sans Telugu', Inter, sans-serif;
+    line-height: 1.7;
+  }
+
+  .th,
+  .telugu-headline {
+    font-family: 'Anek Telugu', 'Noto Sans Telugu', sans-serif;
+    line-height: 1.5;
+  }
+
+  /* A single-line Telugu headline must never be clipped: no fixed heights and
+     no overflow:hidden. Where an ellipsis is genuinely required, use
+     `.te-clamp-N`, which clamps by *lines* and keeps the box height elastic. */
+  .te-clamp-2,
+  .te-clamp-3,
+  .te-clamp-4 {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .te-clamp-2 { -webkit-line-clamp: 2; }
+  .te-clamp-3 { -webkit-line-clamp: 3; }
+  .te-clamp-4 { -webkit-line-clamp: 4; }
+
+  /* Focus visibility — brief §1 accessibility. */
+  :focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+
+  /* Reserve space for media so CLS stays < 0.1 (§10.3). Every image and ad slot
+     in this app declares an aspect-ratio or explicit height; this is the
+     fallback styling for the placeholder state. */
+  .ph {
+    background: var(--placeholder);
+    color: var(--muted-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 11px;
+    line-height: 1.3;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* Reader body copy scales with the A-/A/A+/A++ switcher. */
+  .reader-body {
+    font-size: calc(19px * var(--reader-scale));
+    line-height: 1.7;
+  }
+  .reader-lead {
+    font-size: calc(17px * var(--reader-scale));
+    line-height: 1.7;
+  }
+}

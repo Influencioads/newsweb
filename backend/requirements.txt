@@ -1,0 +1,57 @@
+# Telugu News Platform — API + workers
+# Python 3.12+
+
+# --- web ---------------------------------------------------------------
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# --- validation / settings ---------------------------------------------
+pydantic==2.10.4
+pydantic-settings==2.7.1
+email-validator==2.2.0
+
+# --- database ----------------------------------------------------------
+SQLAlchemy==2.0.36
+alembic==1.14.0
+PyMySQL==1.1.1              # pure-python driver: no build toolchain needed on Windows
+cryptography==44.0.0        # required by PyMySQL for caching_sha2_password + Fernet at-rest
+
+# --- cache / queue -----------------------------------------------------
+redis==5.2.1
+celery==5.4.0
+
+# --- auth / security ---------------------------------------------------
+PyJWT==2.10.1
+argon2-cffi==23.1.0
+bcrypt==4.2.1
+pyotp==2.9.0                # TOTP 2FA (§6.2)
+itsdangerous==2.2.0
+
+# --- search ------------------------------------------------------------
+meilisearch==0.33.0
+
+# --- http / integrations -----------------------------------------------
+httpx==0.28.1
+tenacity==9.0.0             # retry with exponential backoff on 429/5xx only (§7.1)
+boto3==1.35.92              # S3-compatible: Zata.ai
+
+# --- content -----------------------------------------------------------
+bleach==6.2.0               # HTML sanitisation (§12.1)
+python-slugify==8.0.4
+nanoid==2.0.0               # 6-char shortId (§4.5)
+Pillow==11.1.0              # image derivatives, EXIF strip
+blurhash==1.1.4              # pure-python; the C `blurhash-python` needs MSVC on Windows
+
+# --- observability -----------------------------------------------------
+structlog==24.4.0
+sentry-sdk[fastapi]==2.19.2
+
+# --- dev / test --------------------------------------------------------
+pytest==8.3.4
+pytest-asyncio==0.25.2
+pytest-cov==6.0.0
+ruff==0.8.6
+mypy==1.14.1
+types-bleach==6.2.0.20241123
+faker==33.3.0

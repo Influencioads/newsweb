@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="te">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#A61C24" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!--
+      §4.1: preload the 400-weight Telugu BODY font only. Preloading more than one
+      face delays LCP on the 4G mid-range Android we are targeting (§10.3).
+    -->
+    <link
+      rel="preload"
+      href="/fonts/noto-sans-telugu-telugu.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+
+    <title>టాప్ తెలుగు న్యూస్ · Top Telugu News</title>
+    <meta
+      name="description"
+      content="తెలుగు వార్తలు, ఈ-పేపర్, వీడియోలు — ఆంధ్రప్రదేశ్ మరియు తెలంగాణ జిల్లా వార్తలతో."
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      <div style="padding: 24px; font-family: 'Noto Sans Telugu', sans-serif; line-height: 1.7">
+        ఈ వెబ్‌సైట్ చూడటానికి JavaScript అవసరం.
+      </div>
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

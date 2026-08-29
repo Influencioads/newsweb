@@ -1,0 +1,10 @@
+import { api } from '@/api/client';
+import type { CmsArticle, CmsArticleList, CmsEditorOptions, DashboardStats } from '@/types/cms';
+export const fetchArticles=async(params?:{state?:string;search?:string;offset?:number;limit?:number})=>(await api.get<CmsArticleList>('/cms/articles',{params})).data;
+export const fetchArticle=async(id:number)=>(await api.get<CmsArticle>(`/cms/articles/${id}`)).data;
+export const createArticle=async(payload:Record<string,unknown>)=>(await api.post<CmsArticle>('/cms/articles',payload)).data;
+export const updateArticle=async(id:number,payload:Record<string,unknown>)=>(await api.patch<CmsArticle>(`/cms/articles/${id}`,payload)).data;
+export const transitionArticle=async(id:number,action:string,note?:string)=>(await api.post<CmsArticle>(`/cms/articles/${id}/${action}`,{note:note||null})).data;
+export const fetchDashboardStats=async()=>(await api.get<DashboardStats>('/cms/dashboard')).data;
+export const fetchEditorOptions=async()=>(await api.get<CmsEditorOptions>('/cms/dashboard/editor-options')).data;
+export const fetchManagement=async<T>(section:string)=>(await api.get<T>(`/cms/${section}`)).data;

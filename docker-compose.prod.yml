@@ -1,0 +1,117 @@
+name: telugu-news-production
+
+x-api-environment: &api-environment
+  env_file: .env.production
+  environment:
+    MYSQL_HOST: mysql
+    MYSQL_PORT: "3306"
+    REDIS_URL: redis://redis:6379/0
+    CELERY_BROKER_URL: redis://redis:6379/1
+    CELERY_RESULT_BACKEND: redis://redis:6379/2
+    MEILISEARCH_URL: http://meilisearch:7700
+    STORAGE_LOCAL_PATH: /app/var/storage
+
+x-api-image: &api-image
+  build:
+    context: ./backend
+    dockerfile: ../infra/docker/api.Dockerfile
+  image: telugu-news-api:latest
+  restart: unless-stopped
+  <<: *api-environment
+
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env.production}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api: {condition: service_healthy}
+      web: {condition: service_healthy}
+
+  web:
+    build: ./frontend
+    image: telugu-news-web:latest
+    restart: unless-stopped
+
+  api:
+    <<: *api-image
+    command: ["sh", "-c", "python -m alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 3 --proxy-headers --forwarded-allow-ips=*"]
+    volumes:
+      - storage_data:/app/var/storage
+    depends_on:
+      mysql: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      meilisearch: {condition: service_healthy}
+
+  worker:
+    <<: *api-image
+    command: ["celery", "-A", "app.workers.celery_app.celery", "worker", "-l", "info", "--concurrency=2"]
+    volumes:
+      - storage_data:/app/var/storage
+    depends_on:
+      api: {condition: service_healthy}
+
+  beat:
+    <<: *api-image
+    command: ["celery", "-A", "app.workers.celery_app.celery", "beat", "-l", "info"]
+    depends_on:
+      api: {condition: service_healthy}
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--default-time-zone=+00:00", "--explicit_defaults_for_timestamp=ON", "--ngram_token_size=2"]
+    env_file: .env.production
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.10
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      MEILI_MASTER_KEY: ${MEILISEARCH_KEY:?Set MEILISEARCH_KEY in .env.production}
+      MEILI_ENV: production
+      MEILI_NO_ANALYTICS: "true"
+    volumes:
+      - meili_data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:7700/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  mysql_data:
+  redis_data:
+  meili_data:
+  storage_data:
+  caddy_data:
+  caddy_config:

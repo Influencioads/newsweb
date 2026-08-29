@@ -117,7 +117,15 @@ docker compose --env-file .env.production -f docker-compose.prod.yml exec api py
 ```
 
 Do **not** run `--demo` in production. Create the first administrator through an
-approved bootstrap/admin process before opening the CMS to staff.
+interactive bootstrap command before opening the CMS to staff:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml exec -it api \
+  python -m scripts.create_admin --email admin@example.com
+```
+
+The password prompt is hidden and the command refuses to overwrite an existing
+account. Use a unique password of at least 14 characters.
 
 ## 7. Deploy later updates
 

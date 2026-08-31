@@ -221,33 +221,36 @@ function BreakingTicker() {
 
   if (!data?.length) return null;
 
+  // Duplicate items to ensure seamless marquee loop on mobile and desktop
+  const marqueeItems = data.length < 4 ? [...data, ...data, ...data, ...data] : [...data, ...data];
+
   return (
-    <div className="bg-breaking text-white">
-      <div className="mx-auto flex max-w-[1200px] items-stretch">
+    <div className="relative z-10 bg-breaking text-white overflow-hidden shadow-sm">
+      <div className="mx-auto flex max-w-[1200px] items-center">
         <span
           className={[
-            'flex shrink-0 items-center gap-1 whitespace-nowrap bg-brand-deep px-3.5 py-[7px] text-[12.5px] font-bold leading-[1.4]',
+            'relative z-10 flex shrink-0 items-center gap-1.5 whitespace-nowrap bg-brand-deep px-3.5 py-[7px] text-[12.5px] font-bold leading-[1.4] shadow-md',
             language === 'te' ? 'te' : 'font-sans',
           ].join(' ')}
         >
-          <Zap className="h-3.5 w-3.5" aria-hidden />
+          <Zap className="h-3.5 w-3.5 text-yellow-300 fill-current animate-pulse" aria-hidden />
           {t('home.breaking')}
         </span>
-        {/* No fixed height and no overflow:hidden on the text itself — §4.1. */}
-        <div className="min-w-0 flex-1 overflow-hidden px-3.5 py-[7px]">
-          <ul className="flex gap-6">
-            {data.map((item) => (
-              <li key={item.short_id} className="min-w-0 shrink-0">
+        <div className="relative min-w-0 flex-1 overflow-hidden py-[7px]">
+          <div className="animate-marquee flex items-center gap-8 whitespace-nowrap">
+            {marqueeItems.map((item, idx) => (
+              <div key={`${item.short_id}-${idx}`} className="flex items-center gap-8 shrink-0">
                 <Link
                   to={item.url}
                   lang={language === 'te' || isFallback(item.title_te, item.title_en) ? 'te' : 'en'}
-                  className={`${language === 'te' || isFallback(item.title_te, item.title_en) ? 'te' : 'font-sans'} block truncate text-[13px] leading-[1.4] hover:underline`}
+                  className={`${language === 'te' || isFallback(item.title_te, item.title_en) ? 'te' : 'font-sans'} text-[13px] font-medium leading-[1.4] hover:underline hover:text-yellow-200 transition-colors`}
                 >
                   {pick(item.title_te, item.title_en)}
                 </Link>
-              </li>
+                <span className="text-yellow-300/80 text-[10px]" aria-hidden>◆</span>
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
       </div>
     </div>

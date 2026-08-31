@@ -17,6 +17,7 @@ from sqlalchemy import engine_from_config, pool
 from app.core.config import settings
 from app.db.base import Base
 from app.db import registry as _registry  # noqa: F401  (imports all models)
+from app.db import session as _session  # noqa: F401 (registers SQLite BIGINT -> INTEGER compiler)
 
 config = context.config
 if config.config_file_name is not None:
@@ -54,6 +55,14 @@ def run_migrations_online() -> None:
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
+    if connectable.dialect.name == "sqlite":
+        from sqlalchemy import event
+
+        @event.listens_for(connectable, "before_cursor_execute", retval=True)
+        def _sqlite_rewrite(conn, cursor, statement, parameters, context, executemany):  # type: ignore[no-untyped-def]
+            statement = statement.replace("CURRENT_TIMESTAMP(6)", "CURRENT_TIMESTAMP")
+            return statement, parameters
+
     with connectable.connect() as connection:
         context.configure(
             connection=connection,

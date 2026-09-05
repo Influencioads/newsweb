@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import Principal, get_current_principal, get_optional_principal
+from app.core.ratelimit import rate_limit
 from app.db.session import get_db
 from app.models.enums import FollowTargetType, ReportTargetType
 from app.repositories import engagement_repo
@@ -72,6 +73,7 @@ def ingest_events(
     payload: BeaconIn,
     db: Session = Depends(get_db),
     principal: Principal | None = Depends(get_optional_principal),
+    _rl: None = Depends(rate_limit("events", 30)),
 ) -> BeaconOut:
     accepted = engagement_service.ingest_beacon(
         db,
@@ -200,6 +202,7 @@ def add_comment(
     payload: CommentIn,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
+    _rl: None = Depends(rate_limit("comment", 6)),
 ) -> CommentOut:
     comment = engagement_service.add_comment(
         db,
@@ -235,6 +238,7 @@ def report_article(
     payload: ReportIn,
     db: Session = Depends(get_db),
     principal: Principal | None = Depends(get_optional_principal),
+    _rl: None = Depends(rate_limit("report", 6)),
 ) -> dict:
     article = engagement_service.get_live_article(db, short_id)
     engagement_service.add_report(
@@ -258,6 +262,7 @@ def report_comment(
     payload: ReportIn,
     db: Session = Depends(get_db),
     principal: Principal | None = Depends(get_optional_principal),
+    _rl: None = Depends(rate_limit("report", 6)),
 ) -> dict:
     engagement_service.add_report(
         db,
@@ -278,6 +283,7 @@ def follow(
     payload: FollowIn,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
+    _rl: None = Depends(rate_limit("follow", 30)),
 ) -> FollowStateOut:
     engagement_service.set_follow(
         db,

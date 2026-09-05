@@ -82,4 +82,12 @@ def change_state(article_id: int, action: str, payload: TransitionIn, request: R
     article = workflow_service.transition(db, principal, _get(db, article_id), action, payload.note)
     audit_service.record(db, action=_AUDIT[action], entity_type="article", entity_id=article.id,
                          actor=principal.user, note=payload.note, request=request)
+    if action in {"publish", "unpublish"}:
+        # §10.1: a change in public visibility purges the affected cache keys
+        # so readers see it immediately, not after the TTL runs out.
+        from app.core.redis_client import cache_delete_prefix
+
+        cache_delete_prefix("home:")
+        cache_delete_prefix("breaking")
+        cache_delete_prefix("trending:")
     return article

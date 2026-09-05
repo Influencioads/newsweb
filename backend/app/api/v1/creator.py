@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import Principal, get_current_principal, require_any_permission, require_permission
 from app.core.errors import NotFoundError
+from app.core.ratelimit import rate_limit
 from app.db.session import get_db
 from app.models.content import Article, Category
 from app.models.creator import CreatorSubmission
@@ -74,6 +75,7 @@ def create_submission(
     payload: SubmissionIn,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
+    _rl: None = Depends(rate_limit("submission", 3)),
 ) -> SubmissionOut:
     category = (
         article_repo.get_category_by_slug(db, payload.category_slug)

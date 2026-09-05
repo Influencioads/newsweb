@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.deps import Principal, require_permission
+from app.core.ratelimit import rate_limit
 from app.core.errors import NotFoundError, ValidationError
 from app.db.base import utcnow
 from app.db.session import get_db
@@ -90,7 +91,11 @@ def serve_ad(
 
 
 @router.post("/public/ads/{ad_id}/click", status_code=202, summary="Record an ad click")
-def ad_click(ad_id: int, db: Session = Depends(get_db)) -> dict:
+def ad_click(
+    ad_id: int,
+    db: Session = Depends(get_db),
+    _rl: None = Depends(rate_limit("ad_click", 30)),
+) -> dict:
     campaign = db.get(AdCampaign, ad_id)
     if campaign is not None:
         campaign.clicks = (campaign.clicks or 0) + 1

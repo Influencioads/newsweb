@@ -77,6 +77,9 @@ export interface TiptapNode {
 }
 
 export interface ArticleDetail extends ArticleCard {
+  like_count: number;
+  comment_count: number;
+  share_count: number;
   sub_title_te: string | null;
   body: TiptapNode | null;
   author: AuthorOut | null;
@@ -136,9 +139,79 @@ export interface CategoryFeed {
   next_cursor: string | null;
 }
 
+export interface StateOut {
+  code: string;
+  slug: string;
+  name_te: string;
+  name_en: string;
+}
+
+export interface MandalOut {
+  id: number;
+  slug: string;
+  name_te: string;
+  name_en: string;
+}
+
+export interface LocalityOut {
+  id: number;
+  slug: string;
+  name_te: string;
+  name_en: string;
+  kind: string;
+}
+
+export interface LocationState extends StateOut {
+  districts: DistrictOut[];
+}
+
+export interface LocationsPayload {
+  states: LocationState[];
+}
+
+export interface SearchResults {
+  query: string;
+  total: number;
+  articles: ArticleCard[];
+  next_offset: number | null;
+}
+
+export interface SearchMeta {
+  popular: string[];
+  recent: string[];
+}
+
+export interface LocalFeedPayload {
+  state: StateOut | null;
+  district: DistrictOut | null;
+  mandal: MandalOut | null;
+  locality: LocalityOut | null;
+  articles: ArticleCard[];
+  next_offset: number | null;
+}
+
+export interface VideoOut {
+  id: number;
+  youtube_id: string;
+  thumbnail_url: string;
+  embed_url: string;
+  watch_url: string;
+  title_te: string;
+  title_en: string | null;
+  description_te: string | null;
+  category: CategoryOut | null;
+  published_at: string | null;
+}
+
+export interface VideoList {
+  videos: VideoOut[];
+  next_offset: number | null;
+}
+
 export interface SiteConfig {
   site_name_te: string;
   site_name_en: string;
   categories: NavCategoryOut[];
+  states: StateOut[];
   districts: DistrictOut[];
 }

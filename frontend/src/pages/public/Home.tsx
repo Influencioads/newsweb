@@ -10,8 +10,11 @@ import {
   LeadCard,
   SecondaryCard,
 } from '@/components/article/ArticleCard';
+import { AdSlot } from '@/components/ads/AdSlot';
+import * as engagementApi from '@/features/engagement/api';
 import * as publicApi from '@/features/public/api';
 import { useI18n } from '@/i18n';
+import { useAuth } from '@/stores/auth';
 import { useReaderPrefs } from '@/stores/readerPrefs';
 
 /**
@@ -60,6 +63,53 @@ function RailHeading({ title }: { title: string }) {
     >
       {title}
     </h2>
+  );
+}
+
+/**
+ * "మీ కోసం" — the §3.2 personalized rail. Fetched client-side because the
+ * home payload is shared and edge-cached; anonymous readers simply never see
+ * the block (their sensible default is the page itself, §31).
+ */
+function ForYouBlock() {
+  const { language } = useI18n();
+  const authed = useAuth((s) => s.status === 'authenticated');
+  const { data } = useQuery({
+    queryKey: ['reader', 'for-you'],
+    queryFn: () => engagementApi.fetchForYou(0, 7),
+    enabled: authed,
+    staleTime: 120_000,
+  });
+
+  if (!authed || !data || data.articles.length < 3) return null;
+  const [first, ...rest] = data.articles;
+  if (!first) return null;
+  const half = Math.ceil(rest.length / 2);
+
+  return (
+    <section className="mt-8">
+      <SectionRule title={language === 'te' ? 'మీ కోసం' : 'For you'} />
+      <div className="grid gap-x-7 gap-y-4 md:grid-cols-[1.5fr_1fr_0.8fr]">
+        <div className="min-w-0">
+          <SecondaryCard article={first} />
+        </div>
+        <div className="flex flex-col gap-3">
+          {rest.slice(0, half).map((article) => (
+            <CompactCard key={article.short_id} article={article} />
+          ))}
+        </div>
+        <div className="flex flex-col gap-3">
+          {rest.slice(half).map((article) => (
+            <CompactCard key={article.short_id} article={article} />
+          ))}
+        </div>
+      </div>
+      <p className={`${language === 'te' ? 'te' : 'font-sans'} mt-2 text-[11px] text-muted-light`}>
+        {language === 'te'
+          ? 'మీ పఠనం, ఆసక్తులు, ప్రాంతం ఆధారంగా ఎంపిక.'
+          : 'Picked from your reading, interests and location.'}
+      </p>
+    </section>
   );
 }
 
@@ -224,17 +274,13 @@ export default function Home() {
             </Link>
           </section>
 
-          {/* Reserved height keeps CLS < 0.1 (§10.3). */}
-          <section className="mt-4 border border-rule p-3">
-            <p className="mb-2 font-sans text-eyebrow font-bold uppercase tracking-[0.1em] text-muted-light">
-              Ad slot 300×250
-            </p>
-            <div className="ph" style={{ height: 250 }}>
-              <span className={`${script} text-[11px]`}>{t('home.advertisement')}</span>
-            </div>
-          </section>
+          {/* §26 house-ad slot; collapses when no campaign matches. */}
+          <AdSlot placement="in_feed" className="mt-4" />
         </aside>
       </div>
+
+      {/* ============ For You (§3.2, signed-in readers) ============ */}
+      <ForYouBlock />
 
       {/* ============ Section blocks ============ */}
       {data.sections.map((section) => {
@@ -246,7 +292,9 @@ export default function Home() {
           <section key={section.key} className="mt-8">
             <SectionRule
               title={pick(section.title_te, section.title_en)}
-              to={`/section/${section.key}`}
+              // Engine-backed sections (trending) have their own page, not a
+              // category route.
+              to={section.key === 'trending' ? '/trending' : `/section/${section.key}`}
             />
             <div className="grid gap-x-7 gap-y-4 md:grid-cols-[1.5fr_1fr_0.8fr]">
               {/* Section lead keeps its image; the rest go compact so more

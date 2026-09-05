@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as cmsApi from '@/features/cms/api';
 import { useI18n } from '@/i18n';
 
@@ -49,5 +50,89 @@ function ListPage({section,title,subtitle,columns}:{section:string;title:string;
 export function UsersPage(){const {language}=useI18n();const en=language==='en';return <ListPage section="users" title={en?'Users':'వినియోగదారులు'} subtitle={en?'Staff accounts, status, roles, and security':'సిబ్బంది ఖాతాలు, స్థితి, పాత్రలు మరియు భద్రత'} columns={[[en?'name_en':'name_te',en?'Name':'పేరు'],["email","Email"],["phone","Phone"],["status",en?'Status':'స్థితి'],["roles",en?'Roles':'పాత్రలు'],["two_factor_enabled","2FA"],["last_login_at",en?'Last login':'చివరి లాగిన్']]}/>}
 export function RolesPage(){const {language}=useI18n();const en=language==='en';return <ListPage section="roles" title={en?'Roles and permissions':'పాత్రలు మరియు అనుమతులు'} subtitle={en?'Access is controlled by permission keys, not role names':'పాత్ర పేరుకు బదులుగా permission key ఆధారంగా నియంత్రణ'} columns={[[en?'label_en':'label_te',en?'Role':'పాత్ర'],["key","Key"],["level",en?'Level':'స్థాయి'],["scope",en?'Default scope':'డిఫాల్ట్ పరిధి'],["permissions",en?'Permissions':'అనుమతులు']]}/>}
 export function AuditPage(){const {language}=useI18n();const en=language==='en';return <ListPage section="audit" title={en?'Audit log':'ఆడిట్ లాగ్'} subtitle={en?'Immutable history of editorial and security actions':'మార్చలేని సంపాదకీయ మరియు భద్రతా చర్యల చరిత్ర'} columns={[["created_at","Time"],["actor","Actor"],["action","Action"],["entity_type","Entity"],["entity_id","ID"],["ip","IP"],["request_id","Request ID"]]}/>}
+
+type ReportRow={id:number;reason:string;note:string|null;status:string;created_at:string;resolution_note:string|null;target:{kind:string;id:number;title_te?:string|null;short_id?:string|null;url?:string|null;body?:string|null;status?:string|null;author?:string|null}};
+type CommentRow={id:number;body:string;status:string;author:string|null;article_title_te:string|null;article_short_id:string|null;created_at:string};
+type SubmissionRow={id:number;title_te:string;body_te:string;creator_name_te:string|null;creator_phone:string|null;category_slug:string|null;district_slug:string|null;status:string;created_at:string};
+
+/** §19 Moderation — the report queue and comment control room. */
+export function ModerationPage(){
+  const {language}=useI18n();const en=language==='en';
+  const [tab,setTab]=useState<'reports'|'comments'|'submissions'>('reports');
+  const queryClient=useQueryClient();
+  const reports=useQuery({queryKey:['cms','moderation','reports'],queryFn:()=>cmsApi.fetchModeration<{items:ReportRow[];total:number}>('reports','open')});
+  const comments=useQuery({queryKey:['cms','moderation','comments'],queryFn:()=>cmsApi.fetchModeration<{items:CommentRow[];total:number}>('comments'),enabled:tab==='comments'});
+  const submissions=useQuery({queryKey:['cms','moderation','submissions'],queryFn:()=>cmsApi.fetchSubmissions<{items:SubmissionRow[]}>()});
+  const invalidate=()=>{void queryClient.invalidateQueries({queryKey:['cms','moderation']});};
+  const close=useMutation({mutationFn:({id,dismiss}:{id:number;dismiss:boolean})=>cmsApi.closeReport(id,dismiss),onSuccess:invalidate});
+  const moderate=useMutation({mutationFn:({id,hide}:{id:number;hide:boolean})=>cmsApi.moderateComment(id,hide),onSuccess:invalidate});
+  const approveSub=useMutation({mutationFn:(id:number)=>cmsApi.approveSubmission(id),onSuccess:invalidate});
+  const rejectSub=useMutation({mutationFn:(id:number)=>{const note=window.prompt(en?'Note to the creator (optional):':'రచయితకు గమనిక (ఐచ్ఛికం):')??'';return cmsApi.rejectSubmission(id,note.trim()||null);},onSuccess:invalidate});
+  const tabCls=(active:boolean)=>`min-h-[38px] rounded-control border px-4 font-sans text-[12.5px] font-bold ${active?'border-brand bg-brand-tint text-brand':'border-rule bg-white text-muted hover:text-brand'}`;
+  return <Shell title={en?'Moderation':'మోడరేషన్'} subtitle={en?'Reader reports and comment control':'పాఠకుల నివేదికలు మరియు వ్యాఖ్యల నియంత్రణ'}>
+    <div className="mb-4 flex gap-2">
+      <button type="button" className={tabCls(tab==='reports')} onClick={()=>setTab('reports')}>{en?'Reports':'నివేదికలు'}{reports.data?` (${reports.data.total})`:''}</button>
+      <button type="button" className={tabCls(tab==='comments')} onClick={()=>setTab('comments')}>{en?'Comments':'వ్యాఖ్యలు'}</button>
+      <button type="button" className={tabCls(tab==='submissions')} onClick={()=>setTab('submissions')}>{en?'Submissions':'సమర్పణలు'}{submissions.data?.items.length?` (${submissions.data.items.length})`:''}</button>
+    </div>
+    {tab==='submissions'?<>
+      <State loading={submissions.isLoading} error={submissions.isError}/>
+      {submissions.data?<div className="space-y-3">
+        {submissions.data.items.length===0?<p className="te rounded-card border border-rule bg-white p-6 text-center text-muted">{en?'No submissions awaiting review.':'సమీక్ష కోసం సమర్పణలు లేవు.'}</p>:null}
+        {submissions.data.items.map(s=><article key={s.id} className="rounded-card border border-rule bg-white p-4 shadow-card">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="te text-[15px] font-bold text-ink">{s.title_te}</p>
+              <p className="mt-1 font-sans text-[11px] text-muted">{s.creator_name_te??'?'}{s.creator_phone?` · +${s.creator_phone}`:''}{s.category_slug?` · ${s.category_slug}`:''}{s.district_slug?` · ${s.district_slug}`:''} · {new Date(s.created_at).toLocaleString('en-IN')}</p>
+              <p className="te mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap rounded bg-paper-sub p-3 text-[13.5px] leading-telugu text-ink-soft">{s.body_te}</p>
+            </div>
+            <div className="flex shrink-0 flex-col gap-2">
+              <button type="button" onClick={()=>approveSub.mutate(s.id)} disabled={approveSub.isPending} className="min-h-[34px] rounded-control bg-success px-3 font-sans text-[11.5px] font-bold text-white hover:opacity-90 disabled:opacity-50">{en?'Approve → review queue':'ఆమోదించి సమీక్షకు'}</button>
+              <button type="button" onClick={()=>rejectSub.mutate(s.id)} disabled={rejectSub.isPending} className="min-h-[34px] rounded-control border border-breaking px-3 font-sans text-[11.5px] font-bold text-breaking hover:bg-breaking-tint disabled:opacity-50">{en?'Reject':'తిరస్కరించండి'}</button>
+            </div>
+          </div>
+        </article>)}
+      </div>:null}
+    </>:tab==='reports'?<>
+      <State loading={reports.isLoading} error={reports.isError}/>
+      {reports.data?<div className="space-y-3">
+        {reports.data.items.length===0?<p className="te rounded-card border border-rule bg-white p-6 text-center text-muted">{en?'No open reports. All clear.':'తెరిచిన నివేదికలు లేవు.'}</p>:null}
+        {reports.data.items.map(r=><article key={r.id} className="rounded-card border border-rule bg-white p-4 shadow-card">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-sans text-[10px] font-bold uppercase tracking-wide text-breaking">{r.reason}{r.target.kind==='comment'?(en?' · comment':' · వ్యాఖ్య'):(en?' · article':' · కథనం')}</p>
+              {r.target.kind==='article'?<a href={r.target.url??'#'} target="_blank" rel="noreferrer" className="te mt-1 block text-[15px] font-bold text-ink hover:text-brand">{r.target.title_te??'—'}</a>
+                :<p className="te mt-1 text-[14px] text-ink">“{r.target.body??'—'}” <span className="font-sans text-[11px] text-muted">— {r.target.author??'?'}</span></p>}
+              {r.note?<p className="te mt-1 text-[12.5px] text-muted">{en?'Reporter note':'నివేదిక గమనిక'}: {r.note}</p>:null}
+              <p className="mt-1 font-sans text-[10.5px] text-muted-light">{new Date(r.created_at).toLocaleString('en-IN')}</p>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              {r.target.kind==='comment'&&r.target.status!=='hidden'?<button type="button" onClick={()=>moderate.mutate({id:r.target.id,hide:true})} className="min-h-[34px] rounded-control border border-breaking px-3 font-sans text-[11.5px] font-bold text-breaking hover:bg-breaking-tint">{en?'Hide comment':'వ్యాఖ్య దాచండి'}</button>:null}
+              <button type="button" onClick={()=>close.mutate({id:r.id,dismiss:false})} className="min-h-[34px] rounded-control bg-success px-3 font-sans text-[11.5px] font-bold text-white hover:opacity-90">{en?'Resolve':'పరిష్కరించండి'}</button>
+              <button type="button" onClick={()=>close.mutate({id:r.id,dismiss:true})} className="min-h-[34px] rounded-control border border-rule px-3 font-sans text-[11.5px] font-bold text-muted hover:text-ink">{en?'Dismiss':'తోసిపుచ్చండి'}</button>
+            </div>
+          </div>
+        </article>)}
+      </div>:null}
+    </>:<>
+      <State loading={comments.isLoading} error={comments.isError}/>
+      {comments.data?<div className="space-y-3">
+        {comments.data.items.map(c=><article key={c.id} className="rounded-card border border-rule bg-white p-4 shadow-card">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="te text-[14px] text-ink">“{c.body}”</p>
+              <p className="mt-1 font-sans text-[11px] text-muted">{c.author??'?'} · <span className="te">{c.article_title_te??''}</span> · {new Date(c.created_at).toLocaleString('en-IN')} · <span className={c.status==='visible'?'text-success':'text-breaking'}>{c.status}</span></p>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              {c.status==='visible'?<button type="button" onClick={()=>moderate.mutate({id:c.id,hide:true})} className="min-h-[34px] rounded-control border border-breaking px-3 font-sans text-[11.5px] font-bold text-breaking hover:bg-breaking-tint">{en?'Hide':'దాచండి'}</button>
+                :c.status==='hidden'?<button type="button" onClick={()=>moderate.mutate({id:c.id,hide:false})} className="min-h-[34px] rounded-control border border-success px-3 font-sans text-[11.5px] font-bold text-success">{en?'Restore':'పునరుద్ధరించండి'}</button>:null}
+            </div>
+          </div>
+        </article>)}
+        {comments.data.items.length===0?<p className="te rounded-card border border-rule bg-white p-6 text-center text-muted">{en?'No comments yet.':'ఇంకా వ్యాఖ్యలు లేవు.'}</p>:null}
+      </div>:null}
+    </>}
+  </Shell>;
+}
 
 export function SettingsPage(){const {language}=useI18n();const en=language==='en';const q=useQuery({queryKey:['cms','settings'],queryFn:()=>cmsApi.fetchManagement<Row>('settings')});return <Shell title={en?'System settings':'సిస్టమ్ సెట్టింగ్స్'} subtitle={en?'Current runtime configuration with secrets excluded':'రహస్య విలువలను వెల్లడించని ప్రస్తుత రన్‌టైమ్ కాన్ఫిగరేషన్'}><State loading={q.isLoading} error={q.isError}/>{q.data?<dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{Object.entries(q.data).map(([key,val])=><div key={key} className="rounded-card border border-rule bg-white p-4"><dt className="font-mono text-[10px] uppercase text-muted">{key.replaceAll('_',' ')}</dt><dd className="mt-1 break-words font-sans text-[14px] font-semibold text-ink">{typeof val==='boolean'?(val?(en?'Enabled':'ప్రారంభం'):(en?'Disabled':'నిలిపివేయబడింది')):String(val)}</dd></div>)}</dl>:null}</Shell>}

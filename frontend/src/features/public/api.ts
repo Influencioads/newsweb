@@ -4,7 +4,13 @@ import type {
   BreakingItem,
   CategoryFeed,
   HomePayload,
+  LocalFeedPayload,
+  LocationsPayload,
+  MandalOut,
+  SearchMeta,
+  SearchResults,
   SiteConfig,
+  VideoList,
 } from '@/types/public';
 
 /** Reader-facing API. No auth header is required for any of these. */
@@ -42,5 +48,72 @@ export async function fetchFeed(params: {
   limit?: number;
 }): Promise<CategoryFeed> {
   const { data } = await api.get<CategoryFeed>('/public/articles', { params });
+  return data;
+}
+
+export async function fetchVideos(params?: {
+  category?: string;
+  offset?: number;
+  limit?: number;
+}): Promise<VideoList> {
+  const { data } = await api.get<VideoList>('/public/videos', { params });
+  return data;
+}
+
+export async function fetchShortNews(params?: {
+  category?: string;
+  offset?: number;
+  limit?: number;
+}): Promise<CategoryFeed> {
+  const { data } = await api.get<CategoryFeed>('/public/short-news', { params });
+  return data;
+}
+
+export async function fetchTrending(params?: {
+  category?: string;
+  district?: string;
+  offset?: number;
+  limit?: number;
+}): Promise<CategoryFeed> {
+  const { data } = await api.get<CategoryFeed>('/public/trending', { params });
+  return data;
+}
+
+export async function fetchSearch(params: {
+  q: string;
+  category?: string;
+  district?: string;
+  author?: string;
+  tag?: string;
+  offset?: number;
+  limit?: number;
+}): Promise<SearchResults> {
+  const { data } = await api.get<SearchResults>('/public/search', { params });
+  return data;
+}
+
+export async function fetchSearchMeta(): Promise<SearchMeta> {
+  const { data } = await api.get<SearchMeta>('/public/search/meta');
+  return data;
+}
+
+export async function fetchLocations(): Promise<LocationsPayload> {
+  const { data } = await api.get<LocationsPayload>('/public/locations');
+  return data;
+}
+
+export async function fetchDistrictMandals(districtSlug: string): Promise<MandalOut[]> {
+  const { data } = await api.get<MandalOut[]>(`/public/locations/${districtSlug}/mandals`);
+  return data;
+}
+
+export async function fetchLocalFeed(params: {
+  district: string;
+  mandal?: string;
+  locality?: string;
+  offset?: number;
+  limit?: number;
+}): Promise<LocalFeedPayload> {
+  const { data } = await api.get<LocalFeedPayload>('/public/local', { params });
   return data;
 }

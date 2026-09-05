@@ -27,8 +27,12 @@ export interface ReaderPrefsState {
   fontStep: FontStep;
   /** District edition slug, or null for the national/default edition. */
   edition: string | null;
+  /** Finer local-feed levels (updated doc §4). Child never persists without its parent. */
+  mandal: string | null;
+  locality: string | null;
   setFontStep: (step: FontStep) => void;
   setEdition: (slug: string | null) => void;
+  setLocalLevels: (mandal: string | null, locality: string | null) => void;
 }
 
 function applyScale(step: FontStep): void {
@@ -41,11 +45,15 @@ export const useReaderPrefs = create<ReaderPrefsState>()(
     (set) => ({
       fontStep: 'A',
       edition: null,
+      mandal: null,
+      locality: null,
       setFontStep: (fontStep) => {
         applyScale(fontStep);
         set({ fontStep });
       },
-      setEdition: (edition) => set({ edition }),
+      // Changing the district invalidates the mandal/locality beneath it.
+      setEdition: (edition) => set({ edition, mandal: null, locality: null }),
+      setLocalLevels: (mandal, locality) => set({ mandal, locality: mandal ? locality : null }),
     }),
     {
       name: 'tn.reader-prefs',

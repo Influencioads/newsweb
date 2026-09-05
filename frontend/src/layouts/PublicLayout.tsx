@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Menu, Radio, Search, X, Zap } from 'lucide-react';
+import { Bell, MapPin, Menu, Radio, Search, UserRound, X, Zap } from 'lucide-react';
 
 import { LanguageToggle } from '@/components/layout/LanguageToggle';
+import * as notificationsApi from '@/features/engagement/notificationsApi';
 import * as publicApi from '@/features/public/api';
 import { useI18n } from '@/i18n';
+import { useAuth } from '@/stores/auth';
 import { FONT_STEPS, useReaderPrefs } from '@/stores/readerPrefs';
 import { formatFullDate } from '@/utils/time';
 
@@ -33,12 +35,28 @@ function TopStrip() {
   const { fontStep, setFontStep, edition, setEdition } = useReaderPrefs();
   const { t, pick, language } = useI18n();
   const { data: config } = useSiteConfig();
+  const authStatus = useAuth((s) => s.status);
+  const me = useAuth((s) => s.me);
+
+  // Districts grouped by state (updated doc §1.1 location selector).
+  const grouped = useMemo(() => {
+    const states = config?.states ?? [];
+    const districts = config?.districts ?? [];
+    if (!states.length) return [{ code: '', label_te: '', label_en: '', districts }];
+    return states.map((s) => ({
+      code: s.code,
+      label_te: s.name_te,
+      label_en: s.name_en,
+      districts: districts.filter((d) => d.state === s.code),
+    }));
+  }, [config]);
 
   return (
     <div className="border-b border-rule bg-paper">
       <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-2 overflow-hidden px-3 py-1 md:justify-end md:px-4">
         <div className="flex min-w-0 items-center gap-2 md:gap-3">
           <label className="flex items-center gap-1">
+            <MapPin className="h-3 w-3 shrink-0 text-muted" aria-hidden />
             <span className="sr-only">{t('nav.chooseEdition')}</span>
             <select
               value={edition ?? ''}
@@ -49,11 +67,23 @@ function TopStrip() {
               ].join(' ')}
             >
               <option value="">{t('nav.editionAll')}</option>
-              {config?.districts.map((d) => (
-                <option key={d.slug} value={d.slug}>
-                  {pick(d.name_te, d.name_en)}
-                </option>
-              ))}
+              {grouped.map((group) =>
+                group.code ? (
+                  <optgroup key={group.code} label={pick(group.label_te, group.label_en)}>
+                    {group.districts.map((d) => (
+                      <option key={d.slug} value={d.slug}>
+                        {pick(d.name_te, d.name_en)}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : (
+                  group.districts.map((d) => (
+                    <option key={d.slug} value={d.slug}>
+                      {pick(d.name_te, d.name_en)}
+                    </option>
+                  ))
+                ),
+              )}
             </select>
           </label>
 
@@ -78,18 +108,61 @@ function TopStrip() {
 
           <LanguageToggle compact />
 
-          <Link
-            to="/admin/login"
-            className={[
-              'text-[11.5px] font-semibold text-brand hover:text-brand-dark',
-              language === 'te' ? 'te' : 'font-sans',
-            ].join(' ')}
-          >
-            {t('nav.signIn')}
-          </Link>
+          {authStatus === 'authenticated' ? <NotificationBell /> : null}
+
+          {authStatus === 'authenticated' && me ? (
+            <Link
+              to="/profile"
+              className={[
+                'flex items-center gap-1 text-[11.5px] font-semibold text-brand hover:text-brand-dark',
+                language === 'te' ? 'te' : 'font-sans',
+              ].join(' ')}
+            >
+              <UserRound className="h-3.5 w-3.5" aria-hidden />
+              <span className="max-w-[110px] truncate">
+                {pick(me.user.name_te, me.user.name_en)}
+              </span>
+            </Link>
+          ) : (
+            <Link
+              to="/login"
+              className={[
+                'flex items-center gap-1 text-[11.5px] font-semibold text-brand hover:text-brand-dark',
+                language === 'te' ? 'te' : 'font-sans',
+              ].join(' ')}
+            >
+              <UserRound className="h-3.5 w-3.5" aria-hidden />
+              {t('nav.signIn')}
+            </Link>
+          )}
         </div>
       </div>
     </div>
+  );
+}
+
+function NotificationBell() {
+  const { language } = useI18n();
+  const { data } = useQuery({
+    queryKey: ['notifications', 'unread'],
+    queryFn: () => notificationsApi.fetchInbox(0),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+  const unread = data?.unread ?? 0;
+  return (
+    <Link
+      to="/notifications"
+      aria-label={language === 'te' ? 'నోటిఫికేషన్లు' : 'Notifications'}
+      className="relative flex h-[28px] w-[28px] items-center justify-center text-muted hover:text-brand"
+    >
+      <Bell className="h-4 w-4" aria-hidden />
+      {unread > 0 ? (
+        <span className="absolute -right-0.5 -top-0.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-breaking px-0.5 font-sans text-[9px] font-bold leading-none text-white">
+          {unread > 99 ? '99+' : unread}
+        </span>
+      ) : null}
+    </Link>
   );
 }
 
@@ -143,7 +216,7 @@ function CategoryNav() {
   const items = config?.categories.filter((c) => c.show_in_nav) ?? [];
   const linkClass = (isActive: boolean) =>
     [
-      'block px-[13px] py-2 text-[14px] leading-[1.4] transition-colors',
+      'block whitespace-nowrap px-[13px] py-2 text-[14px] leading-[1.4] transition-colors',
       language === 'te' ? 'te' : 'font-sans',
       isActive
         ? 'font-bold text-brand md:border-b-[3px] md:border-brand'
@@ -168,7 +241,9 @@ function CategoryNav() {
 
         <ul
           className={[
-            'w-full md:flex md:w-auto md:justify-center',
+            // The §1.2 nav carries 18+ sections — on desktop it scrolls
+            // horizontally instead of clipping (the scrollbar stays subtle).
+            'w-full md:flex md:w-auto md:min-w-0 md:flex-1 md:flex-nowrap md:overflow-x-auto md:[scrollbar-width:thin]',
             open ? 'block' : 'hidden md:flex',
           ].join(' ')}
         >
@@ -183,6 +258,26 @@ function CategoryNav() {
                 <Radio className="h-3.5 w-3.5 text-breaking" aria-hidden />
                 {language === 'te' ? 'లైవ్' : 'Live'}
               </span>
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/trending" className={({ isActive }) => linkClass(isActive)}>
+              {language === 'te' ? 'ట్రెండింగ్' : 'Trending'}
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/local" className={({ isActive }) => linkClass(isActive)}>
+              {language === 'te' ? 'లోకల్' : 'Local'}
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/videos" className={({ isActive }) => linkClass(isActive)}>
+              {language === 'te' ? 'వీడియో' : 'Video'}
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/short-news" className={({ isActive }) => linkClass(isActive)}>
+              {language === 'te' ? 'షార్ట్స్' : 'Shorts'}
             </NavLink>
           </li>
           {items.map((c) => (
@@ -307,11 +402,18 @@ function PolicyFooter() {
 
 export default function PublicLayout() {
   const { language } = useI18n();
+  const authStatus = useAuth((s) => s.status);
+  const bootstrap = useAuth((s) => s.bootstrap);
 
   // Keep <html lang> correct on first paint as well as after a switch.
   useEffect(() => {
     document.documentElement.lang = language;
   }, [language]);
+
+  // Resolve the reader's session so the header shows profile vs sign-in.
+  useEffect(() => {
+    if (authStatus === 'idle') void bootstrap();
+  }, [authStatus, bootstrap]);
 
   return (
     <div className="min-h-screen bg-canvas">

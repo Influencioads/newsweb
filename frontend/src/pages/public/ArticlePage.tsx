@@ -1,14 +1,20 @@
 import { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Bookmark, Volume2 } from 'lucide-react';
+import { Pause, Volume2 } from 'lucide-react';
 
 import { ApiError } from '@/api/client';
+import { AdSlot } from '@/components/ads/AdSlot';
 import { GridCard } from '@/components/article/ArticleCard';
 import { ArticleGallery } from '@/components/article/ArticleGallery';
 import { ArticleRenderer } from '@/components/article/ArticleRenderer';
 import { ImageCaption, NewsImage } from '@/components/media/NewsImage';
+import { useReadingBeacon, trackShare } from '@/features/engagement/beacon';
+import { CommentsSection } from '@/features/engagement/components/CommentsSection';
+import { EngagementBar } from '@/features/engagement/components/EngagementBar';
+import { FollowButton } from '@/features/engagement/components/FollowButton';
 import * as publicApi from '@/features/public/api';
+import { extractPlainText, useTts } from '@/features/reader/tts';
 import { useI18n } from '@/i18n';
 import { FONT_STEPS, useReaderPrefs } from '@/stores/readerPrefs';
 import type { ArticleDetail } from '@/types/public';
@@ -71,6 +77,9 @@ function ReaderToolbar({ article }: { article: ArticleDetail }) {
   const { fontStep, setFontStep } = useReaderPrefs();
   const { t, language } = useI18n();
   const script = language === 'te' ? 'te' : 'font-sans';
+  // §16 audio news, v1: on-device Telugu speech. The headline leads so a
+  // listener knows immediately which story started.
+  const tts = useTts(`${article.title_te}. ${extractPlainText(article.body)}`);
 
   function shareToWhatsApp() {
     // §4.6 — WhatsApp is the #1 distribution channel. The Latin slug in the URL
@@ -78,6 +87,7 @@ function ReaderToolbar({ article }: { article: ArticleDetail }) {
     const url = `${window.location.origin}${article.url}`;
     const shared = language === 'en' && article.title_en ? article.title_en : article.title_te;
     const text = encodeURIComponent(`${shared}\n${url}`);
+    trackShare(article.short_id);
     window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
   }
 
@@ -106,13 +116,34 @@ function ReaderToolbar({ article }: { article: ArticleDetail }) {
 
       <button
         type="button"
-        // TODO(phase-10): wire to Google Cloud TTS te-IN once the voice is confirmed (§10.4).
-        disabled
-        title={t('reader.listenSoon')}
-        className={`${script} flex min-h-tap items-center gap-1.5 rounded-control border border-rule px-3 text-[11.5px] font-semibold leading-[1.4] text-brand disabled:opacity-50`}
+        onClick={tts.toggle}
+        disabled={tts.state === 'unavailable'}
+        aria-pressed={tts.state === 'speaking'}
+        title={
+          tts.state === 'unavailable'
+            ? language === 'te'
+              ? 'ఈ పరికరంలో తెలుగు వాయిస్ లేదు'
+              : 'No Telugu voice on this device'
+            : t('reader.listen')
+        }
+        className={[
+          script,
+          'flex min-h-tap items-center gap-1.5 rounded-control border px-3 text-[11.5px] font-semibold leading-[1.4] disabled:opacity-50',
+          tts.state === 'speaking' || tts.state === 'paused'
+            ? 'border-brand bg-brand-tint text-brand'
+            : 'border-rule text-brand',
+        ].join(' ')}
       >
-        <Volume2 className="h-3.5 w-3.5" aria-hidden />
-        {t('reader.listen')} {readingTime(article.reading_time_sec, language)}
+        {tts.state === 'speaking' ? (
+          <Pause className="h-3.5 w-3.5" aria-hidden />
+        ) : (
+          <Volume2 className="h-3.5 w-3.5" aria-hidden />
+        )}
+        {tts.state === 'speaking'
+          ? language === 'te' ? 'ఆపండి' : 'Pause'
+          : tts.state === 'paused'
+            ? language === 'te' ? 'కొనసాగించండి' : 'Resume'
+            : `${t('reader.listen')} ${readingTime(article.reading_time_sec, language)}`}
       </button>
 
       <button
@@ -121,16 +152,6 @@ function ReaderToolbar({ article }: { article: ArticleDetail }) {
         className="flex min-h-tap items-center rounded-control border border-rule px-3 font-sans text-[11px] font-semibold text-success"
       >
         WhatsApp
-      </button>
-
-      <button
-        type="button"
-        disabled
-        title={t('reader.bookmarkLogin')}
-        aria-label={t('reader.bookmark')}
-        className="flex h-tap w-tap items-center justify-center rounded-control border border-rule text-muted disabled:opacity-50"
-      >
-        <Bookmark className="h-4 w-4" aria-hidden />
       </button>
     </div>
   );
@@ -151,6 +172,8 @@ export default function ArticlePage() {
   });
 
   useNewsArticleJsonLd(data);
+  // §3.1 behaviour tracking: view on open, read-time heartbeats, scroll depth.
+  useReadingBeacon(data ? shortId : undefined);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -348,6 +371,52 @@ export default function ArticlePage() {
           </p>
         ) : null}
 
+        {/* Like · comment · save · share · report (§5) */}
+        <EngagementBar article={data} />
+
+        {/* §26 article-page ad, category-targeted; collapses when unfilled. */}
+        <AdSlot placement="article" category={data.category?.slug} className="mt-6" />
+
+        {/* Follow the threads this story belongs to (§12) */}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className={`${script} text-[12px] font-semibold text-muted`}>
+            {language === 'te' ? 'ఫాలో అవ్వండి:' : 'Follow:'}
+          </span>
+          {data.category ? (
+            <FollowButton
+              targetType="category"
+              slug={data.category.slug}
+              name={pick(data.category.name_te, data.category.name_en)}
+              compact
+            />
+          ) : null}
+          {data.district ? (
+            <FollowButton
+              targetType="district"
+              slug={data.district.slug}
+              name={pick(data.district.name_te, data.district.name_en)}
+              compact
+            />
+          ) : null}
+          {data.author?.author_slug ? (
+            <FollowButton
+              targetType="author"
+              slug={data.author.author_slug}
+              name={pick(data.author.name_te, data.author.name_en)}
+              compact
+            />
+          ) : null}
+          {data.tags.slice(0, 3).map((tag) => (
+            <FollowButton
+              key={tag.slug}
+              targetType="tag"
+              slug={tag.slug}
+              name={`# ${tag.name_te}`}
+              compact
+            />
+          ))}
+        </div>
+
         {/* Photo gallery — the rest of the desk's take on this story. */}
         <ArticleGallery images={data.gallery} />
 
@@ -366,6 +435,9 @@ export default function ArticlePage() {
             ))}
           </div>
         ) : null}
+
+        {/* Comments (§5) */}
+        <CommentsSection shortId={data.short_id} />
 
         {/* Related */}
         {data.related.length > 0 ? (

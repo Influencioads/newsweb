@@ -4,6 +4,7 @@ import { ChevronRight, Clock3 } from 'lucide-react';
 
 import { ApiError } from '@/api/client';
 import { LeadCard, RowCard, SecondaryCard } from '@/components/article/ArticleCard';
+import { FollowButton } from '@/features/engagement/components/FollowButton';
 import * as publicApi from '@/features/public/api';
 import { useI18n } from '@/i18n';
 
@@ -64,12 +65,15 @@ export default function SectionPage() {
             </h1>
             {description ? <p className={`${script} mt-2 max-w-[680px] text-[13px] text-muted sm:text-[14px]`}>{description}</p> : null}
           </div>
-          {articles.length ? (
-            <p className="flex items-center gap-1.5 font-sans text-[11px] font-medium text-muted-light">
-              <Clock3 className="h-3.5 w-3.5" />
-              {te ? `${articles.length} తాజా కథనాలు` : `${articles.length} latest stories`}
-            </p>
-          ) : null}
+          <div className="flex items-center gap-3">
+            <FollowButton targetType="category" slug={slug} />
+            {articles.length ? (
+              <p className="flex items-center gap-1.5 font-sans text-[11px] font-medium text-muted-light">
+                <Clock3 className="h-3.5 w-3.5" />
+                {te ? `${articles.length} తాజా కథనాలు` : `${articles.length} latest stories`}
+              </p>
+            ) : null}
+          </div>
         </div>
       </header>
 

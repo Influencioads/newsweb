@@ -3,7 +3,7 @@
 Status of every §31 homepage acceptance criterion, with the evidence that
 backs it. "Test" names an automated test that fails if the behaviour
 regresses; "live" means walked in the browser against the dev stack during
-the build (Sep 2026). The backend suite is `backend/tests/` (135 tests).
+the build (Sep 2026). The backend suite is `backend/tests/` (133 tests).
 
 | § | Criterion | Status | Evidence |
 |---|---|---|---|

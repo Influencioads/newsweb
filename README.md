@@ -64,6 +64,23 @@ cd backend && .venv/Scripts/python.exe -m uvicorn app.main:app --reload --port 8
 cd frontend && npm install && npm run dev
 ```
 
+**4. Mobile app (React Native / Expo)** — see [mobile/README.md](mobile/README.md)
+
+```bash
+cd mobile && npm install && npm start
+```
+
+**No-Docker alternative for reader-facing work**: SQLite stands in for MySQL and
+Redis features degrade to dev fallbacks —
+
+```bash
+cd backend && .venv/Scripts/python.exe scripts/init_dev_db.py --fresh
+```
+
+```bash
+cd backend && .venv/Scripts/python.exe scripts/run_dev.py
+```
+
 | Surface | URL |
 |---|---|
 | Reader site / CMS | http://localhost:5174 |

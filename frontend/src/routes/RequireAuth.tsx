@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 
+import { useI18n } from '@/i18n';
 import { useAuth } from '@/stores/auth';
 import type { PermissionKey } from '@/types/auth';
 
@@ -23,13 +24,7 @@ export function RequireAuth({ permission }: { permission?: PermissionKey }) {
   }, [status, bootstrap]);
 
   if (status === 'idle' || status === 'loading') {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-canvas">
-        <p className="te text-[13px] text-muted" role="status">
-          లోడ్ అవుతోంది…
-        </p>
-      </div>
-    );
+    return <GuardLoading />;
   }
 
   if (status === 'anonymous') {
@@ -43,13 +38,31 @@ export function RequireAuth({ permission }: { permission?: PermissionKey }) {
   return <Outlet />;
 }
 
+function GuardLoading() {
+  const { language } = useI18n();
+  const te = language === 'te';
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-canvas">
+      <p className={`${te ? 'te' : 'font-sans'} text-[13px] text-muted`} role="status">
+        {te ? 'లోడ్ అవుతోంది…' : 'Loading…'}
+      </p>
+    </div>
+  );
+}
+
 function PermissionDenied({ permission }: { permission: PermissionKey }) {
+  const { language } = useI18n();
+  const te = language === 'te';
   return (
     <main className="flex min-h-screen items-center justify-center bg-canvas px-4">
       <div className="max-w-md rounded-card border border-rule bg-white p-6 text-center shadow-card">
-        <h1 className="th text-[20px] font-bold text-ink">ఈ పేజీకి మీకు అనుమతి లేదు</h1>
-        <p className="te mt-2 text-[13px] text-muted">
-          ఈ విభాగాన్ని చూడటానికి అవసరమైన అనుమతి మీ ఖాతాకు లేదు. మీ ఎడిటర్‌ను సంప్రదించండి.
+        <h1 className={`${te ? 'th' : 'font-sans'} text-[20px] font-bold text-ink`}>
+          {te ? 'ఈ పేజీకి మీకు అనుమతి లేదు' : 'You do not have access to this page'}
+        </h1>
+        <p className={`${te ? 'te' : 'font-sans'} mt-2 text-[13px] text-muted`}>
+          {te
+            ? 'ఈ విభాగాన్ని చూడటానికి అవసరమైన అనుమతి మీ ఖాతాకు లేదు. మీ ఎడిటర్‌ను సంప్రదించండి.'
+            : 'Your account does not hold the permission this section needs. Contact your editor.'}
         </p>
         <p className="mt-3 font-mono text-[11px] text-muted-light">required: {permission}</p>
       </div>

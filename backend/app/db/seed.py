@@ -433,6 +433,17 @@ def run(include_demo: bool = False, reset_passwords: bool = False) -> None:
             demo_articles = seed_demo_articles(db, categories, tags)
             demo_images = seed_article_images(db)
             seed_demo_events(db)
+            # English headlines so the reader's English mode is testable end to
+            # end (§16 item 3 decided Telugu + English).
+            from app.models.content import Article as _Article
+            from scripts.set_english_titles import ENGLISH_TITLES
+
+            for short_id, title_en in ENGLISH_TITLES.items():
+                article = db.execute(
+                    select(_Article).where(_Article.short_id == short_id)
+                ).scalar_one_or_none()
+                if article is not None and not article.title_en:
+                    article.title_en = title_en
             seed_demo_videos(db)
 
     print("\nReference data seeded:")

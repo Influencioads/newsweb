@@ -74,7 +74,7 @@ export function FollowButton({
         <Plus className="h-3.5 w-3.5" aria-hidden />
       )}
       {name ? (
-        <span lang="te" className="te">{name}</span>
+        <span lang={te ? 'te' : 'en'} className={te ? 'te' : 'font-sans'}>{name}</span>
       ) : following ? (
         te ? 'ఫాలో అవుతున్నారు' : 'Following'
       ) : te ? (

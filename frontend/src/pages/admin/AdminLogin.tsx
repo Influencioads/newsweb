@@ -153,19 +153,19 @@ function OtpPanel({ onSignedIn }: { onSignedIn: () => void }) {
               <OtpInput id="otp-0" label="OTP" value={otp} onChange={setOtp} autoFocus />
             </div>
 
-            <p className="te mt-2 text-[11px] text-muted-light">
+            <p className={`${en ? 'font-sans' : 'te'} mt-2 text-[11px] text-muted-light`}>
               {secondsLeft > 0 ? (
-                <>మళ్లీ పంపండి — 00:{String(secondsLeft).padStart(2, '0')}</>
+                <>{en ? 'Resend' : 'మళ్లీ పంపండి'} — 00:{String(secondsLeft).padStart(2, '0')}</>
               ) : (
                 <button
                   type="button"
                   onClick={() => request.mutate()}
                   className="font-semibold text-brand underline"
                 >
-                  మళ్లీ పంపండి
+                  {en ? 'Resend' : 'మళ్లీ పంపండి'}
                 </button>
               )}{' '}
-              · <span className="text-breaking">5 ప్రయత్నాలు / 15 నిమి.</span>
+              · <span className="text-breaking">{en ? '5 attempts / 15 min' : '5 ప్రయత్నాలు / 15 నిమి.'}</span>
             </p>
 
             {devOtp ? (

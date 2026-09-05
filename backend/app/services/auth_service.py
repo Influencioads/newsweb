@@ -46,7 +46,6 @@ from app.services.session_registry import (
     retire_refresh_hash,
     revoke_all_for_user,
     revoke_session,
-    touch_session,
 )
 
 logger = get_logger(__name__)
@@ -285,7 +284,11 @@ def rotate_refresh_token(
         permissions=sorted(principal.permissions),
         level=principal.level,
     )
-    touch_session(session.session_key, new_expires)
+    # Re-register (not merely touch): the refresh token in hand proves this
+    # session's validity from the durable MySQL row, so a registry that lost the
+    # key — a Redis flush, or a dev-server restart on the local fallback — heals
+    # here instead of force-logging-out every reader.
+    register_session(session.session_key, user.id, new_expires)
     return session, access_token, new_raw, access_expires
 
 
@@ -385,6 +388,53 @@ def authenticate_password(
 # --------------------------------------------------------------------------- #
 # OTP login (reporters, stringers, readers)
 # --------------------------------------------------------------------------- #
+# Redis holds OTPs. In development/test only, an in-process dict stands in when
+# Redis is down — the same trade the session registry makes, so `docker compose`
+# is not a prerequisite for local reader-login work. Never in production: the
+# fallback neither survives a restart nor spans workers.
+_local_otps: dict[str, tuple[str, datetime]] = {}
+
+
+def _otp_fallback_allowed() -> bool:
+    return settings.APP_ENV in {"development", "test"}
+
+
+def _otp_store(normalised: str, otp: str) -> None:
+    hashed = security.hash_otp(otp, normalised)
+    try:
+        get_redis().setex(f"{_OTP_PREFIX}{normalised}", settings.OTP_TTL_SECONDS, hashed)
+    except Exception as exc:  # noqa: BLE001
+        if not _otp_fallback_allowed():
+            logger.error("otp_store_failed", error=str(exc))
+            raise RateLimitedError() from exc
+        logger.warning("otp_local_fallback", op="store", error=str(exc))
+        _local_otps[normalised] = (
+            hashed,
+            datetime.now(timezone.utc) + timedelta(seconds=settings.OTP_TTL_SECONDS),
+        )
+
+
+def _otp_read(normalised: str) -> str | None:
+    try:
+        stored = get_redis().get(f"{_OTP_PREFIX}{normalised}")
+        if stored:
+            return stored
+    except Exception as exc:  # noqa: BLE001
+        if not _otp_fallback_allowed():
+            logger.error("otp_read_failed", error=str(exc))
+            raise InvalidOtpError() from exc
+    if _otp_fallback_allowed():
+        item = _local_otps.get(normalised)
+        if item and item[1] > datetime.now(timezone.utc):
+            return item[0]
+    return None
+
+
+def _otp_clear(normalised: str) -> None:
+    _local_otps.pop(normalised, None)
+    redis_delete(f"{_OTP_PREFIX}{normalised}")
+
+
 def request_otp(db: Session, phone: str, request: Request | None = None) -> tuple[str, int]:
     """Issue an OTP. Returns (otp_or_empty, ttl_seconds).
 
@@ -400,15 +450,7 @@ def request_otp(db: Session, phone: str, request: Request | None = None) -> tupl
 
     # Always store and always answer identically, whether or not the number is
     # registered — otherwise this endpoint enumerates our reporters' numbers.
-    try:
-        get_redis().setex(
-            f"{_OTP_PREFIX}{normalised}",
-            settings.OTP_TTL_SECONDS,
-            security.hash_otp(otp, normalised),
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.error("otp_store_failed", error=str(exc))
-        raise RateLimitedError() from exc
+    _otp_store(normalised, otp)
 
     audit_service.record_auth_event(
         db,
@@ -428,19 +470,15 @@ def request_otp(db: Session, phone: str, request: Request | None = None) -> tupl
     return (otp if settings.OTP_DEV_ECHO else ""), settings.OTP_TTL_SECONDS
 
 
-def verify_otp_login(
+def _consume_valid_otp(
     db: Session, phone: str, otp: str, request: Request | None = None
-) -> User:
+) -> str:
+    """Validate and burn an OTP; returns the normalised phone. Raises on failure."""
     ip = _request_ip(request)
     normalised = normalise_phone(phone)
     check_login_allowed(normalised, ip)
 
-    try:
-        stored = get_redis().get(f"{_OTP_PREFIX}{normalised}")
-    except Exception as exc:  # noqa: BLE001
-        logger.error("otp_read_failed", error=str(exc))
-        raise InvalidOtpError() from exc
-
+    stored = _otp_read(normalised)
     if not stored or not security.verify_otp(otp, normalised, stored):
         register_failed_attempt(normalised, ip)
         audit_service.record_auth_event(
@@ -453,16 +491,69 @@ def verify_otp_login(
         )
         raise InvalidOtpError()
 
+    # Single use.
+    _otp_clear(normalised)
+    clear_failed_attempts(normalised, ip)
+    return normalised
+
+
+def verify_otp_login(
+    db: Session, phone: str, otp: str, request: Request | None = None
+) -> User:
+    normalised = _consume_valid_otp(db, phone, otp, request)
+
     user = get_user_by_phone(db, normalised)
     if user is None:
         raise InvalidOtpError()
     if user.status != UserStatus.ACTIVE:
         raise AccountInactiveError()
-
-    # Single use.
-    redis_delete(f"{_OTP_PREFIX}{normalised}")
-    clear_failed_attempts(normalised, ip)
     return user
+
+
+def verify_otp_reader(
+    db: Session, phone: str, otp: str, request: Request | None = None
+) -> tuple[User, bool]:
+    """Reader sign-in (updated doc §11): a valid OTP both authenticates an
+    existing account and registers a new one — there is no separate signup form.
+
+    Returns (user, is_new_account). A suspended reader still cannot enter.
+    """
+    normalised = _consume_valid_otp(db, phone, otp, request)
+
+    user = get_user_by_phone(db, normalised)
+    if user is not None:
+        if user.status != UserStatus.ACTIVE:
+            raise AccountInactiveError()
+        return user, False
+
+    from app.models.enums import RoleKey, ScopeType
+    from app.models.user import Role, UserRole
+
+    role = db.execute(
+        select(Role).where(Role.key == RoleKey.SUBSCRIBER.value)
+    ).scalar_one_or_none()
+    if role is None:  # pragma: no cover — seeds always create it
+        raise AccountInactiveError()
+
+    display = f"రీడర్ {normalised[-4:]}"
+    user = User(
+        phone=normalised,
+        name_te=display,
+        name_en=f"Reader {normalised[-4:]}",
+        status=UserStatus.ACTIVE,
+    )
+    db.add(user)
+    db.flush()
+    db.add(
+        UserRole(
+            user_id=user.id, role_id=role.id, scope_type=ScopeType.SELF, scope_id=None
+        )
+    )
+    db.flush()
+    # Reload so user.roles is populated for the principal build.
+    db.refresh(user)
+    logger.info("reader_registered", user_id=user.id, phone_suffix=normalised[-4:])
+    return user, True
 
 
 # --------------------------------------------------------------------------- #

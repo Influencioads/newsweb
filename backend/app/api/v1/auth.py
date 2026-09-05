@@ -36,6 +36,7 @@ from app.schemas.auth import (
     TwoFactorSetupOut,
     UserOut,
 )
+from app.schemas.reader import ReaderLoginResponse
 from app.services import audit_service, auth_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -170,6 +171,51 @@ def verify_otp(
     return LoginResponse(
         tokens=TokenPair(access_token=access, refresh_token=refresh, expires_at=expires),
         me=_me_payload(principal),
+    )
+
+
+@router.post(
+    "/reader/otp/verify",
+    response_model=ReaderLoginResponse,
+    summary="Reader sign-in: verify an OTP, registering on first use",
+    description=(
+        "The reader flow of the updated doc §11: request an OTP via "
+        "`/auth/otp/request`, then verify here. A valid OTP for an unknown "
+        "number **creates** a subscriber account — there is no separate signup "
+        "form. Staff accounts sign in exactly as before via `/auth/otp/verify`."
+    ),
+    responses={401: {"description": "INVALID_OTP"}, 429: {"description": "ACCOUNT_LOCKED"}},
+)
+def verify_reader_otp(
+    payload: OtpVerifyRequest, request: Request, db: Session = Depends(get_db)
+) -> ReaderLoginResponse:
+    user, is_new = auth_service.verify_otp_reader(db, payload.phone, payload.otp, request)
+    session, access, refresh_token, expires = auth_service.create_session(
+        db,
+        user,
+        platform=payload.platform,
+        device_id=payload.device_id,
+        device_label=payload.device_label,
+        request=request,
+    )
+    audit_service.record_auth_event(
+        db,
+        action=AuditAction.LOGIN,
+        user=user,
+        identifier=payload.phone,
+        note=f"reader otp login{' (registered)' if is_new else ''}, "
+        f"session {session.session_key[:8]}",
+        request=request,
+    )
+    from app.core.deps import build_principal
+
+    principal = build_principal(user, session.session_key)
+    return ReaderLoginResponse(
+        tokens=TokenPair(
+            access_token=access, refresh_token=refresh_token, expires_at=expires
+        ),
+        me=_me_payload(principal),
+        is_new_account=is_new,
     )
 
 

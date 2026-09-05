@@ -22,8 +22,22 @@ from app.models.content import (
     TermGlossary,
     WorkflowTransition,
 )
-from app.models.geo import District, Mandal
+from app.models.creator import AdCampaign, CreatorSubmission
+from app.models.discovery import Pin, TrendingScore
+from app.models.engagement import (
+    ArticleEvent,
+    Bookmark,
+    Comment,
+    Follow,
+    Like,
+    ReadingSession,
+    Report,
+)
+from app.models.notify import Notification, NotificationCampaign, PushDevice
+from app.models.geo import District, Locality, Mandal, State
 from app.models.media import ArticleMedia, Media
+from app.models.reader import UserPreference
+from app.models.site import HomepageSection, SearchQuery
 from app.models.user import (
     Permission,
     Role,
@@ -32,26 +46,47 @@ from app.models.user import (
     UserRole,
     UserSession,
 )
+from app.models.video import Video
 
 __all__ = [
+    "AdCampaign",
     "Article",
+    "CreatorSubmission",
+    "ArticleEvent",
     "ArticleMedia",
     "ArticleSearchAlias",
+    "Bookmark",
+    "Comment",
+    "Follow",
+    "Like",
+    "ReadingSession",
+    "Report",
     "ArticleTag",
     "ArticleVersion",
     "AuditLog",
     "Base",
     "Category",
     "District",
+    "HomepageSection",
+    "Locality",
     "Mandal",
     "Media",
+    "Notification",
+    "NotificationCampaign",
     "Permission",
+    "Pin",
+    "PushDevice",
+    "TrendingScore",
+    "SearchQuery",
+    "State",
     "Role",
     "RolePermission",
     "Tag",
     "TermGlossary",
     "User",
+    "UserPreference",
     "UserRole",
     "UserSession",
+    "Video",
     "WorkflowTransition",
 ]

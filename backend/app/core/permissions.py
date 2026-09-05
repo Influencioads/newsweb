@@ -200,6 +200,9 @@ ROLE_PERMISSIONS: dict[RoleKey, set[str]] = {
         "epaper.hotspot",
         "epaper.publish",
         "video.view",
+        # With YouTube-links-only video (§15 product decision), "upload" means
+        # pasting a link — desk editors curate the hub.
+        "video.upload",
         "video.edit",
         "video.publish",
         "ai.use",

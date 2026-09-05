@@ -15,6 +15,7 @@ because the cache was unavailable.
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 
 import redis
@@ -32,9 +33,57 @@ _pool = redis.ConnectionPool.from_url(
     health_check_interval=30,
 )
 
+# ---------------------------------------------------------------------------
+# Circuit breaker. Without it, a Redis outage adds the full 2 s connect
+# timeout to EVERY cache/session/counter call — several per request — turning
+# "degrade, not break" into 10-second requests. After one connection failure,
+# calls fail fast for a short window, then one probe is allowed through.
+# ---------------------------------------------------------------------------
+_BREAK_SECONDS = 15.0
+_down_until = 0.0
+
+
+def _trip_breaker() -> None:
+    global _down_until
+    _down_until = time.monotonic() + _BREAK_SECONDS
+
+
+def _circuit_open() -> bool:
+    return time.monotonic() < _down_until
+
+
+class _BreakerPipeline(redis.client.Pipeline):
+    """Buffers commands as normal; only `execute()` touches the network, so the
+    fail-fast lives there — inside the try/except every call site already has."""
+
+    def execute(self, raise_on_error: bool = True) -> Any:  # type: ignore[override]
+        if _circuit_open():
+            raise redis.ConnectionError("redis circuit open after a recent failure")
+        try:
+            return super().execute(raise_on_error)
+        except (redis.ConnectionError, redis.TimeoutError):
+            _trip_breaker()
+            raise
+
+
+class _BreakerRedis(redis.Redis):
+    def execute_command(self, *args: Any, **kwargs: Any) -> Any:  # type: ignore[override]
+        if _circuit_open():
+            raise redis.ConnectionError("redis circuit open after a recent failure")
+        try:
+            return super().execute_command(*args, **kwargs)
+        except (redis.ConnectionError, redis.TimeoutError):
+            _trip_breaker()
+            raise
+
+    def pipeline(self, transaction: bool = True, shard_hint: Any = None) -> Any:  # type: ignore[override]
+        return _BreakerPipeline(
+            self.connection_pool, self.response_callbacks, transaction, shard_hint
+        )
+
 
 def get_redis() -> redis.Redis:
-    return redis.Redis(connection_pool=_pool)
+    return _BreakerRedis(connection_pool=_pool)
 
 
 def ping() -> bool:
@@ -92,13 +141,22 @@ def cache_delete_prefix(prefix: str) -> int:
 # counters — rate limiting and login attempts
 # --------------------------------------------------------------------------- #
 def incr_with_ttl(key: str, ttl_seconds: int) -> int:
-    """Atomically increment a counter, setting the TTL on first write."""
-    client = get_redis()
-    pipe = client.pipeline()
-    pipe.incr(key)
-    pipe.expire(key, ttl_seconds, nx=True)
-    result = pipe.execute()
-    return int(result[0])
+    """Atomically increment a counter, setting the TTL on first write.
+
+    Returns 0 when Redis is unreachable: counters back rate limits, and a Redis
+    outage must degrade (no limiting) rather than turn every failed login into
+    a 500. The session registry failing closed is what actually gates access.
+    """
+    try:
+        client = get_redis()
+        pipe = client.pipeline()
+        pipe.incr(key)
+        pipe.expire(key, ttl_seconds, nx=True)
+        result = pipe.execute()
+        return int(result[0])
+    except redis.RedisError as exc:
+        logger.warning("counter_unavailable", key=key, error=str(exc))
+        return 0
 
 
 def get_int(key: str) -> int:

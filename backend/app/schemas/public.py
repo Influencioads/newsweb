@@ -78,6 +78,44 @@ class TagOut(BaseModel):
     type: str
 
 
+class StateOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    code: str
+    slug: str
+    name_te: str
+    name_en: str
+
+
+class MandalOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    slug: str
+    name_te: str
+    name_en: str
+
+
+class LocalityOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    slug: str
+    name_te: str
+    name_en: str
+    kind: str
+
+
+class LocationStateOut(StateOut):
+    """One state with its districts — the location-selector tree (doc §4)."""
+
+    districts: list[DistrictOut] = Field(default_factory=list)
+
+
+class LocationsOut(BaseModel):
+    states: list[LocationStateOut]
+
+
 class AuthorOut(BaseModel):
     """§10.3 requires author as a Person with a real author page."""
 
@@ -122,6 +160,9 @@ class ArticleCardOut(BaseModel):
 class ArticleDetailOut(ArticleCardOut):
     """Full article for the reader page (mockup 1c)."""
 
+    like_count: int = 0
+    comment_count: int = 0
+    share_count: int = 0
     sub_title_te: str | None
     body: dict[str, Any] | None = Field(
         description="Tiptap/ProseMirror JSON — the source of truth, rendered natively"
@@ -216,4 +257,34 @@ class SiteConfigOut(BaseModel):
     site_name_te: str
     site_name_en: str
     categories: list[NavCategoryOut]
+    states: list[StateOut] = Field(default_factory=list)
     districts: list[DistrictOut]
+
+
+class SearchResultsOut(BaseModel):
+    """Reader search response (updated doc §10)."""
+
+    query: str
+    total: int
+    articles: list[ArticleCardOut]
+    next_offset: int | None = Field(
+        default=None, description="Pass back as `offset` for the next page; null when exhausted"
+    )
+
+
+class SearchMetaOut(BaseModel):
+    popular: list[str] = Field(default_factory=list)
+    recent: list[str] = Field(
+        default_factory=list, description="Only populated for a signed-in reader"
+    )
+
+
+class LocalFeedOut(BaseModel):
+    """Exact-location-first feed (updated doc §4)."""
+
+    state: StateOut | None = None
+    district: DistrictOut | None = None
+    mandal: MandalOut | None = None
+    locality: LocalityOut | None = None
+    articles: list[ArticleCardOut]
+    next_offset: int | None = None

@@ -157,6 +157,112 @@ class TagType(StrEnum):
     EVENT = "event"
 
 
+class EventType(StrEnum):
+    """Reader-behaviour events (updated doc §3.1) — one append-only stream that
+    trending (§8), analytics (§25) and personalization (§3.2) all read."""
+
+    VIEW = "view"
+    READ = "read"          # value = seconds since the last heartbeat
+    SCROLL = "scroll"      # value = max scroll depth, percent
+    SHARE = "share"
+    LIKE = "like"
+    UNLIKE = "unlike"
+    BOOKMARK = "bookmark"
+    UNBOOKMARK = "unbookmark"
+    NOT_INTERESTED = "not_interested"
+
+
+class CommentStatus(StrEnum):
+    """Post-moderation model: comments publish immediately, moderators hide.
+    DELETED = removed by the author; HIDDEN = removed by a moderator."""
+
+    VISIBLE = "visible"
+    PENDING = "pending"
+    HIDDEN = "hidden"
+    DELETED = "deleted"
+
+
+class ReportTargetType(StrEnum):
+    ARTICLE = "article"
+    COMMENT = "comment"
+
+
+class ReportStatus(StrEnum):
+    OPEN = "open"
+    RESOLVED = "resolved"
+    DISMISSED = "dismissed"
+
+
+class FollowTargetType(StrEnum):
+    """What a reader can follow (updated doc §12)."""
+
+    CATEGORY = "category"
+    TAG = "tag"
+    DISTRICT = "district"
+    MANDAL = "mandal"
+    AUTHOR = "author"
+
+
+class PinPlacement(StrEnum):
+    """Where a pinned story surfaces (updated doc §9)."""
+
+    HOME = "home"
+    CATEGORY = "category"
+    LOCAL = "local"
+
+
+class TrendingScope(StrEnum):
+    """§8: global trending is kept separate from category/location trending."""
+
+    GLOBAL = "global"
+    CATEGORY = "category"
+    DISTRICT = "district"
+
+
+class NotificationKind(StrEnum):
+    """§13 triggers. BREAKING outranks LOCAL outranks TOPIC when one article
+    would qualify for several — a reader gets one notification per story."""
+
+    BREAKING = "breaking"
+    LOCAL = "local"
+    TOPIC = "topic"
+    SYSTEM = "system"
+
+
+class SubmissionStatus(StrEnum):
+    """Creator submissions (updated doc §17): moderation, not publication.
+    APPROVED means the text became a real Article in the normal editorial
+    workflow — publishing still requires an editor, like everything else."""
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class AdPlacement(StrEnum):
+    """House-ad slots (updated doc §26)."""
+
+    TOP_BANNER = "top_banner"
+    IN_FEED = "in_feed"
+    ARTICLE = "article"
+    CATEGORY = "category"
+
+
+class HomeSectionKind(StrEnum):
+    """What a configurable homepage section renders (updated doc §23–24).
+
+    CATEGORY pulls the latest stories of one category. The other kinds are
+    engine-backed blocks that light up as their phases land; a kind whose
+    engine is not live yet simply yields no articles and is skipped.
+    """
+
+    CATEGORY = "category"
+    TRENDING = "trending"
+    LATEST = "latest"
+    SHORT_NEWS = "short_news"
+    VIDEOS = "videos"
+
+
 class MediaType(StrEnum):
     IMAGE = "image"
     VIDEO = "video"

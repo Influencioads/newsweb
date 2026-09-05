@@ -41,9 +41,12 @@ from app.db.seed_content import (
 )
 from app.db.seed_data import AP_DISTRICTS, MANDALS, TS_DISTRICTS
 from app.db.seed_media import seed_article_images
+from app.db.base import utcnow
 from app.db.session import session_scope
-from app.models.enums import RoleKey, ScopeType, UserStatus
-from app.models.geo import District, Mandal
+from app.models.content import Category
+from app.models.enums import HomeSectionKind, RoleKey, ScopeType, UserStatus
+from app.models.geo import District, Mandal, State
+from app.models.site import HomepageSection
 from app.models.user import Permission, Role, RolePermission, User, UserRole
 
 logger = get_logger("seed")
@@ -114,6 +117,164 @@ def seed_roles(db: Session, permissions: dict[str, Permission]) -> dict[str, Rol
     db.flush()
     logger.info("seeded_roles", count=len(existing))
     return existing
+
+
+#: (code, slug, name_te, name_en) — top of the §4 location hierarchy.
+STATES: tuple[tuple[str, str, str, str], ...] = (
+    ("AP", "andhra-pradesh", "ఆంధ్రప్రదేశ్", "Andhra Pradesh"),
+    ("TS", "telangana", "తెలంగాణ", "Telangana"),
+)
+
+
+def seed_states(db: Session) -> dict[str, State]:
+    existing = {s.code: s for s in db.execute(select(State)).scalars()}
+    for sort, (code, slug, name_te, name_en) in enumerate(STATES):
+        state = existing.get(code)
+        if state is None:
+            state = State(code=code)
+            db.add(state)
+            existing[code] = state
+        state.slug = slug
+        state.name_te = name_te
+        state.name_en = name_en
+        state.sort = sort
+        state.is_active = True
+    db.flush()
+    logger.info("seeded_states", count=len(existing))
+    return existing
+
+
+def seed_homepage_sections(db: Session, categories: dict[str, "Category"]) -> int:
+    """Create a default section row per nav category (updated doc §24).
+
+    Insert-only: an admin's reordering/toggles survive every re-seed — the seed
+    only backfills sections for categories that have none yet.
+    """
+    existing_keys = {s.key for s in db.execute(select(HomepageSection)).scalars()}
+    next_sort = (
+        max((s.sort for s in db.execute(select(HomepageSection)).scalars()), default=-1) + 1
+    )
+    created = 0
+    # The §8 trending block leads the section list; the engine behind it fills
+    # it once reader behaviour exists, and the block hides itself until then.
+    if "trending" not in existing_keys:
+        db.add(
+            HomepageSection(
+                key="trending",
+                kind=HomeSectionKind.TRENDING,
+                title_te="ట్రెండింగ్",
+                title_en="Trending",
+                sort=next_sort,
+                is_enabled=True,
+                item_count=6,
+                min_items=3,
+            )
+        )
+        next_sort += 1
+        created += 1
+    for cat in sorted(categories.values(), key=lambda c: c.sort):
+        if not cat.show_in_nav or cat.slug in existing_keys:
+            continue
+        db.add(
+            HomepageSection(
+                key=cat.slug,
+                kind=HomeSectionKind.CATEGORY,
+                category_id=cat.id,
+                sort=next_sort,
+                is_enabled=True,
+                item_count=7,
+                min_items=3,
+            )
+        )
+        next_sort += 1
+        created += 1
+    db.flush()
+    logger.info("seeded_homepage_sections", created=created)
+    return created
+
+
+def seed_demo_events(db: Session) -> int:
+    """Synthetic reader behaviour so trending and analytics have something to
+    show in a fresh dev environment. Deterministic-ish, demo tier only."""
+    import random
+
+    from datetime import timedelta
+
+    from app.models.content import Article
+    from app.models.engagement import ArticleEvent
+    from app.models.enums import ArticleStatus, EventType
+
+    if db.execute(select(ArticleEvent.id).limit(1)).scalar_one_or_none() is not None:
+        return 0
+
+    rng = random.Random(42)
+    now = utcnow()
+    articles = list(
+        db.execute(
+            select(Article).where(Article.status == ArticleStatus.PUBLISHED)
+        ).scalars()
+    )
+    created = 0
+    for index, article in enumerate(articles):
+        # Newer demo stories draw more synthetic readers; a few go "viral".
+        readers = rng.randint(3, 10) + (12 if index % 7 == 0 else 0)
+        for reader in range(readers):
+            anon = f"demo-{index}-{reader}"
+            age = rng.uniform(0.5, 30.0)
+            db.add(ArticleEvent(article_id=article.id, anon_id=anon, event_type=EventType.VIEW,
+                                created_at=now - timedelta(hours=age)))
+            created += 1
+            if rng.random() < 0.5:
+                db.add(ArticleEvent(article_id=article.id, anon_id=anon, event_type=EventType.READ,
+                                    value=rng.randint(20, 110),
+                                    created_at=now - timedelta(hours=age)))
+                created += 1
+            if rng.random() < 0.25:
+                db.add(ArticleEvent(article_id=article.id, anon_id=anon, event_type=EventType.SHARE,
+                                    created_at=now - timedelta(hours=age)))
+                article.share_count = (article.share_count or 0) + 1
+                created += 1
+        article.view_count = (article.view_count or 0) + readers
+    db.flush()
+    logger.info("seeded_demo_events", events=created)
+    return created
+
+
+#: (youtube_id, title_te, title_en, category_slug) — placeholder ids for the
+#: demo library; production editors paste real newsroom links.
+DEMO_VIDEOS: tuple[tuple[str, str, str, str], ...] = (
+    ("dQw4w9WgXcQ", "అమరావతి పనుల డ్రోన్ దృశ్యాలు", "Amaravati works drone view", "andhra-pradesh"),
+    ("jNQXAC9IVRw", "హైదరాబాద్ మెట్రో రెండో దశ వివరణ", "Hyderabad Metro phase 2 explainer", "telangana"),
+    ("M7lc1UVf-VE", "ఈవారం సినీ విశేషాలు", "This week in cinema", "cinema"),
+    ("ysz5S6PUM-U", "పోలవరం ప్రాజెక్టు క్షేత్రస్థాయి నివేదిక", "Polavaram ground report", "politics"),
+)
+
+
+def seed_demo_videos(db: Session) -> int:
+    from app.models.content import Category
+    from app.models.video import Video
+
+    categories = {c.slug: c for c in db.execute(select(Category)).scalars()}
+    existing = {v.youtube_id for v in db.execute(select(Video)).scalars()}
+    created = 0
+    for youtube_id, title_te, title_en, category_slug in DEMO_VIDEOS:
+        if youtube_id in existing:
+            continue
+        category = categories.get(category_slug)
+        db.add(
+            Video(
+                youtube_id=youtube_id,
+                title_te=title_te,
+                title_en=title_en,
+                category_id=category.id if category else None,
+                is_published=True,
+                published_at=utcnow(),
+            )
+        )
+        created += 1
+    db.flush()
+    logger.info("seeded_demo_videos", created=created)
+    return created
 
 
 def seed_districts(db: Session) -> dict[str, District]:
@@ -257,9 +418,11 @@ def run(include_demo: bool = False, reset_passwords: bool = False) -> None:
     with session_scope() as db:
         permissions = seed_permissions(db)
         roles = seed_roles(db, permissions)
+        seed_states(db)
         districts = seed_districts(db)
         mandals = seed_mandals(db, districts)
         categories = seed_categories(db)
+        seed_homepage_sections(db, categories)
         tags = seed_tags(db)
 
         credentials: list[tuple[str, str]] = []
@@ -269,6 +432,8 @@ def run(include_demo: bool = False, reset_passwords: bool = False) -> None:
             credentials = seed_demo_users(db, roles, districts, mandals, reset_passwords)
             demo_articles = seed_demo_articles(db, categories, tags)
             demo_images = seed_article_images(db)
+            seed_demo_events(db)
+            seed_demo_videos(db)
 
     print("\nReference data seeded:")
     print(f"  permissions {len(PERMISSIONS)}   roles {len(ROLE_DEFINITIONS)}")

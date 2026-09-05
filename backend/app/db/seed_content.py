@@ -42,18 +42,31 @@ logger = get_logger("seed.content")
 
 DEMO_SOURCE_TYPE = "demo"
 
-# (slug, name_te, name_en, show_in_nav) — the nav row from mockup 1b
+# (slug, name_te, name_en, show_in_nav) — the full section set of the updated
+# doc §1.2/§1.5, in nav order. AP/TS lead because this is a Telugu-first,
+# local-first product; Home/Trending/Local are feeds, not categories, so they
+# are not rows here. Tuple position doubles as the sort order on every re-seed.
 CATEGORIES: tuple[tuple[str, str, str, bool], ...] = (
     ("andhra-pradesh", "ఆంధ్రప్రదేశ్", "Andhra Pradesh", True),
     ("telangana", "తెలంగాణ", "Telangana", True),
     ("national", "జాతీయం", "National", True),
+    ("world", "అంతర్జాతీయం", "International", True),
+    ("politics", "రాజకీయం", "Politics", True),
     ("cinema", "సినిమా", "Cinema", True),
     ("sports", "క్రీడలు", "Sports", True),
     ("business", "బిజినెస్", "Business", True),
-    ("politics", "రాజకీయం", "Politics", False),
+    ("jobs", "ఉద్యోగాలు", "Jobs", True),
+    ("health", "ఆరోగ్యం", "Health", True),
+    ("crime", "క్రైమ్", "Crime", True),
+    ("devotional", "భక్తి", "Devotional", True),
+    ("lifestyle", "లైఫ్‌స్టైల్", "Lifestyle", True),
+    ("travel", "పర్యాటకం", "Travel", True),
+    ("food", "రుచులు", "Food", True),
+    ("inspiring", "స్ఫూర్తి", "Inspiring Stories", True),
+    ("zero-to-hero", "జీరో టు హీరో", "Zero to Hero", True),
+    ("best-deals", "బెస్ట్ డీల్స్", "Best Deals", True),
     ("districts", "జిల్లాలు", "Districts", False),
     ("opinion", "అభిప్రాయం", "Opinion", False),
-    ("world", "అంతర్జాతీయం", "World", False),
 )
 
 TAGS: tuple[tuple[str, str, str, TagType], ...] = (

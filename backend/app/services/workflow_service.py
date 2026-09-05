@@ -103,6 +103,16 @@ def transition(db: Session, principal: Principal, article: Article, action: str,
         article.published_by = principal.id
         article.published_at = utcnow()
         article.first_published_at = article.first_published_at or article.published_at
+        # §13 publish triggers (breaking / local / topic). A notification bug
+        # must never keep a story off the site, hence the broad guard.
+        try:
+            from app.services.notification_service import fan_out_for_article
+
+            fan_out_for_article(db, article)
+        except Exception:  # noqa: BLE001
+            from app.core.logging import get_logger
+
+            get_logger(__name__).exception("notification_fanout_failed", article_id=article.id)
     elif action == "unpublish":
         article.status = ArticleStatus.UNPUBLISHED
     elif target in {WorkflowState.SUBMITTED, WorkflowState.IN_REVIEW}:

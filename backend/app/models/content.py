@@ -147,6 +147,8 @@ class Article(PKMixin, TimestampMixin, SoftDeleteMixin, ActorMixin, Base):
         Index("ix_articles_status_published_at", "status", "published_at"),
         Index("ix_articles_category_id_published_at", "category_id", "published_at"),
         Index("ix_articles_district_id_published_at", "district_id", "published_at"),
+        Index("ix_articles_mandal_id_published_at", "mandal_id", "published_at"),
+        Index("ix_articles_locality_id_published_at", "locality_id", "published_at"),
         # MySQL has no partial index; this composite serves the public feed query
         # `WHERE status='published' AND deleted_at IS NULL ORDER BY published_at DESC`.
         Index("ix_articles_status_deleted_at_published_at", "status", "deleted_at", "published_at"),
@@ -195,6 +197,12 @@ class Article(PKMixin, TimestampMixin, SoftDeleteMixin, ActorMixin, Base):
     )
     mandal_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("mandals.id", ondelete="SET NULL"), nullable=True
+    )
+    locality_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("localities.id", ondelete="SET NULL"),
+        nullable=True,
+        doc="City/village granularity (updated doc §4); usually NULL",
     )
     hero_media_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("media.id", ondelete="SET NULL"), nullable=True
@@ -254,6 +262,17 @@ class Article(PKMixin, TimestampMixin, SoftDeleteMixin, ActorMixin, Base):
     reading_time_sec: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     word_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     view_count: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    # Denormalised engagement counters (Phase C), kept in sync by
+    # engagement_service so the article page never needs a COUNT(*).
+    like_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    comment_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    share_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
     # --- timing ------------------------------------------------------------

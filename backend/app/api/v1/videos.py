@@ -71,7 +71,8 @@ def public_videos(
     limit: int = Query(default=12, ge=1, le=50),
     db: Session = Depends(get_db),
 ) -> VideoListOut:
-    response.headers["Cache-Control"] = "public, max-age=0, s-maxage=60"
+    response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
+    response.headers["CDN-Cache-Control"] = "public, s-maxage=60"
     stmt = (
         select(Video)
         .where(Video.is_published.is_(True), Video.deleted_at.is_(None))

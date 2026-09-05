@@ -181,7 +181,8 @@ def list_comments(
 ) -> CommentListOut:
     article = engagement_service.get_live_article(db, short_id)
     if principal is None:
-        response.headers["Cache-Control"] = "public, max-age=0, s-maxage=15"
+        response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
+        response.headers["CDN-Cache-Control"] = "public, s-maxage=15"
     comments = engagement_repo.comments_for_article(
         db, article_id=article.id, limit=limit, offset=offset
     )

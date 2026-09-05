@@ -60,10 +60,20 @@ router = APIRouter(prefix="/public", tags=["public"])
 # helpers
 # --------------------------------------------------------------------------- #
 def _cache_headers(response: Response, ttl: int | None = None) -> None:
-    """§10.1 — the CDN, not the database, absorbs the spike."""
+    """§10.1 — the CDN, not the database, absorbs the spike.
+
+    The split matters: `stale-while-revalidate` in Cache-Control lets the
+    READER'S BROWSER keep showing a five-minute-old front page after a publish
+    or a section change, even though the server cache was purged. So browsers
+    get `max-age=0, must-revalidate` (always fetch the current page — the Redis
+    layer makes that cheap) while the edge keeps its s-maxage + SWR via
+    CDN-Cache-Control, which Cloudflare/Fastly/CloudFront-class caches honor
+    and browsers ignore.
+    """
     ttl = ttl or settings.PUBLIC_CACHE_TTL_SECONDS
-    response.headers["Cache-Control"] = (
-        f"public, max-age=0, s-maxage={ttl}, "
+    response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
+    response.headers["CDN-Cache-Control"] = (
+        f"public, s-maxage={ttl}, "
         f"stale-while-revalidate={settings.PUBLIC_CACHE_SWR_SECONDS}"
     )
 

@@ -34,6 +34,7 @@ const NAV: NavItem[] = [
   { to: '/admin/notifications', labelTe: 'నోటిఫికేషన్లు', labelEn: 'Notifications', permission: 'push.create' },
   { to: '/admin/videos', labelTe: 'వీడియోలు', labelEn: 'Videos', permission: 'video.view' },
   { to: '/admin/ads', labelTe: 'ప్రకటనలు', labelEn: 'Ads', permission: 'ads.manage' },
+  { to: '/admin/homepage', labelTe: 'హోమ్ విభాగాలు', labelEn: 'Homepage', permission: 'settings.manage' },
   { to: '/admin/analytics', labelTe: 'విశ్లేషణలు', labelEn: 'Analytics', permission: 'analytics.view' },
   { to: '/admin/taxonomy', labelTe: 'వర్గీకరణ', labelEn: 'Taxonomy', permission: 'taxonomy.view' },
   { to: '/admin/media', labelTe: 'మీడియా', labelEn: 'Media', permission: 'media.view' },

@@ -452,7 +452,65 @@ export default function ArticlePage() {
             </div>
           </section>
         ) : null}
+
+        {/* §5: more from the same category and the same location */}
+        <MoreFromRail
+          kind="category"
+          slug={data.category?.slug}
+          name={data.category ? pick(data.category.name_te, data.category.name_en) : ''}
+          exclude={[data.short_id, ...data.related.map((a) => a.short_id)]}
+        />
+        <MoreFromRail
+          kind="district"
+          slug={data.district?.slug}
+          name={data.district ? pick(data.district.name_te, data.district.name_en) : ''}
+          exclude={[data.short_id, ...data.related.map((a) => a.short_id)]}
+        />
       </article>
     </main>
+  );
+}
+
+/** §5 "More from same category" / "More from same location" rails. */
+function MoreFromRail({
+  kind,
+  slug,
+  name,
+  exclude,
+}: {
+  kind: 'category' | 'district';
+  slug: string | undefined;
+  name: string;
+  exclude: string[];
+}) {
+  const { language } = useI18n();
+  const te = language === 'te';
+  const feed = useQuery({
+    queryKey: ['public', 'more-from', kind, slug],
+    queryFn: () => publicApi.fetchFeed({ [kind]: slug, limit: 7 }),
+    enabled: Boolean(slug),
+    staleTime: 60_000,
+  });
+  const articles = (feed.data?.articles ?? [])
+    .filter((a) => !exclude.includes(a.short_id))
+    .slice(0, 3);
+  if (!slug || articles.length === 0) return null;
+
+  const title =
+    kind === 'category'
+      ? te ? `${name}లో మరిన్ని` : `More from ${name}`
+      : te ? `${name} నుంచి మరిన్ని` : `More from ${name}`;
+
+  return (
+    <section className="mt-7 border-t border-rule pt-3">
+      <h2 className={`${te ? 'th' : 'font-sans'} mb-2.5 text-[15px] font-bold text-brand`}>
+        {title}
+      </h2>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {articles.map((a) => (
+          <GridCard key={a.short_id} article={a} />
+        ))}
+      </div>
+    </section>
   );
 }

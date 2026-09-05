@@ -8,22 +8,77 @@ import type { Config } from 'tailwindcss';
  */
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
+  // §1.1 dark mode. Every token below resolves through a CSS variable defined
+  // in assets/index.css (:root = light, .dark = dark), so the whole app
+  // re-themes from one place and utility class names never change.
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        brand: { DEFAULT: '#A61C24', dark: '#7E1219', deep: '#8E0B16', tint: '#FDECEC' },
-        breaking: { DEFAULT: '#C6111F', tint: '#FDECEC', border: '#F2C4C7' },
-        ink: { DEFAULT: '#1A1714', soft: '#4A443C', panel: '#242019', deep: '#14110E' },
-        muted: { DEFAULT: '#6B635A', light: '#8A7F70', inverse: '#B7AFA4' },
-        paper: { DEFAULT: '#FAF7F2', warm: '#FFFDF8', sub: '#F5F2EA' },
-        canvas: { DEFAULT: '#EFEBE3', cms: '#F4F2ED' },
-        rule: { DEFAULT: '#E5DFD6', soft: '#F1EDE4', strong: '#D8D2C8', input: '#DDD8CE' },
-        ai: { DEFAULT: '#6D4FC4', tint: '#F4F0FB', border: '#DDD2F2', text: '#4A3F6E' },
-        exclusive: { DEFAULT: '#B98A2E', tint: '#FBF3DC', border: '#EBD9A8', text: '#7A611E' },
-        success: { DEFAULT: '#2E7D4F', tint: '#EAF4EC', border: '#BFDCC6' },
-        info: { DEFAULT: '#1E66C8', tint: '#E8F0FB' },
-        placeholder: { DEFAULT: '#E9E2D6', text: '#8A7F70', line: '#C9C2B6' },
-        highlight: '#FBE9A9',
+        brand: {
+          DEFAULT: 'rgb(var(--tn-brand) / <alpha-value>)',
+          dark: 'rgb(var(--tn-brand-dark) / <alpha-value>)',
+          deep: 'rgb(var(--tn-brand-deep) / <alpha-value>)',
+          tint: 'rgb(var(--tn-brand-tint) / <alpha-value>)',
+        },
+        breaking: {
+          DEFAULT: 'rgb(var(--tn-breaking) / <alpha-value>)',
+          tint: 'rgb(var(--tn-breaking-tint) / <alpha-value>)',
+          border: 'rgb(var(--tn-breaking-border) / <alpha-value>)',
+        },
+        ink: {
+          DEFAULT: 'rgb(var(--tn-ink) / <alpha-value>)',
+          soft: 'rgb(var(--tn-ink-soft) / <alpha-value>)',
+          panel: 'rgb(var(--tn-ink-panel) / <alpha-value>)',
+          deep: 'rgb(var(--tn-ink-deep) / <alpha-value>)',
+        },
+        muted: {
+          DEFAULT: 'rgb(var(--tn-muted) / <alpha-value>)',
+          light: 'rgb(var(--tn-muted-light) / <alpha-value>)',
+          inverse: 'rgb(var(--tn-muted-inverse) / <alpha-value>)',
+        },
+        paper: {
+          DEFAULT: 'rgb(var(--tn-paper) / <alpha-value>)',
+          warm: 'rgb(var(--tn-paper-warm) / <alpha-value>)',
+          sub: 'rgb(var(--tn-paper-sub) / <alpha-value>)',
+        },
+        canvas: {
+          DEFAULT: 'rgb(var(--tn-canvas) / <alpha-value>)',
+          cms: 'rgb(var(--tn-canvas-cms) / <alpha-value>)',
+        },
+        rule: {
+          DEFAULT: 'rgb(var(--tn-rule) / <alpha-value>)',
+          soft: 'rgb(var(--tn-rule-soft) / <alpha-value>)',
+          strong: 'rgb(var(--tn-rule-strong) / <alpha-value>)',
+          input: 'rgb(var(--tn-rule-input) / <alpha-value>)',
+        },
+        ai: {
+          DEFAULT: 'rgb(var(--tn-ai) / <alpha-value>)',
+          tint: 'rgb(var(--tn-ai-tint) / <alpha-value>)',
+          border: 'rgb(var(--tn-ai-border) / <alpha-value>)',
+          text: 'rgb(var(--tn-ai-text) / <alpha-value>)',
+        },
+        exclusive: {
+          DEFAULT: 'rgb(var(--tn-exclusive) / <alpha-value>)',
+          tint: 'rgb(var(--tn-exclusive-tint) / <alpha-value>)',
+          border: 'rgb(var(--tn-exclusive-border) / <alpha-value>)',
+          text: 'rgb(var(--tn-exclusive-text) / <alpha-value>)',
+        },
+        success: {
+          DEFAULT: 'rgb(var(--tn-success) / <alpha-value>)',
+          tint: 'rgb(var(--tn-success-tint) / <alpha-value>)',
+          border: 'rgb(var(--tn-success-border) / <alpha-value>)',
+        },
+        info: {
+          DEFAULT: 'rgb(var(--tn-info) / <alpha-value>)',
+          tint: 'rgb(var(--tn-info-tint) / <alpha-value>)',
+        },
+        placeholder: {
+          DEFAULT: 'rgb(var(--tn-placeholder) / <alpha-value>)',
+          text: 'rgb(var(--tn-placeholder-text) / <alpha-value>)',
+          line: 'rgb(var(--tn-placeholder-line) / <alpha-value>)',
+        },
+        highlight: 'rgb(var(--tn-highlight) / <alpha-value>)',
       },
       fontFamily: {
         // Headlines. Anek Telugu carries the display weight the mastheads need.

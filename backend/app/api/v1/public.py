@@ -271,14 +271,15 @@ def get_home(
                 db, limit=item_count, exclude_ids=used
             )
         else:
-            items = article_repo.latest(
-                db, limit=item_count, category_id=category_id, exclude_ids=used
-            )
+            # §23: sections are independent blocks. A story may appear both in
+            # the broadsheet top and inside its own section — hiding it there
+            # would starve small sections and break the "every configured
+            # section renders" contract.
+            items = article_repo.latest(db, limit=item_count, category_id=category_id)
         # A section block with one story reads as broken rather than sparse, so
         # a section only earns a block once it has enough copy to fill one.
         if len(items) < max(min_items, 1):
             continue
-        used |= {a.id for a in items}
         sections.append(
             HomeSectionOut(
                 key=key,

@@ -10,28 +10,99 @@
  * (the e-paper viewer, the hotspot canvas, printed/exported surfaces).
  * ------------------------------------------------------------------------- */
 :root {
-  --brand: #a61c24;
-  --brand-dark: #7e1219;
-  --breaking: #c6111f;
-  --ink: #1a1714;
-  --ink-soft: #4a443c;
-  --muted: #6b635a;
-  --muted-light: #8a7f70;
-  --paper: #faf7f2;
-  --canvas: #efebe3;
-  --cms-canvas: #f4f2ed;
-  --rule: #e5dfd6;
-  --ai: #6d4fc4;
-  --exclusive: #b98a2e;
-  --success: #2e7d4f;
-  --info: #1e66c8;
-  --placeholder: #e9e2d6;
+  /* RGB triplets consumed by tailwind.config.ts via rgb(var(--tn-*) / a).
+     Light theme = the mockup-1a palette verbatim. */
+  --tn-brand: 166 28 36;          --tn-brand-dark: 126 18 25;
+  --tn-brand-deep: 142 11 22;     --tn-brand-tint: 253 236 236;
+  --tn-breaking: 198 17 31;       --tn-breaking-tint: 253 236 236;
+  --tn-breaking-border: 242 196 199;
+  --tn-ink: 26 23 20;             --tn-ink-soft: 74 68 60;
+  --tn-ink-panel: 36 32 25;       --tn-ink-deep: 20 17 14;
+  --tn-muted: 107 99 90;          --tn-muted-light: 138 127 112;
+  --tn-muted-inverse: 183 175 164;
+  --tn-paper: 250 247 242;        --tn-paper-warm: 255 253 248;
+  --tn-paper-sub: 245 242 234;
+  --tn-canvas: 239 235 227;       --tn-canvas-cms: 244 242 237;
+  --tn-rule: 229 223 214;         --tn-rule-soft: 241 237 228;
+  --tn-rule-strong: 216 210 200;  --tn-rule-input: 221 216 206;
+  --tn-ai: 109 79 196;            --tn-ai-tint: 244 240 251;
+  --tn-ai-border: 221 210 242;    --tn-ai-text: 74 63 110;
+  --tn-exclusive: 185 138 46;     --tn-exclusive-tint: 251 243 220;
+  --tn-exclusive-border: 235 217 168; --tn-exclusive-text: 122 97 30;
+  --tn-success: 46 125 79;        --tn-success-tint: 234 244 236;
+  --tn-success-border: 191 220 198;
+  --tn-info: 30 102 200;          --tn-info-tint: 232 240 251;
+  --tn-placeholder: 233 226 214;  --tn-placeholder-text: 138 127 112;
+  --tn-placeholder-line: 201 194 182;
+  --tn-highlight: 251 233 169;
+  /* The surface behind `bg-white` cards; overridden by the dark theme. */
+  --tn-surface: 255 255 255;
+
+  /* Legacy hex aliases for the few raw-CSS consumers below. */
+  --brand: rgb(var(--tn-brand));
+  --brand-dark: rgb(var(--tn-brand-dark));
+  --breaking: rgb(var(--tn-breaking));
+  --ink: rgb(var(--tn-ink));
+  --ink-soft: rgb(var(--tn-ink-soft));
+  --muted: rgb(var(--tn-muted));
+  --muted-light: rgb(var(--tn-muted-light));
+  --paper: rgb(var(--tn-paper));
+  --canvas: rgb(var(--tn-canvas));
+  --cms-canvas: rgb(var(--tn-canvas-cms));
+  --rule: rgb(var(--tn-rule));
+  --ai: rgb(var(--tn-ai));
+  --exclusive: rgb(var(--tn-exclusive));
+  --success: rgb(var(--tn-success));
+  --info: rgb(var(--tn-info));
+  --placeholder: rgb(var(--tn-placeholder));
 
   /* Reader font-size switcher (§4.1 A- / A / A+ / A++).
      The scale multiplies every Telugu text size; it is set on <html> by the
      font-size store and persisted to localStorage. */
   --reader-scale: 1;
+
+  color-scheme: light;
 }
+
+/* ---------------------------------------------------------------------------
+ * §1.1 dark mode — same warm-newsprint identity at night. Brand and breaking
+ * hues brighten for contrast; the "deep" panels stay dark in both themes.
+ * ------------------------------------------------------------------------- */
+.dark {
+  --tn-brand: 217 87 94;          --tn-brand-dark: 231 122 128;
+  --tn-brand-tint: 64 31 32;
+  --tn-breaking-tint: 64 37 37;   --tn-breaking-border: 110 52 55;
+  --tn-ink: 237 231 221;          --tn-ink-soft: 201 192 179;
+  /* muted-inverse is only used on the constant-dark panels (footer, CMS
+     topbar), so it keeps its light value in both themes. */
+  --tn-muted: 170 159 145;        --tn-muted-light: 140 129 114;
+  --tn-paper: 32 27 22;           --tn-paper-warm: 39 33 27;
+  --tn-paper-sub: 44 38 31;
+  --tn-canvas: 23 19 16;          --tn-canvas-cms: 27 23 19;
+  --tn-rule: 58 51 43;            --tn-rule-soft: 47 41 34;
+  --tn-rule-strong: 77 68 58;     --tn-rule-input: 66 58 49;
+  --tn-ai: 164 143 224;           --tn-ai-tint: 45 39 62;
+  --tn-ai-border: 77 66 106;      --tn-ai-text: 196 183 232;
+  --tn-exclusive: 211 168 83;     --tn-exclusive-tint: 56 47 30;
+  --tn-exclusive-border: 100 82 44; --tn-exclusive-text: 222 190 122;
+  --tn-success: 109 187 140;      --tn-success-tint: 33 51 41;
+  --tn-success-border: 58 88 69;
+  --tn-info: 111 163 232;         --tn-info-tint: 30 41 56;
+  --tn-placeholder: 46 40 34;     --tn-placeholder-text: 140 129 114;
+  --tn-placeholder-line: 84 75 64;
+  --tn-highlight: 92 74 27;
+  --tn-surface: 38 32 26;
+
+  color-scheme: dark;
+}
+
+/* Cards written as `bg-white` follow the surface token in dark mode; text-white
+ * (buttons, tickers) intentionally stays white. The `bg-ink` panels — footer,
+ * CMS topbar, code blocks, story cards — are dark by design in BOTH themes,
+ * so they pin to the constant deep tone while text-ink flips. */
+.dark .bg-white { background-color: rgb(var(--tn-surface)); }
+.dark .bg-white\/95 { background-color: rgb(var(--tn-surface) / 0.95); }
+.dark .bg-ink { background-color: rgb(var(--tn-ink-deep)); }
 
 @layer base {
   html {

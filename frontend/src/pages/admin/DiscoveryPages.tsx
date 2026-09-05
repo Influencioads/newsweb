@@ -230,6 +230,60 @@ export function VideosAdminPage() {
 }
 
 // --------------------------------------------------------------------------- #
+type SectionRow = { id: number; key: string; kind: string; title_te: string | null; title_en: string | null; sort: number; is_enabled: boolean; item_count: number };
+
+/** §24 admin-controlled homepage: order, toggle, count — no deploy needed. */
+export function HomepageSectionsPage() {
+  const { language, pick } = useI18n(); const en = language === 'en';
+  const queryClient = useQueryClient();
+  const q = useQuery({ queryKey: ['cms', 'home-sections'], queryFn: () => cmsApi.fetchHomeSections<{ items: SectionRow[] }>() });
+  const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['cms', 'home-sections'] });
+  const patch = useMutation({ mutationFn: ({ id, body }: { id: number; body: Record<string, unknown> }) => cmsApi.patchHomeSection(id, body), onSuccess: invalidate });
+  const reorder = useMutation({ mutationFn: (ids: number[]) => cmsApi.reorderHomeSections(ids), onSuccess: invalidate });
+  const items = q.data?.items ?? [];
+  function move(index: number, delta: number) {
+    const next = [...items];
+    const target = index + delta;
+    const a = next[index];
+    const b = next[target];
+    if (!a || !b) return;
+    next[index] = b;
+    next[target] = a;
+    reorder.mutate(next.map((s) => s.id));
+  }
+  return <Shell title={en ? 'Homepage sections' : 'హోమ్ విభాగాలు'} subtitle={en ? 'Reorder, toggle and size the front-page blocks (§24); changes go live instantly' : 'హోమ్ పేజీ బ్లాకుల క్రమం, స్థితి, పరిమాణం — మార్పులు వెంటనే అమలు'}>
+    <div className="mb-4">
+      {/* §24 "preview before publishing" — the cache purges on save, so the
+          live front page IS the preview; open it beside the editor. */}
+      <a href="/" target="_blank" rel="noreferrer" className="inline-flex min-h-[38px] items-center rounded-control border border-brand px-4 font-sans text-[12.5px] font-bold text-brand hover:bg-brand-tint">
+        {en ? 'Preview homepage ↗' : 'హోమ్ ప్రివ్యూ ↗'}</a>
+    </div>
+    <State loading={q.isLoading} error={q.isError} />
+    <div className="space-y-2">
+      {items.map((s, i) => (
+        <article key={s.id} className={`flex flex-wrap items-center gap-3 rounded-card border bg-white p-3 ${s.is_enabled ? 'border-rule' : 'border-rule opacity-60'}`}>
+          <div className="flex flex-col gap-0.5">
+            <button type="button" onClick={() => move(i, -1)} disabled={i === 0 || reorder.isPending} aria-label="up" className="rounded border border-rule px-1.5 font-sans text-[11px] font-bold text-muted hover:text-brand disabled:opacity-30">▲</button>
+            <button type="button" onClick={() => move(i, 1)} disabled={i === items.length - 1 || reorder.isPending} aria-label="down" className="rounded border border-rule px-1.5 font-sans text-[11px] font-bold text-muted hover:text-brand disabled:opacity-30">▼</button>
+          </div>
+          <span className="w-6 text-center font-sans text-[13px] font-extrabold text-muted-light">{i + 1}</span>
+          <span className="te min-w-0 flex-1 truncate text-[15px] font-semibold">{pick(s.title_te, s.title_en) || s.key}</span>
+          <span className="rounded-chip bg-paper px-2 py-0.5 font-mono text-[10px] text-muted">{s.kind}</span>
+          <label className="flex items-center gap-1 font-sans text-[11px] font-bold text-muted">{en ? 'Stories' : 'కథనాలు'}
+            <select value={s.item_count} onChange={(e) => patch.mutate({ id: s.id, body: { item_count: Number(e.target.value) } })} className="rounded-control border border-rule-input bg-white px-1.5 py-1 font-sans text-[12px]">
+              {[3, 4, 5, 6, 7, 8, 10].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select></label>
+          <button type="button" onClick={() => patch.mutate({ id: s.id, body: { is_enabled: !s.is_enabled } })}
+            className={`min-h-[32px] rounded-control border px-3 font-sans text-[11.5px] font-bold ${s.is_enabled ? 'border-rule text-muted hover:border-breaking hover:text-breaking' : 'border-success text-success'}`}>
+            {s.is_enabled ? (en ? 'Disable' : 'ఆపండి') : en ? 'Enable' : 'చూపించండి'}</button>
+        </article>
+      ))}
+      {q.data && items.length === 0 ? <p className="te rounded-card border border-rule bg-white p-6 text-center text-muted">—</p> : null}
+    </div>
+  </Shell>;
+}
+
+// --------------------------------------------------------------------------- #
 type AdRow = { id: number; name: string; image_url: string; target_url: string; placement: string; starts_at: string; ends_at: string; is_active: boolean; weight: number; impressions: number; clicks: number; ctr_percent: number };
 
 export function AdsPage() {

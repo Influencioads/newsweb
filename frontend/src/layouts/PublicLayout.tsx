@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Bell, MapPin, Menu, Radio, Search, UserRound, X, Zap } from 'lucide-react';
+import { Bell, MapPin, Menu, Moon, Radio, Search, Sun, UserRound, X, Zap } from 'lucide-react';
 
 import { LanguageToggle } from '@/components/layout/LanguageToggle';
 import * as notificationsApi from '@/features/engagement/notificationsApi';
@@ -32,7 +32,7 @@ function useSiteConfig() {
 }
 
 function TopStrip() {
-  const { fontStep, setFontStep, edition, setEdition } = useReaderPrefs();
+  const { fontStep, setFontStep, edition, setEdition, theme, toggleTheme } = useReaderPrefs();
   const { t, pick, language } = useI18n();
   const { data: config } = useSiteConfig();
   const authStatus = useAuth((s) => s.status);
@@ -107,6 +107,22 @@ function TopStrip() {
           </div>
 
           <LanguageToggle compact />
+
+          {/* §1.1 dark mode toggle */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-pressed={theme === 'dark'}
+            aria-label={language === 'te' ? 'డార్క్ మోడ్' : 'Dark mode'}
+            title={language === 'te' ? 'డార్క్ మోడ్' : 'Dark mode'}
+            className="flex h-[28px] w-[28px] items-center justify-center rounded text-muted hover:text-brand"
+          >
+            {theme === 'dark' ? (
+              <Sun className="h-4 w-4" aria-hidden />
+            ) : (
+              <Moon className="h-4 w-4" aria-hidden />
+            )}
+          </button>
 
           {authStatus === 'authenticated' ? <NotificationBell /> : null}
 

@@ -9,6 +9,9 @@ export const fetchDashboardStats=async()=>(await api.get<DashboardStats>('/cms/d
 export const fetchEditorOptions=async()=>(await api.get<CmsEditorOptions>('/cms/dashboard/editor-options')).data;
 export const fetchManagement=async<T>(section:string)=>(await api.get<T>(`/cms/${section}`)).data;
 export const fetchModeration=async<T>(kind:'reports'|'comments',status?:string)=>(await api.get<T>(`/cms/moderation/${kind}`,{params:status?{status}:undefined})).data;
+export const fetchHomeSections=async<T>()=>(await api.get<T>('/cms/homepage/sections')).data;
+export const patchHomeSection=async(id:number,payload:Record<string,unknown>)=>(await api.patch(`/cms/homepage/sections/${id}`,payload)).data;
+export const reorderHomeSections=async(orderedIds:number[])=>(await api.put('/cms/homepage/sections/order',{ordered_ids:orderedIds})).data;
 export const fetchPins=async<T>(includeExpired=false)=>(await api.get<T>('/cms/pins',{params:{include_expired:includeExpired}})).data;
 export const createPin=async(payload:Record<string,unknown>)=>(await api.post('/cms/pins',payload)).data;
 export const removePin=async(id:number)=>(await api.delete(`/cms/pins/${id}`)).data;

@@ -23,6 +23,8 @@ const SCALE: Record<FontStep, number> = {
   'A++': 1.32,
 };
 
+export type Theme = 'light' | 'dark';
+
 export interface ReaderPrefsState {
   fontStep: FontStep;
   /** District edition slug, or null for the national/default edition. */
@@ -30,9 +32,12 @@ export interface ReaderPrefsState {
   /** Finer local-feed levels (updated doc §4). Child never persists without its parent. */
   mandal: string | null;
   locality: string | null;
+  /** §1.1 dark mode. Applied as the `dark` class on <html>; persisted. */
+  theme: Theme;
   setFontStep: (step: FontStep) => void;
   setEdition: (slug: string | null) => void;
   setLocalLevels: (mandal: string | null, locality: string | null) => void;
+  toggleTheme: () => void;
 }
 
 function applyScale(step: FontStep): void {
@@ -40,13 +45,19 @@ function applyScale(step: FontStep): void {
   document.documentElement.style.setProperty('--reader-scale', String(SCALE[step]));
 }
 
+function applyTheme(theme: Theme): void {
+  if (typeof document === 'undefined') return;
+  document.documentElement.classList.toggle('dark', theme === 'dark');
+}
+
 export const useReaderPrefs = create<ReaderPrefsState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       fontStep: 'A',
       edition: null,
       mandal: null,
       locality: null,
+      theme: 'light',
       setFontStep: (fontStep) => {
         applyScale(fontStep);
         set({ fontStep });
@@ -54,6 +65,11 @@ export const useReaderPrefs = create<ReaderPrefsState>()(
       // Changing the district invalidates the mandal/locality beneath it.
       setEdition: (edition) => set({ edition, mandal: null, locality: null }),
       setLocalLevels: (mandal, locality) => set({ mandal, locality: mandal ? locality : null }),
+      toggleTheme: () => {
+        const theme: Theme = get().theme === 'dark' ? 'light' : 'dark';
+        applyTheme(theme);
+        set({ theme });
+      },
     }),
     {
       name: 'tn.reader-prefs',
@@ -61,7 +77,10 @@ export const useReaderPrefs = create<ReaderPrefsState>()(
       onRehydrateStorage: () => (state) => {
         // Re-apply the persisted scale once the store has hydrated, otherwise a
         // reader who chose A++ sees a flash of default-size text on every load.
-        if (state) applyScale(state.fontStep);
+        if (state) {
+          applyScale(state.fontStep);
+          applyTheme(state.theme ?? 'light');
+        }
       },
     },
   ),

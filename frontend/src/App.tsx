@@ -8,7 +8,7 @@ import Articles from './pages/admin/Articles';
 import ArticleEditor from './pages/admin/ArticleEditor';
 import ReviewQueue from './pages/admin/ReviewQueue';
 import { AuditPage, MediaPage, ModerationPage, RolesPage, SettingsPage, TaxonomyPage, UsersPage } from './pages/admin/ManagementPages';
-import { AdsPage, AnalyticsPage, NotificationsAdminPage, PinsPage, TrendingAdminPage, VideosAdminPage } from './pages/admin/DiscoveryPages';
+import { AdsPage, AnalyticsPage, HomepageSectionsPage, NotificationsAdminPage, PinsPage, TrendingAdminPage, VideosAdminPage } from './pages/admin/DiscoveryPages';
 import ArticlePage from './pages/public/ArticlePage';
 import Home from './pages/public/Home';
 import { BookmarksPage, FollowingPage, HistoryPage } from './pages/public/LibraryPages';
@@ -98,6 +98,7 @@ export default function App() {
           <Route path="/admin/analytics" element={<AnalyticsPage />} />
           <Route path="/admin/videos" element={<VideosAdminPage />} />
           <Route path="/admin/ads" element={<AdsPage />} />
+          <Route path="/admin/homepage" element={<HomepageSectionsPage />} />
           <Route path="/admin/notifications" element={<NotificationsAdminPage />} />
           <Route path="/admin/taxonomy" element={<TaxonomyPage />} />
           <Route path="/admin/media" element={<MediaPage />} />

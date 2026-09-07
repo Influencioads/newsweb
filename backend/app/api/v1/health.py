@@ -60,7 +60,7 @@ def health(response: Response) -> HealthResponse:
         logger.warning("health_mysql_down", error=str(exc))
 
     redis_ok = redis_ping()
-    healthy = mysql_ok and redis_ok
+    healthy = mysql_ok and (redis_ok or settings.is_development)
     if not healthy:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
 

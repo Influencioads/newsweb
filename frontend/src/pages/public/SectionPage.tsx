@@ -4,6 +4,7 @@ import { ChevronRight, Clock3 } from 'lucide-react';
 
 import { ApiError } from '@/api/client';
 import { LeadCard, RowCard, SecondaryCard } from '@/components/article/ArticleCard';
+import { VideoStrip } from '@/components/video/VideoStrip';
 import { FollowButton } from '@/features/engagement/components/FollowButton';
 import * as publicApi from '@/features/public/api';
 import { useI18n } from '@/i18n';
@@ -76,6 +77,9 @@ export default function SectionPage() {
           </div>
         </div>
       </header>
+
+      {/* §15 — videos for this section (renders only when the category has any) */}
+      <VideoStrip category={slug} limit={4} className="mb-7" />
 
       {isLoading ? (
         <div aria-busy="true" className="grid gap-6 lg:grid-cols-[1.45fr_1fr]">

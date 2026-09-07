@@ -5,6 +5,7 @@ import { Pause, Volume2 } from 'lucide-react';
 
 import { ApiError } from '@/api/client';
 import { AdSlot } from '@/components/ads/AdSlot';
+import { VideoStrip } from '@/components/video/VideoStrip';
 import { GridCard } from '@/components/article/ArticleCard';
 import { ArticleGallery } from '@/components/article/ArticleGallery';
 import { ArticleRenderer } from '@/components/article/ArticleRenderer';
@@ -466,6 +467,9 @@ export default function ArticlePage() {
           name={data.district ? pick(data.district.name_te, data.district.name_en) : ''}
           exclude={[data.short_id, ...data.related.map((a) => a.short_id)]}
         />
+
+        {/* §15 — videos from this story's section */}
+        <VideoStrip category={data.category?.slug} limit={4} className="mt-7" />
       </article>
     </main>
   );

@@ -16,6 +16,7 @@ import * as publicApi from '@/api/public';
 import { CompactCard, LeadCard, RowCard } from '@/components/ArticleCard';
 import { EmptyState, ErrorState, LoadingState } from '@/components/Feedback';
 import { SectionHeader } from '@/components/SectionHeader';
+import { VideoStrip } from '@/components/VideoStrip';
 import { useI18n } from '@/lib/i18n';
 import { color, font } from '@/lib/theme';
 import { useAuth } from '@/stores/auth';
@@ -175,6 +176,9 @@ export default function HomeScreen() {
               ))}
             </>
           ) : null}
+
+          {/* -------------------------------------------- video strip (§15) - */}
+          <VideoStrip />
 
           {/* -------------------------------------------- sections ---------- */}
           {home.data.sections.map((section) => (

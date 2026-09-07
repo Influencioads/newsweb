@@ -11,6 +11,7 @@ import {
   SecondaryCard,
 } from '@/components/article/ArticleCard';
 import { AdSlot } from '@/components/ads/AdSlot';
+import { VideoStrip } from '@/components/video/VideoStrip';
 import * as engagementApi from '@/features/engagement/api';
 import * as publicApi from '@/features/public/api';
 import { useI18n } from '@/i18n';
@@ -281,6 +282,9 @@ export default function Home() {
 
       {/* ============ For You (§3.2, signed-in readers) ============ */}
       <ForYouBlock />
+
+      {/* ============ Video news strip (§15) ============ */}
+      <VideoStrip className="mt-8" limit={4} />
 
       {/* ============ Section blocks ============ */}
       {data.sections.map((section) => {

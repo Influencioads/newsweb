@@ -25,4 +25,8 @@ os.environ.setdefault(
 import uvicorn  # noqa: E402
 
 if __name__ == "__main__":
-    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=False)
+    # 0.0.0.0 so a phone on the same Wi-Fi can reach the API — the mobile app
+    # derives this machine's LAN address from the Metro host (see
+    # mobile/src/api/client.ts) and would otherwise hit a closed port. This is
+    # the local dev entrypoint only; production serves through nginx.
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=False)  # noqa: S104

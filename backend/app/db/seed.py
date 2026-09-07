@@ -20,7 +20,7 @@ import argparse
 import secrets
 import sys
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -195,7 +195,13 @@ def seed_homepage_sections(db: Session, categories: dict[str, "Category"]) -> in
 
 def seed_demo_events(db: Session) -> int:
     """Synthetic reader behaviour so trending and analytics have something to
-    show in a fresh dev environment. Deterministic-ish, demo tier only."""
+    show in a fresh dev environment. Deterministic-ish, demo tier only.
+
+    Re-seeds when the newest event has aged past the trending window: §8 decays
+    engagement over 48 hours, so a dev database left alone for two days would
+    otherwise show an empty Trending block — the engine working correctly, but
+    looking broken. Real deployments get this from actual reader traffic.
+    """
     import random
 
     from datetime import timedelta
@@ -204,7 +210,8 @@ def seed_demo_events(db: Session) -> int:
     from app.models.engagement import ArticleEvent
     from app.models.enums import ArticleStatus, EventType
 
-    if db.execute(select(ArticleEvent.id).limit(1)).scalar_one_or_none() is not None:
+    newest = db.execute(select(func.max(ArticleEvent.created_at))).scalar()
+    if newest is not None and (utcnow() - newest) < timedelta(hours=12):
         return 0
 
     rng = random.Random(42)

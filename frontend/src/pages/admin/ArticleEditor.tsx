@@ -2,15 +2,17 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 
+import { AudioAttachment } from '@/components/admin/AudioAttachment';
 import { CategoryPicker } from '@/components/admin/CategoryPicker';
 import { Field, Section, Toggle, inputClass } from '@/components/admin/FormControls';
 import { LocationSelector, type LocationValue } from '@/components/admin/LocationSelector';
 import { MediaPicker } from '@/components/admin/MediaPicker';
+import { PlacementPicker } from '@/components/admin/PlacementPicker';
 import { TagInput } from '@/components/admin/TagInput';
 import * as cmsApi from '@/features/cms/api';
 import { useAuth } from '@/stores/auth';
 import type { ApiError } from '@/api/client';
-import type { CmsMediaRef } from '@/types/cms';
+import type { CmsActivePin, CmsAudioRef, CmsMediaRef } from '@/types/cms';
 
 /**
  * §1 — the full article form.
@@ -158,6 +160,8 @@ export default function ArticleEditor() {
   const editing = Boolean(id);
   const nav = useNavigate();
   const can = useAuth((s) => s.can);
+  // Choosing what leads the home page is publish authority, not edit authority.
+  const canPin = can('article.publish');
 
   const existing = useQuery({
     queryKey: ['cms', 'article', id],
@@ -197,6 +201,12 @@ export default function ArticleEditor() {
   const [isFeatured, setIsFeatured] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
 
+  // --- placement & audio (§8, §9, §19) ------------------------------------
+  const [pinHome, setPinHome] = useState<number | null>(null);
+  const [pinTrending, setPinTrending] = useState<number | null>(null);
+  const [activePins, setActivePins] = useState<CmsActivePin[]>([]);
+  const [audio, setAudio] = useState<CmsAudioRef | null>(null);
+
   // --- SEO & schedule -----------------------------------------------------
   const [slug, setSlug] = useState('');
   const [seoTitle, setSeoTitle] = useState('');
@@ -231,7 +241,21 @@ export default function ArticleEditor() {
     setSeoTitle(a.seo_title ?? '');
     setSeoDescription(a.seo_description ?? '');
     setScheduledAt(toLocalInput(a.scheduled_at));
+    setPinHome(a.pin_home_minutes);
+    setPinTrending(a.pin_trending_minutes);
+    setActivePins(a.active_pins ?? []);
+    setAudio(a.audio);
   }, [existing.data]);
+
+  // Placement has its own write path: a published article cannot be PATCHed,
+  // and repositioning it on the front page is exactly the decision an editor
+  // revisits after publication.
+  const placement = useMutation({
+    mutationFn: () => cmsApi.setArticlePlacement(Number(id), {
+      pin_home_minutes: pinHome, pin_trending_minutes: pinTrending,
+    }),
+    onSuccess: (article) => setActivePins(article.active_pins ?? []),
+  });
 
   const save = useMutation({
     mutationFn: (p: Record<string, unknown>) =>
@@ -272,6 +296,8 @@ export default function ArticleEditor() {
       seo_title: seoTitle || null,
       seo_description: seoDescription || null,
       scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+      pin_home_minutes: canPin ? pinHome : undefined,
+      pin_trending_minutes: canPin ? pinTrending : undefined,
     });
   }
 
@@ -324,7 +350,7 @@ export default function ArticleEditor() {
           </Field>
         </Section>
 
-        <Section title="విభాగం & ప్రాంతం · Placement" subtitle="§2 — రాష్ట్రం నుంచి ఊరు వరకు">
+        <Section title="విభాగం & ప్రాంతం · Category and location" subtitle="§2 — రాష్ట్రం నుంచి ఊరు వరకు">
           <CategoryPicker
             categories={categories} categoryId={categoryId} subcategoryId={subcategoryId}
             onChange={(c, s) => { setCategoryId(c); setSubcategoryId(s); }}
@@ -392,6 +418,33 @@ export default function ArticleEditor() {
             <input type="datetime-local" value={scheduledAt}
               onChange={(e) => setScheduledAt(e.target.value)} className={inputClass} />
           </Field>
+        </Section>
+
+        <Section
+          title="స్థానం · Front-page placement"
+          subtitle="§8, §9 — ప్రచురణ అయ్యాక వీటిని దానంతట అదే వర్తింపజేస్తుంది"
+        >
+          <PlacementPicker
+            homeMinutes={pinHome}
+            trendingMinutes={pinTrending}
+            activePins={activePins}
+            onChange={(home, trending) => { setPinHome(home); setPinTrending(trending); }}
+            onApply={editing ? () => placement.mutate() : undefined}
+            applying={placement.isPending}
+            applied={placement.isSuccess}
+            disabled={!canPin}
+          />
+        </Section>
+
+        <Section
+          title="ఆడియో · Audio"
+          subtitle="§19 — సొంత రికార్డింగ్ జోడించండి, లేదా వదిలేస్తే వాయిస్ దానంతట చదువుతుంది"
+        >
+          <AudioAttachment
+            articleId={editing ? Number(id) : null}
+            audio={audio}
+            onChange={setAudio}
+          />
         </Section>
 
         <Section title="SEO">

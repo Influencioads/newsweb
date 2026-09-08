@@ -276,6 +276,19 @@ class Article(PKMixin, TimestampMixin, SoftDeleteMixin, ActorMixin, Base):
         doc="§9 duration control. NULL falls back to 24h after publication.",
     )
 
+    # --- placement intent, set on the article form (§8, §9) ----------------
+    # A pin cannot exist before the story is live, but the person deciding
+    # "this leads the home page" is writing the article, not watching the pin
+    # screen. These hold the decision until publication, when the pin is
+    # created for real; on an already-published article they take effect on
+    # save. NULL means "do not pin".
+    pin_home_minutes: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, doc="Minutes to pin to the home page once published"
+    )
+    pin_trending_minutes: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, doc="Minutes to pin into Top trending once published"
+    )
+
     # --- byline (§12.5 wire-copy rules) ------------------------------------
     author_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True

@@ -21,21 +21,43 @@ def trending_articles(
     offset: int = 0,
     exclude_ids: set[int] | None = None,
 ) -> list[Article]:
+    """Trending, with editor pins in front.
+
+    §8 is explicit that an editor override must not be a score boost — a
+    faked score makes the whole table dishonest and leaves no audit trail. So
+    "put this in Top trending" is a TRENDING-placement pin instead: it leads
+    the rail, it expires on its own, and `pins` records who did it and when.
+    The computed scores underneath stay exactly as the reader behaviour made
+    them.
+    """
+    skip = set(exclude_ids or ())
+    pinned: list[Article] = []
+    # A pin is an override of the front of the list, so it only makes sense on
+    # the first page.
+    if offset == 0 and scope_type == TrendingScope.GLOBAL:
+        pinned = active_pins(db, placement=PinPlacement.TRENDING, limit=min(limit, 5))
+        pinned = [a for a in pinned if a.id not in skip]
+        skip |= {a.id for a in pinned}
+
+    remaining = limit - len(pinned)
+    if remaining <= 0:
+        return pinned[:limit]
+
     stmt = (
         published_query()
         .join(TrendingScore, TrendingScore.article_id == Article.id)
         .where(TrendingScore.scope_type == scope_type)
         .order_by(TrendingScore.score.desc(), Article.published_at.desc())
-        .limit(limit)
+        .limit(remaining)
         .offset(offset)
     )
     if scope_type == TrendingScope.GLOBAL:
         stmt = stmt.where(TrendingScore.scope_id.is_(None))
     else:
         stmt = stmt.where(TrendingScore.scope_id == scope_id)
-    if exclude_ids:
-        stmt = stmt.where(Article.id.notin_(exclude_ids))
-    return list(db.execute(stmt).unique().scalars())
+    if skip:
+        stmt = stmt.where(Article.id.notin_(skip))
+    return pinned + list(db.execute(stmt).unique().scalars())
 
 
 def scored_rows(

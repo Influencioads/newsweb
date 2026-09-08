@@ -1,6 +1,10 @@
 export interface CmsMediaRef { id:number; url:string; alt_te:string|null; credit:string|null; width:number|null; height:number|null }
 export interface CmsVideoRef { id:number; youtube_id:string; title_te:string; thumbnail_url:string }
 export interface CmsTagRef { id:number; slug:string; name_te:string; name_en:string }
+/** §19 — the rendition the article uses. `provider:'upload'` is an editor's own file. */
+export interface CmsAudioRef { id:number; url:string|null; mime:string; duration_sec:number; provider:string; status:string }
+/** §8/§9 — a pin that is live right now, with its own countdown. */
+export interface CmsActivePin { placement:'home'|'category'|'local'|'breaking'|'trending'; ends_at:string; seconds_remaining:number }
 
 /** §23 — where the article came from, distinct from `source_type`'s copyright origin. */
 export type ArticleType = 'NORMAL'|'REPORTER'|'USER_SUBMITTED'|'AI_SUGGESTED'|'AI_DRAFT'|'BREAKING_NEWS';
@@ -21,7 +25,10 @@ export interface CmsArticle {
   approved_by:number|null; approved_at:string|null;
   published_at:string|null; scheduled_at:string|null; expires_at:string|null;
   breaking_until:string|null; updated_at:string;
+  // §8/§9 placement chosen on the form; applied when the story goes live.
+  pin_home_minutes:number|null; pin_trending_minutes:number|null;
   hero_media:CmsMediaRef|null; gallery:CmsMediaRef[]; video:CmsVideoRef|null; tags:CmsTagRef[];
+  audio:CmsAudioRef|null; active_pins:CmsActivePin[];
 }
 export interface CmsArticleList { articles:CmsArticle[]; total:number }
 

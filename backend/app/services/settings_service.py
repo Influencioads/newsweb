@@ -61,7 +61,9 @@ SPECS: dict[str, Spec] = {
     # --- §20 / §21 voice ----------------------------------------------------
     "voice.enabled": Spec(
         False, "bool",
-        "Global voice switch. Off hides the player everywhere, whatever the article says."),
+        "Generate spoken audio with a TTS provider. Off hides the Listen button "
+        "on stories that would have been synthesised; audio an editor uploaded "
+        "by hand still plays, because it costs nothing to serve."),
     "voice.provider": Spec(
         "local", "str", "TTS adapter: local | google | bhashini."),
     "voice.language": Spec("te-IN", "str", "Synthesis language tag."),

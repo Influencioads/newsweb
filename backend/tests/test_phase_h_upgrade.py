@@ -626,3 +626,180 @@ class TestDashboard:
         assert now_live.json()["workflow_state"] == WorkflowState.PUBLISHED.value
         assert now_live.json()["scheduled_at"] is None
         assert client.get(f"/api/v1/public/articles/{short_id}").status_code == 200
+
+
+# --------------------------------------------------------------------------- #
+# §8 / §9 — placement chosen on the article form
+# --------------------------------------------------------------------------- #
+class TestPlacementFromTheForm:
+    def _approved(self, client: TestClient, db: Session, title: str, **extra) -> dict:
+        chief = staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="h-chief@test.example.com")
+        approver = staff_headers(db, role=RoleKey.ADMIN, email="h-approver@test.example.com")
+        created = client.post("/api/v1/cms/articles", json={
+            "title_te": title, "body": body_doc(BODY_TE), **extra,
+        }, headers=chief).json()
+        client.post(f"/api/v1/cms/articles/{created['id']}/submit", json={}, headers=chief)
+        client.post(f"/api/v1/cms/articles/{created['id']}/approve", json={}, headers=approver)
+        return created
+
+    def test_pin_intent_becomes_a_real_pin_at_publication(
+        self, client: TestClient, db: Session
+    ) -> None:
+        chief = staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="h-chief@test.example.com")
+        created = self._approved(client, db, "హోమ్ పిన్ కథనం",
+                                 pin_home_minutes=15, pin_trending_minutes=30)
+        assert created["pin_home_minutes"] == 15
+
+        # Nothing is pinned while it is still a draft — there is nothing to pin.
+        before = client.get(f"/api/v1/cms/articles/{created['id']}", headers=chief).json()
+        assert before["active_pins"] == []
+
+        published = client.post(f"/api/v1/cms/articles/{created['id']}/publish",
+                                json={}, headers=chief)
+        assert published.status_code == 200, published.text
+        placements = {p["placement"] for p in published.json()["active_pins"]}
+        assert placements == {"home", "trending"}
+        home = next(p for p in published.json()["active_pins"] if p["placement"] == "home")
+        assert 0 < home["seconds_remaining"] <= 15 * 60
+
+    def test_trending_pin_leads_the_rail_without_faking_a_score(
+        self, client: TestClient, db: Session
+    ) -> None:
+        """§8 forbids score inflation, so the override has to be a pin."""
+        from app.models.discovery import TrendingScore
+
+        chief = staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="h-chief@test.example.com")
+        created = self._approved(client, db, "ట్రెండింగ్ పిన్ కథనం", pin_trending_minutes=30)
+        client.post(f"/api/v1/cms/articles/{created['id']}/publish", json={}, headers=chief)
+
+        payload = client.get("/api/v1/public/trending").json()
+        items = payload["articles"] if isinstance(payload, dict) else payload
+        assert items, "the pinned story alone should populate the rail"
+        assert items[0]["short_id"] == created["short_id"]
+
+        # ...and its computed score was never written.
+        assert db.scalar(select(TrendingScore).where(
+            TrendingScore.article_id == created["id"])) is None
+
+    def test_placement_needs_publish_authority(self, client: TestClient, db: Session) -> None:
+        district = db.execute(select(District).where(District.slug == "krishna")).scalar_one()
+        reporter = staff_headers(db, role=RoleKey.REPORTER, email="h-pinreporter@test.example.com",
+                                 district_id=district.id)
+        r = client.post("/api/v1/cms/articles", json={
+            "title_te": "అనుమతి లేని పిన్ ప్రయత్నం",
+            "body": body_doc(BODY_TE),
+            "district_id": district.id,
+            "pin_home_minutes": 60,
+        }, headers=reporter)
+        assert r.status_code == 403
+
+    def test_placement_endpoint_works_after_publication(
+        self, client: TestClient, db: Session
+    ) -> None:
+        chief = staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="h-chief@test.example.com")
+        created = self._approved(client, db, "ప్రచురణ తర్వాత పిన్")
+        client.post(f"/api/v1/cms/articles/{created['id']}/publish", json={}, headers=chief)
+
+        # A published article cannot be PATCHed, which is exactly why placement
+        # has its own route.
+        assert client.patch(f"/api/v1/cms/articles/{created['id']}",
+                            json={"pin_home_minutes": 10}, headers=chief).status_code == 409
+
+        placed = client.post(f"/api/v1/cms/articles/{created['id']}/placement",
+                             json={"pin_home_minutes": 10}, headers=chief)
+        assert placed.status_code == 200, placed.text
+        assert {p["placement"] for p in placed.json()["active_pins"]} == {"home"}
+
+
+# --------------------------------------------------------------------------- #
+# §19 — audio an editor attaches by hand
+# --------------------------------------------------------------------------- #
+class TestAudioAttachment:
+    def _published(self, client: TestClient, db: Session, title: str) -> dict:
+        chief = staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="h-chief@test.example.com")
+        approver = staff_headers(db, role=RoleKey.ADMIN, email="h-approver@test.example.com")
+        created = client.post("/api/v1/cms/articles", json={
+            "title_te": title, "body": body_doc(BODY_TE),
+        }, headers=chief).json()
+        client.post(f"/api/v1/cms/articles/{created['id']}/submit", json={}, headers=chief)
+        client.post(f"/api/v1/cms/articles/{created['id']}/approve", json={}, headers=approver)
+        client.post(f"/api/v1/cms/articles/{created['id']}/publish", json={}, headers=chief)
+        return created
+
+    def test_upload_plays_even_with_tts_switched_off(
+        self, client: TestClient, db: Session
+    ) -> None:
+        chief = staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="h-chief@test.example.com")
+        admin = staff_headers(db, role=RoleKey.ADMIN, email="h-admin@test.example.com")
+        article = self._published(client, db, "ఆడియో జత చేసిన కథనం")
+
+        # The global switch governs synthesis, not a file someone recorded.
+        client.patch("/api/v1/cms/settings",
+                     json={"values": {"voice.enabled": False}}, headers=admin)
+        settings_service.invalidate()
+
+        r = client.post(
+            f"/api/v1/cms/articles/{article['id']}/audio",
+            files={"file": ("bulletin.mp3", b"ID3\x04\x00fake mp3 payload", "audio/mpeg")},
+            data={"duration_sec": "42"},
+            headers=chief,
+        )
+        assert r.status_code == 201, r.text
+        assert r.json()["provider"] == "upload"
+        assert r.json()["duration_sec"] == 42
+
+        public = client.get(f"/api/v1/public/articles/{article['short_id']}/audio").json()
+        assert public["available"] is True
+        assert public["provider"] == "upload"
+
+        # It is not charged against the §21 synthesis budget.
+        usage = client.get("/api/v1/cms/settings", headers=admin).json()["voice_usage"]
+        assert usage["chars_this_month"] == 0
+
+    def test_upload_wins_over_generated_audio(self, client: TestClient, db: Session) -> None:
+        chief = staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="h-chief@test.example.com")
+        article = self._published(client, db, "జనరేట్ ప్రయత్నం")
+        client.post(
+            f"/api/v1/cms/articles/{article['id']}/audio",
+            files={"file": ("clip.mp3", b"ID3\x04\x00another payload", "audio/mpeg")},
+            headers=chief,
+        )
+        generated = client.post(f"/api/v1/cms/articles/{article['id']}/generate-audio",
+                                headers=chief).json()
+        assert generated["provider"] == "upload", "must not overwrite the editor's file"
+
+    def test_a_wrong_file_type_is_refused(self, client: TestClient, db: Session) -> None:
+        chief = staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="h-chief@test.example.com")
+        article = self._published(client, db, "తప్పు ఫైల్ రకం")
+        r = client.post(
+            f"/api/v1/cms/articles/{article['id']}/audio",
+            files={"file": ("notes.txt", b"not audio", "text/plain")},
+            headers=chief,
+        )
+        assert r.status_code == 415
+
+    def test_removing_the_upload_restores_the_device_fallback(
+        self, client: TestClient, db: Session
+    ) -> None:
+        chief = staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="h-chief@test.example.com")
+        admin = staff_headers(db, role=RoleKey.ADMIN, email="h-admin@test.example.com")
+        article = self._published(client, db, "ఆడియో తీసివేత")
+        client.post(
+            f"/api/v1/cms/articles/{article['id']}/audio",
+            files={"file": ("clip.mp3", b"ID3\x04\x00payload three", "audio/mpeg")},
+            headers=chief,
+        )
+        removed = client.delete(f"/api/v1/cms/articles/{article['id']}/audio", headers=chief)
+        assert removed.status_code == 200
+        assert removed.json()["removed"] is True
+
+        client.patch("/api/v1/cms/settings",
+                     json={"values": {"voice.enabled": True}}, headers=admin)
+        settings_service.invalidate()
+        public = client.get(f"/api/v1/public/articles/{article['short_id']}/audio").json()
+        assert public["available"] is False
+        assert public["fallback"] == "device"
+
+        client.patch("/api/v1/cms/settings",
+                     json={"values": {"voice.enabled": False}}, headers=admin)
+        settings_service.invalidate()

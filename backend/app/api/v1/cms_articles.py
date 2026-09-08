@@ -7,8 +7,11 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import Principal, require_any_permission, require_permission
 from app.core.errors import NotFoundError
+from app.db.base import utcnow
 from app.db.session import get_db
+from app.models.audio import AudioAsset
 from app.models.content import Article
+from app.models.discovery import Pin
 from app.models.enums import ArticleType, AuditAction, WorkflowState
 from app.models.media import ArticleMedia, Media
 from app.models.video import Video
@@ -17,9 +20,11 @@ from app.schemas.cms import (
     ArticleWrite,
     CmsArticleList,
     CmsArticleOut,
+    CmsAudioRef,
     CmsMediaRef,
     CmsTagRef,
     CmsVideoRef,
+    PlacementIn,
     TransitionIn,
 )
 from app.services import audit_service, workflow_service
@@ -77,6 +82,24 @@ def _out(db: Session, article: Article) -> CmsArticleOut:
         CmsTagRef(id=link.tag.id, slug=link.tag.slug, name_te=link.tag.name_te,
                   name_en=link.tag.name_en)
         for link in sorted(article.tags, key=lambda x: x.sort) if link.tag
+    ]
+    if article.audio_asset_id:
+        audio = db.get(AudioAsset, article.audio_asset_id)
+        if audio is not None:
+            payload.audio = CmsAudioRef(
+                id=audio.id, url=audio.url, mime=audio.mime,
+                duration_sec=audio.duration_sec, provider=audio.provider,
+                status=audio.status,
+            )
+    # §8/§9 — what is actually running, not just what was requested. A pin the
+    # editor set an hour ago may already have expired.
+    now = utcnow()
+    payload.active_pins = [
+        {"placement": p.placement, "ends_at": p.ends_at,
+         "seconds_remaining": max(0, int((p.ends_at - now).total_seconds()))}
+        for p in db.scalars(select(Pin).where(
+            Pin.article_id == article.id, Pin.starts_at <= now, Pin.ends_at > now
+        ).order_by(Pin.placement)).all()
     ]
     return payload
 
@@ -176,6 +199,38 @@ _PERMISSION = {"submit":"article.submit", "review":"article.review", "approve":"
 _AUDIT = {"submit":AuditAction.SUBMIT, "review":AuditAction.REVIEW_START, "approve":AuditAction.APPROVE,
           "request-changes":AuditAction.REQUEST_CHANGES, "reject":AuditAction.REJECT,
           "publish":AuditAction.PUBLISH, "unpublish":AuditAction.UNPUBLISH}
+
+
+@router.post("/{article_id}/placement", response_model=CmsArticleOut)
+def set_placement(article_id: int, payload: PlacementIn, request: Request,
+                  db: Session = Depends(get_db),
+                  principal: Principal = Depends(require_permission("article.publish"))):
+    """§8 / §9 — "pin to home page" and "show in Top trending" from the article
+    form.
+
+    Its own route rather than part of PATCH because a published article cannot
+    be edited, and placement is exactly the decision an editor revisits after
+    publication. Sending `null` for a slot clears the intent; the pin itself is
+    ended through the pin screen, which keeps the unpin audit trail in one
+    place.
+    """
+    article = _get(db, article_id)
+    workflow_service._scope(principal, article)
+
+    changes = payload.model_dump(exclude_unset=True)
+    for key, value in changes.items():
+        setattr(article, key, value)
+    applied = workflow_service.apply_placement_pins(db, article, principal.id)
+
+    audit_service.record(db, action=AuditAction.UPDATE, entity_type="article",
+                         entity_id=article.id, actor=principal.user,
+                         after={**changes, "pins_applied": applied}, request=request)
+    if applied:
+        from app.core.redis_client import cache_delete_prefix
+
+        cache_delete_prefix("home:")
+        cache_delete_prefix("trending:")
+    return _out(db, article)
 
 
 class BreakingControlIn(BaseModel):

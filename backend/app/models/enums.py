@@ -227,6 +227,10 @@ class PinPlacement(StrEnum):
     CATEGORY = "category"
     LOCAL = "local"
     BREAKING = "breaking"
+    #: §8 forbids editor overrides from inflating a trending score, so forcing
+    #: a story into Top trending is a pin like any other: it leads the rail,
+    #: expires by itself, and leaves an audit row.
+    TRENDING = "trending"
 
 
 class TrendingScope(StrEnum):

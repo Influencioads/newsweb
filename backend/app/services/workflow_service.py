@@ -37,6 +37,9 @@ _SCALARS = (
     "source_type", "is_breaking", "is_exclusive", "is_featured", "voice_enabled",
     "article_type", "hero_media_id", "video_id", "author_id",
 )
+#: Placement intent. Nullable ints where an explicit null means "do not pin",
+#: so they are handled with the clearable fields rather than _SCALARS.
+_PIN_INTENT = ("pin_home_minutes", "pin_trending_minutes")
 #: Nullable timestamps: an explicit `null` clears them, so presence matters
 #: rather than truthiness.
 _TIMESTAMPS = ("scheduled_at", "expires_at", "breaking_until")
@@ -158,6 +161,9 @@ def apply_copy(article: Article, values: dict[str, Any], db: Session | None = No
                 "hero_media_id", "video_id"):
         if key in values and values[key] is None:
             setattr(article, key, None)
+    for key in _PIN_INTENT:
+        if key in values:
+            setattr(article, key, values[key])
     for key in _TIMESTAMPS:
         if key in values:
             setattr(article, key, values[key])
@@ -191,6 +197,11 @@ def _guard_flags(db: Session, principal: Principal, article: Article,
                  values: dict[str, Any]) -> None:
     if values.get("is_breaking"):
         principal.require("article.breaking")
+    # Choosing what leads the home page or Top trending is the same authority
+    # as pinning from the pin screen — the form is a shortcut to that action,
+    # not a way around its permission.
+    if any(values.get(key) for key in _PIN_INTENT):
+        principal.require("article.publish")
     if values.get("article_type") in _MACHINE_TYPES:
         raise ValidationError(
             message_en="AI article types are set by the AI pipeline, not by hand.",
@@ -199,6 +210,55 @@ def _guard_flags(db: Session, principal: Principal, article: Article,
         # Re-assigning a byline moves ownership of the article, so it needs the
         # same authority as approving one.
         principal.require("article.approve")
+
+
+def apply_placement_pins(db: Session, article: Article, actor_id: int | None) -> list[str]:
+    """Turn the form's pin intent into real pins (§8, §9).
+
+    Called on save for an already-live article and again at publication, so the
+    editor's decision lands whichever order the two happen in. Re-running it is
+    safe: an existing live pin in the same slot is replaced rather than
+    duplicated, so saving twice does not stack two overlapping windows.
+    """
+    from app.models.discovery import Pin
+    from app.models.enums import PinPlacement
+
+    if article.status != ArticleStatus.PUBLISHED:
+        return []
+
+    now = utcnow()
+    applied: list[str] = []
+    wanted = {
+        PinPlacement.HOME: article.pin_home_minutes,
+        PinPlacement.TRENDING: article.pin_trending_minutes,
+    }
+    for placement, minutes in wanted.items():
+        if not minutes or minutes <= 0:
+            continue
+        existing = db.scalar(
+            select(Pin).where(
+                Pin.article_id == article.id,
+                Pin.placement == placement,
+                Pin.ends_at > now,
+            )
+        )
+        if existing is not None:
+            existing.starts_at = now
+            existing.ends_at = now + timedelta(minutes=minutes)
+            existing.created_by = actor_id
+        else:
+            db.add(Pin(
+                article_id=article.id,
+                placement=placement,
+                starts_at=now,
+                ends_at=now + timedelta(minutes=minutes),
+                note="Set on the article form",
+                created_by=actor_id,
+            ))
+        applied.append(placement.value)
+    if applied:
+        db.flush()
+    return applied
 
 
 def create(db: Session, principal: Principal, values: dict[str, Any]) -> Article:
@@ -317,6 +377,9 @@ def transition(db: Session, principal: Principal, article: Article, action: str,
 
             minutes = settings_service.get_int(db, "breaking.default_duration_minutes")
             article.breaking_until = article.published_at + timedelta(minutes=minutes)
+        # §8 / §9 — the placement chosen on the article form becomes real now
+        # that there is something to place.
+        apply_placement_pins(db, article, principal.id)
         # §13 publish triggers (breaking / local / topic). A notification bug
         # must never keep a story off the site, hence the broad guard.
         try:

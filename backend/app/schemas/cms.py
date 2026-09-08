@@ -63,6 +63,10 @@ class ArticleWrite(BaseModel):
     expires_at: datetime | None = None
     breaking_until: datetime | None = None
 
+    # §8 / §9 placement, chosen while writing. Applied when the story goes live.
+    pin_home_minutes: int | None = Field(default=None, ge=1, le=60 * 24 * 7)
+    pin_trending_minutes: int | None = Field(default=None, ge=1, le=60 * 24 * 7)
+
 
 class ArticlePatch(BaseModel):
     title_te: str | None = Field(default=None, min_length=3, max_length=400)
@@ -104,6 +108,10 @@ class ArticlePatch(BaseModel):
     expires_at: datetime | None = None
     breaking_until: datetime | None = None
 
+    # §8 / §9 placement, chosen while writing. Applied when the story goes live.
+    pin_home_minutes: int | None = Field(default=None, ge=1, le=60 * 24 * 7)
+    pin_trending_minutes: int | None = Field(default=None, ge=1, le=60 * 24 * 7)
+
 
 class TransitionIn(BaseModel):
     note: str | None = Field(default=None, max_length=1000)
@@ -125,6 +133,18 @@ class CmsVideoRef(BaseModel):
     youtube_id: str
     title_te: str
     thumbnail_url: str
+
+
+class CmsAudioRef(BaseModel):
+    """§19 — whichever rendition the article currently uses, generated or
+    uploaded. `provider == 'upload'` is a file an editor attached by hand."""
+
+    id: int
+    url: str | None
+    mime: str
+    duration_sec: int
+    provider: str
+    status: str
 
 
 class CmsTagRef(BaseModel):
@@ -173,6 +193,8 @@ class CmsArticleOut(BaseModel):
     scheduled_at: datetime | None = None
     expires_at: datetime | None = None
     breaking_until: datetime | None = None
+    pin_home_minutes: int | None = None
+    pin_trending_minutes: int | None = None
     updated_at: datetime
 
     # Resolved for the editor form; not columns.
@@ -180,6 +202,22 @@ class CmsArticleOut(BaseModel):
     gallery: list[CmsMediaRef] = []
     video: CmsVideoRef | None = None
     tags: list[CmsTagRef] = []
+    audio: CmsAudioRef | None = None
+    #: Live pins for this article, so the form shows what is actually running
+    #: rather than only what was requested.
+    active_pins: list[dict[str, Any]] = []
+
+
+class PlacementIn(BaseModel):
+    """§8 / §9 — set (or clear) the home and Top-trending pins for one article.
+
+    Separate from ArticlePatch because a published article cannot be edited,
+    but its placement very much can: the story leading the front page is a
+    decision made *after* publication as often as before it.
+    """
+
+    pin_home_minutes: int | None = Field(default=None, ge=1, le=60 * 24 * 7)
+    pin_trending_minutes: int | None = Field(default=None, ge=1, le=60 * 24 * 7)
 
 
 class CmsArticleList(BaseModel):

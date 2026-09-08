@@ -11,7 +11,7 @@ what shipped before this feature existed and still works offline.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -23,6 +23,22 @@ from app.models.enums import ArticleStatus, AuditAction
 from app.services import audit_service, settings_service, tts_service
 
 router = APIRouter(tags=["audio"])
+
+
+def _article(db: Session, article_id: int, principal: Principal) -> Article:
+    article = db.get(Article, article_id)
+    if article is None or article.deleted_at:
+        raise NotFoundError()
+    principal.assert_scope(district_id=article.district_id, mandal_id=article.mandal_id)
+    return article
+
+
+def _purge_article_caches() -> None:
+    """Audio changes what the article endpoint reports, so the cached copy has
+    to go — otherwise the player keeps pointing at the old file."""
+    from app.core.redis_client import cache_delete_prefix
+
+    cache_delete_prefix("article:")
 
 
 def _payload(article: Article, asset) -> dict:
@@ -67,15 +83,51 @@ def public_audio(short_id: str, response: Response, db: Session = Depends(get_db
     return _payload(article, asset)
 
 
+@router.post("/cms/articles/{article_id}/audio", status_code=201)
+async def upload_audio(article_id: int, request: Request, file: UploadFile = File(...),
+                       duration_sec: int = Form(0),
+                       db: Session = Depends(get_db),
+                       p: Principal = Depends(require_any_permission("article.edit", "article.edit_own"))):
+    """§19 — attach your own audio instead of a synthesised reading.
+
+    For a recorded bulletin, an interview clip, or a presenter reading the
+    story properly. It replaces generated audio for this article and, unlike
+    generated audio, does not depend on a TTS provider being configured.
+    """
+    article = _article(db, article_id, p)
+    raw = await file.read()
+    asset = tts_service.attach_upload(
+        db, article, raw=raw, filename=file.filename or "audio",
+        mime=file.content_type or "application/octet-stream",
+        duration_sec=duration_sec, requested_by=p.id,
+    )
+    audit_service.record(db, action=AuditAction.MEDIA_UPLOAD, entity_type="audio_asset",
+                         entity_id=asset.id, actor=p.user,
+                         after={"article_id": article.id, "bytes": asset.bytes,
+                                "mime": asset.mime}, request=request)
+    _purge_article_caches()
+    return _payload(article, asset)
+
+
+@router.delete("/cms/articles/{article_id}/audio")
+def delete_audio(article_id: int, request: Request, db: Session = Depends(get_db),
+                 p: Principal = Depends(require_any_permission("article.edit", "article.edit_own"))):
+    """Detach the uploaded file. Generated audio, if any, takes over again."""
+    article = _article(db, article_id, p)
+    removed = tts_service.remove_upload(db, article)
+    if removed:
+        audit_service.record(db, action=AuditAction.MEDIA_DELETE, entity_type="audio_asset",
+                             entity_id=article.id, actor=p.user,
+                             after={"article_id": article.id}, request=request)
+        _purge_article_caches()
+    return {"removed": removed, **_payload(article, tts_service.existing_ready(db, article))}
+
+
 @router.post("/cms/articles/{article_id}/generate-audio")
 def generate_audio(article_id: int, request: Request, force: bool = False,
                    db: Session = Depends(get_db),
                    p: Principal = Depends(require_any_permission("article.edit", "article.edit_own"))):
-    article = db.get(Article, article_id)
-    if article is None or article.deleted_at:
-        raise NotFoundError()
-    p.assert_scope(district_id=article.district_id, mandal_id=article.mandal_id)
-
+    article = _article(db, article_id, p)
     asset = tts_service.ensure_audio(db, article, requested_by=p.id, force=force)
     audit_service.record(db, action=AuditAction.UPDATE, entity_type="audio_asset",
                          entity_id=(asset.id if asset else "none"), actor=p.user,

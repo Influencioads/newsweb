@@ -1,5 +1,5 @@
 import { api } from '@/api/client';
-import type { AiDraft, AiSuggestion, AudioState, CmsArticle, CmsArticleList, CmsEditorOptions, CmsMediaRef, CmsOption, DashboardStats, SettingsPayload } from '@/types/cms';
+import type { AiDraft, AiSuggestion, AudioState, CmsArticle, CmsArticleList, CmsAudioRef, CmsEditorOptions, CmsMediaRef, CmsOption, DashboardStats, SettingsPayload } from '@/types/cms';
 export const fetchArticles=async(params?:{state?:string;search?:string;offset?:number;limit?:number})=>(await api.get<CmsArticleList>('/cms/articles',{params})).data;
 export const fetchArticle=async(id:number)=>(await api.get<CmsArticle>(`/cms/articles/${id}`)).data;
 export const createArticle=async(payload:Record<string,unknown>)=>(await api.post<CmsArticle>('/cms/articles',payload)).data;
@@ -57,3 +57,10 @@ export const discardAiDraft=async(id:number)=>(await api.post<AiDraft>(`/cms/ai/
 
 // --- §19 voice -------------------------------------------------------------
 export const generateArticleAudio=async(id:number,force=false)=>(await api.post<AudioState&{usage:Record<string,number>}>(`/cms/articles/${id}/generate-audio`,null,{params:{force}})).data;
+
+// --- §8 / §9 placement from the article form -------------------------------
+export const setArticlePlacement=async(id:number,payload:{pin_home_minutes?:number|null;pin_trending_minutes?:number|null})=>(await api.post<CmsArticle>(`/cms/articles/${id}/placement`,payload)).data;
+
+// --- §19 audio an editor attaches by hand ----------------------------------
+export const uploadArticleAudio=async(id:number,file:File,durationSec=0)=>{const fd=new FormData();fd.append('file',file);fd.append('duration_sec',String(Math.round(durationSec)));return (await api.post<CmsAudioRef&{available:boolean;url:string|null}>(`/cms/articles/${id}/audio`,fd,{headers:{'Content-Type':'multipart/form-data'}})).data};
+export const deleteArticleAudio=async(id:number)=>(await api.delete<{removed:boolean}>(`/cms/articles/${id}/audio`)).data;

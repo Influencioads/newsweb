@@ -11,6 +11,8 @@ So model modules are registered here, once, rather than at each call site.
 """
 
 from app.db.base import Base
+from app.models.ai import AiArticleDraft, AiSource, AiSuggestion
+from app.models.audio import AudioAsset
 from app.models.audit import AuditLog
 from app.models.content import (
     Article,
@@ -37,6 +39,7 @@ from app.models.notify import Notification, NotificationCampaign, PushDevice
 from app.models.geo import District, Locality, Mandal, State
 from app.models.media import ArticleMedia, Media
 from app.models.reader import UserPreference
+from app.models.setting import AppSetting
 from app.models.site import HomepageSection, SearchQuery
 from app.models.user import (
     Permission,
@@ -50,7 +53,12 @@ from app.models.video import Video
 
 __all__ = [
     "AdCampaign",
+    "AiArticleDraft",
+    "AiSource",
+    "AiSuggestion",
+    "AppSetting",
     "Article",
+    "AudioAsset",
     "CreatorSubmission",
     "ArticleEvent",
     "ArticleMedia",

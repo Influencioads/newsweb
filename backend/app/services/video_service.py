@@ -91,6 +91,35 @@ def add_video(
     return video
 
 
+def link_for_article(db: Session, youtube_url: str, *, article) -> Video:
+    """Attach a pasted YouTube URL to an article (§1 "video" field).
+
+    Unlike `add_video`, a link that is already in the library is *reused*
+    rather than rejected — two stories legitimately reference the same clip,
+    and an editor pasting a known URL should not see an error.
+    """
+    youtube_id = parse_youtube_id(youtube_url)
+    existing = db.execute(
+        select(Video).where(Video.youtube_id == youtube_id, Video.deleted_at.is_(None))
+    ).scalar_one_or_none()
+    if existing is not None:
+        return existing
+
+    video = Video(
+        youtube_id=youtube_id,
+        title_te=(article.title_te or "వీడియో")[:400],
+        title_en=(article.title_en or None),
+        category_id=article.category_id,
+        district_id=article.district_id,
+        is_published=True,
+        published_at=utcnow(),
+        created_by=article.updated_by or article.created_by,
+    )
+    db.add(video)
+    db.flush()
+    return video
+
+
 def get_video(db: Session, video_id: int) -> Video:
     video = db.get(Video, video_id)
     if video is None or video.deleted_at is not None:

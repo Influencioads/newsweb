@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 from app.schemas.auth import LoginResponse
 from app.schemas.public import DistrictOut, LocalityOut, MandalOut, StateOut
@@ -44,3 +44,9 @@ class PreferencesPatch(BaseModel):
 class ReaderProfilePatch(BaseModel):
     name_te: str | None = Field(default=None, min_length=1, max_length=120)
     name_en: str | None = Field(default=None, min_length=1, max_length=120)
+    #: §5 profile fields. `email` is accepted here only when the account has
+    #: none yet — changing a verified address has to go through verification,
+    #: which the route enforces.
+    email: EmailStr | None = None
+    bio_te: str | None = Field(default=None, max_length=2000)
+    avatar_media_id: int | None = None

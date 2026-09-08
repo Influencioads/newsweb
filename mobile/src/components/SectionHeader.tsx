@@ -2,10 +2,12 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useI18n } from '@/lib/i18n';
 import { color, font, HIT_SLOP } from '@/lib/theme';
+import { makeStyles } from '@/lib/useTheme';
 
 /** Section rule: bold title on the left, optional "see all →" on the right —
  * the same block header the web home uses. */
 export function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => void }) {
+  const styles = useStyles();
   const { t } = useI18n();
   return (
     <View style={styles.row}>
@@ -19,7 +21,7 @@ export function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: (
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((color) => ({
   row: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -44,4 +46,4 @@ const styles = StyleSheet.create({
     color: color.info,
     fontWeight: '600',
   },
-});
+}));

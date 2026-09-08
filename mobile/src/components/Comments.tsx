@@ -4,11 +4,14 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import * as engagementApi from '@/api/engagement';
 import { timeAgo, useI18n } from '@/lib/i18n';
-import { color, font } from '@/lib/theme';
+import { font } from '@/lib/theme';
+import { makeStyles, useColors } from '@/lib/useTheme';
 import { useAuth } from '@/stores/auth';
 
 /** Comments (§5): visible threads + a composer for signed-in readers. */
 export function Comments({ shortId }: { shortId: string }) {
+  const styles = useStyles();
+  const color = useColors();
   const { t, pick, language } = useI18n();
   const authed = useAuth((s) => s.status === 'authenticated');
   const queryClient = useQueryClient();
@@ -98,7 +101,7 @@ export function Comments({ shortId }: { shortId: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((color) => ({
   section: {
     marginTop: 20,
     borderTopWidth: 2,
@@ -147,4 +150,4 @@ const styles = StyleSheet.create({
   time: { fontFamily: font.telugu, fontSize: 10.5, lineHeight: 16, color: color.mutedLight },
   delete: { color: color.breaking, fontSize: 13, paddingHorizontal: 4 },
   body: { fontFamily: font.telugu, fontSize: 14.5, lineHeight: 24, color: color.inkSoft, marginTop: 2 },
-});
+}));

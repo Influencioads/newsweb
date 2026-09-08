@@ -8,6 +8,7 @@ import { RowCard } from '@/components/ArticleCard';
 import { EmptyState, ErrorState, LoadingState } from '@/components/Feedback';
 import { useI18n } from '@/lib/i18n';
 import { color, font } from '@/lib/theme';
+import { makeStyles } from '@/lib/useTheme';
 import { usePrefs } from '@/stores/prefs';
 
 /**
@@ -25,6 +26,7 @@ function Chip({
   active: boolean;
   onPress: () => void;
 }) {
+  const styles = useStyles();
   return (
     <Pressable
       onPress={onPress}
@@ -38,6 +40,7 @@ function Chip({
 }
 
 export default function LocalScreen() {
+  const styles = useStyles();
   const { t, pick } = useI18n();
   const { edition, mandal, setEdition, setMandal } = usePrefs();
   const [stateCode, setStateCode] = useState<string>('');
@@ -153,7 +156,7 @@ export default function LocalScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((color) => ({
   safe: { flex: 1, backgroundColor: color.canvas },
   header: {
     backgroundColor: color.paper,
@@ -182,4 +185,4 @@ const styles = StyleSheet.create({
   chipActive: { borderColor: color.brand, backgroundColor: color.brandTint },
   chipText: { fontFamily: font.telugu, fontSize: 13, lineHeight: 20, color: color.muted },
   chipTextActive: { color: color.brand, fontFamily: font.teluguSemiBold },
-});
+}));

@@ -20,7 +20,10 @@ import { Platform } from 'react-native';
 // from the Metro host instead so the app talks to the laptop's backend.
 function resolveApiOrigin(): string {
   const explicit = process.env.EXPO_PUBLIC_API_URL;
-  if (explicit) return explicit.replace(/\/$/, '');
+  // Tolerate the version suffix being included by mistake: this is an *origin*,
+  // and `/api/v1` is appended below. A build that carried it twice 404'd every
+  // request, so strip it rather than trust the value.
+  if (explicit) return explicit.replace(/\/+$/, '').replace(/\/api\/v1$/, '');
   const hostUri: string | undefined = Constants.expoConfig?.hostUri;
   const host = hostUri?.split(':')[0];
   if (host && Platform.OS !== 'web') return `http://${host}:8000`;

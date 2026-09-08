@@ -2,11 +2,13 @@ import { Tabs } from 'expo-router';
 import { Text } from 'react-native';
 
 import { useI18n } from '@/lib/i18n';
-import { color, font } from '@/lib/theme';
+import { font } from '@/lib/theme';
+import { useColors } from '@/lib/useTheme';
 
 /** Bottom tab bar (DailyHunt-benchmarked): Home · Local · Search · Profile. */
 
 function TabIcon({ glyph, focused }: { glyph: string; focused: boolean }) {
+  const color = useColors();
   return (
     <Text style={{ fontSize: 20, color: focused ? color.brand : color.mutedLight }}>{glyph}</Text>
   );
@@ -14,6 +16,7 @@ function TabIcon({ glyph, focused }: { glyph: string; focused: boolean }) {
 
 export default function TabsLayout() {
   const { t } = useI18n();
+  const color = useColors();
   return (
     <Tabs
       screenOptions={{

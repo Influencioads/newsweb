@@ -13,11 +13,14 @@ import type { FontStep } from '@/lib/theme';
  */
 interface PrefsState {
   language: 'te' | 'en';
+  /** 'system' follows the OS; the other two are the reader's explicit choice. */
+  theme: 'system' | 'light' | 'dark';
   /** District slug anchoring the local feed and the home edition. */
   edition: string | null;
   mandal: string | null;
   fontStep: FontStep;
   setLanguage: (language: 'te' | 'en') => void;
+  setTheme: (theme: 'system' | 'light' | 'dark') => void;
   setEdition: (slug: string | null) => void;
   setMandal: (slug: string | null) => void;
   setFontStep: (step: FontStep) => void;
@@ -27,10 +30,12 @@ export const usePrefs = create<PrefsState>()(
   persist(
     (set) => ({
       language: 'te',
+      theme: 'system',
       edition: null,
       mandal: null,
       fontStep: 'A',
       setLanguage: (language) => set({ language }),
+      setTheme: (theme) => set({ theme }),
       // Changing the district invalidates the mandal beneath it (§4 hierarchy).
       setEdition: (edition) => set({ edition, mandal: null }),
       setMandal: (mandal) => set({ mandal }),

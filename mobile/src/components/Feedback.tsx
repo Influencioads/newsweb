@@ -1,11 +1,14 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useI18n } from '@/lib/i18n';
-import { color, font, type } from '@/lib/theme';
+import { font, type } from '@/lib/theme';
+import { makeStyles, useColors } from '@/lib/useTheme';
 
 /** Loading / error / empty states — every screen ships all three (doc §31). */
 
 export function LoadingState() {
+  const styles = useStyles();
+  const color = useColors();
   const { t } = useI18n();
   return (
     <View style={styles.box}>
@@ -16,6 +19,8 @@ export function LoadingState() {
 }
 
 export function ErrorState({ onRetry, message }: { onRetry?: () => void; message?: string }) {
+  const styles = useStyles();
+  const color = useColors();
   const { t } = useI18n();
   return (
     <View style={styles.box}>
@@ -30,6 +35,8 @@ export function ErrorState({ onRetry, message }: { onRetry?: () => void; message
 }
 
 export function EmptyState({ message }: { message?: string }) {
+  const styles = useStyles();
+  const color = useColors();
   const { t } = useI18n();
   return (
     <View style={styles.box}>
@@ -38,7 +45,7 @@ export function EmptyState({ message }: { message?: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((color) => ({
   box: { alignItems: 'center', justifyContent: 'center', padding: 40, gap: 10 },
   text: {
     fontFamily: font.telugu,
@@ -56,4 +63,4 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   retryText: { fontFamily: font.teluguSemiBold, fontSize: 14, lineHeight: 21, color: color.brand },
-});
+}));

@@ -31,6 +31,7 @@ from app.core.errors import (
     SessionRevokedError,
     TwoFactorRequiredError,
     UnauthorizedError,
+    ValidationError,
 )
 from app.core.logging import get_logger
 from app.core.redis_client import delete as redis_delete
@@ -461,8 +462,10 @@ def request_otp(db: Session, phone: str, request: Request | None = None) -> tupl
     )
 
     if user is not None:
-        # TODO(phase-10): dispatch through the MSG91 adapter. Until then the code
-        # is only available via OTP_DEV_ECHO in development.
+        from app.integrations.messaging import sms
+
+        # Unconfigured MSG91 echoes to the log, so development is unchanged.
+        sms.send_otp(normalised, otp)
         logger.info("otp_issued", phone_suffix=normalised[-4:], registered=True)
     else:
         logger.info("otp_requested_unknown_number", phone_suffix=normalised[-4:])
@@ -520,10 +523,14 @@ def verify_otp_reader(
     """
     normalised = _consume_valid_otp(db, phone, otp, request)
 
+    from app.services import verification_service
+
     user = get_user_by_phone(db, normalised)
     if user is not None:
         if user.status != UserStatus.ACTIVE:
             raise AccountInactiveError()
+        # §4 — the OTP they just completed is the proof.
+        verification_service.mark_phone_verified(user)
         return user, False
 
     from app.models.enums import RoleKey, ScopeType
@@ -541,6 +548,7 @@ def verify_otp_reader(
         name_te=display,
         name_en=f"Reader {normalised[-4:]}",
         status=UserStatus.ACTIVE,
+        phone_verified_at=utcnow(),
     )
     db.add(user)
     db.flush()
@@ -554,6 +562,75 @@ def verify_otp_reader(
     db.refresh(user)
     logger.info("reader_registered", user_id=user.id, phone_suffix=normalised[-4:])
     return user, True
+
+
+# --------------------------------------------------------------------------- #
+# Reader registration with email + password (updated doc §4)
+# --------------------------------------------------------------------------- #
+def register_reader(
+    db: Session,
+    *,
+    email: str,
+    password: str,
+    name: str,
+    phone: str | None = None,
+    request: Request | None = None,
+) -> User:
+    """Create a reader account from the §4 signup form.
+
+    This coexists with OTP sign-in rather than replacing it: `password_hash`
+    stays nullable, so an existing OTP reader is untouched, and a reader who
+    registers here can still sign in by OTP later if they add a phone number.
+    """
+    from app.models.enums import RoleKey, ScopeType
+    from app.models.user import Role, UserRole
+
+    address = email.strip().lower()
+    if get_user_by_email(db, address) is not None:
+        raise ValidationError(
+            message_en="An account with that email already exists.",
+            message_te="ఆ ఇమెయిల్‌తో ఖాతా ఇప్పటికే ఉంది.",
+            details={"email": "already registered"},
+        )
+
+    normalised_phone: str | None = None
+    if phone:
+        normalised_phone = normalise_phone(phone)
+        if get_user_by_phone(db, normalised_phone) is not None:
+            raise ValidationError(
+                message_en="An account with that phone number already exists.",
+                message_te="ఆ ఫోన్ నంబర్‌తో ఖాతా ఇప్పటికే ఉంది.",
+                details={"phone": "already registered"},
+            )
+
+    role = db.execute(
+        select(Role).where(Role.key == RoleKey.SUBSCRIBER.value)
+    ).scalar_one_or_none()
+    if role is None:  # pragma: no cover — seeds always create it
+        raise AccountInactiveError()
+
+    label = name.strip()[:120] or address.split("@")[0]
+    user = User(
+        email=address,
+        phone=normalised_phone,
+        name_te=label,
+        name_en=label,
+        password_hash=security.hash_password(password),
+        password_changed_at=utcnow(),
+        status=UserStatus.ACTIVE,
+    )
+    db.add(user)
+    db.flush()
+    # SELF scope: a reader may act on their own records and nothing else.
+    db.add(UserRole(user_id=user.id, role_id=role.id, scope_type=ScopeType.SELF, scope_id=None))
+    db.flush()
+    db.refresh(user)
+
+    audit_service.record_auth_event(
+        db, action=AuditAction.CREATE, user=user, identifier=address, request=request
+    )
+    logger.info("reader_registered_email", user_id=user.id)
+    return user
 
 
 # --------------------------------------------------------------------------- #

@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text } from 'react-native';
 import * as engagementApi from '@/api/engagement';
 import type { FollowTargetType } from '@/api/engagement';
 import { color, font } from '@/lib/theme';
+import { makeStyles } from '@/lib/useTheme';
 import { useAuth } from '@/stores/auth';
 
 /** Follow toggle chip (§12). One shared my-follows query keeps chips in sync. */
@@ -17,6 +18,7 @@ export function FollowChip({
   slug: string;
   name: string;
 }) {
+  const styles = useStyles();
   const authed = useAuth((s) => s.status === 'authenticated');
   const queryClient = useQueryClient();
 
@@ -57,7 +59,7 @@ export function FollowChip({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((color) => ({
   chip: {
     borderWidth: 1,
     borderColor: color.rule,
@@ -69,4 +71,4 @@ const styles = StyleSheet.create({
   chipActive: { borderColor: color.brand, backgroundColor: color.brandTint },
   text: { fontFamily: font.telugu, fontSize: 12.5, lineHeight: 19, color: color.muted },
   textActive: { color: color.brand, fontFamily: font.teluguSemiBold },
-});
+}));

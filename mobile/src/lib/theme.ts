@@ -2,8 +2,13 @@
  * Design tokens — the same contract the web app compiles into Tailwind
  * (frontend/tailwind.config.ts, lifted from mockup 1a). A component that needs
  * a colour picks one of these; it does not invent one.
+ *
+ * Both themes are defined here. `color` remains the light palette so any code
+ * that reads a token at module scope still compiles, but screens obtain their
+ * palette through `makeStyles`, which re-resolves it whenever the reader
+ * changes theme.
  */
-export const color = {
+export const lightColor = {
   brand: '#A61C24',
   brandDark: '#7E1219',
   brandDeep: '#8E0B16',
@@ -60,3 +65,49 @@ export const FONT_SCALE: Record<FontStep, number> = {
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 } as const;
 export const HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 };
+
+/**
+ * Dark palette.
+ *
+ * Not an inversion: the brand red is lightened so it still reads as the
+ * masthead colour on a dark ground rather than turning into a muddy maroon,
+ * and the neutrals carry the same warm bias as the light set so the two
+ * themes feel like one publication.
+ */
+export const darkColor: Palette = {
+  brand: '#E0737A',
+  brandDark: '#C85A62',
+  brandDeep: '#F08A91',
+  brandTint: '#3E1F21',
+  breaking: '#E9848A',
+  ink: '#EDE7DD',
+  inkSoft: '#C9C0B3',
+  muted: '#AA9F91',
+  mutedLight: '#8C8172',
+  paper: '#262019',
+  paperSub: '#221D17',
+  canvas: '#171310',
+  rule: '#3A332B',
+  ruleStrong: '#4D443A',
+  exclusive: '#D9B366',
+  exclusiveTint: '#38301F',
+  success: '#79C296',
+  successTint: '#22342A',
+  info: '#7FAEEA',
+  placeholder: '#2E2820',
+  white: '#201B16',
+} as const;
+
+export type Palette = { -readonly [K in keyof typeof lightColor]: string };
+export type ThemeName = 'light' | 'dark';
+
+/**
+ * The light palette, kept under its original name so module-scope reads and
+ * non-themed call sites (navigation options, one-off constants) still work.
+ */
+export const color = lightColor;
+
+export const palettes: Record<ThemeName, Palette> = {
+  light: lightColor,
+  dark: darkColor,
+};

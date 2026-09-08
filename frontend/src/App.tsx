@@ -7,13 +7,17 @@ import Dashboard from './pages/admin/Dashboard';
 import Articles from './pages/admin/Articles';
 import ArticleEditor from './pages/admin/ArticleEditor';
 import ReviewQueue from './pages/admin/ReviewQueue';
-import { AuditPage, MediaPage, ModerationPage, RolesPage, SettingsPage, TaxonomyPage, UsersPage } from './pages/admin/ManagementPages';
+import { AuditPage, MediaPage, ModerationPage, RolesPage, TaxonomyPage, UsersPage } from './pages/admin/ManagementPages';
+import SettingsPage from './pages/admin/SettingsPage';
+import AiSuggestionsPage from './pages/admin/AiSuggestions';
+import PendingArticlesPage from './pages/admin/PendingArticles';
 import { AdsPage, AnalyticsPage, HomepageSectionsPage, NotificationsAdminPage, PinsPage, TrendingAdminPage, VideosAdminPage } from './pages/admin/DiscoveryPages';
 import ArticlePage from './pages/public/ArticlePage';
 import Home from './pages/public/Home';
 import { BookmarksPage, FollowingPage, HistoryPage } from './pages/public/LibraryPages';
 import LocalPage from './pages/public/LocalPage';
 import LoginPage from './pages/public/LoginPage';
+import { ForgotPasswordPage, RegisterPage, ResetPasswordPage, VerifyEmailPage } from './pages/public/AccountPages';
 import NotificationsPage from './pages/public/NotificationsPage';
 import PolicyPage from './pages/public/PolicyPage';
 import ProfilePage from './pages/public/ProfilePage';
@@ -51,6 +55,10 @@ export default function App() {
         <Route path="/local" element={<LocalPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/submit" element={<SubmitPage />} />
         <Route path="/bookmarks" element={<BookmarksPage />} />
@@ -92,6 +100,8 @@ export default function App() {
           <Route path="/admin/articles/new" element={<ArticleEditor />} />
           <Route path="/admin/articles/:id/edit" element={<ArticleEditor />} />
           <Route path="/admin/review" element={<ReviewQueue />} />
+          <Route path="/admin/pending" element={<PendingArticlesPage />} />
+          <Route path="/admin/ai" element={<AiSuggestionsPage />} />
           <Route path="/admin/moderation" element={<ModerationPage />} />
           <Route path="/admin/pins" element={<PinsPage />} />
           <Route path="/admin/trending" element={<TrendingAdminPage />} />

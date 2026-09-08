@@ -197,7 +197,20 @@ export default function LoginPage() {
         ) : null}
       </div>
 
-      <p className={`${teCls} mt-4 text-center text-[12px] text-muted`}>
+      {/* §4 — OTP stays the fastest way in, so the email path is offered
+          alongside it rather than replacing it. */}
+      <p className={`${teCls} mt-5 text-center text-[13px] text-muted`}>
+        {te ? 'ఇమెయిల్‌తో లాగిన్ కావాలా? ' : 'Prefer email and password? '}
+        <Link to="/register" className="font-bold text-brand hover:underline">
+          {te ? 'ఖాతా సృష్టించండి' : 'Create an account'}
+        </Link>
+        {' · '}
+        <Link to="/forgot-password" className="font-semibold text-info hover:underline">
+          {te ? 'పాస్‌వర్డ్ మర్చిపోయారా?' : 'Forgot password?'}
+        </Link>
+      </p>
+
+      <p className={`${teCls} mt-3 text-center text-[12px] text-muted`}>
         {te ? 'సిబ్బంది లాగిన్ ' : 'Newsroom staff sign in '}
         <Link to="/admin/login" className="font-semibold text-info hover:underline">
           {te ? 'ఇక్కడ' : 'here'}

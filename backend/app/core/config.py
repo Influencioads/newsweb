@@ -108,6 +108,19 @@ class Settings(BaseSettings):
     AI_QUOTA_REPORTER_PER_DAY: int = 50
     AI_SIMILARITY_BLOCK_PERCENT: int = 85
     AI_ENABLED: bool = False
+    #: §17 — the only sources the research pass is permitted to read. Feeds we
+    #: are licensed for, or that are published for redistribution (press
+    #: releases, government bulletins, publisher RSS). Empty means the pass has
+    #: nothing legal to read and returns nothing, which is the correct default.
+    AI_ALLOWED_SOURCE_FEEDS: str = ""
+
+    # --- TTS (§19–21) -------------------------------------------------------
+    GOOGLE_TTS_API_KEY: str = ""
+    GOOGLE_TTS_VOICE: str = "te-IN-Standard-A"
+    BHASHINI_API_KEY: str = ""
+    BHASHINI_ENDPOINT: str = ""
+    BHASHINI_PIPELINE_ID: str = ""
+    BHASHINI_VOICE: str = "female"
 
     # --- messaging ----------------------------------------------------------
     MSG91_AUTH_KEY: str = ""
@@ -117,6 +130,8 @@ class Settings(BaseSettings):
     FCM_SERVICE_ACCOUNT_JSON: str = ""
     APNS_KEY_ID: str = ""
     SMTP_URL: str = ""
+    MAIL_FROM: str = "no-reply@localhost"
+    MAIL_FROM_NAME: str = "Top Telugu News"
 
     # --- licensed image sourcing --------------------------------------------
     IMAGE_SOURCE_PROVIDER: str = "wikimedia"

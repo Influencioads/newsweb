@@ -3,12 +3,14 @@ import { StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 import { color } from '@/lib/theme';
+import { makeStyles } from '@/lib/useTheme';
 
 /**
  * Video player (§15, YouTube links only): the privacy-enhanced embed inside a
  * WebView. Autoplay here is fine — the reader explicitly tapped the card.
  */
 export default function VideoPlayerScreen() {
+  const styles = useStyles();
   const { youtubeId, title } = useLocalSearchParams<{ youtubeId: string; title?: string }>();
 
   return (
@@ -30,7 +32,7 @@ export default function VideoPlayerScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((color) => ({
   container: { flex: 1, backgroundColor: '#000' },
   player: { flex: 1, backgroundColor: '#000' },
-});
+}));

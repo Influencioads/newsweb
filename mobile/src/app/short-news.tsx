@@ -9,6 +9,7 @@ import type { ArticleCard } from '@/api/types';
 import { EmptyState, ErrorState, LoadingState } from '@/components/Feedback';
 import { timeAgo, useI18n } from '@/lib/i18n';
 import { color, font } from '@/lib/theme';
+import { makeStyles } from '@/lib/useTheme';
 
 /**
  * Short news (§14): the InShorts/DailyHunt swipe — one full-screen card per
@@ -16,6 +17,7 @@ import { color, font } from '@/lib/theme';
  * opens the full article.
  */
 export default function ShortNewsScreen() {
+  const styles = useStyles();
   const { t, pick, language } = useI18n();
   const { height } = useWindowDimensions();
   // Card height = viewport minus the stack header (~56) — paging stays exact.
@@ -102,7 +104,7 @@ export default function ShortNewsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((color) => ({
   card: { backgroundColor: color.paper, borderBottomWidth: 1, borderBottomColor: color.rule },
   hero: { width: '100%', height: '38%', backgroundColor: color.placeholder },
   body: { flex: 1, padding: 18 },
@@ -148,4 +150,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 10,
   },
-});
+}));

@@ -1,0 +1,16 @@
+{
+  "cli": {
+    "version": ">= 16.0.0"
+  },
+  "build": {
+    "apk": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://telugunews.influencioweb.com"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import * as cmsApi from '@/features/cms/api';
@@ -18,7 +18,25 @@ function State({ loading, error }: { loading: boolean; error: boolean }) {
 }
 
 // --------------------------------------------------------------------------- #
-type PinRow = { id: number; article_title_te: string | null; article_short_id: string | null; placement: string; starts_at: string; ends_at: string; active: boolean; note: string | null };
+type PinRow = { id: number; article_title_te: string | null; article_short_id: string | null; placement: string; starts_at: string; ends_at: string; active: boolean; seconds_remaining: number; note: string | null };
+
+/** §8 presets. Minutes, because pinning for five while a story develops is the
+ *  real newsroom action the old 1h floor made impossible. */
+const PIN_PRESETS: Array<[string, string]> = [['5','5m'],['10','10m'],['15','15m'],['30','30m'],['60','1h'],['180','3h'],['360','6h'],['720','12h'],['1440','24h'],['4320','3d']];
+
+/** Live countdown for an active pin (§8 "show remaining time"). */
+function Countdown({ seconds }: { seconds: number }) {
+  const [left, setLeft] = useState(seconds);
+  useEffect(() => { setLeft(seconds); }, [seconds]);
+  useEffect(() => {
+    if (left <= 0) return;
+    const id = window.setInterval(() => setLeft((v) => Math.max(0, v - 1)), 1000);
+    return () => window.clearInterval(id);
+  }, [left > 0]);
+  if (left <= 0) return <span className="font-sans text-[11px] font-bold text-muted">expired</span>;
+  const h = Math.floor(left / 3600), m = Math.floor((left % 3600) / 60), sec = left % 60;
+  return <span className="font-sans text-[11px] font-bold tabular-nums text-brand">{h ? `${h}h ` : ''}{String(m).padStart(2,'0')}:{String(sec).padStart(2,'0')}</span>;
+}
 type TrendRow = { rank: number; score: number; article_id: number; short_id: string; title_te: string; view_count: number; like_count: number; comment_count: number; share_count: number; is_pinned: boolean };
 
 export function PinsPage() {
@@ -27,7 +45,7 @@ export function PinsPage() {
   const [articleId, setArticleId] = useState('');
   const [placement, setPlacement] = useState('home');
   const [scopeSlug, setScopeSlug] = useState('');
-  const [hours, setHours] = useState('24');
+  const [minutes, setMinutes] = useState('1440');
   const pins = useQuery({ queryKey: ['cms', 'pins'], queryFn: () => cmsApi.fetchPins<{ items: PinRow[] }>() });
   const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['cms', 'pins'] });
   const create = useMutation({
@@ -35,7 +53,7 @@ export function PinsPage() {
       article_id: Number(articleId), placement,
       category_slug: placement === 'category' ? scopeSlug : null,
       district_slug: placement === 'local' ? scopeSlug : null,
-      duration_hours: Number(hours),
+      duration_minutes: Number(minutes),
     }),
     onSuccess: () => { setArticleId(''); invalidate(); },
   });
@@ -47,15 +65,15 @@ export function PinsPage() {
         <input value={articleId} onChange={(e) => setArticleId(e.target.value.replace(/\D/g, ''))} className={`${inputCls} w-28`} placeholder="123" /></label>
       <label className="flex flex-col gap-1 font-sans text-[10.5px] font-bold uppercase text-muted">{en ? 'Placement' : 'స్థానం'}
         <select value={placement} onChange={(e) => setPlacement(e.target.value)} className={inputCls}>
-          <option value="home">Home top</option><option value="category">Category top</option><option value="local">Local top</option>
+          <option value="home">Home top</option><option value="category">Category top</option><option value="local">Local top</option><option value="breaking">Breaking ticker</option>
         </select></label>
       {placement !== 'home' ? (
         <label className="flex flex-col gap-1 font-sans text-[10.5px] font-bold uppercase text-muted">{placement === 'category' ? 'Category slug' : 'District slug'}
           <input value={scopeSlug} onChange={(e) => setScopeSlug(e.target.value)} className={`${inputCls} w-40`} placeholder={placement === 'category' ? 'cinema' : 'guntur'} /></label>
       ) : null}
       <label className="flex flex-col gap-1 font-sans text-[10.5px] font-bold uppercase text-muted">{en ? 'Duration' : 'వ్యవధి'}
-        <select value={hours} onChange={(e) => setHours(e.target.value)} className={inputCls}>
-          {['1', '6', '12', '24', '72'].map((h) => <option key={h} value={h}>{h}h</option>)}
+        <select value={minutes} onChange={(e) => setMinutes(e.target.value)} className={inputCls}>
+          {PIN_PRESETS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select></label>
       <button type="button" disabled={!articleId || create.isPending} onClick={() => create.mutate()}
         className="min-h-[38px] rounded-control bg-brand px-4 font-sans text-[12.5px] font-bold text-white disabled:opacity-50">
@@ -69,6 +87,7 @@ export function PinsPage() {
           <span className={`rounded-chip px-2 py-0.5 font-sans text-[10px] font-bold uppercase ${p.active ? 'bg-success-tint text-success' : 'bg-paper text-muted'}`}>{p.placement}</span>
           <span className="te min-w-0 flex-1 truncate text-[14px] font-semibold">{p.article_title_te ?? p.article_short_id}</span>
           <span className="font-sans text-[11px] text-muted">{en ? 'ends' : 'ముగింపు'} {new Date(p.ends_at).toLocaleString('en-IN')}</span>
+          {p.active ? <Countdown seconds={p.seconds_remaining} /> : null}
           {p.active ? <button type="button" onClick={() => remove.mutate(p.id)} className="rounded-control border border-breaking px-3 py-1.5 font-sans text-[11px] font-bold text-breaking">{en ? 'Unpin' : 'తీసివేయండి'}</button> : null}
         </article>
       ))}

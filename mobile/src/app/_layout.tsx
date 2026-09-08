@@ -16,7 +16,7 @@ import { useEffect } from 'react';
 
 import { ApiError } from '@/api/client';
 import { useAuth } from '@/stores/auth';
-import { color } from '@/lib/theme';
+import { useColors, useThemeName } from '@/lib/useTheme';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -43,6 +43,8 @@ export default function RootLayout() {
     AnekTelugu_800ExtraBold,
   });
   const bootstrap = useAuth((s) => s.bootstrap);
+  const color = useColors();
+  const theme = useThemeName();
 
   useEffect(() => {
     void bootstrap();
@@ -58,7 +60,9 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <StatusBar style="dark" />
+      {/* Status-bar glyphs invert with the theme; a dark bar on a dark
+          header is invisible. */}
+      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: color.paper },

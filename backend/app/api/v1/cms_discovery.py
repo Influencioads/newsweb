@@ -36,12 +36,20 @@ def _purge_feeds() -> None:
 # --------------------------------------------------------------------------- #
 # pins (§9)
 # --------------------------------------------------------------------------- #
+#: §8 presets. Minutes, not hours: pinning a story to the top of the home page
+#: for five minutes while it develops is the actual newsroom use, and the old
+#: 1h floor made that impossible.
+PIN_PRESETS_MINUTES = (5, 10, 15, 30, 60, 180, 360, 720, 1440, 4320)
+
+
 class PinIn(BaseModel):
     article_id: int
     placement: PinPlacement = PinPlacement.HOME
     category_slug: str | None = None
     district_slug: str | None = None
-    duration_hours: float = Field(default=24, gt=0, le=24 * 7, description="1h/6h/12h/24h presets or custom")
+    duration_minutes: int = Field(
+        default=1440, gt=0, le=60 * 24 * 7,
+        description="§8 presets: 5/10/15/30/60/180/360/720/1440/4320 minutes, or any custom value")
     note: str | None = Field(default=None, max_length=200)
 
 
@@ -57,6 +65,9 @@ def _pin_row(pin: Pin) -> dict:
         "starts_at": pin.starts_at,
         "ends_at": pin.ends_at,
         "active": pin.starts_at <= utcnow() < pin.ends_at,
+        # §8 asks for the remaining time, not just the end timestamp. Computed
+        # server-side so a phone with a wrong clock still counts down correctly.
+        "seconds_remaining": max(0, int((pin.ends_at - utcnow()).total_seconds())),
         "note": pin.note,
         "created_by": pin.created_by,
     }
@@ -106,7 +117,7 @@ def create_pin(
         category_id=category_id,
         district_id=district_id,
         starts_at=now,
-        ends_at=now + timedelta(hours=payload.duration_hours),
+        ends_at=now + timedelta(minutes=payload.duration_minutes),
         note=payload.note,
         created_by=p.id,
     )

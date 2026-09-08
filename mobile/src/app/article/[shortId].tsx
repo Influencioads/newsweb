@@ -14,6 +14,8 @@ import { FollowChip } from '@/components/FollowChip';
 import { trackShare, useReadingBeacon } from '@/lib/beacon';
 import { timeAgo, useI18n } from '@/lib/i18n';
 import { color, font, FONT_SCALE, FONT_STEPS } from '@/lib/theme';
+import { makeStyles } from '@/lib/useTheme';
+import { ArticleAudio } from '@/components/ArticleAudio';
 import { extractPlainText, useTts } from '@/lib/tts';
 import { usePrefs } from '@/stores/prefs';
 
@@ -23,6 +25,7 @@ import { usePrefs } from '@/stores/prefs';
  * toolbar carries the §4.1 A-/A/A+/A++ switcher.
  */
 export default function ArticleScreen() {
+  const styles = useStyles();
   const { shortId } = useLocalSearchParams<{ shortId: string }>();
   const { t, pick, language } = useI18n();
   const { fontStep, setFontStep } = usePrefs();
@@ -103,16 +106,14 @@ export default function ArticleScreen() {
                     .join(' · ')}
                 </Text>
               </View>
-              <Pressable
-                onPress={tts.toggle}
-                accessibilityRole="button"
-                accessibilityState={{ selected: tts.speaking }}
-                style={[styles.shareButton, tts.speaking && styles.listenActive]}
-              >
-                <Text style={styles.shareText}>
-                  {tts.speaking ? `■ ${t('article.stopListening')}` : `🔊 ${t('article.listen')}`}
-                </Text>
-              </Pressable>
+              {/* §19 — server audio when it exists, device voice otherwise. */}
+              <ArticleAudio
+                shortId={data.short_id}
+                deviceSpeaking={tts.speaking}
+                onToggleDevice={tts.toggle}
+                listenLabel={t('article.listen')}
+                stopLabel={t('article.stopListening')}
+              />
               <Pressable onPress={share} accessibilityRole="button" style={styles.shareButton}>
                 <Text style={styles.shareText}>↗ {t('article.share')}</Text>
               </Pressable>
@@ -218,7 +219,7 @@ export default function ArticleScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((color) => ({
   scroll: { flex: 1, backgroundColor: color.paper },
   head: { padding: 16, paddingBottom: 10 },
   breaking: {
@@ -319,4 +320,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-});
+}));

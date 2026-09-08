@@ -147,6 +147,23 @@ class WorkflowState(StrEnum):
     REJECTED = "REJECTED"
 
 
+class ArticleType(StrEnum):
+    """Where an article came from (updated doc §23).
+
+    Orthogonal to `source_type`, which records the *copyright* origin (own /
+    agency / syndicated). This records the *production* origin, so the pending
+    queue can be filtered by it and AI output can never be mistaken for desk
+    copy. NORMAL is the default for everything written in the CMS.
+    """
+
+    NORMAL = "NORMAL"
+    REPORTER = "REPORTER"
+    USER_SUBMITTED = "USER_SUBMITTED"
+    AI_SUGGESTED = "AI_SUGGESTED"
+    AI_DRAFT = "AI_DRAFT"
+    BREAKING_NEWS = "BREAKING_NEWS"
+
+
 class TagType(StrEnum):
     """§5 tags(..., type). `PERSON` rows also form the AI image name blocklist (§7.4)."""
 
@@ -209,6 +226,7 @@ class PinPlacement(StrEnum):
     HOME = "home"
     CATEGORY = "category"
     LOCAL = "local"
+    BREAKING = "breaking"
 
 
 class TrendingScope(StrEnum):
@@ -269,3 +287,33 @@ class MediaType(StrEnum):
     AUDIO = "audio"
     PDF = "pdf"
     DOC = "doc"
+
+
+class AudioStatus(StrEnum):
+    """Lifecycle of one server-side TTS rendition (§19). FAILED is kept rather
+    than deleted so a repeated provider error is visible instead of silently
+    retried on every request."""
+
+    PENDING = "pending"
+    GENERATING = "generating"
+    READY = "ready"
+    FAILED = "failed"
+
+
+class AiSuggestionStatus(StrEnum):
+    """§16. An editor accepts (a draft gets written) or rejects; USED means a
+    real article came out of it. Nothing moves without a person."""
+
+    NEW = "new"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    USED = "used"
+
+
+class AiDraftStatus(StrEnum):
+    """§15. CONVERTED = an Article now exists, entering the normal workflow at
+    SUBMITTED — there is no state here that means "published"."""
+
+    DRAFT = "draft"
+    CONVERTED = "converted"
+    DISCARDED = "discarded"

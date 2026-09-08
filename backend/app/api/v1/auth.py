@@ -28,6 +28,7 @@ from app.schemas.auth import (
     PasswordResetConfirmRequest,
     PasswordResetRequestRequest,
     RefreshRequest,
+    RegisterRequest,
     RoleAssignmentOut,
     SessionOut,
     SimpleMessage,
@@ -35,6 +36,7 @@ from app.schemas.auth import (
     TwoFactorSetupConfirmRequest,
     TwoFactorSetupOut,
     UserOut,
+    VerifyEmailRequest,
 )
 from app.schemas.reader import ReaderLoginResponse
 from app.services import audit_service, auth_service
@@ -220,6 +222,119 @@ def verify_reader_otp(
 
 
 # --------------------------------------------------------------------------- #
+# Reader registration with email + password (updated doc §4)
+# --------------------------------------------------------------------------- #
+@router.post(
+    "/register",
+    response_model=ReaderLoginResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Reader signup with email and password",
+    description=(
+        "Creates a subscriber account and signs it in. Coexists with OTP "
+        "sign-in: an account created here can add a phone later, and accounts "
+        "created by OTP are untouched. A verification email is sent, but the "
+        "account is usable immediately — verification gates submitting an "
+        "article (§6), not reading."
+    ),
+    responses={400: {"description": "VALIDATION_ERROR — email or phone already registered"}},
+)
+def register(
+    payload: RegisterRequest, request: Request, db: Session = Depends(get_db)
+) -> ReaderLoginResponse:
+    from app.services import verification_service
+
+    user = auth_service.register_reader(
+        db,
+        email=payload.email,
+        password=payload.password,
+        name=payload.name,
+        phone=payload.phone,
+        request=request,
+    )
+    verification_service.send_email_verification(db, user)
+
+    session, access, refresh_token, expires = auth_service.create_session(
+        db,
+        user,
+        platform=payload.platform,
+        device_id=payload.device_id,
+        device_label=payload.device_label,
+        request=request,
+    )
+    audit_service.record_auth_event(
+        db,
+        action=AuditAction.LOGIN,
+        user=user,
+        identifier=payload.email,
+        note=f"reader registration, session {session.session_key[:8]}",
+        request=request,
+    )
+    from app.core.deps import build_principal
+
+    principal = build_principal(user, session.session_key)
+    return ReaderLoginResponse(
+        tokens=TokenPair(access_token=access, refresh_token=refresh_token, expires_at=expires),
+        me=_me_payload(principal),
+        is_new_account=True,
+    )
+
+
+@router.post(
+    "/verify-email",
+    response_model=SimpleMessage,
+    summary="Confirm an email address",
+    responses={401: {"description": "UNAUTHORIZED — link invalid or expired"}},
+)
+def verify_email(payload: VerifyEmailRequest, db: Session = Depends(get_db)) -> SimpleMessage:
+    from app.services import verification_service
+
+    verification_service.confirm_email(db, payload.token)
+    return SimpleMessage(message="Email verified.")
+
+
+@router.post(
+    "/verify-email/resend",
+    response_model=SimpleMessage,
+    summary="Send the verification email again",
+)
+def resend_verification(
+    db: Session = Depends(get_db), principal: Principal = Depends(get_current_principal)
+) -> SimpleMessage:
+    from app.services import verification_service
+
+    verification_service.send_email_verification(db, principal.user)
+    # Always the same answer, verified or not — this endpoint must not report
+    # account state to anyone holding a stolen token.
+    return SimpleMessage(message="If the address needs verifying, a link is on its way.")
+
+
+@router.post(
+    "/verify-phone",
+    response_model=SimpleMessage,
+    summary="Confirm the signed-in reader's phone number with an OTP",
+    responses={401: {"description": "INVALID_OTP"}},
+)
+def verify_phone(
+    payload: OtpVerifyRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> SimpleMessage:
+    from app.services import verification_service
+
+    # Reuses the OTP challenge rather than inventing a second one, so there is
+    # a single code path for "prove you hold this number".
+    user, _ = auth_service.verify_otp_reader(db, payload.phone, payload.otp, request)
+    if user.id != principal.id:
+        raise ValidationError(
+            message_en="That number belongs to another account.",
+            message_te="ఆ నంబర్ మరో ఖాతాకు చెందినది.",
+        )
+    verification_service.mark_phone_verified(user)
+    return SimpleMessage(message="Phone verified.")
+
+
+# --------------------------------------------------------------------------- #
 # Refresh / logout
 # --------------------------------------------------------------------------- #
 @router.post(
@@ -359,8 +474,22 @@ def revoke_session(
 def request_password_reset(
     payload: PasswordResetRequestRequest, db: Session = Depends(get_db)
 ) -> SimpleMessage:
-    # TODO(phase-10): deliver via the SMTP adapter once notifications land.
-    auth_service.issue_password_reset(db, payload.email)
+    token = auth_service.issue_password_reset(db, payload.email)
+    if token:
+        from app.core.config import settings as app_settings
+        from app.integrations.messaging import email as email_sender
+
+        link = f"{app_settings.APP_URL.rstrip('/')}/reset-password?token={token}"
+        email_sender.send(
+            payload.email,
+            subject="పాస్‌వర్డ్ రీసెట్ · Reset your password",
+            body_text=(
+                f"పాస్‌వర్డ్ మార్చడానికి ఈ లింక్‌ను తెరవండి:\n{link}\n\n"
+                "ఈ లింక్ 15 నిమిషాల్లో గడువు ముగుస్తుంది. మీరు అడగకపోతే "
+                "ఈ సందేశాన్ని విస్మరించండి.\n\n"
+                f"Reset your password: {link}\nThis link expires in 15 minutes."
+            ),
+        )
     return SimpleMessage(
         message_en="If that address is registered, a reset link has been sent.",
         message_te="ఆ చిరునామా నమోదై ఉంటే, రీసెట్ లింక్ పంపబడింది.",

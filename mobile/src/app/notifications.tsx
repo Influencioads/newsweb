@@ -7,6 +7,7 @@ import * as notificationsApi from '@/api/notifications';
 import { EmptyState, ErrorState, LoadingState } from '@/components/Feedback';
 import { timeAgo, useI18n } from '@/lib/i18n';
 import { color, font } from '@/lib/theme';
+import { makeStyles } from '@/lib/useTheme';
 import { useAuth } from '@/stores/auth';
 
 const KIND_GLYPH: Record<notificationsApi.NotificationKind, string> = {
@@ -18,6 +19,7 @@ const KIND_GLYPH: Record<notificationsApi.NotificationKind, string> = {
 
 /** The reader's inbox (§13). Opening it clears the badge. */
 export default function NotificationsScreen() {
+  const styles = useStyles();
   const { t, language } = useI18n();
   const authed = useAuth((s) => s.status === 'authenticated');
   const queryClient = useQueryClient();
@@ -85,7 +87,7 @@ export default function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((color) => ({
   row: {
     flexDirection: 'row',
     gap: 10,
@@ -103,4 +105,4 @@ const styles = StyleSheet.create({
   subtitle: { fontFamily: font.telugu, fontSize: 13, lineHeight: 21, color: color.muted, marginTop: 2 },
   time: { fontFamily: font.telugu, fontSize: 10.5, lineHeight: 16, color: color.mutedLight, marginTop: 4 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: color.brand, marginTop: 6 },
-});
+}));

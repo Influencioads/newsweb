@@ -5,7 +5,8 @@ import { Linking, StyleSheet, Text, View } from 'react-native';
 import { absoluteMediaUrl } from '@/api/client';
 import type { TiptapNode } from '@/api/types';
 import { usePrefs } from '@/stores/prefs';
-import { color, font, FONT_SCALE } from '@/lib/theme';
+import { font, FONT_SCALE, type Palette } from '@/lib/theme';
+import { makeStyles, useColors } from '@/lib/useTheme';
 
 /**
  * Tiptap/ProseMirror JSON → React Native.
@@ -19,16 +20,23 @@ import { color, font, FONT_SCALE } from '@/lib/theme';
  * a >= 1.65× line-height at every step.
  */
 
-function textStyle(scale: number) {
+/** Everything the pure render functions need from the render pass. */
+interface Ctx {
+  scale: number;
+  styles: ReturnType<typeof useStyles>;
+  color: Palette;
+}
+
+function textStyle(ctx: Ctx) {
   return {
     fontFamily: font.telugu,
-    fontSize: 17 * scale,
-    lineHeight: 29 * scale,
-    color: color.ink,
+    fontSize: 17 * ctx.scale,
+    lineHeight: 29 * ctx.scale,
+    color: ctx.color.ink,
   } as const;
 }
 
-function renderMarks(text: string, marks: TiptapNode['marks'], key: string, scale: number): ReactNode {
+function renderMarks(text: string, marks: TiptapNode['marks'], key: string, ctx: Ctx): ReactNode {
   if (!marks?.length) return <Fragment key={key}>{text}</Fragment>;
 
   return marks.reduce<ReactNode>(
@@ -71,7 +79,7 @@ function renderMarks(text: string, marks: TiptapNode['marks'], key: string, scal
           return (
             <Text
               key={k}
-              style={{ color: color.brand, textDecorationLine: 'underline' }}
+              style={{ color: ctx.color.brand, textDecorationLine: 'underline' }}
               onPress={() => Linking.openURL(href).catch(() => undefined)}
             >
               {acc}
@@ -86,28 +94,28 @@ function renderMarks(text: string, marks: TiptapNode['marks'], key: string, scal
   );
 }
 
-function inlineChildren(node: TiptapNode, key: string, scale: number): ReactNode[] {
+function inlineChildren(node: TiptapNode, key: string, ctx: Ctx): ReactNode[] {
   return (node.content ?? []).map((child, i) => {
     const k = `${key}.${i}`;
-    if (child.type === 'text') return renderMarks(child.text ?? '', child.marks, k, scale);
+    if (child.type === 'text') return renderMarks(child.text ?? '', child.marks, k, ctx);
     if (child.type === 'hardBreak') return <Fragment key={k}>{'\n'}</Fragment>;
-    return inlineChildren(child, k, scale);
+    return inlineChildren(child, k, ctx);
   });
 }
 
-function renderNode(node: TiptapNode, key: string, scale: number): ReactNode {
+function renderNode(node: TiptapNode, key: string, ctx: Ctx): ReactNode {
   switch (node.type) {
     case 'doc':
       return (
         <Fragment key={key}>
-          {(node.content ?? []).map((child, i) => renderNode(child, `${key}.${i}`, scale))}
+          {(node.content ?? []).map((child, i) => renderNode(child, `${key}.${i}`, ctx))}
         </Fragment>
       );
 
     case 'paragraph':
       return (
-        <Text key={key} style={[textStyle(scale), styles.paragraph]}>
-          {inlineChildren(node, key, scale)}
+        <Text key={key} style={[textStyle(ctx), ctx.styles.paragraph]}>
+          {inlineChildren(node, key, ctx)}
         </Text>
       );
 
@@ -118,11 +126,11 @@ function renderNode(node: TiptapNode, key: string, scale: number): ReactNode {
         <Text
           key={key}
           style={[
-            styles.heading,
-            { fontSize: sizes[level] * scale, lineHeight: sizes[level] * 1.5 * scale },
+            ctx.styles.heading,
+            { fontSize: sizes[level] * ctx.scale, lineHeight: sizes[level] * 1.5 * ctx.scale },
           ]}
         >
-          {inlineChildren(node, key, scale)}
+          {inlineChildren(node, key, ctx)}
         </Text>
       );
     }
@@ -130,14 +138,14 @@ function renderNode(node: TiptapNode, key: string, scale: number): ReactNode {
     case 'bulletList':
     case 'orderedList':
       return (
-        <View key={key} style={styles.list}>
+        <View key={key} style={ctx.styles.list}>
           {(node.content ?? []).map((item, i) => (
-            <View key={`${key}.${i}`} style={styles.listItem}>
-              <Text style={[textStyle(scale), styles.bullet]}>
+            <View key={`${key}.${i}`} style={ctx.styles.listItem}>
+              <Text style={[textStyle(ctx), ctx.styles.bullet]}>
                 {node.type === 'orderedList' ? `${i + 1}.` : '•'}
               </Text>
-              <View style={styles.listItemBody}>
-                {(item.content ?? []).map((child, j) => renderNode(child, `${key}.${i}.${j}`, scale))}
+              <View style={ctx.styles.listItemBody}>
+                {(item.content ?? []).map((child, j) => renderNode(child, `${key}.${i}.${j}`, ctx))}
               </View>
             </View>
           ))}
@@ -147,13 +155,13 @@ function renderNode(node: TiptapNode, key: string, scale: number): ReactNode {
     case 'blockquote':
     case 'pullQuote':
       return (
-        <View key={key} style={styles.quote}>
-          {(node.content ?? []).map((child, i) => renderNode(child, `${key}.${i}`, scale))}
+        <View key={key} style={ctx.styles.quote}>
+          {(node.content ?? []).map((child, i) => renderNode(child, `${key}.${i}`, ctx))}
         </View>
       );
 
     case 'horizontalRule':
-      return <View key={key} style={styles.rule} />;
+      return <View key={key} style={ctx.styles.rule} />;
 
     case 'image': {
       const src = absoluteMediaUrl(String(node.attrs?.src ?? ''));
@@ -164,7 +172,7 @@ function renderNode(node: TiptapNode, key: string, scale: number): ReactNode {
         <Image
           key={key}
           source={{ uri: src }}
-          style={[styles.image, { aspectRatio: width / height }]}
+          style={[ctx.styles.image, { aspectRatio: width / height }]}
           contentFit="cover"
           transition={150}
           accessibilityLabel={String(node.attrs?.alt ?? '')}
@@ -174,30 +182,30 @@ function renderNode(node: TiptapNode, key: string, scale: number): ReactNode {
 
     case 'figure':
       return (
-        <View key={key} style={styles.figure}>
-          {(node.content ?? []).map((child, i) => renderNode(child, `${key}.${i}`, scale))}
+        <View key={key} style={ctx.styles.figure}>
+          {(node.content ?? []).map((child, i) => renderNode(child, `${key}.${i}`, ctx))}
         </View>
       );
 
     case 'figcaption':
       return (
-        <Text key={key} style={styles.caption}>
-          {inlineChildren(node, key, scale)}
+        <Text key={key} style={ctx.styles.caption}>
+          {inlineChildren(node, key, ctx)}
         </Text>
       );
 
     case 'factBox':
       return (
-        <View key={key} style={styles.factBox}>
-          {(node.content ?? []).map((child, i) => renderNode(child, `${key}.${i}`, scale))}
+        <View key={key} style={ctx.styles.factBox}>
+          {(node.content ?? []).map((child, i) => renderNode(child, `${key}.${i}`, ctx))}
         </View>
       );
 
     case 'text':
       // A stray inline node at block level — wrap it so it still shows.
       return (
-        <Text key={key} style={textStyle(scale)}>
-          {renderMarks(node.text ?? '', node.marks, key, scale)}
+        <Text key={key} style={textStyle(ctx)}>
+          {renderMarks(node.text ?? '', node.marks, key, ctx)}
         </Text>
       );
 
@@ -205,7 +213,7 @@ function renderNode(node: TiptapNode, key: string, scale: number): ReactNode {
       // Unknown block: render its children rather than dropping reader text.
       return (
         <Fragment key={key}>
-          {(node.content ?? []).map((child, i) => renderNode(child, `${key}.${i}`, scale))}
+          {(node.content ?? []).map((child, i) => renderNode(child, `${key}.${i}`, ctx))}
         </Fragment>
       );
   }
@@ -213,11 +221,13 @@ function renderNode(node: TiptapNode, key: string, scale: number): ReactNode {
 
 export function BodyRenderer({ doc }: { doc: TiptapNode | null }) {
   const fontStep = usePrefs((s) => s.fontStep);
+  const styles = useStyles();
+  const color = useColors();
   if (!doc) return null;
-  return <View>{renderNode(doc, 'n', FONT_SCALE[fontStep])}</View>;
+  return <View>{renderNode(doc, 'n', { scale: FONT_SCALE[fontStep], styles, color })}</View>;
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((color) => ({
   paragraph: { marginBottom: 14 },
   heading: { fontFamily: font.teluguBold, color: color.ink, marginTop: 16, marginBottom: 8 },
   list: { marginBottom: 14, gap: 6 },
@@ -250,4 +260,4 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 14,
   },
-});
+}));

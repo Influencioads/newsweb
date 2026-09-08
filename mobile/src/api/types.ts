@@ -117,6 +117,8 @@ export interface HomeSection {
 
 export interface HomePayload {
   edition: DistrictOut | null;
+  /** §3 — present only when the reader has saved a mandal. */
+  mandal_block: HomeSection | null;
   lead: ArticleCard | null;
   secondary: ArticleCard[];
   mid_column: ArticleCard[];

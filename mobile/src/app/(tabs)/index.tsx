@@ -18,7 +18,8 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/Feedback';
 import { SectionHeader } from '@/components/SectionHeader';
 import { VideoStrip } from '@/components/VideoStrip';
 import { useI18n } from '@/lib/i18n';
-import { color, font } from '@/lib/theme';
+import { font } from '@/lib/theme';
+import { makeStyles, useColors } from '@/lib/useTheme';
 import { useAuth } from '@/stores/auth';
 import { usePrefs } from '@/stores/prefs';
 
@@ -27,13 +28,16 @@ import { usePrefs } from '@/stores/prefs';
  * admin-configured section blocks — one `/public/home` request (§23).
  */
 export default function HomeScreen() {
+  const styles = useStyles();
+  const color = useColors();
   const { t, pick } = useI18n();
   const edition = usePrefs((s) => s.edition);
+  const mandal = usePrefs((s) => s.mandal);
   const authed = useAuth((s) => s.status === 'authenticated');
 
   const home = useQuery({
-    queryKey: ['home', edition],
-    queryFn: () => publicApi.fetchHome(edition),
+    queryKey: ['home', edition, mandal],
+    queryFn: () => publicApi.fetchHome(edition, mandal),
   });
 
   const unread = useQuery({
@@ -177,6 +181,20 @@ export default function HomeScreen() {
             </>
           ) : null}
 
+          {/* --------------------------- §3 what's happening in your mandal - */}
+          {home.data.mandal_block?.articles.length ? (
+            <View>
+              <SectionHeader
+                title={pick(home.data.mandal_block.title_te, home.data.mandal_block.title_en)}
+                onSeeAll={() => router.push('/local')}
+              />
+              <LeadCard article={home.data.mandal_block.articles[0]} />
+              {home.data.mandal_block.articles.slice(1, 5).map((article) => (
+                <RowCard key={article.short_id} article={article} />
+              ))}
+            </View>
+          ) : null}
+
           {/* -------------------------------------------- video strip (§15) - */}
           <VideoStrip />
 
@@ -206,7 +224,7 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((color) => ({
   safe: { flex: 1, backgroundColor: color.canvas },
   masthead: {
     backgroundColor: color.paper,
@@ -266,4 +284,4 @@ const styles = StyleSheet.create({
   breakingItem: { marginRight: 22, maxWidth: 320 },
   breakingText: { fontFamily: font.telugu, fontSize: 13, lineHeight: 20, color: color.white },
   footerSpace: { height: 24 },
-});
+}));

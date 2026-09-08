@@ -35,3 +35,6 @@ Thumbs.db
 frontend/dist/
 backend/var/storage/
 backend/.mysql-local/
+
+# Build artifacts — the APK is produced by EAS, never committed.
+*.apk

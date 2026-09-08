@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bookmark, Check, History, LogOut, MapPin, PenLine, Rss } from 'lucide-react';
 
 import { ApiError } from '@/api/client';
+import { AccountIdentity } from '@/features/auth/components/AccountIdentity';
 import * as publicApi from '@/features/public/api';
 import * as readerApi from '@/features/reader/api';
 import { useI18n } from '@/i18n';
@@ -126,9 +127,6 @@ export default function ProfilePage() {
           <h1 className={`${te ? 'th' : 'font-sans'} mt-1 text-[26px] font-extrabold text-ink`}>
             {pick(me.user.name_te, me.user.name_en)}
           </h1>
-          {me.user.phone ? (
-            <p className="mt-0.5 font-sans text-[13px] text-muted">+{me.user.phone}</p>
-          ) : null}
         </div>
         <button
           type="button"
@@ -139,6 +137,9 @@ export default function ProfilePage() {
           {te ? 'సైన్ అవుట్' : 'Sign out'}
         </button>
       </div>
+
+      {/* §5 — profile picture, email and verification state. */}
+      <AccountIdentity me={me} />
 
       {/* ------------------------------------------------ my library -------- */}
       <section className="mb-7">

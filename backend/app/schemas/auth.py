@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from app.models.enums import ScopeType, SessionPlatform, UserStatus
 
@@ -70,6 +70,37 @@ class LogoutRequest(BaseModel):
     all_devices: bool = Field(default=False, description="Sign out every device for this account")
 
 
+class RegisterRequest(BaseModel):
+    """Reader signup (updated doc §4). Phone is optional: supplying one lets the
+    same account also sign in by OTP later."""
+
+    name: str = Field(min_length=2, max_length=120)
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=200)
+    confirm_password: str = Field(min_length=8, max_length=200)
+    phone: str | None = Field(default=None, max_length=20)
+    device_id: str | None = Field(default=None, max_length=120)
+    device_label: str | None = Field(default=None, max_length=160)
+    platform: SessionPlatform = SessionPlatform.WEB
+
+    @model_validator(mode="after")
+    def _passwords_match(self) -> "RegisterRequest":
+        if self.password != self.confirm_password:
+            raise ValueError("passwords do not match")
+        return self
+
+    @field_validator("phone")
+    @classmethod
+    def _phone_digits(cls, v: str | None) -> str | None:
+        if v and sum(ch.isdigit() for ch in v) < 10:
+            raise ValueError("phone must contain at least 10 digits")
+        return v
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str = Field(min_length=20)
+
+
 class PasswordResetRequestRequest(BaseModel):
     email: EmailStr
 
@@ -112,6 +143,12 @@ class UserOut(BaseModel):
     designation_te: str | None
     last_login_at: datetime | None
     created_at: datetime
+    # §4 — the profile screen shows what still needs confirming.
+    email_verified_at: datetime | None = None
+    phone_verified_at: datetime | None = None
+    avatar_media_id: int | None = None
+    avatar_url: str | None = None
+    bio_te: str | None = None
 
 
 class MeOut(BaseModel):

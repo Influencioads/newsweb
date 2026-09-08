@@ -17,9 +17,13 @@ export async function fetchSiteConfig(): Promise<SiteConfig> {
   return data;
 }
 
-export async function fetchHome(edition?: string | null): Promise<HomePayload> {
+export async function fetchHome(
+  edition?: string | null,
+  mandal?: string | null,
+): Promise<HomePayload> {
   const { data } = await api.get<HomePayload>('/public/home', {
-    params: edition ? { edition } : undefined,
+    // §3 — the mandal block is only meaningful inside its district edition.
+    params: edition ? (mandal ? { edition, mandal } : { edition }) : undefined,
   });
   return data;
 }

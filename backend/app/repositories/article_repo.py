@@ -99,13 +99,25 @@ def get_by_short_id(db: Session, short_id: str) -> Article | None:
 
 def breaking(db: Session, *, limit: int = 5, hours: int = 24) -> list[Article]:
     """Breaking ticker source (mockup 1b). Kept short and time-bounded — a
-    three-day-old 'breaking' banner destroys the signal."""
+    three-day-old 'breaking' banner destroys the signal.
+
+    §9 duration control: `breaking_until` is the editor's explicit end time and
+    wins when set. `hours` remains the fallback for rows published before the
+    column existed, so an old story cannot become permanently breaking.
+    """
     from datetime import timedelta
 
-    since = utcnow() - timedelta(hours=hours)
+    now = utcnow()
+    since = now - timedelta(hours=hours)
     stmt = (
         published_query()
-        .where(Article.is_breaking.is_(True), Article.published_at >= since)
+        .where(
+            Article.is_breaking.is_(True),
+            or_(
+                Article.breaking_until > now,
+                and_(Article.breaking_until.is_(None), Article.published_at >= since),
+            ),
+        )
         .order_by(Article.published_at.desc())
         .limit(limit)
     )
@@ -115,11 +127,40 @@ def breaking(db: Session, *, limit: int = 5, hours: int = 24) -> list[Article]:
 def related(db: Session, article: Article, *, limit: int = 3) -> list[Article]:
     """Related stories for the article page (mockup 1c).
 
-    Category first, then same district, then simply recent — so the block is
-    never empty on a young site.
+    §14 similarity, in descending order of how much it actually means:
+
+      1. shared tags, most overlap first — two stories tagged "అమరావతి" +
+         "రాజధాని" are about the same thing, which sharing a category is not
+      2. same category
+      3. same district
+      4. simply recent, so the block is never empty on a young site
     """
+    from sqlalchemy import func
+
     picked: list[Article] = []
     seen = {article.id}
+
+    # --- 1. tag overlap -----------------------------------------------------
+    tag_ids = [link.tag_id for link in article.tags]
+    if tag_ids:
+        overlap = (
+            select(ArticleTag.article_id, func.count(ArticleTag.tag_id).label("shared"))
+            .where(ArticleTag.tag_id.in_(tag_ids), ArticleTag.article_id != article.id)
+            .group_by(ArticleTag.article_id)
+            .order_by(func.count(ArticleTag.tag_id).desc())
+            .limit(limit * 4)
+            .subquery()
+        )
+        stmt = (
+            published_query()
+            .join(overlap, overlap.c.article_id == Article.id)
+            .order_by(overlap.c.shared.desc(), Article.published_at.desc())
+            .limit(limit)
+        )
+        for a in db.execute(stmt).unique().scalars():
+            if a.id not in seen:
+                picked.append(a)
+                seen.add(a.id)
 
     for predicate in (
         Article.category_id == article.category_id if article.category_id else None,

@@ -9,10 +9,12 @@ import type { ArticleDetail } from '@/api/types';
 import { trackShare } from '@/lib/beacon';
 import { useI18n } from '@/lib/i18n';
 import { color, font } from '@/lib/theme';
+import { makeStyles } from '@/lib/useTheme';
 import { useAuth } from '@/stores/auth';
 
 /** Like · save · share · report (§5). Anonymous taps route to the Profile tab. */
 export function EngagementRow({ article }: { article: ArticleDetail }) {
+  const styles = useStyles();
   const { t } = useI18n();
   const authed = useAuth((s) => s.status === 'authenticated');
   const queryClient = useQueryClient();
@@ -124,7 +126,7 @@ export function EngagementRow({ article }: { article: ArticleDetail }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((color) => ({
   row: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -146,4 +148,4 @@ const styles = StyleSheet.create({
   buttonActive: { borderColor: color.brand, backgroundColor: color.brandTint },
   buttonText: { fontFamily: font.teluguSemiBold, fontSize: 12.5, lineHeight: 19, color: color.muted },
   buttonTextActive: { color: color.brand },
-});
+}));

@@ -6,9 +6,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as publicApi from '@/api/public';
 import { useI18n } from '@/lib/i18n';
 import { color, font } from '@/lib/theme';
+import { makeStyles } from '@/lib/useTheme';
 
 /** Horizontal YouTube strip (§15); hidden when the category has no videos. */
 export function VideoStrip({ category }: { category?: string }) {
+  const styles = useStyles();
   const { t, pick } = useI18n();
   const videos = useQuery({
     queryKey: ['videos-strip', category ?? 'all'],
@@ -52,7 +54,7 @@ export function VideoStrip({ category }: { category?: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((color) => ({
   wrap: {
     backgroundColor: color.paper,
     borderTopWidth: 2,
@@ -89,7 +91,7 @@ const styles = StyleSheet.create({
   playGlyph: {
     fontSize: 15,
     color: color.white,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: 'rgba(0,0,0,0.55))',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 18,
@@ -102,4 +104,4 @@ const styles = StyleSheet.create({
     color: color.ink,
     marginTop: 6,
   },
-});
+}));

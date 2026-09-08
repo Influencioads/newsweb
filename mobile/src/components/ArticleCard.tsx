@@ -6,6 +6,7 @@ import { absoluteMediaUrl } from '@/api/client';
 import type { ArticleCard as ArticleCardType } from '@/api/types';
 import { timeAgo, useI18n } from '@/lib/i18n';
 import { color, font, type } from '@/lib/theme';
+import { makeStyles } from '@/lib/useTheme';
 
 /**
  * Card variants for feeds. Same information architecture as the web cards
@@ -18,6 +19,7 @@ function openArticle(article: ArticleCardType) {
 }
 
 function Kicker({ article }: { article: ArticleCardType }) {
+  const styles = useStyles();
   const { pick, t } = useI18n();
   if (article.is_breaking) {
     return <Text style={styles.kickerBreaking}>{t('home.breaking')}</Text>;
@@ -29,6 +31,7 @@ function Kicker({ article }: { article: ArticleCardType }) {
 }
 
 function MetaLine({ article }: { article: ArticleCardType }) {
+  const styles = useStyles();
   const { language, pick } = useI18n();
   const parts = [
     article.district ? pick(article.district.name_te, article.district.name_en) : null,
@@ -40,6 +43,7 @@ function MetaLine({ article }: { article: ArticleCardType }) {
 
 /** Big image-led card: home lead and section leads. */
 export function LeadCard({ article }: { article: ArticleCardType }) {
+  const styles = useStyles();
   const { pick } = useI18n();
   const heroUrl = absoluteMediaUrl(article.hero?.url ?? null);
   return (
@@ -76,6 +80,7 @@ export function LeadCard({ article }: { article: ArticleCardType }) {
 
 /** Thumb + headline row: lists and section blocks. */
 export function RowCard({ article }: { article: ArticleCardType }) {
+  const styles = useStyles();
   const { pick } = useI18n();
   const heroUrl = absoluteMediaUrl(article.hero?.url ?? null);
   return (
@@ -107,6 +112,7 @@ export function RowCard({ article }: { article: ArticleCardType }) {
 
 /** Headline-only compact row for the latest rail. */
 export function CompactCard({ article }: { article: ArticleCardType }) {
+  const styles = useStyles();
   const { pick, language } = useI18n();
   return (
     <Pressable
@@ -122,7 +128,7 @@ export function CompactCard({ article }: { article: ArticleCardType }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((color) => ({
   pressed: { opacity: 0.75 },
   kicker: {
     fontFamily: font.teluguSemiBold,
@@ -203,4 +209,4 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     color: color.ink,
   },
-});
+}));

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -47,6 +47,33 @@ def media_library(offset: int = Query(0, ge=0), limit: int = Query(48, ge=1, le=
                         "width": x.width, "height": x.height, "credit": x.credit,
                         "alt_te": x.alt_te, "ai_generated": x.ai_generated,
                         "created_at": x.created_at} for x in rows], "total": total}
+
+
+@router.post("/media", status_code=201)
+async def upload_media(request: Request, file: UploadFile = File(...),
+                       alt_te: str | None = Form(None), caption_te: str | None = Form(None),
+                       credit: str | None = Form(None), source_type: str = Form("own"),
+                       db: Session = Depends(get_db),
+                       p: Principal = Depends(require_permission("media.upload"))):
+    """§1 needs a picker, and a picker needs something to pick — this is the
+    upload behind it. Validation, EXIF stripping and re-encoding all happen in
+    `media_service`; nothing here trusts the declared content type."""
+    from app.services import media_service
+
+    raw = await file.read()
+    media = media_service.create_image_media(
+        db, raw=raw, filename=file.filename or "upload",
+        mime=file.content_type or "application/octet-stream",
+        max_bytes=settings.UPLOAD_IMAGE_MAX_BYTES,
+        uploaded_by=p.id, alt_te=alt_te, caption_te=caption_te,
+        credit=credit, source_type=source_type,
+    )
+    audit_service.record(db, action=AuditAction.MEDIA_UPLOAD, entity_type="media",
+                         entity_id=media.id, actor=p.user,
+                         after={"filename": media.filename, "bytes": media.bytes}, request=request)
+    return {"id": media.id, "url": media.cdn_url or f"/media/{media.storage_key}",
+            "width": media.width, "height": media.height, "alt_te": media.alt_te,
+            "credit": media.credit, "blurhash": media.blurhash}
 
 
 @router.get("/users")
@@ -457,11 +484,56 @@ def update_locality(locality_id: int, payload: LocationTogglePatch, request: Req
     return _patch_location(db, db.get(Locality, locality_id), payload, p, request, "locality")
 
 
+# --------------------------------------------------------------------------- #
+# settings (updated doc §18, §20, §35)
+# --------------------------------------------------------------------------- #
+class SettingsPatch(BaseModel):
+    """Free-form on purpose: the key set lives in `settings_service.SPECS`, which
+    validates every value and rejects unknown keys. Duplicating it as pydantic
+    fields would mean two lists to keep in step."""
+
+    values: dict[str, object] = Field(default_factory=dict)
+
+
 @router.get("/settings")
-def settings_summary(_p: Principal = Depends(require_permission("settings.view"))):
-    return {"environment": settings.APP_ENV, "site_name": settings.APP_NAME, "app_url": settings.APP_URL,
-            "api_url": settings.API_URL, "storage_provider": settings.STORAGE_PROVIDER,
-            "ai_enabled": settings.AI_ENABLED, "secure_cookies": settings.SECURE_COOKIES,
+def settings_summary(db: Session = Depends(get_db),
+                     _p: Principal = Depends(require_permission("settings.view"))):
+    """Two blocks, because they behave differently: `environment` is read-only
+    deployment config, `values` are the editable §18/§20/§35 switches."""
+    from app.services import settings_service, tts_service
+
+    return {
+        "environment": {
+            "app_env": settings.APP_ENV, "site_name": settings.APP_NAME,
+            "app_url": settings.APP_URL, "api_url": settings.API_URL,
+            "storage_provider": settings.STORAGE_PROVIDER,
+            "ai_available": settings.AI_ENABLED,
+            "tts_google_configured": bool(settings.GOOGLE_TTS_API_KEY),
+            "tts_bhashini_configured": bool(settings.BHASHINI_API_KEY),
+            "smtp_configured": bool(settings.SMTP_URL),
+            "sms_configured": bool(settings.MSG91_AUTH_KEY),
+            "secure_cookies": settings.SECURE_COOKIES,
             "hsts_enabled": settings.HSTS_ENABLED, "csp_enabled": settings.CSP_ENABLED,
             "public_cache_ttl_seconds": settings.PUBLIC_CACHE_TTL_SECONDS,
-            "breaking_cache_ttl_seconds": settings.BREAKING_CACHE_TTL_SECONDS}
+            "breaking_cache_ttl_seconds": settings.BREAKING_CACHE_TTL_SECONDS,
+        },
+        "values": settings_service.all_settings(db),
+        "specs": settings_service.describe(),
+        "voice_usage": tts_service.usage_summary(db),
+    }
+
+
+@router.patch("/settings")
+def update_settings(payload: SettingsPatch, request: Request, db: Session = Depends(get_db),
+                    p: Principal = Depends(require_permission("settings.manage"))):
+    from app.services import settings_service
+
+    before = settings_service.all_settings(db)
+    values = settings_service.set_many(db, payload.values, actor_id=p.id)
+    audit_service.record(db, action=AuditAction.SETTING_CHANGED, entity_type="app_settings",
+                         entity_id="values", actor=p.user,
+                         before={k: before.get(k) for k in payload.values},
+                         after=dict(payload.values), request=request)
+    # A ratio or voice change alters what /public/home returns.
+    _invalidate_public_cache()
+    return {"values": values}

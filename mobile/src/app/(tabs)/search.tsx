@@ -15,10 +15,13 @@ import * as publicApi from '@/api/public';
 import { RowCard } from '@/components/ArticleCard';
 import { EmptyState, ErrorState, LoadingState } from '@/components/Feedback';
 import { useI18n } from '@/lib/i18n';
-import { color, font } from '@/lib/theme';
+import { font } from '@/lib/theme';
+import { makeStyles, useColors } from '@/lib/useTheme';
 
 /** Search (§10): full-text with offset paging and popular/recent chips. */
 export default function SearchScreen() {
+  const styles = useStyles();
+  const color = useColors();
   const { t } = useI18n();
   const [value, setValue] = useState('');
   const [query, setQuery] = useState('');
@@ -113,7 +116,7 @@ export default function SearchScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((color) => ({
   safe: { flex: 1, backgroundColor: color.canvas },
   header: {
     backgroundColor: color.paper,
@@ -172,4 +175,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-});
+}));

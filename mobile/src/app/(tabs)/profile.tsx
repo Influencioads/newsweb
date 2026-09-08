@@ -17,7 +17,8 @@ import * as publicApi from '@/api/public';
 import * as readerApi from '@/api/reader';
 import { LoadingState } from '@/components/Feedback';
 import { useI18n } from '@/lib/i18n';
-import { color, font, FONT_STEPS } from '@/lib/theme';
+import { font, FONT_STEPS } from '@/lib/theme';
+import { makeStyles, useColors } from '@/lib/useTheme';
 import { useAuth } from '@/stores/auth';
 import { usePrefs } from '@/stores/prefs';
 
@@ -28,6 +29,8 @@ import { usePrefs } from '@/stores/prefs';
  */
 
 function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  const styles = useStyles();
+  const color = useColors();
   return (
     <Pressable
       onPress={onPress}
@@ -42,11 +45,21 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
 
 // --------------------------------------------------------------- sign-in ---
 function SignIn() {
+  const styles = useStyles();
+  const color = useColors();
   const { t, isTelugu } = useI18n();
   const setMe = useAuth((s) => s.setMe);
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
+  // §4 — OTP stays the default because it is the fastest path; the email form
+  // is a second mode on the same card rather than a separate screen.
+  const [mode, setMode] = useState<'otp' | 'email'>('otp');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [emailStep, setEmailStep] = useState<'signin' | 'register'>('signin');
   const [busy, setBusy] = useState(false);
   const [devOtp, setDevOtp] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +93,120 @@ function SignIn() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function submitEmail() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = emailStep === 'register'
+        ? await readerApi.registerReader({
+            name, email, password, confirm_password: confirm, phone: phone || undefined,
+          })
+        : await readerApi.loginWithPassword(email, password);
+      setMe(res.me);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? isTelugu ? err.messageTe : err.messageEn
+          : isTelugu ? 'ఏదో తప్పు జరిగింది.' : 'Something went wrong.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const emailInvalid =
+    !email.trim() ||
+    password.length < 8 ||
+    (emailStep === 'register' && (name.trim().length < 2 || password !== confirm));
+
+  if (mode === 'email') {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>
+          {emailStep === 'register'
+            ? isTelugu ? 'ఖాతా సృష్టించండి' : 'Create your account'
+            : isTelugu ? 'ఇమెయిల్‌తో లాగిన్' : 'Sign in with email'}
+        </Text>
+
+        {emailStep === 'register' ? (
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder={isTelugu ? 'పేరు' : 'Name'}
+            placeholderTextColor={color.mutedLight}
+            style={styles.phoneInput}
+            accessibilityLabel={isTelugu ? 'పేరు' : 'Name'}
+          />
+        ) : null}
+        <TextInput
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoComplete="email"
+          placeholder={isTelugu ? 'ఇమెయిల్' : 'Email'}
+          placeholderTextColor={color.mutedLight}
+          style={styles.phoneInput}
+          accessibilityLabel={isTelugu ? 'ఇమెయిల్' : 'Email'}
+        />
+        <TextInput
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          autoComplete={emailStep === 'register' ? 'new-password' : 'current-password'}
+          placeholder={isTelugu ? 'పాస్‌వర్డ్' : 'Password'}
+          placeholderTextColor={color.mutedLight}
+          style={styles.phoneInput}
+          accessibilityLabel={isTelugu ? 'పాస్‌వర్డ్' : 'Password'}
+        />
+        {emailStep === 'register' ? (
+          <TextInput
+            value={confirm}
+            onChangeText={setConfirm}
+            secureTextEntry
+            placeholder={isTelugu ? 'పాస్‌వర్డ్ మళ్లీ' : 'Confirm password'}
+            placeholderTextColor={color.mutedLight}
+            style={styles.phoneInput}
+            accessibilityLabel={isTelugu ? 'పాస్‌వర్డ్ మళ్లీ' : 'Confirm password'}
+          />
+        ) : null}
+
+        <Pressable
+          onPress={submitEmail}
+          disabled={busy || emailInvalid}
+          accessibilityRole="button"
+          style={[styles.primaryButton, (busy || emailInvalid) && styles.disabled]}
+        >
+          <Text style={styles.primaryButtonText}>
+            {busy
+              ? isTelugu ? 'ఆగండి…' : 'Please wait…'
+              : emailStep === 'register'
+                ? isTelugu ? 'ఖాతా సృష్టించండి' : 'Create account'
+                : isTelugu ? 'లాగిన్' : 'Sign in'}
+          </Text>
+        </Pressable>
+
+        <View style={styles.otpActions}>
+          <Pressable
+            onPress={() => setEmailStep(emailStep === 'register' ? 'signin' : 'register')}
+            accessibilityRole="button"
+          >
+            <Text style={styles.linkText}>
+              {emailStep === 'register'
+                ? isTelugu ? 'ఖాతా ఉందా? లాగిన్' : 'Have an account? Sign in'
+                : isTelugu ? 'కొత్త ఖాతా' : 'Create an account'}
+            </Text>
+          </Pressable>
+          <Pressable onPress={() => setMode('otp')} accessibilityRole="button">
+            <Text style={styles.linkText}>{isTelugu ? 'OTP ద్వారా' : 'Use OTP instead'}</Text>
+          </Pressable>
+        </View>
+
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      </View>
+    );
   }
 
   return (
@@ -149,16 +276,25 @@ function SignIn() {
       )}
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+      <Pressable onPress={() => setMode('email')} accessibilityRole="button">
+        <Text style={[styles.linkText, styles.altAuthLink]}>
+          {isTelugu ? 'ఇమెయిల్ / పాస్‌వర్డ్‌తో లాగిన్' : 'Sign in with email and password'}
+        </Text>
+      </Pressable>
     </View>
   );
 }
 
 // ----------------------------------------------------------- preferences ---
 function Preferences() {
+  const styles = useStyles();
+  const color = useColors();
   const { t, pick, language, setLanguage } = useI18n();
+  const isTelugu = language === 'te';
   const { me, signOut } = useAuth();
   const queryClient = useQueryClient();
-  const { fontStep, setFontStep, setEdition, setMandal } = usePrefs();
+  const { fontStep, setFontStep, setEdition, setMandal, theme, setTheme } = usePrefs();
   const [isTeluguUi, setTeluguUi] = useState(language === 'te');
 
   const config = useQuery({
@@ -267,6 +403,23 @@ function Preferences() {
       <View style={styles.chipRow}>
         <Chip label="తెలుగు" active={isTeluguUi} onPress={() => setTeluguUi(true)} />
         <Chip label="English" active={!isTeluguUi} onPress={() => setTeluguUi(false)} />
+      </View>
+
+      {/* theme — parity with the web app's dark mode -------------------- */}
+      <Text style={styles.sectionTitle}>{isTelugu ? 'థీమ్' : 'Theme'}</Text>
+      <View style={styles.chipRow}>
+        {([
+          ['system', isTelugu ? 'ఫోన్ సెట్టింగ్' : 'System'],
+          ['light', isTelugu ? 'లైట్' : 'Light'],
+          ['dark', isTelugu ? 'డార్క్' : 'Dark'],
+        ] as const).map(([value, label]) => (
+          <Chip
+            key={value}
+            label={label}
+            active={theme === value}
+            onPress={() => setTheme(value)}
+          />
+        ))}
       </View>
 
       {/* font size (§4.1 — required) ------------------------------------ */}
@@ -384,6 +537,8 @@ function Preferences() {
 }
 
 export default function ProfileScreen() {
+  const styles = useStyles();
+  const color = useColors();
   const { t } = useI18n();
   const status = useAuth((s) => s.status);
 
@@ -405,7 +560,7 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((color) => ({
   safe: { flex: 1, backgroundColor: color.canvas },
   header: {
     backgroundColor: color.paper,
@@ -472,6 +627,7 @@ const styles = StyleSheet.create({
   primaryButtonText: { fontFamily: font.teluguBold, fontSize: 15, lineHeight: 23, color: color.white },
   disabled: { opacity: 0.6 },
   otpActions: { flexDirection: 'row', justifyContent: 'space-between' },
+  altAuthLink: { marginTop: 14, textAlign: 'center' },
   linkText: { fontFamily: font.teluguSemiBold, fontSize: 12.5, lineHeight: 19, color: color.info },
   errorText: {
     fontFamily: font.telugu,
@@ -549,4 +705,4 @@ const styles = StyleSheet.create({
   },
   switchLabel: { fontFamily: font.telugu, fontSize: 15, lineHeight: 24, color: color.ink },
   saveButton: { marginTop: 22 },
-});
+}));

@@ -135,4 +135,3 @@ export function ModerationPage(){
   </Shell>;
 }
 
-export function SettingsPage(){const {language}=useI18n();const en=language==='en';const q=useQuery({queryKey:['cms','settings'],queryFn:()=>cmsApi.fetchManagement<Row>('settings')});return <Shell title={en?'System settings':'సిస్టమ్ సెట్టింగ్స్'} subtitle={en?'Current runtime configuration with secrets excluded':'రహస్య విలువలను వెల్లడించని ప్రస్తుత రన్‌టైమ్ కాన్ఫిగరేషన్'}><State loading={q.isLoading} error={q.isError}/>{q.data?<dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{Object.entries(q.data).map(([key,val])=><div key={key} className="rounded-card border border-rule bg-white p-4"><dt className="font-mono text-[10px] uppercase text-muted">{key.replaceAll('_',' ')}</dt><dd className="mt-1 break-words font-sans text-[14px] font-semibold text-ink">{typeof val==='boolean'?(val?(en?'Enabled':'ప్రారంభం'):(en?'Disabled':'నిలిపివేయబడింది')):String(val)}</dd></div>)}</dl>:null}</Shell>}

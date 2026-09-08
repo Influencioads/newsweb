@@ -57,3 +57,47 @@ export async function logout(allDevices = false): Promise<void> {
     clearTokens();
   }
 }
+
+// --- §4 reader accounts with email + password ------------------------------
+export interface RegisterInput { name: string; email: string; password: string; confirm_password: string; phone?: string }
+
+/** Creates a subscriber account and signs it in, exactly like the OTP flow. */
+export async function registerReader(input: RegisterInput): Promise<LoginResponse> {
+  const { data } = await api.post<LoginResponse>('/auth/register', {
+    ...input,
+    phone: input.phone || null,
+    platform: 'web',
+    device_label: navigator.userAgent.slice(0, 120),
+  });
+  setTokens(data.tokens.access_token, data.tokens.refresh_token);
+  return data;
+}
+
+/** Reader password sign-in shares the staff endpoint; only the platform differs. */
+export async function loginReader(email: string, password: string): Promise<LoginResponse> {
+  const { data } = await api.post<LoginResponse>('/auth/login', {
+    email, password, platform: 'web', device_label: navigator.userAgent.slice(0, 120),
+  });
+  setTokens(data.tokens.access_token, data.tokens.refresh_token);
+  return data;
+}
+
+export const requestPasswordReset = async (email: string) =>
+  (await api.post('/auth/password/reset-request', { email })).data;
+export const confirmPasswordReset = async (token: string, newPassword: string) =>
+  (await api.post('/auth/password/reset', { token, new_password: newPassword })).data;
+export const verifyEmail = async (token: string) =>
+  (await api.post('/auth/verify-email', { token })).data;
+export const resendVerification = async () =>
+  (await api.post('/auth/verify-email/resend')).data;
+export const verifyPhone = async (phone: string, otp: string) =>
+  (await api.post('/auth/verify-phone', { phone, otp, platform: 'web' })).data;
+
+/** §5 profile picture. Multipart, so it bypasses the JSON default. */
+export async function uploadAvatar(file: File) {
+  const fd = new FormData();
+  fd.append('file', file);
+  return (await api.post('/users/me/avatar', fd, { headers: { 'Content-Type': 'multipart/form-data' } })).data;
+}
+export const updateProfile = async (payload: Record<string, unknown>) =>
+  (await api.patch('/users/me', payload)).data;

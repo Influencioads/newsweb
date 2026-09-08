@@ -9,12 +9,14 @@ import type { VideoOut } from '@/api/types';
 import { EmptyState, ErrorState, LoadingState } from '@/components/Feedback';
 import { timeAgo, useI18n } from '@/lib/i18n';
 import { color, font } from '@/lib/theme';
+import { makeStyles } from '@/lib/useTheme';
 
 /**
  * Video hub (§15, YouTube links only). Cards carry the YouTube thumbnail;
  * nothing plays until the reader taps — the player screen embeds it.
  */
 export default function VideosScreen() {
+  const styles = useStyles();
   const { t, pick, language } = useI18n();
 
   const feed = useInfiniteQuery({
@@ -90,7 +92,7 @@ export default function VideosScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((color) => ({
   safe: { flex: 1, backgroundColor: color.canvas },
   header: {
     backgroundColor: color.paper,
@@ -119,7 +121,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: 'rgba(0,0,0,0.55))',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -146,4 +148,4 @@ const styles = StyleSheet.create({
     color: color.mutedLight,
     marginTop: 4,
   },
-});
+}));

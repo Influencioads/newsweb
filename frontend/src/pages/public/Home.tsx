@@ -175,12 +175,13 @@ function ErrorState({ error, onRetry }: { error: unknown; onRetry: () => void })
 
 export default function Home() {
   const edition = useReaderPrefs((s) => s.edition);
+  const mandal = useReaderPrefs((s) => s.mandal);
   const { t, pick, language } = useI18n();
   const script = language === 'te' ? 'te' : 'font-sans';
 
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['public', 'home', edition],
-    queryFn: () => publicApi.fetchHome(edition),
+    queryKey: ['public', 'home', edition, mandal],
+    queryFn: () => publicApi.fetchHome(edition, mandal),
   });
 
   if (isLoading) return <HomeSkeleton />;
@@ -282,6 +283,26 @@ export default function Home() {
 
       {/* ============ For You (§3.2, signed-in readers) ============ */}
       <ForYouBlock />
+
+      {/* ============ §3 What's happening in your mandal? ============ */}
+      {data.mandal_block && data.mandal_block.articles.length ? (
+        <section className="mt-8">
+          <SectionRule
+            title={pick(data.mandal_block.title_te, data.mandal_block.title_en)}
+            to={`/mandal/${data.mandal_block.key.replace(/^mandal-/, '')}`}
+          />
+          <div className="grid gap-x-7 gap-y-4 md:grid-cols-[1.5fr_1fr]">
+            <div className="min-w-0">
+              <SecondaryCard article={data.mandal_block.articles[0]} />
+            </div>
+            <div className="min-w-0 md:border-l md:border-rule md:pl-7">
+              {data.mandal_block.articles.slice(1).map((a) => (
+                <CompactCard key={a.short_id} article={a} />
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {/* ============ Video news strip (§15) ============ */}
       <VideoStrip className="mt-8" limit={4} />

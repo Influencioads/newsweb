@@ -20,9 +20,17 @@ export async function fetchSiteConfig(): Promise<SiteConfig> {
   return data;
 }
 
-export async function fetchHome(edition?: string | null): Promise<HomePayload> {
+export async function fetchHome(
+  edition?: string | null,
+  mandal?: string | null,
+): Promise<HomePayload> {
+  // §3 — the mandal block only appears once the reader has chosen one, and the
+  // mandal is only meaningful inside its district edition.
+  const params: Record<string, string> = {};
+  if (edition) params.edition = edition;
+  if (edition && mandal) params.mandal = mandal;
   const { data } = await api.get<HomePayload>('/public/home', {
-    params: edition ? { edition } : undefined,
+    params: Object.keys(params).length ? params : undefined,
   });
   return data;
 }

@@ -24,6 +24,12 @@ export interface AuthUser {
   designation_te: string | null;
   last_login_at: string | null;
   created_at: string;
+  // §4 / §5 — verification state and profile picture.
+  email_verified_at: string | null;
+  phone_verified_at: string | null;
+  avatar_media_id: number | null;
+  avatar_url: string | null;
+  bio_te: string | null;
 }
 
 export interface RoleAssignment {

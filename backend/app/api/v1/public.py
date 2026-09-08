@@ -203,10 +203,16 @@ def get_home(
     edition: str | None = Query(
         default=None, description="District slug, e.g. `visakhapatnam`"
     ),
+    mandal: str | None = Query(
+        default=None,
+        description="Mandal slug — adds the §3 'What's happening in your mandal?' block",
+    ),
     db: Session = Depends(get_db),
 ) -> HomeOut:
     _cache_headers(response)
-    cache_key = f"home:{edition or 'all'}"
+    # The mandal block varies the payload, so it has to vary the cache key too
+    # — otherwise the first reader's mandal is served to the whole district.
+    cache_key = f"home:{edition or 'all'}:{mandal or '-'}"
     cached = cache_get(cache_key)
     if cached:
         return HomeOut.model_validate(cached)
@@ -299,28 +305,62 @@ def get_home(
             )
         )
 
+    # §3 — "What's happening in your mandal?". Driven by the reader's saved
+    # location, so it is absent for a reader who has not chosen one rather than
+    # showing an arbitrary mandal.
+    mandal_block: HomeSectionOut | None = None
+    if mandal and edition_district is not None:
+        mandal_row = next(
+            (m for m in article_repo.mandals_for_district(db, edition_district.id)
+             if m.slug == mandal),
+            None,
+        )
+        if mandal_row is not None:
+            items = article_repo.latest(db, limit=6, mandal_id=mandal_row.id)
+            if items:
+                mandal_block = HomeSectionOut(
+                    key=f"mandal-{mandal_row.slug}",
+                    title_te=f"మీ మండలంలో ఏం జరుగుతోంది? · {mandal_row.name_te}",
+                    title_en=f"What's happening in {mandal_row.name_en}?",
+                    articles=_cards(items, db, districts),
+                )
+
     payload = HomeOut(
         edition=DistrictOut.model_validate(edition_district) if edition_district else None,
+        mandal_block=mandal_block,
         lead=_cards([lead], db, districts)[0] if lead else None,
         secondary=_cards(secondary, db, districts),
         mid_column=_cards(mid_column, db, districts),
         briefs=_cards(briefs, db, districts),
         latest=_cards(latest, db, districts),
-        breaking=[
-            BreakingItemOut(
-                short_id=a.short_id,
-                title_te=a.title_te,
-                title_en=a.title_en,
-                url=a.url_path,
-                published_at=a.published_at,
-            )
-            for a in article_repo.breaking(db)
-        ],
+        breaking=_breaking_items(db),
         sections=sections,
         generated_at=utcnow(),
     )
     cache_set(cache_key, payload.model_dump(mode="json"), settings.PUBLIC_CACHE_TTL_SECONDS)
     return payload
+
+
+def _breaking_items(db: Session) -> list[BreakingItemOut]:
+    """The ticker: stories pinned to the BREAKING slot first, then flagged
+    stories that are still inside their window (§9).
+
+    A pin is how an editor forces a story to the front of the ticker without
+    re-flagging it, so pinned entries lead and duplicates are dropped.
+    """
+    pinned = discovery_repo.active_pins(db, placement=PinPlacement.BREAKING, limit=5)
+    seen = {a.id for a in pinned}
+    rest = [a for a in article_repo.breaking(db) if a.id not in seen]
+    return [
+        BreakingItemOut(
+            short_id=a.short_id,
+            title_te=a.title_te,
+            title_en=a.title_en,
+            url=a.url_path,
+            published_at=a.published_at,
+        )
+        for a in (pinned + rest)[:8]
+    ]
 
 
 @router.get(
@@ -338,16 +378,7 @@ def get_breaking(response: Response, db: Session = Depends(get_db)) -> list[Brea
     if cached:
         return [BreakingItemOut.model_validate(i) for i in cached]
 
-    items = [
-        BreakingItemOut(
-            short_id=a.short_id,
-            title_te=a.title_te,
-            title_en=a.title_en,
-            url=a.url_path,
-            published_at=a.published_at,
-        )
-        for a in article_repo.breaking(db)
-    ]
+    items = _breaking_items(db)
     cache_set(
         "breaking",
         [i.model_dump(mode="json") for i in items],

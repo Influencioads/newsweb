@@ -28,6 +28,7 @@ from app.models.content import Article, ArticleTag
 from app.models.engagement import ArticleEvent, Follow, ReadingSession
 from app.models.enums import EventType, FollowTargetType
 from app.models.reader import UserPreference
+from app.models.site import SearchQuery
 from app.repositories.article_repo import latest
 
 logger = get_logger(__name__)
@@ -46,6 +47,14 @@ W_DISTRICT_FOLLOW = 3.0
 W_MANDAL_HOME = 2.0        # additional, on top of the district match
 W_AUTHOR_FOLLOW = 4.0
 W_ENGAGEMENT = 1.5         # site-wide signal, normalised 0..1
+W_TAG_SEARCH = 1.5         # §12 search history — recent, explicit, but noisy
+W_CATEGORY_SKIP = 2.0      # §12 repeatedly served and never opened
+
+#: How many recent searches feed the profile. Beyond this the terms are old
+#: enough that they describe a different week's interests.
+SEARCH_HISTORY_LIMIT = 30
+#: Views of a category with no reading session before the penalty applies.
+SKIP_PENALTY_THRESHOLD = 5
 P_NOT_INTERESTED_CATEGORY = 4.0
 CATEGORY_READ_CAP = 6.0
 
@@ -148,6 +157,55 @@ def build_profile(db: Session, user_id: int) -> Profile:
         if category_id is not None:
             profile.penalised_category_ids.add(category_id)
 
+    # --- §12 "search history" ----------------------------------------------
+    # What someone searched for is a strong, recent statement of interest, and
+    # it was the one §12 signal the engine was not reading. Terms are matched
+    # against tag names rather than free-text so a typo cannot inject weight.
+    search_terms = [
+        row for row in db.execute(
+            select(SearchQuery.normalized)
+            .where(SearchQuery.user_id == user_id, SearchQuery.created_at >= since)
+            .order_by(SearchQuery.created_at.desc())
+            .limit(SEARCH_HISTORY_LIMIT)
+        ).scalars() if row
+    ]
+    if search_terms:
+        from app.models.content import Tag
+
+        matched = db.execute(
+            select(Tag.id).where(func.lower(Tag.name_en).in_(search_terms))
+        ).scalars()
+        for tag_id in matched:
+            profile.tag_weights[tag_id] = (
+                profile.tag_weights.get(tag_id, 0.0) + W_TAG_SEARCH
+            )
+
+    # --- §12 "repeatedly skipped" ------------------------------------------
+    # A story served and never opened is weak evidence on its own, so the
+    # penalty applies to categories the reader has skipped repeatedly *and*
+    # never read — otherwise a busy day would look like disinterest.
+    skipped = db.execute(
+        select(Article.category_id, func.count(ArticleEvent.id))
+        .join(Article, Article.id == ArticleEvent.article_id)
+        .outerjoin(
+            ReadingSession,
+            (ReadingSession.article_id == Article.id)
+            & (ReadingSession.user_id == user_id),
+        )
+        .where(
+            ArticleEvent.user_id == user_id,
+            ArticleEvent.event_type == EventType.VIEW,
+            ArticleEvent.created_at >= since,
+            ReadingSession.id.is_(None),
+        )
+        .group_by(Article.category_id)
+        .having(func.count(ArticleEvent.id) >= SKIP_PENALTY_THRESHOLD)
+    ).all()
+    for category_id, _count in skipped:
+        if category_id is None or category_id in profile.category_weights:
+            continue
+        profile.category_weights[category_id] = -W_CATEGORY_SKIP
+
     return profile
 
 
@@ -191,7 +249,14 @@ def for_you_feed(
     db: Session, *, user_id: int, limit: int = 20, offset: int = 0
 ) -> list[Article]:
     """Ranked candidates for this reader. An empty profile (brand-new account)
-    degrades to the latest feed — the §31 "sensible default"."""
+    degrades to the latest feed — the §31 "sensible default".
+
+    §34–35: the result is not purely personal. A fixed share of each page is
+    reserved for local, trending and breaking stories, so a reader who only
+    ever opens cinema still sees their district flooding and the day's biggest
+    story. The shares are the `feed.ratios` setting, editable by an admin
+    without a deploy.
+    """
     profile = build_profile(db, user_id)
     candidates = latest(db, limit=CANDIDATE_POOL)
     if profile.is_empty:
@@ -217,4 +282,63 @@ def for_you_feed(
         key=lambda pair: pair[0],
         reverse=True,
     )
-    return [a for _s, a in ranked[offset : offset + limit]]
+    ordered = _apply_mix(db, [a for _s, a in ranked], profile, limit + offset)
+    return ordered[offset : offset + limit]
+
+
+def _apply_mix(
+    db: Session, ranked: list[Article], profile: Profile, needed: int
+) -> list[Article]:
+    """§35 — reserve slots for local, trending and breaking within a personally
+    ranked list.
+
+    Works by promotion rather than replacement: the personal ranking is the
+    spine, and the first unseen article of each reserved kind is pulled forward
+    until its quota is met. Nothing is dropped, so a reader never loses a story
+    they would have got — the order changes, not the set.
+    """
+    from app.services import settings_service
+
+    if not ranked:
+        return ranked
+    ratios = settings_service.feed_ratios(db)
+    quota = {
+        kind: max(0, round(needed * ratios.get(kind, 0) / 100))
+        for kind in ("local", "trending", "breaking")
+    }
+    if not any(quota.values()):
+        return ranked
+
+    def kind_of(article: Article) -> str | None:
+        if article.is_breaking:
+            return "breaking"
+        if profile.home_district_id and article.district_id == profile.home_district_id:
+            return "local"
+        return None
+
+    trending_ids = set(_trending_ids(db, limit=quota["trending"] * 3))
+    promoted: list[Article] = []
+    remaining: list[Article] = []
+    filled = {"local": 0, "trending": 0, "breaking": 0}
+    for article in ranked:
+        kind = kind_of(article) or ("trending" if article.id in trending_ids else None)
+        if kind and filled[kind] < quota[kind]:
+            filled[kind] += 1
+            promoted.append(article)
+        else:
+            remaining.append(article)
+    return promoted + remaining
+
+
+def _trending_ids(db: Session, *, limit: int) -> list[int]:
+    if limit <= 0:
+        return []
+    from app.models.discovery import TrendingScore
+    from app.models.enums import TrendingScope
+
+    return list(db.execute(
+        select(TrendingScore.article_id)
+        .where(TrendingScore.scope_type == TrendingScope.GLOBAL)
+        .order_by(TrendingScore.score.desc())
+        .limit(limit)
+    ).scalars())

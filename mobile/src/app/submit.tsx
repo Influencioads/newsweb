@@ -6,7 +6,8 @@ import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from
 import { api, ApiError } from '@/api/client';
 import { EmptyState } from '@/components/Feedback';
 import { timeAgo, useI18n } from '@/lib/i18n';
-import { color, font } from '@/lib/theme';
+import { font } from '@/lib/theme';
+import { makeStyles, useColors } from '@/lib/useTheme';
 import { useAuth } from '@/stores/auth';
 
 /** Creator submissions (§17): write → accept guidelines → moderation. */
@@ -21,6 +22,8 @@ interface Submission {
 }
 
 export default function SubmitScreen() {
+  const styles = useStyles();
+  const color = useColors();
   const { t, language, isTelugu } = useI18n();
   const authed = useAuth((s) => s.status === 'authenticated');
   const queryClient = useQueryClient();
@@ -148,7 +151,7 @@ export default function SubmitScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((color) => ({
   scroll: { padding: 16 },
   hint: { fontFamily: font.telugu, fontSize: 13, lineHeight: 22, color: color.muted, marginBottom: 12 },
   label: {
@@ -238,4 +241,4 @@ const styles = StyleSheet.create({
   mineTime: { fontFamily: font.telugu, fontSize: 10.5, lineHeight: 16, color: color.mutedLight, marginTop: 2 },
   mineStatus: { fontFamily: font.teluguBold, fontSize: 11.5, lineHeight: 18 },
   mineEmpty: { fontFamily: font.telugu, fontSize: 13, color: color.mutedLight },
-});
+}));

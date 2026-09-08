@@ -7,8 +7,10 @@ import { RowCard } from '@/components/ArticleCard';
 import { EmptyState, ErrorState, LoadingState } from '@/components/Feedback';
 import { timeAgo, useI18n } from '@/lib/i18n';
 import { color, font } from '@/lib/theme';
+import { makeStyles } from '@/lib/useTheme';
 
 export default function HistoryScreen() {
+  const styles = useStyles();
   const { t, language } = useI18n();
   const feed = useInfiniteQuery({
     queryKey: ['history'],
@@ -58,7 +60,7 @@ export default function HistoryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((color) => ({
   progressRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -73,4 +75,4 @@ const styles = StyleSheet.create({
   track: { flex: 1, height: 3, borderRadius: 2, backgroundColor: color.rule, overflow: 'hidden' },
   fill: { height: '100%', backgroundColor: color.brand },
   meta: { fontFamily: font.telugu, fontSize: 10.5, lineHeight: 16, color: color.mutedLight },
-});
+}));

@@ -7,9 +7,11 @@ import { RowCard } from '@/components/ArticleCard';
 import { EmptyState, ErrorState, LoadingState } from '@/components/Feedback';
 import { useI18n } from '@/lib/i18n';
 import { color, font } from '@/lib/theme';
+import { makeStyles } from '@/lib/useTheme';
 
 /** Trending (§8) with rank numbers, paged by offset via next_cursor. */
 export default function TrendingScreen() {
+  const styles = useStyles();
   const { t } = useI18n();
   const feed = useInfiniteQuery({
     queryKey: ['trending-screen'],
@@ -53,7 +55,7 @@ export default function TrendingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((color) => ({
   row: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: color.paper },
   rank: {
     width: 34,
@@ -65,4 +67,4 @@ const styles = StyleSheet.create({
   },
   rankTop: { color: color.brand },
   card: { flex: 1, minWidth: 0 },
-});
+}));

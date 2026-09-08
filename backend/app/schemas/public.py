@@ -220,6 +220,8 @@ class HomeOut(BaseModel):
     """
 
     edition: DistrictOut | None
+    #: §3 — present only when the reader has chosen a mandal.
+    mandal_block: HomeSectionOut | None = None
     lead: ArticleCardOut | None
     secondary: list[ArticleCardOut] = Field(
         default_factory=list, description="Thumb + headline rows under the lead"

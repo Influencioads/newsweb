@@ -166,6 +166,12 @@ class User(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     )
     email: Mapped[str | None] = mapped_column(String(190), nullable=True)
 
+    # §4 verification. NULL = unverified; the timestamp doubles as the audit of
+    # when it happened. Readers who registered by OTP get phone_verified_at set
+    # at first login, because the OTP *is* the proof.
+    email_verified_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    phone_verified_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
     password_hash: Mapped[str | None] = mapped_column(
         String(255), nullable=True, doc="argon2id or bcrypt. Never plaintext, never MD5/SHA (§6.2)"
     )
@@ -219,6 +225,26 @@ class User(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     @property
     def display_name(self) -> str:
         return self.name_te or self.name_en
+
+    @property
+    def avatar_url(self) -> str | None:
+        """§5 — resolve the profile picture so clients never construct media
+        URLs themselves. `avatar_media_id` is a plain column rather than a FK
+        (media is a separate module), so this looks the row up through the
+        active session."""
+        if not self.avatar_media_id:
+            return None
+        from sqlalchemy import inspect as sa_inspect
+
+        session = sa_inspect(self).session
+        if session is None:
+            return None
+        from app.models.media import Media
+
+        media = session.get(Media, self.avatar_media_id)
+        if media is None or media.deleted_at is not None:
+            return None
+        return media.cdn_url or f"/media/{media.storage_key}"
 
     @property
     def max_level(self) -> int:

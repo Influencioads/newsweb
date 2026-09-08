@@ -228,7 +228,7 @@ class TestPins:
 
         r = client.post(
             "/api/v1/cms/pins",
-            json={"article_id": pinned.id, "placement": "home", "duration_hours": 6},
+            json={"article_id": pinned.id, "placement": "home", "duration_minutes": 360},
             headers=editor,
         )
         assert r.status_code == 201, r.text
@@ -266,7 +266,7 @@ class TestPins:
         editor = staff_headers(db, role=RoleKey.DESK_EDITOR, email="pins@test.example.com")
         pin_id = client.post(
             "/api/v1/cms/pins",
-            json={"article_id": article.id, "placement": "home", "duration_hours": 24},
+            json={"article_id": article.id, "placement": "home", "duration_minutes": 1440},
             headers=editor,
         ).json()["id"]
         r = client.delete(f"/api/v1/cms/pins/{pin_id}", headers=editor)

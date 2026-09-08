@@ -11,7 +11,7 @@ valid session — a subscriber holds no permission keys at all.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -176,16 +176,43 @@ def update_preferences(
     return _prefs_out(db, prefs)
 
 
-@router.patch("/me", response_model=UserOut, summary="Update my display name")
+@router.patch("/me", response_model=UserOut, summary="Update my profile")
 def update_profile(
     payload: ReaderProfilePatch,
     request: Request,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ) -> UserOut:
+    from app.services import auth_service, verification_service
+
     changes = payload.model_dump(exclude_unset=True, exclude_none=True)
+
+    if "email" in changes:
+        address = str(changes["email"]).strip().lower()
+        if principal.user.email and principal.user.email_verified_at is not None:
+            # Changing a *verified* address is an account-takeover vector, so it
+            # is not a profile edit — it needs the reset flow.
+            raise ValidationError(
+                message_en="Contact support to change a verified email address.",
+                message_te="ధృవీకరించిన ఇమెయిల్ మార్చడానికి సపోర్ట్‌ను సంప్రదించండి.",
+                details={"email": "already verified"})
+        existing = auth_service.get_user_by_email(db, address)
+        if existing is not None and existing.id != principal.id:
+            raise ValidationError(details={"email": "already registered"})
+        changes["email"] = address
+        principal.user.email_verified_at = None
+
+    if "avatar_media_id" in changes:
+        from app.models.media import Media
+
+        media = db.get(Media, changes["avatar_media_id"])
+        if media is None or media.deleted_at is not None:
+            raise ValidationError(details={"avatar_media_id": "unknown image"})
+
     for field, value in changes.items():
         setattr(principal.user, field, value)
+    if "email" in changes:
+        verification_service.send_email_verification(db, principal.user)
     if changes:
         db.add(principal.user)
         audit_service.record(
@@ -197,4 +224,43 @@ def update_profile(
             after=changes,
             request=request,
         )
+    return UserOut.model_validate(principal.user)
+
+
+@router.post("/me/avatar", response_model=UserOut, summary="Upload my profile picture")
+async def upload_avatar(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> UserOut:
+    """§5 profile image. Readers hold no `media.upload` permission — this is
+    their own avatar, not the newsroom library, so the route is scoped to
+    `/users/me` and the image is credited to them."""
+    from app.core.config import settings
+    from app.services import media_service
+
+    raw = await file.read()
+    media = media_service.create_image_media(
+        db,
+        raw=raw,
+        filename=file.filename or "avatar",
+        mime=file.content_type or "application/octet-stream",
+        # A profile picture has no business being a 15 MB press photo.
+        max_bytes=min(settings.UPLOAD_IMAGE_MAX_BYTES, 4 * 1024 * 1024),
+        uploaded_by=principal.id,
+        alt_te=principal.user.name_te,
+        credit=principal.user.name_en,
+        source_type="own",
+    )
+    principal.user.avatar_media_id = media.id
+    audit_service.record(
+        db,
+        action=AuditAction.MEDIA_UPLOAD,
+        entity_type="user",
+        entity_id=principal.id,
+        actor=principal.user,
+        after={"avatar_media_id": media.id},
+        request=request,
+    )
     return UserOut.model_validate(principal.user)

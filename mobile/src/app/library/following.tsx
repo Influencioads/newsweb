@@ -8,8 +8,10 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/Feedback';
 import { FollowChip } from '@/components/FollowChip';
 import { useI18n } from '@/lib/i18n';
 import { color } from '@/lib/theme';
+import { makeStyles } from '@/lib/useTheme';
 
 export default function FollowingScreen() {
+  const styles = useStyles();
   const { t, pick } = useI18n();
   const follows = useQuery({ queryKey: ['my-follows'], queryFn: engagementApi.fetchMyFollows });
   const feed = useInfiniteQuery({
@@ -60,7 +62,7 @@ export default function FollowingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((color) => ({
   chipBar: {
     backgroundColor: color.paper,
     borderBottomWidth: 1,
@@ -68,4 +70,4 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   chipRow: { paddingHorizontal: 12, gap: 6 },
-});
+}));

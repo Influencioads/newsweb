@@ -15,6 +15,7 @@ import { CommentsSection } from '@/features/engagement/components/CommentsSectio
 import { EngagementBar } from '@/features/engagement/components/EngagementBar';
 import { FollowButton } from '@/features/engagement/components/FollowButton';
 import * as publicApi from '@/features/public/api';
+import { AudioPlayer } from '@/components/article/AudioPlayer';
 import { extractPlainText, useTts } from '@/features/reader/tts';
 import { useI18n } from '@/i18n';
 import { FONT_STEPS, useReaderPrefs } from '@/stores/readerPrefs';
@@ -115,37 +116,13 @@ function ReaderToolbar({ article }: { article: ArticleDetail }) {
         ))}
       </div>
 
-      <button
-        type="button"
-        onClick={tts.toggle}
-        disabled={tts.state === 'unavailable'}
-        aria-pressed={tts.state === 'speaking'}
-        title={
-          tts.state === 'unavailable'
-            ? language === 'te'
-              ? 'ఈ పరికరంలో తెలుగు వాయిస్ లేదు'
-              : 'No Telugu voice on this device'
-            : t('reader.listen')
-        }
-        className={[
-          script,
-          'flex min-h-tap items-center gap-1.5 rounded-control border px-3 text-[11.5px] font-semibold leading-[1.4] disabled:opacity-50',
-          tts.state === 'speaking' || tts.state === 'paused'
-            ? 'border-brand bg-brand-tint text-brand'
-            : 'border-rule text-brand',
-        ].join(' ')}
-      >
-        {tts.state === 'speaking' ? (
-          <Pause className="h-3.5 w-3.5" aria-hidden />
-        ) : (
-          <Volume2 className="h-3.5 w-3.5" aria-hidden />
-        )}
-        {tts.state === 'speaking'
-          ? language === 'te' ? 'ఆపండి' : 'Pause'
-          : tts.state === 'paused'
-            ? language === 'te' ? 'కొనసాగించండి' : 'Resume'
-            : `${t('reader.listen')} ${readingTime(article.reading_time_sec, language)}`}
-      </button>
+      {/* §19 — a server-generated file when one exists (seek + speed), the
+          device voice when it does not, nothing when voice is switched off. */}
+      <AudioPlayer
+        shortId={article.short_id}
+        readingLabel={readingTime(article.reading_time_sec, language)}
+        deviceTts={tts}
+      />
 
       <button
         type="button"

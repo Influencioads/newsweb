@@ -32,6 +32,7 @@ from app.models.engagement import (
     Comment,
     Follow,
     Like,
+    Reaction,
     ReadingSession,
     Report,
 )
@@ -49,7 +50,7 @@ from app.models.user import (
     UserRole,
     UserSession,
 )
-from app.models.video import Video
+from app.models.video import Video, VideoChannel, VideoTag
 
 __all__ = [
     "AdCampaign",
@@ -59,6 +60,9 @@ __all__ = [
     "AppSetting",
     "Article",
     "AudioAsset",
+    "Reaction",
+    "VideoChannel",
+    "VideoTag",
     "CreatorSubmission",
     "ArticleEvent",
     "ArticleMedia",

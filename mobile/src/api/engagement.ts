@@ -3,7 +3,7 @@ import type { ArticleCard } from './types';
 
 /** Engagement API (Phase C) — the app twin of the web engagement feature. */
 
-export type FollowTargetType = 'category' | 'tag' | 'district' | 'mandal' | 'author';
+export type FollowTargetType = 'category' | 'tag' | 'district' | 'mandal' | 'author' | 'channel';
 
 export interface EngagementCounts {
   like_count: number;

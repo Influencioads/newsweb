@@ -9,8 +9,12 @@ import type {
   MandalOut,
   SearchMeta,
   SearchResults,
+  ReactionKind,
+  ReactionSummary,
   SiteConfig,
+  VideoDetail,
   VideoList,
+  VideoRails,
 } from '@/types/public';
 
 /** Reader-facing API. No auth header is required for any of these. */
@@ -125,3 +129,42 @@ export async function fetchLocalFeed(params: {
   const { data } = await api.get<LocalFeedPayload>('/public/local', { params });
   return data;
 }
+
+
+// --- §15 video hub ---------------------------------------------------------
+export const fetchVideoRails = async (): Promise<VideoRails> =>
+  (await api.get<VideoRails>('/public/videos/rails')).data;
+
+export const fetchVideo = async (id: number, anonId?: string | null): Promise<VideoDetail> =>
+  (await api.get<VideoDetail>(`/public/videos/${id}`, {
+    params: anonId ? { anon_id: anonId } : undefined,
+  })).data;
+
+/** Fire-and-forget: a failed count must never interrupt playback. */
+export const countVideoView = (id: number) =>
+  api.post(`/public/videos/${id}/view`).catch(() => undefined);
+export const countVideoShare = (id: number) =>
+  api.post(`/public/videos/${id}/share`).catch(() => undefined);
+
+export const setVideoReaction = async (
+  id: number,
+  kind: ReactionKind | null,
+  anonId?: string | null,
+): Promise<ReactionSummary> =>
+  (await api.post<ReactionSummary>(`/public/videos/${id}/reaction`, { kind, anon_id: anonId ?? null })).data;
+
+export const setArticleReaction = async (
+  shortId: string,
+  kind: ReactionKind | null,
+  anonId?: string | null,
+): Promise<ReactionSummary> =>
+  (await api.post<ReactionSummary>(`/public/articles/${shortId}/reaction`, { kind, anon_id: anonId ?? null })).data;
+
+export interface VideoComment {
+  id: number; parent_id: number | null; body: string;
+  author_name_te: string; author_name_en: string; is_mine: boolean; created_at: string;
+}
+export const fetchVideoComments = async (id: number) =>
+  (await api.get<{ total_visible: number; comments: VideoComment[] }>(`/public/videos/${id}/comments`)).data;
+export const addVideoComment = async (id: number, body: string, parentId: number | null) =>
+  (await api.post<VideoComment>(`/videos/${id}/comments`, { body, parent_id: parentId })).data;

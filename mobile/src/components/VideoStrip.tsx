@@ -33,7 +33,7 @@ export function VideoStrip({ category }: { category?: string }) {
           <Pressable
             key={video.id}
             onPress={() =>
-              router.push({ pathname: '/video/[youtubeId]', params: { youtubeId: video.youtube_id } })
+              router.push({ pathname: '/video/[id]', params: { id: String(video.id) } })
             }
             accessibilityRole="button"
             style={styles.card}

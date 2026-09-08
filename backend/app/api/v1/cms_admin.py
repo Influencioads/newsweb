@@ -326,16 +326,40 @@ def moderation_comments(status: str | None = Query(None, pattern="^(visible|pend
     from app.models.enums import CommentStatus
     from app.repositories import engagement_repo
 
+    from app.models.enums import CommentTargetType
+    from app.models.video import Video
+
     rows, total = engagement_repo.comment_queue(
         db, status=CommentStatus(status) if status else None, offset=offset, limit=limit)
-    articles = engagement_repo.articles_by_ids(db, [c.article_id for c in rows])
+
+    # §15 — the queue now carries video comments too, so the parent lookup has
+    # to follow the target type. A moderator needs to see *what* was commented
+    # on; without this a video comment would show a blank headline.
+    articles = engagement_repo.articles_by_ids(
+        db, [c.article_id for c in rows if c.article_id])
+    video_ids = [c.video_id for c in rows if c.video_id]
+    videos = {v.id: v for v in db.scalars(
+        select(Video).where(Video.id.in_(video_ids))).all()} if video_ids else {}
+
+    def parent_of(c) -> dict:
+        if c.target_type == CommentTargetType.VIDEO:
+            video = videos.get(c.video_id)
+            return {"target_type": "video",
+                    "title_te": video.title_te if video else None,
+                    "ref": str(video.id) if video else None}
+        article = articles.get(c.article_id)
+        return {"target_type": "article",
+                "title_te": article.title_te if article else None,
+                "ref": article.short_id if article else None}
+
     return {"items": [{"id": c.id, "body": c.body, "status": c.status,
                         "author": c.user.name_en if c.user else None,
                         "author_id": c.user_id, "parent_id": c.parent_id,
-                        "article_title_te": (articles[c.article_id].title_te
-                                              if c.article_id in articles else None),
-                        "article_short_id": (articles[c.article_id].short_id
-                                              if c.article_id in articles else None),
+                        "target": parent_of(c),
+                        # Kept for the existing admin table; a video comment
+                        # reports the video's title in the same field.
+                        "article_title_te": parent_of(c)["title_te"],
+                        "article_short_id": parent_of(c)["ref"],
                         "created_at": c.created_at} for c in rows], "total": total}
 
 

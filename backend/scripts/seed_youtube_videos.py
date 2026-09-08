@@ -139,7 +139,7 @@ def run() -> None:
                 title = str(meta["title"])[:390]
                 author = str(meta.get("author_name") or "YouTube")[:180]
                 try:
-                    video_service.add_video(
+                    video = video_service.add_video(
                         db,
                         youtube_url=video_id,
                         title_te=title,
@@ -149,6 +149,19 @@ def run() -> None:
                         district_id=None,
                         created_by=editor.id if editor else 0,
                     )
+                    # §15 attribution: the publisher becomes a real row so the
+                    # video page can credit it and a reader can follow it,
+                    # rather than it living as text inside the description.
+                    video.channel_id = video_service.get_or_create_channel(
+                        db,
+                        name=author,
+                        url=str(meta.get("author_url") or "") or None,
+                    ).id
+                    # Hashtag chips: category first, then the district-level
+                    # topics the category implies. Never invented from the
+                    # title, which would produce confident nonsense.
+                    video_service.apply_tags(db, video, [category.name_te])
+                    db.flush()
                 except Exception as exc:  # noqa: BLE001 — dupe or validation; move on
                     print(f"  {slug:14s} skip {video_id}: {exc}")
                     continue

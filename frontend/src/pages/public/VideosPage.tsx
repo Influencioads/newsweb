@@ -1,156 +1,187 @@
-import { useState } from 'react';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { PlayCircle } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
+import { VideoCard } from '@/components/video/VideoCard';
 import * as publicApi from '@/features/public/api';
 import { useI18n } from '@/i18n';
-import { relativeTime } from '@/utils/time';
-import type { VideoOut } from '@/types/public';
+import type { VideoRail } from '@/types/public';
 
 /**
- * Video hub (updated doc §15, YouTube links only).
+ * Video hub (§15).
  *
- * Cards show the YouTube thumbnail; clicking swaps the card for the
- * privacy-enhanced (`youtube-nocookie`) iframe with autoplay — §15's "no
- * aggressive autoplay" rule holds because nothing plays until the reader asks.
+ * A tab strip of the categories that actually have video, then a rail per
+ * category — the shape a reader browsing video expects, and the one that lets
+ * a section be skimmed without committing to it. Choosing a tab filters to
+ * that one rail rather than navigating away, so comparing sections costs no
+ * page loads.
+ *
+ * Nothing plays here. Playback lives on the video page, where the view is
+ * counted and the publisher is credited.
  */
+
+function Rail({ rail }: { rail: VideoRail }) {
+  const { language, pick } = useI18n();
+  const te = language === 'te';
+  const track = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ start: true, end: false });
+
+  function measure() {
+    const el = track.current;
+    if (!el) return;
+    setEdges({
+      start: el.scrollLeft <= 2,
+      end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 2,
+    });
+  }
+
+  useEffect(() => {
+    measure();
+    const el = track.current;
+    if (!el) return;
+    // The arrows must disappear at the ends, so they follow the scroll
+    // position rather than being permanently half-useful.
+    el.addEventListener('scroll', measure, { passive: true });
+    window.addEventListener('resize', measure);
+    return () => {
+      el.removeEventListener('scroll', measure);
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
+
+  function nudge(direction: -1 | 1) {
+    track.current?.scrollBy({ left: direction * 520, behavior: 'smooth' });
+  }
+
+  return (
+    <section className="mt-7">
+      <div className="mb-2.5 flex items-baseline justify-between gap-3 border-b-2 border-ink pb-1.5">
+        <h2 className={`${te ? 'th' : 'font-sans'} text-[17px] font-extrabold text-ink`}>
+          {pick(rail.title_te, rail.title_en)}
+        </h2>
+        <Link
+          to={`/section/${rail.key}`}
+          className={`${te ? 'te' : 'font-sans'} shrink-0 text-[12px] font-bold text-brand hover:underline`}
+        >
+          {te ? 'అన్నీ చూడండి →' : 'See all →'}
+        </Link>
+      </div>
+
+      <div className="relative">
+        <div
+          ref={track}
+          className="flex gap-3.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {rail.videos.map((video) => (
+            <VideoCard key={video.id} video={video} />
+          ))}
+        </div>
+
+        {!edges.start ? (
+          <button
+            type="button"
+            aria-label={te ? 'వెనక్కి' : 'Scroll left'}
+            onClick={() => nudge(-1)}
+            className="absolute left-0 top-1/2 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-rule bg-white/95 text-ink shadow-card hover:text-brand md:flex dark:bg-surface"
+          >
+            <ChevronLeft className="h-5 w-5" aria-hidden />
+          </button>
+        ) : null}
+        {!edges.end ? (
+          <button
+            type="button"
+            aria-label={te ? 'ముందుకు' : 'Scroll right'}
+            onClick={() => nudge(1)}
+            className="absolute right-0 top-1/2 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-rule bg-white/95 text-ink shadow-card hover:text-brand md:flex dark:bg-surface"
+          >
+            <ChevronRight className="h-5 w-5" aria-hidden />
+          </button>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 export default function VideosPage() {
   const { language, pick } = useI18n();
   const te = language === 'te';
   const teCls = te ? 'te' : 'font-sans';
-  const [category, setCategory] = useState('');
-  const [playingId, setPlayingId] = useState<number | null>(null);
+  const [active, setActive] = useState('');
 
-  const config = useQuery({
-    queryKey: ['public', 'config'],
-    queryFn: publicApi.fetchSiteConfig,
-    staleTime: 300_000,
+  const hub = useQuery({
+    queryKey: ['public', 'video-rails'],
+    queryFn: publicApi.fetchVideoRails,
+    staleTime: 120_000,
   });
 
-  const feed = useInfiniteQuery({
-    queryKey: ['public', 'videos', category],
-    queryFn: ({ pageParam }) =>
-      publicApi.fetchVideos({
-        category: category || undefined,
-        offset: pageParam,
-        limit: 12,
-      }),
-    initialPageParam: 0,
-    getNextPageParam: (last) => last.next_offset ?? undefined,
-  });
-
-  const videos = feed.data?.pages.flatMap((page) => page.videos) ?? [];
-
-  function VideoCard({ video }: { video: VideoOut }) {
-    const playing = playingId === video.id;
-    return (
-      <article className="overflow-hidden rounded-card border border-rule bg-white shadow-card">
-        {playing ? (
-          <div className="aspect-video w-full bg-ink">
-            <iframe
-              src={`${video.embed_url}?autoplay=1&rel=0`}
-              title={video.title_te}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="h-full w-full border-0"
-            />
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setPlayingId(video.id)}
-            aria-label={`${te ? 'ప్లే' : 'Play'}: ${video.title_te}`}
-            className="group relative block aspect-video w-full bg-placeholder"
-          >
-            <img
-              src={video.thumbnail_url}
-              alt=""
-              loading="lazy"
-              className="h-full w-full object-cover"
-            />
-            <span className="absolute inset-0 flex items-center justify-center bg-black/25 transition-colors group-hover:bg-black/40">
-              <PlayCircle className="h-12 w-12 text-white drop-shadow" aria-hidden />
-            </span>
-          </button>
-        )}
-        <div className="p-3">
-          {video.category ? (
-            <p className={`${teCls} text-[10.5px] font-bold uppercase tracking-[0.08em] text-brand`}>
-              {pick(video.category.name_te, video.category.name_en)}
-            </p>
-          ) : null}
-          <h2 lang="te" className="te mt-0.5 text-[15px] font-bold leading-telugu text-ink">
-            {video.title_te}
-          </h2>
-          <p className="mt-1 font-sans text-[10.5px] text-muted-light">
-            {relativeTime(video.published_at, language)}
-          </p>
-        </div>
-      </article>
-    );
-  }
+  const rails = (hub.data?.rails ?? []).filter((r) => !active || r.key === active);
 
   return (
-    <main className="mx-auto min-h-[55vh] max-w-[1100px] px-4 py-7 sm:py-10">
-      <div className="mb-6 border-b-2 border-ink pb-4">
-        <p className="flex items-center gap-1.5 font-sans text-[11px] font-bold uppercase tracking-[0.16em] text-brand">
-          <PlayCircle className="h-3.5 w-3.5" aria-hidden />
-          {te ? 'వీడియో వార్తలు' : 'VIDEO NEWS'}
-        </p>
-        <h1 className={`${te ? 'th' : 'font-sans'} mt-1 text-[27px] font-extrabold text-ink sm:text-[32px]`}>
-          {te ? 'వీడియోలు' : 'Videos'}
+    <main className="mx-auto max-w-6xl px-4 py-6">
+      <header className="border-b-2 border-brand pb-3">
+        <h1 className={`${te ? 'th' : 'font-sans'} text-[26px] font-extrabold text-ink`}>
+          ▶ {te ? 'వీడియోలు' : 'Videos'}
         </h1>
-      </div>
+        <p className={`${teCls} mt-1 text-[12.5px] text-muted`}>
+          {te
+            ? 'విభాగాల వారీగా తాజా వీడియో వార్తలు.'
+            : 'The latest video news, by section.'}
+        </p>
+      </header>
 
-      <div className="mb-5 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setCategory('')}
-          aria-pressed={!category}
-          className={`${teCls} rounded-chip border px-3 py-1.5 text-[12.5px] font-semibold ${!category ? 'border-brand bg-brand-tint text-brand' : 'border-rule bg-paper text-muted hover:border-brand'}`}
-        >
-          {te ? 'అన్నీ' : 'All'}
-        </button>
-        {config.data?.categories.filter((c) => c.show_in_nav).slice(0, 8).map((c) => (
+      {/* -------------------------------------------------- category tabs -- */}
+      {hub.data && hub.data.tabs.length ? (
+        <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <button
-            key={c.slug}
             type="button"
-            onClick={() => setCategory(category === c.slug ? '' : c.slug)}
-            aria-pressed={category === c.slug}
-            className={`${teCls} rounded-chip border px-3 py-1.5 text-[12.5px] font-semibold ${category === c.slug ? 'border-brand bg-brand-tint text-brand' : 'border-rule bg-paper text-muted hover:border-brand'}`}
+            aria-pressed={active === ''}
+            onClick={() => setActive('')}
+            className={`${teCls} min-h-[34px] shrink-0 rounded-chip border px-3.5 text-[12.5px] font-semibold ${
+              active === '' ? 'border-brand bg-brand text-white' : 'border-rule bg-white text-ink dark:bg-surface'
+            }`}
           >
-            {pick(c.name_te, c.name_en)}
+            {te ? 'అన్నీ' : 'All'}
           </button>
-        ))}
-      </div>
+          {hub.data.tabs.map((tab) => (
+            <button
+              key={tab.slug}
+              type="button"
+              aria-pressed={active === tab.slug}
+              onClick={() => setActive(active === tab.slug ? '' : tab.slug)}
+              className={`${teCls} min-h-[34px] shrink-0 rounded-chip border px-3.5 text-[12.5px] font-semibold ${
+                active === tab.slug
+                  ? 'border-brand bg-brand text-white'
+                  : 'border-rule bg-white text-ink dark:bg-surface'
+              }`}
+            >
+              {pick(tab.name_te, tab.name_en)}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
-      {feed.isLoading ? (
-        <p className={`${teCls} text-muted`}>{te ? 'లోడ్ అవుతోంది…' : 'Loading…'}</p>
-      ) : feed.isError ? (
-        <p className={`${teCls} text-brand`}>{te ? 'లోడ్ కాలేదు. మళ్లీ ప్రయత్నించండి.' : 'Could not load. Try again.'}</p>
-      ) : videos.length === 0 ? (
-        <p className={`${teCls} rounded border border-rule bg-paper px-4 py-8 text-center text-[14.5px] text-muted`}>
+      {hub.isLoading ? (
+        <p className={`${teCls} mt-8 text-center text-[13px] text-muted`} role="status">
+          {te ? 'లోడ్ అవుతోంది…' : 'Loading…'}
+        </p>
+      ) : null}
+
+      {hub.isError ? (
+        <p role="alert" className={`${teCls} mt-8 rounded-card border border-breaking-border bg-breaking-tint p-5 text-[13px] text-breaking`}>
+          {te ? 'వీడియోలు లోడ్ కాలేదు.' : 'Could not load videos.'}
+        </p>
+      ) : null}
+
+      {hub.data && rails.length === 0 ? (
+        <p className={`${teCls} mt-8 rounded-card border border-rule bg-white p-8 text-center text-[13px] text-muted dark:bg-surface`}>
           {te ? 'ఇంకా వీడియోలు లేవు.' : 'No videos yet.'}
         </p>
-      ) : (
-        <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {videos.map((video) => (
-              <VideoCard key={video.id} video={video} />
-            ))}
-          </div>
-          {feed.hasNextPage ? (
-            <button
-              type="button"
-              onClick={() => feed.fetchNextPage()}
-              disabled={feed.isFetchingNextPage}
-              className={`${teCls} mt-6 w-full border border-rule bg-paper py-3 text-[13.5px] font-bold text-ink hover:border-brand hover:text-brand disabled:opacity-60`}
-            >
-              {te ? 'మరిన్ని వీడియోలు' : 'More videos'}
-            </button>
-          ) : null}
-        </>
-      )}
+      ) : null}
+
+      {rails.map((rail) => (
+        <Rail key={rail.key} rail={rail} />
+      ))}
     </main>
   );
 }

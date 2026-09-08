@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.content import Article, ArticleTag
 from app.models.engagement import Bookmark, Comment, Follow, Like, ReadingSession, Report
-from app.models.enums import CommentStatus, FollowTargetType, ReportStatus
+from app.models.enums import CommentStatus, CommentTargetType, FollowTargetType, ReportStatus
 from app.repositories.article_repo import published_query
 
 
@@ -73,14 +73,27 @@ def reading_history(
 # --------------------------------------------------------------------------- #
 # comments
 # --------------------------------------------------------------------------- #
-def comments_for_article(
-    db: Session, *, article_id: int, limit: int = 50, offset: int = 0
+def comments_for_target(
+    db: Session,
+    *,
+    target_type: CommentTargetType,
+    target_id: int,
+    limit: int = 50,
+    offset: int = 0,
 ) -> list[Comment]:
-    """Top-level VISIBLE comments plus their visible replies, newest thread first."""
+    """Top-level VISIBLE comments plus their visible replies, newest thread first.
+
+    Works for an article or a video (§15); the column filtered on follows the
+    target type, so the two surfaces cannot leak threads into each other.
+    """
+    owner_column = (
+        Comment.video_id if target_type == CommentTargetType.VIDEO else Comment.article_id
+    )
     top = (
         select(Comment)
         .where(
-            Comment.article_id == article_id,
+            Comment.target_type == target_type,
+            owner_column == target_id,
             Comment.parent_id.is_(None),
             Comment.status == CommentStatus.VISIBLE,
         )
@@ -100,6 +113,16 @@ def comments_for_article(
         .order_by(Comment.created_at.asc())
     )
     return parents + list(db.execute(replies).unique().scalars())
+
+
+def comments_for_article(
+    db: Session, *, article_id: int, limit: int = 50, offset: int = 0
+) -> list[Comment]:
+    """Article threads. Thin wrapper so existing call sites read unchanged."""
+    return comments_for_target(
+        db, target_type=CommentTargetType.ARTICLE, target_id=article_id,
+        limit=limit, offset=offset,
+    )
 
 
 def comment_queue(

@@ -192,6 +192,19 @@ export interface LocalFeedPayload {
   next_offset: number | null;
 }
 
+/** §15 attribution — the publisher a video came from, and a follow target. */
+export interface ChannelOut {
+  id: number;
+  key: string;
+  name: string;
+  url: string | null;
+  avatar_url: string | null;
+  is_verified: boolean;
+  follower_count: number;
+}
+
+export interface VideoTagOut { slug: string; name_te: string; name_en: string }
+
 export interface VideoOut {
   id: number;
   youtube_id: string;
@@ -203,6 +216,39 @@ export interface VideoOut {
   description_te: string | null;
   category: CategoryOut | null;
   published_at: string | null;
+  duration_sec: number | null;
+  view_count: number;
+  comment_count: number;
+  share_count: number;
+  channel: ChannelOut | null;
+  tags: VideoTagOut[];
+}
+
+export type ReactionKind = 'happy' | 'sad' | 'angry';
+export interface ReactionSummary {
+  total: number;
+  counts: Record<ReactionKind, number>;
+  percent: Record<ReactionKind, number>;
+  mine: ReactionKind | null;
+}
+
+/** Everything the video page renders, in one request. */
+export interface VideoDetail extends VideoOut {
+  reactions: ReactionSummary;
+  related: VideoOut[];
+  following_channel: boolean;
+}
+
+export interface VideoRail {
+  key: string;
+  title_te: string;
+  title_en: string | null;
+  videos: VideoOut[];
+}
+
+export interface VideoRails {
+  tabs: CategoryOut[];
+  rails: VideoRail[];
 }
 
 export interface VideoList {

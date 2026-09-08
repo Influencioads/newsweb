@@ -8,8 +8,13 @@ import type {
   MandalOut,
   SearchMeta,
   SearchResults,
+  ReactionKind,
+  ReactionSummary,
   SiteConfig,
+  VideoComment,
+  VideoDetail,
   VideoList,
+  VideoRails,
 } from './types';
 
 export async function fetchSiteConfig(): Promise<SiteConfig> {
@@ -103,4 +108,43 @@ export async function fetchLocalFeed(params: {
 }): Promise<LocalFeedPayload> {
   const { data } = await api.get<LocalFeedPayload>('/public/local', { params });
   return data;
+}
+
+
+// --- §15 video hub ---------------------------------------------------------
+export async function fetchVideoRails(): Promise<VideoRails> {
+  return (await api.get<VideoRails>('/public/videos/rails')).data;
+}
+
+export async function fetchVideo(id: number, anonId?: string | null): Promise<VideoDetail> {
+  return (await api.get<VideoDetail>(`/public/videos/${id}`, {
+    params: anonId ? { anon_id: anonId } : undefined,
+  })).data;
+}
+
+/** Fire-and-forget: a failed count must never interrupt playback. */
+export const countVideoView = (id: number) =>
+  api.post(`/public/videos/${id}/view`).catch(() => undefined);
+export const countVideoShare = (id: number) =>
+  api.post(`/public/videos/${id}/share`).catch(() => undefined);
+
+export async function setVideoReaction(
+  id: number,
+  kind: ReactionKind | null,
+  anonId?: string | null,
+): Promise<ReactionSummary> {
+  return (await api.post<ReactionSummary>(`/public/videos/${id}/reaction`, {
+    kind, anon_id: anonId ?? null,
+  })).data;
+}
+
+export async function fetchVideoComments(id: number) {
+  return (await api.get<{ total_visible: number; comments: VideoComment[] }>(
+    `/public/videos/${id}/comments`)).data;
+}
+
+export async function addVideoComment(id: number, body: string, parentId: number | null) {
+  return (await api.post<VideoComment>(`/videos/${id}/comments`, {
+    body, parent_id: parentId,
+  })).data;
 }

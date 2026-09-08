@@ -1,39 +1,56 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
-import { Image } from 'expo-image';
-import { router } from 'expo-router';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { FlatList, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import * as publicApi from '@/api/public';
-import type { VideoOut } from '@/api/types';
+import { VideoCard } from '@/components/VideoCard';
 import { EmptyState, ErrorState, LoadingState } from '@/components/Feedback';
-import { timeAgo, useI18n } from '@/lib/i18n';
-import { color, font } from '@/lib/theme';
+import { SectionHeader } from '@/components/SectionHeader';
+import { useI18n } from '@/lib/i18n';
+import { font } from '@/lib/theme';
 import { makeStyles } from '@/lib/useTheme';
+import type { VideoRail } from '@/api/types';
 
 /**
- * Video hub (§15, YouTube links only). Cards carry the YouTube thumbnail;
- * nothing plays until the reader taps — the player screen embeds it.
+ * Video hub (§15) — the app twin of the web page.
+ *
+ * A tab strip of the categories that actually have video, then a horizontal
+ * rail per category. Choosing a tab filters to that rail instead of navigating,
+ * so comparing sections costs nothing.
  */
+
+function Rail({ rail }: { rail: VideoRail }) {
+  const styles = useStyles();
+  const { pick } = useI18n();
+  return (
+    <View style={styles.rail}>
+      <SectionHeader title={pick(rail.title_te, rail.title_en)} />
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.railTrack}
+      >
+        {rail.videos.map((video) => (
+          <VideoCard key={video.id} video={video} />
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
 export default function VideosScreen() {
   const styles = useStyles();
-  const { t, pick, language } = useI18n();
+  const { t, pick, isTelugu } = useI18n();
+  const [active, setActive] = useState('');
 
-  const feed = useInfiniteQuery({
-    queryKey: ['videos'],
-    queryFn: ({ pageParam }) => publicApi.fetchVideos({ offset: pageParam, limit: 12 }),
-    initialPageParam: 0,
-    getNextPageParam: (last) => last.next_offset ?? undefined,
+  const hub = useQuery({
+    queryKey: ['video-rails'],
+    queryFn: publicApi.fetchVideoRails,
+    staleTime: 120_000,
   });
 
-  const videos = feed.data?.pages.flatMap((page) => page.videos) ?? [];
-
-  function open(video: VideoOut) {
-    router.push({
-      pathname: '/video/[youtubeId]',
-      params: { youtubeId: video.youtube_id, title: video.title_te },
-    });
-  }
+  const rails = (hub.data?.rails ?? []).filter((r) => !active || r.key === active);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -41,52 +58,53 @@ export default function VideosScreen() {
         <Text style={styles.title}>▶ {t('videos.title')}</Text>
       </View>
 
-      {feed.isLoading ? <LoadingState /> : null}
-      {feed.isError ? <ErrorState onRetry={() => feed.refetch()} /> : null}
-      {feed.data ? (
-        videos.length === 0 ? (
-          <EmptyState message={t('videos.empty')} />
-        ) : (
-          <FlatList
-            data={videos}
-            keyExtractor={(item) => String(item.id)}
-            contentContainerStyle={styles.list}
-            renderItem={({ item }) => (
+      {hub.data && hub.data.tabs.length ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabs}
+        >
+          <Pressable
+            onPress={() => setActive('')}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active === '' }}
+            style={[styles.tab, active === '' && styles.tabActive]}
+          >
+            <Text style={[styles.tabText, active === '' && styles.tabTextActive]}>
+              {isTelugu ? 'అన్నీ' : 'All'}
+            </Text>
+          </Pressable>
+          {hub.data.tabs.map((tab) => {
+            const selected = active === tab.slug;
+            return (
               <Pressable
-                onPress={() => open(item)}
+                key={tab.slug}
+                onPress={() => setActive(selected ? '' : tab.slug)}
                 accessibilityRole="button"
-                style={({ pressed }) => [styles.card, pressed && { opacity: 0.8 }]}
+                accessibilityState={{ selected }}
+                style={[styles.tab, selected && styles.tabActive]}
               >
-                <View style={styles.thumbWrap}>
-                  <Image
-                    source={{ uri: item.thumbnail_url }}
-                    style={styles.thumb}
-                    contentFit="cover"
-                    transition={150}
-                  />
-                  <View style={styles.playBadge}>
-                    <Text style={styles.playGlyph}>▶</Text>
-                  </View>
-                </View>
-                <View style={styles.cardBody}>
-                  {item.category ? (
-                    <Text style={styles.kicker}>
-                      {pick(item.category.name_te, item.category.name_en)}
-                    </Text>
-                  ) : null}
-                  <Text style={styles.cardTitle}>{item.title_te}</Text>
-                  <Text style={styles.cardTime}>{timeAgo(item.published_at, language)}</Text>
-                </View>
+                <Text style={[styles.tabText, selected && styles.tabTextActive]}>
+                  {pick(tab.name_te, tab.name_en)}
+                </Text>
               </Pressable>
-            )}
-            onEndReached={() => {
-              if (feed.hasNextPage && !feed.isFetchingNextPage) void feed.fetchNextPage();
-            }}
-            onEndReachedThreshold={0.6}
-            refreshing={feed.isRefetching && !feed.isFetchingNextPage}
-            onRefresh={() => feed.refetch()}
-          />
-        )
+            );
+          })}
+        </ScrollView>
+      ) : null}
+
+      {hub.isLoading ? <LoadingState /> : null}
+      {hub.isError ? <ErrorState onRetry={() => hub.refetch()} /> : null}
+      {hub.data && rails.length === 0 ? <EmptyState message={t('videos.empty')} /> : null}
+
+      {rails.length ? (
+        <FlatList
+          data={rails}
+          keyExtractor={(item) => item.key}
+          contentContainerStyle={styles.list}
+          renderItem={({ item }) => <Rail rail={item} />}
+          showsVerticalScrollIndicator={false}
+        />
       ) : null}
     </SafeAreaView>
   );
@@ -98,54 +116,24 @@ const useStyles = makeStyles((color) => ({
     backgroundColor: color.paper,
     borderBottomWidth: 2,
     borderBottomColor: color.brand,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  title: { fontFamily: font.headline, fontSize: 20, lineHeight: 30, color: color.brand },
-  list: { padding: 12, gap: 12 },
-  card: {
-    backgroundColor: color.paper,
-    borderRadius: 10,
-    overflow: 'hidden',
+  title: { fontFamily: font.headline, fontSize: 21, color: color.brand },
+  tabs: { paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
+  tab: {
+    minHeight: 34,
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: color.rule,
+    backgroundColor: color.paper,
+    borderRadius: 17,
+    paddingHorizontal: 14,
   },
-  thumbWrap: { position: 'relative' },
-  thumb: { width: '100%', aspectRatio: 16 / 9, backgroundColor: color.placeholder },
-  playBadge: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    marginLeft: -24,
-    marginTop: -24,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(0,0,0,0.55))',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  playGlyph: { color: color.white, fontSize: 18, marginLeft: 3 },
-  cardBody: { padding: 12 },
-  kicker: {
-    fontFamily: font.teluguSemiBold,
-    fontSize: 11,
-    lineHeight: 17,
-    color: color.brand,
-    textTransform: 'uppercase',
-  },
-  cardTitle: {
-    fontFamily: font.teluguBold,
-    fontSize: 16,
-    lineHeight: 26,
-    color: color.ink,
-    marginTop: 2,
-  },
-  cardTime: {
-    fontFamily: font.telugu,
-    fontSize: 11.5,
-    lineHeight: 17,
-    color: color.mutedLight,
-    marginTop: 4,
-  },
+  tabActive: { backgroundColor: color.brand, borderColor: color.brand },
+  tabText: { fontFamily: font.teluguSemiBold, fontSize: 12.5, color: color.ink },
+  tabTextActive: { color: color.onBrand },
+  list: { paddingBottom: 28 },
+  rail: { marginTop: 6, paddingHorizontal: 16 },
+  railTrack: { paddingTop: 4, paddingBottom: 6 },
 }));

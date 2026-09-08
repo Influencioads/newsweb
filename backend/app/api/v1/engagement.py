@@ -23,7 +23,9 @@ from sqlalchemy.orm import Session
 from app.core.deps import Principal, get_current_principal, get_optional_principal
 from app.core.ratelimit import rate_limit
 from app.db.session import get_db
-from app.models.enums import FollowTargetType, ReportTargetType
+from pydantic import BaseModel, Field
+
+from app.models.enums import CommentTargetType, FollowTargetType, ReactionKind, ReportTargetType
 from app.repositories import engagement_repo
 from app.schemas.engagement import (
     BeaconIn,
@@ -214,6 +216,30 @@ def add_comment(
     )
     comment.user = principal.user
     return _comment_out(comment, principal.id)
+
+
+class ReactionIn(BaseModel):
+    kind: ReactionKind | None = None
+    anon_id: str | None = Field(default=None, max_length=64)
+
+
+@router.post("/public/articles/{short_id}/reaction", summary="Set my reaction to a story")
+def set_article_reaction(
+    short_id: str,
+    payload: ReactionIn,
+    db: Session = Depends(get_db),
+    principal: Principal | None = Depends(get_optional_principal),
+) -> dict:
+    """The three-way sentiment bar. Open to anonymous readers on purpose: a bar
+    that required a login would measure sign-ups, not sentiment."""
+    return engagement_service.set_reaction(
+        db,
+        target_type=CommentTargetType.ARTICLE,
+        target_key=short_id,
+        kind=payload.kind,
+        user_id=principal.id if principal else None,
+        anon_id=payload.anon_id,
+    )
 
 
 @router.delete("/comments/{comment_id}", summary="Delete my comment")

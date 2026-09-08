@@ -31,8 +31,10 @@ from app.db.base import MYSQL_TABLE_ARGS, Base, PKMixin, TimestampMixin
 from app.db.types import UTCDateTime
 from app.models.enums import (
     CommentStatus,
+    CommentTargetType,
     EventType,
     FollowTargetType,
+    ReactionKind,
     ReportStatus,
     ReportTargetType,
 )
@@ -129,18 +131,34 @@ class Bookmark(Base):
 
 
 class Comment(PKMixin, TimestampMixin, Base):
-    """One reply level (parent_id), post-moderation (§5, §19 Moderation)."""
+    """One reply level (parent_id), post-moderation (§5, §19 Moderation).
+
+    Comments hang off an article *or* a video (§15). `target_type` says which,
+    and exactly one of the two foreign keys is set — kept as real FKs rather
+    than a bare `target_id` so the database still cascades a delete and the
+    moderation queue can join to the parent in one query.
+    """
 
     __tablename__ = "comments"
     __table_args__ = (
         Index("ix_comments_article_id_status_created_at", "article_id", "status", "created_at"),
+        Index("ix_comments_video_id_status_created_at", "video_id", "status", "created_at"),
         Index("ix_comments_user_id_created_at", "user_id", "created_at"),
         Index("ix_comments_status_created_at", "status", "created_at"),
         MYSQL_TABLE_ARGS,
     )
 
-    article_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("articles.id", ondelete="CASCADE"), nullable=False
+    target_type: Mapped[CommentTargetType] = mapped_column(
+        Enum(CommentTargetType, native_enum=False, length=10, validate_strings=True),
+        nullable=False,
+        default=CommentTargetType.ARTICLE,
+        server_default=CommentTargetType.ARTICLE.name,
+    )
+    article_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("articles.id", ondelete="CASCADE"), nullable=True
+    )
+    video_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("videos.id", ondelete="CASCADE"), nullable=True
     )
     user_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
@@ -163,6 +181,40 @@ class Comment(PKMixin, TimestampMixin, Base):
     )
 
     user = relationship("User", foreign_keys=[user_id], lazy="joined")
+
+
+class Reaction(PKMixin, Base):
+    """The three-way sentiment bar (§15, "మీ స్పందన ఏంటి?").
+
+    One row per reader per item, replaced when they change their mind — so the
+    percentages describe *people*, not clicks, the same anti-inflation rule
+    trending follows. Anonymous readers count too, keyed by the same
+    `viewer_key` the reading sessions use, because requiring a login to react
+    would make the bar measure sign-ups rather than sentiment.
+    """
+
+    __tablename__ = "reactions"
+    __table_args__ = (
+        UniqueConstraint("target_type", "target_id", "viewer_key", name="uq_reactions_target_viewer"),
+        Index("ix_reactions_target", "target_type", "target_id"),
+        MYSQL_TABLE_ARGS,
+    )
+
+    target_type: Mapped[CommentTargetType] = mapped_column(
+        Enum(CommentTargetType, native_enum=False, length=10, validate_strings=True), nullable=False
+    )
+    target_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    viewer_key: Mapped[str] = mapped_column(
+        String(80), nullable=False, doc="user:<id> or anon:<anon_id>, as in reading_sessions"
+    )
+    user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    kind: Mapped[ReactionKind] = mapped_column(
+        Enum(ReactionKind, native_enum=False, length=10, validate_strings=True), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
 
 
 class Report(PKMixin, TimestampMixin, Base):

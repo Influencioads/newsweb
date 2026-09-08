@@ -218,6 +218,33 @@ class FollowTargetType(StrEnum):
     DISTRICT = "district"
     MANDAL = "mandal"
     AUTHOR = "author"
+    #: A video publisher (§15). Distinct from AUTHOR, which is one of our own
+    #: journalists — a channel is somebody else's newsroom.
+    CHANNEL = "channel"
+
+
+class CommentTargetType(StrEnum):
+    """What a comment thread hangs off (§15).
+
+    Comments began article-only. Videos are the second surface, so the target
+    became explicit rather than implied by which FK happened to be set.
+    """
+
+    ARTICLE = "article"
+    VIDEO = "video"
+
+
+class ReactionKind(StrEnum):
+    """The three-way sentiment bar ("మీ స్పందన ఏంటి?").
+
+    Deliberately not a like: a like is endorsement, and a reader reacting to a
+    story about a disaster is not endorsing it. One reaction per reader per
+    item, changeable.
+    """
+
+    HAPPY = "happy"
+    SAD = "sad"
+    ANGRY = "angry"
 
 
 class PinPlacement(StrEnum):

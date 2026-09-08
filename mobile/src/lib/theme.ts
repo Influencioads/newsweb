@@ -30,6 +30,9 @@ export const lightColor = {
   info: '#1E66C8',
   placeholder: '#E9E2D6',
   white: '#FFFFFF',
+  /** Foreground on a brand-filled surface. Light on the deep red here; dark on
+   *  the lightened red the dark palette uses, where white would not contrast. */
+  onBrand: '#FFFFFF',
 } as const;
 
 /** Font family names as registered with expo-font in app/_layout.tsx. */
@@ -96,6 +99,7 @@ export const darkColor: Palette = {
   info: '#7FAEEA',
   placeholder: '#2E2820',
   white: '#201B16',
+  onBrand: '#201B16',
 } as const;
 
 export type Palette = { -readonly [K in keyof typeof lightColor]: string };

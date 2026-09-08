@@ -21,7 +21,9 @@ interface BeaconEvent {
 const ANON_KEY = 'tn.anon_id';
 let cachedAnonId: string | null = null;
 
-async function anonId(): Promise<string> {
+/** Stable per-install id. Shared with the §15 reaction bar so an anonymous
+ *  reader's reaction survives a reload the same way their reading does. */
+export async function anonId(): Promise<string> {
   if (cachedAnonId) return cachedAnonId;
   try {
     let id = await AsyncStorage.getItem(ANON_KEY);

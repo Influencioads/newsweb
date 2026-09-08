@@ -8,7 +8,7 @@ so they can drift only if someone writes the tables by hand.
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import NotFoundError, ValidationError
@@ -21,18 +21,22 @@ from app.models.engagement import (
     Comment,
     Follow,
     Like,
+    Reaction,
     ReadingSession,
     Report,
 )
 from app.models.enums import (
     CommentStatus,
+    CommentTargetType,
     EventType,
     FollowTargetType,
+    ReactionKind,
     ReportStatus,
     ReportTargetType,
 )
 from app.models.geo import District, Mandal
 from app.models.user import User
+from app.models.video import Video, VideoChannel
 
 logger = get_logger(__name__)
 
@@ -233,33 +237,74 @@ def set_bookmark(db: Session, *, short_id: str, user_id: int, bookmarked: bool) 
 COMMENT_MAX_LENGTH = 2000
 
 
+def get_live_video(db: Session, video_id: int) -> Video:
+    """A video readers may act on: published and not soft-deleted."""
+    video = db.get(Video, video_id)
+    if video is None or video.deleted_at is not None or not video.is_published:
+        raise NotFoundError()
+    return video
+
+
+def comment_parent(db: Session, target_type: CommentTargetType, target_key: str | int):
+    """Resolve whichever thing a comment thread hangs off (§15).
+
+    One function so the API, the counters and the moderation queue all agree on
+    what "the parent" means, rather than three places each unpacking the two
+    foreign keys their own way.
+    """
+    if target_type == CommentTargetType.VIDEO:
+        return get_live_video(db, int(target_key))
+    return get_live_article(db, str(target_key))
+
+
+def _counter_owner(db: Session, comment: Comment):
+    if comment.target_type == CommentTargetType.VIDEO:
+        return db.get(Video, comment.video_id) if comment.video_id else None
+    return db.get(Article, comment.article_id) if comment.article_id else None
+
+
 def add_comment(
-    db: Session, *, short_id: str, user_id: int, body: str, parent_id: int | None
+    db: Session,
+    *,
+    user_id: int,
+    body: str,
+    parent_id: int | None,
+    short_id: str | None = None,
+    video_id: int | None = None,
 ) -> Comment:
-    article = get_live_article(db, short_id)
+    """Add a comment to an article (`short_id`) or a video (`video_id`)."""
+    if (short_id is None) == (video_id is None):
+        raise ValidationError(details={"target": "exactly one of short_id or video_id"})
+
+    target_type = CommentTargetType.VIDEO if video_id is not None else CommentTargetType.ARTICLE
+    parent_obj = comment_parent(db, target_type, video_id if video_id is not None else short_id)
+
     text = body.strip()
     if not text:
         raise ValidationError(details={"body": "empty"})
     if len(text) > COMMENT_MAX_LENGTH:
         raise ValidationError(details={"body": f"over {COMMENT_MAX_LENGTH} characters"})
 
+    own_id_field = "video_id" if target_type == CommentTargetType.VIDEO else "article_id"
     if parent_id is not None:
         parent = db.get(Comment, parent_id)
-        if parent is None or parent.article_id != article.id:
-            raise ValidationError(details={"parent_id": "not a comment on this article"})
+        if parent is None or getattr(parent, own_id_field) != parent_obj.id:
+            raise ValidationError(details={"parent_id": "not a comment on this item"})
         if parent.parent_id is not None:
             # One reply level only — reply to the thread, not to a reply.
             parent_id = parent.parent_id
 
     comment = Comment(
-        article_id=article.id,
+        target_type=target_type,
+        article_id=parent_obj.id if target_type == CommentTargetType.ARTICLE else None,
+        video_id=parent_obj.id if target_type == CommentTargetType.VIDEO else None,
         user_id=user_id,
         parent_id=parent_id,
         body=text,
         status=CommentStatus.VISIBLE,
     )
     db.add(comment)
-    article.comment_count = (article.comment_count or 0) + 1
+    parent_obj.comment_count = (parent_obj.comment_count or 0) + 1
     db.flush()
     return comment
 
@@ -273,9 +318,9 @@ def delete_own_comment(db: Session, *, comment_id: int, user_id: int) -> None:
     was_public = comment.status == CommentStatus.VISIBLE
     comment.status = CommentStatus.DELETED
     if was_public:
-        article = db.get(Article, comment.article_id)
-        if article is not None:
-            article.comment_count = max((article.comment_count or 0) - 1, 0)
+        owner = _counter_owner(db, comment)
+        if owner is not None:
+            owner.comment_count = max((owner.comment_count or 0) - 1, 0)
 
 
 def moderate_comment(
@@ -287,13 +332,91 @@ def moderate_comment(
     target = CommentStatus.HIDDEN if hide else CommentStatus.VISIBLE
     if comment.status == target or comment.status == CommentStatus.DELETED:
         return comment
-    article = db.get(Article, comment.article_id)
-    if article is not None:
+    owner = _counter_owner(db, comment)
+    if owner is not None:
         delta = -1 if hide else 1
-        article.comment_count = max((article.comment_count or 0) + delta, 0)
+        owner.comment_count = max((owner.comment_count or 0) + delta, 0)
     comment.status = target
     comment.moderated_by = moderator_id
     return comment
+
+
+# --------------------------------------------------------------------------- #
+# reactions (§15 sentiment bar)
+# --------------------------------------------------------------------------- #
+def set_reaction(
+    db: Session,
+    *,
+    target_type: CommentTargetType,
+    target_key: str | int,
+    kind: ReactionKind | None,
+    user_id: int | None,
+    anon_id: str | None,
+) -> dict:
+    """Record (or clear) one reader's reaction and return the tallies.
+
+    Anonymous readers count, keyed the same way reading sessions are — a bar
+    that only measured signed-in readers would measure sign-ups, not sentiment.
+    Changing your mind replaces the row rather than adding one, so the
+    percentages describe people.
+    """
+    viewer = _viewer_key(user_id, anon_id)
+    parent_obj = comment_parent(db, target_type, target_key)
+    if viewer is None:
+        return reaction_summary(db, target_type=target_type, target_id=parent_obj.id, viewer=None)
+
+    existing = db.scalar(select(Reaction).where(
+        Reaction.target_type == target_type,
+        Reaction.target_id == parent_obj.id,
+        Reaction.viewer_key == viewer,
+    ))
+    now = utcnow()
+    if kind is None:
+        if existing is not None:
+            db.delete(existing)
+    elif existing is None:
+        db.add(Reaction(target_type=target_type, target_id=parent_obj.id, viewer_key=viewer,
+                        user_id=user_id, kind=kind, created_at=now, updated_at=now))
+    else:
+        existing.kind = kind
+        existing.user_id = user_id
+        existing.updated_at = now
+    db.flush()
+    return reaction_summary(db, target_type=target_type, target_id=parent_obj.id, viewer=viewer)
+
+
+def reaction_summary(
+    db: Session, *, target_type: CommentTargetType, target_id: int, viewer: str | None
+) -> dict:
+    """Counts and whole-number percentages, plus what this reader chose.
+
+    Percentages are rounded independently and therefore need not total 100 —
+    the UI shows them per option, never as a stacked bar, so that is honest
+    rather than a rounding bug waiting to be noticed.
+    """
+    rows = db.execute(
+        select(Reaction.kind, func.count(Reaction.id))
+        .where(Reaction.target_type == target_type, Reaction.target_id == target_id)
+        .group_by(Reaction.kind)
+    ).all()
+    counts = {kind.value: 0 for kind in ReactionKind}
+    for kind, count in rows:
+        counts[ReactionKind(kind).value] = int(count)
+    total = sum(counts.values())
+    mine = None
+    if viewer:
+        chosen = db.scalar(select(Reaction.kind).where(
+            Reaction.target_type == target_type,
+            Reaction.target_id == target_id,
+            Reaction.viewer_key == viewer,
+        ))
+        mine = ReactionKind(chosen).value if chosen else None
+    return {
+        "total": total,
+        "counts": counts,
+        "percent": {k: (round(v * 100 / total) if total else 0) for k, v in counts.items()},
+        "mine": mine,
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -383,6 +506,19 @@ def resolve_follow_target(
         row = db.execute(
             select(Mandal).where(Mandal.slug == slug, Mandal.is_active.is_(True))
         ).scalar_one_or_none()
+    elif target_type == FollowTargetType.CHANNEL:
+        # A channel has one name, not a Telugu/English pair — YouTube gives us
+        # what the publisher calls itself, and renaming somebody else's
+        # newsroom for them would be wrong.
+        channel = db.execute(
+            select(VideoChannel).where(VideoChannel.youtube_channel_key == slug)
+        ).scalar_one_or_none()
+        if channel is None:
+            raise NotFoundError(
+                message_en="Nothing to follow at that address.",
+                message_te="ఆ చిరునామాలో ఫాలో చేయదగినది లేదు.",
+            )
+        return channel.id, channel.name, channel.name
     else:
         row = db.execute(
             select(User).where(

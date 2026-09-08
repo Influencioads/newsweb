@@ -3,7 +3,7 @@ import type { ArticleCard } from '@/types/public';
 
 /** Engagement API (Phase C) — mirrors backend/app/api/v1/engagement.py. */
 
-export type FollowTargetType = 'category' | 'tag' | 'district' | 'mandal' | 'author';
+export type FollowTargetType = 'category' | 'tag' | 'district' | 'mandal' | 'author' | 'channel';
 
 export interface EngagementCounts {
   like_count: number;

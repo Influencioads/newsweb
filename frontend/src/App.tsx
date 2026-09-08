@@ -30,6 +30,7 @@ import { AuthorPage, DistrictPage, MandalPage, PhotoGalleryPage, TagPage, WebSto
 import ShortNewsPage from './pages/public/ShortNewsPage';
 import SubmitPage from './pages/public/SubmitPage';
 import VideosPage from './pages/public/VideosPage';
+import VideoDetailPage from './pages/public/VideoDetailPage';
 import SystemStatus from './pages/qa/SystemStatus';
 import TeluguRenderTest from './pages/qa/TeluguRenderTest';
 import { RequireAuth } from './routes/RequireAuth';
@@ -71,6 +72,7 @@ export default function App() {
         <Route path="/mandal/:slug" element={<MandalPage />} />
         <Route path="/photos" element={<PhotoGalleryPage />} />
         <Route path="/videos" element={<VideosPage />} />
+        <Route path="/videos/:id" element={<VideoDetailPage />} />
         <Route path="/short-news" element={<ShortNewsPage />} />
         <Route path="/web-stories" element={<WebStoriesPage />} />
         <Route path="/author/:slug" element={<AuthorPage />} />

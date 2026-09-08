@@ -10,7 +10,11 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import NotFoundError, ValidationError
 from app.db.base import utcnow
-from app.models.video import Video
+from app.models.content import Tag
+from app.models.enums import TagType
+from app.models.video import Video, VideoChannel, VideoTag
+from app.telugu.normalize import normalize_text
+from app.telugu.transliterate import slugify
 
 _ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 
@@ -125,3 +129,136 @@ def get_video(db: Session, video_id: int) -> Video:
     if video is None or video.deleted_at is not None:
         raise NotFoundError()
     return video
+
+
+# --------------------------------------------------------------------------- #
+# channels (§15) — the publisher behind a video
+# --------------------------------------------------------------------------- #
+def channel_key(name: str, youtube_channel_id: str | None = None) -> str:
+    """Stable identity for a channel.
+
+    Prefers YouTube's own id; falls back to a slug of the display name, because
+    oEmbed returns `author_name` but not always `author_id`. Two videos from
+    the same publisher must land on the same row either way, or "follow" would
+    mean a different thing per video.
+    """
+    if youtube_channel_id:
+        return youtube_channel_id[:80]
+    return (slugify(name) or "channel")[:80]
+
+
+def get_or_create_channel(
+    db: Session,
+    *,
+    name: str,
+    youtube_channel_id: str | None = None,
+    url: str | None = None,
+    avatar_url: str | None = None,
+) -> VideoChannel:
+    key = channel_key(name, youtube_channel_id)
+    channel = db.execute(
+        select(VideoChannel).where(VideoChannel.youtube_channel_key == key)
+    ).scalar_one_or_none()
+    if channel is None:
+        channel = VideoChannel(youtube_channel_key=key, name=name[:200], url=url,
+                               avatar_url=avatar_url)
+        db.add(channel)
+        db.flush()
+        return channel
+    # A publisher that renames itself should not fork into two rows.
+    if name and channel.name != name[:200]:
+        channel.name = name[:200]
+    if url and not channel.url:
+        channel.url = url
+    if avatar_url and not channel.avatar_url:
+        channel.avatar_url = avatar_url
+    return channel
+
+
+# --------------------------------------------------------------------------- #
+# tags (§15 hashtag chips) — the same tags articles use
+# --------------------------------------------------------------------------- #
+def apply_tags(db: Session, video: Video, names: list[str]) -> None:
+    """Replace a video's tags, creating any name that does not exist yet.
+
+    Deliberately shares the `tags` table with articles: a reader tapping
+    #Politics on a video should land on the same page as #Politics on a story,
+    not a parallel universe of video-only tags.
+    """
+    wanted: list[Tag] = []
+    seen: set[str] = set()
+    for raw in names[:25]:
+        name = normalize_text(raw).strip()
+        if not name:
+            continue
+        slug = slugify(name)[:100]
+        if not slug or slug in seen:
+            continue
+        seen.add(slug)
+        tag = db.scalar(select(Tag).where(Tag.slug == slug))
+        if tag is None:
+            tag = Tag(slug=slug, name_te=name[:140], name_en=name[:140], type=TagType.TOPIC)
+            db.add(tag)
+            db.flush()
+        wanted.append(tag)
+
+    existing = {link.tag_id: link for link in video.tags}
+    keep = {t.id for t in wanted}
+    for tag_id, link in list(existing.items()):
+        if tag_id not in keep:
+            video.tags.remove(link)
+    for position, tag in enumerate(wanted):
+        link = existing.get(tag.id)
+        if link is None:
+            video.tags.append(VideoTag(tag_id=tag.id, sort=position))
+        else:
+            link.sort = position
+    db.flush()
+
+
+def record_view(db: Session, video: Video) -> int:
+    """Count one play (§15).
+
+    A plain increment rather than the article beacon's unique-viewer dedup:
+    `videos.view_count` is a display figure next to the title, not a trending
+    input, so it cannot distort a ranking. Trending still reads only
+    `article_events`.
+    """
+    video.view_count = (video.view_count or 0) + 1
+    db.flush()
+    return video.view_count
+
+
+def record_share(db: Session, video: Video) -> int:
+    video.share_count = (video.share_count or 0) + 1
+    db.flush()
+    return video.share_count
+
+
+def related(db: Session, video: Video, *, limit: int = 8) -> list[Video]:
+    """Videos to watch next: same channel first, then same category, then recent.
+
+    Same order of specificity as the article `related` query, for the same
+    reason — the closest match is the most useful, and the fallbacks stop the
+    rail being empty on a young library.
+    """
+    picked: list[Video] = []
+    seen = {video.id}
+    live = [Video.is_published.is_(True), Video.deleted_at.is_(None)]
+
+    for predicate in (
+        Video.channel_id == video.channel_id if video.channel_id else None,
+        Video.category_id == video.category_id if video.category_id else None,
+        None,
+    ):
+        if len(picked) >= limit:
+            break
+        stmt = select(Video).where(*live, Video.id.notin_(seen))
+        if predicate is not None:
+            stmt = stmt.where(predicate)
+        stmt = stmt.order_by(Video.published_at.desc()).limit(limit - len(picked))
+        for row in db.execute(stmt).unique().scalars():
+            if row.id not in seen:
+                picked.append(row)
+                seen.add(row.id)
+    return picked[:limit]

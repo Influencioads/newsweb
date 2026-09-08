@@ -10,6 +10,7 @@ import ReviewQueue from './pages/admin/ReviewQueue';
 import { AuditPage, MediaPage, ModerationPage, RolesPage, TaxonomyPage, UsersPage } from './pages/admin/ManagementPages';
 import SettingsPage from './pages/admin/SettingsPage';
 import AiSuggestionsPage from './pages/admin/AiSuggestions';
+import ContentSourcesPage from './pages/admin/ContentSources';
 import PendingArticlesPage from './pages/admin/PendingArticles';
 import { AdsPage, AnalyticsPage, HomepageSectionsPage, NotificationsAdminPage, PinsPage, TrendingAdminPage, VideosAdminPage } from './pages/admin/DiscoveryPages';
 import ArticlePage from './pages/public/ArticlePage';
@@ -104,6 +105,7 @@ export default function App() {
           <Route path="/admin/review" element={<ReviewQueue />} />
           <Route path="/admin/pending" element={<PendingArticlesPage />} />
           <Route path="/admin/ai" element={<AiSuggestionsPage />} />
+          <Route path="/admin/sources" element={<ContentSourcesPage />} />
           <Route path="/admin/moderation" element={<ModerationPage />} />
           <Route path="/admin/pins" element={<PinsPage />} />
           <Route path="/admin/trending" element={<TrendingAdminPage />} />

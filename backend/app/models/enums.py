@@ -162,6 +162,10 @@ class ArticleType(StrEnum):
     AI_SUGGESTED = "AI_SUGGESTED"
     AI_DRAFT = "AI_DRAFT"
     BREAKING_NEWS = "BREAKING_NEWS"
+    #: Ingested from a licensed feed (§17). Distinct from AGENCY copy a
+    #: sub-editor rewrote — this is the publisher's own words, republished
+    #: under agreement and labelled as such.
+    SYNDICATED = "SYNDICATED"
 
 
 class TagType(StrEnum):
@@ -348,3 +352,49 @@ class AiDraftStatus(StrEnum):
     DRAFT = "draft"
     CONVERTED = "converted"
     DISCARDED = "discarded"
+
+
+class SourceLicence(StrEnum):
+    """What right we hold over a source's words (§17).
+
+    This is the field that decides whether the platform is an aggregator with
+    agreements or a scraper with a nice UI. RSS_PUBLIC is the honest default:
+    a public feed is an invitation to *link*, not a republication licence, so
+    it can only ever produce a headline, an excerpt and a link out.
+    """
+
+    #: A wire contract — PTI, IANS, ANI. Full text, republished verbatim.
+    AGENCY_CONTRACT = "agency_contract"
+    #: A named agreement with one publisher.
+    PUBLISHER_PARTNER = "publisher_partner"
+    #: Issued for redistribution: press releases, PIB, government bulletins.
+    PRESS_RELEASE = "press_release"
+    GOVERNMENT = "government"
+    #: CC-BY and friends. Attribution is mandatory and enforced.
+    CREATIVE_COMMONS = "creative_commons"
+    #: Another title we own.
+    OWN_NETWORK = "own_network"
+    #: A public feed with no agreement behind it. Excerpt and link only.
+    RSS_PUBLIC = "rss_public"
+
+
+class ContentPolicy(StrEnum):
+    """How much of an ingested item we may keep (§17).
+
+    EXCERPT_ONLY stores a headline, a short standfirst and a link — the shape
+    every feed reader has used for twenty years. FULL_TEXT is only reachable
+    when the licence supports it; the model enforces that pairing.
+    """
+
+    LINK_ONLY = "link_only"
+    EXCERPT_ONLY = "excerpt_only"
+    FULL_TEXT = "full_text"
+
+
+class IngestStatus(StrEnum):
+    """Where a fetched item sits in the editorial queue (§17)."""
+
+    NEW = "new"
+    IMPORTED = "imported"
+    REJECTED = "rejected"
+    DUPLICATE = "duplicate"

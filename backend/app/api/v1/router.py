@@ -19,6 +19,7 @@ from app.api.v1 import (
     cms_articles,
     cms_dashboard,
     cms_discovery,
+    cms_ingestion,
     creator,
     engagement,
     notifications,
@@ -44,3 +45,4 @@ api_router.include_router(cms_dashboard.router)
 api_router.include_router(cms_admin.router)
 api_router.include_router(cms_ai.router)
 api_router.include_router(cms_discovery.router)
+api_router.include_router(cms_ingestion.router)

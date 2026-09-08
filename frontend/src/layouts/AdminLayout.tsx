@@ -30,6 +30,7 @@ const NAV: NavItem[] = [
   { to: '/admin/review', labelTe: 'రివ్యూ క్యూ', labelEn: 'Review queue', permission: 'article.review' },
   { to: '/admin/pending', labelTe: 'పెండింగ్ కథనాలు', labelEn: 'Pending articles', permission: 'article.review' },
   { to: '/admin/ai', labelTe: 'AI సూచనలు', labelEn: 'AI suggestions', permission: 'ai.use' },
+  { to: '/admin/sources', labelTe: 'కంటెంట్ మూలాలు', labelEn: 'Content sources', permission: 'article.review' },
   { to: '/admin/moderation', labelTe: 'మోడరేషన్', labelEn: 'Moderation', permission: 'comment.moderate' },
   { to: '/admin/trending', labelTe: 'ట్రెండింగ్', labelEn: 'Trending', permission: 'dashboard.view' },
   { to: '/admin/pins', labelTe: 'పిన్‌లు', labelEn: 'Pins', permission: 'article.publish' },

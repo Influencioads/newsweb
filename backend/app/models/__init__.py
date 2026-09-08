@@ -38,6 +38,7 @@ from app.models.engagement import (
 )
 from app.models.notify import Notification, NotificationCampaign, PushDevice
 from app.models.geo import District, Locality, Mandal, State
+from app.models.ingestion import ContentSource, IngestedItem
 from app.models.media import ArticleMedia, Media
 from app.models.reader import UserPreference
 from app.models.setting import AppSetting
@@ -60,6 +61,8 @@ __all__ = [
     "AppSetting",
     "Article",
     "AudioAsset",
+    "ContentSource",
+    "IngestedItem",
     "Reaction",
     "VideoChannel",
     "VideoTag",

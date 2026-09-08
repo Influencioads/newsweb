@@ -83,3 +83,39 @@ export interface AudioState {
   /** 'device' means fall back to the browser voice; null means hide the player. */
   fallback:'device'|null; voice_enabled:boolean;
 }
+
+/** §17 — what right we hold over a source's words. */
+export type SourceLicence =
+  | 'agency_contract' | 'publisher_partner' | 'press_release'
+  | 'government' | 'creative_commons' | 'own_network' | 'rss_public';
+export type ContentPolicy = 'link_only' | 'excerpt_only' | 'full_text';
+export type IngestStatus = 'new' | 'imported' | 'rejected' | 'duplicate';
+
+export interface ContentSource {
+  id: number; slug: string; name: string; name_te: string | null;
+  feed_url: string; feed_kind: string;
+  homepage_url: string | null; logo_url: string | null;
+  licence: SourceLicence; content_policy: ContentPolicy;
+  licence_note: string | null;
+  /** The server's own verdict — never recompute it in the UI. */
+  may_store_full_text: boolean;
+  attribution_required: boolean; auto_publish: boolean;
+  default_category_id: number | null; default_district_id: number | null;
+  language: string; fetch_interval_minutes: number; is_active: boolean;
+  last_fetched_at: string | null; last_status: string | null;
+  consecutive_failures: number; items_ingested: number; pending_items: number;
+}
+
+export interface IngestedItem {
+  id: number; title: string; summary: string | null;
+  url: string | null; canonical_url: string | null;
+  image_url: string | null; author: string | null;
+  published_at: string | null; fetched_at: string;
+  word_count: number; status: IngestStatus;
+  article_id: number | null; review_note: string | null;
+  source: { id: number; slug: string; name: string; licence: SourceLicence;
+            content_policy: ContentPolicy; full_text: boolean } | null;
+  has_full_text: boolean;
+}
+
+export type IngestQueueCounts = Record<IngestStatus, number>;

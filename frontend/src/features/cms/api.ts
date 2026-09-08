@@ -1,5 +1,5 @@
 import { api } from '@/api/client';
-import type { AiDraft, AiSuggestion, AudioState, CmsArticle, CmsArticleList, CmsAudioRef, CmsEditorOptions, CmsMediaRef, CmsOption, DashboardStats, SettingsPayload } from '@/types/cms';
+import type { ContentSource, IngestQueueCounts, IngestedItem, AiDraft, AiSuggestion, AudioState, CmsArticle, CmsArticleList, CmsAudioRef, CmsEditorOptions, CmsMediaRef, CmsOption, DashboardStats, SettingsPayload } from '@/types/cms';
 export const fetchArticles=async(params?:{state?:string;search?:string;offset?:number;limit?:number})=>(await api.get<CmsArticleList>('/cms/articles',{params})).data;
 export const fetchArticle=async(id:number)=>(await api.get<CmsArticle>(`/cms/articles/${id}`)).data;
 export const createArticle=async(payload:Record<string,unknown>)=>(await api.post<CmsArticle>('/cms/articles',payload)).data;
@@ -64,3 +64,14 @@ export const setArticlePlacement=async(id:number,payload:{pin_home_minutes?:numb
 // --- §19 audio an editor attaches by hand ----------------------------------
 export const uploadArticleAudio=async(id:number,file:File,durationSec=0)=>{const fd=new FormData();fd.append('file',file);fd.append('duration_sec',String(Math.round(durationSec)));return (await api.post<CmsAudioRef&{available:boolean;url:string|null}>(`/cms/articles/${id}/audio`,fd,{headers:{'Content-Type':'multipart/form-data'}})).data};
 export const deleteArticleAudio=async(id:number)=>(await api.delete<{removed:boolean}>(`/cms/articles/${id}/audio`)).data;
+
+// --- §17 content ingestion -------------------------------------------------
+export const fetchSources=async()=>(await api.get<{items:ContentSource[];total:number;queue:IngestQueueCounts}>('/cms/sources')).data;
+export const createSource=async(payload:Record<string,unknown>)=>(await api.post<ContentSource>('/cms/sources',payload)).data;
+export const patchSource=async(id:number,payload:Record<string,unknown>)=>(await api.patch<ContentSource>(`/cms/sources/${id}`,payload)).data;
+export const deleteSource=async(id:number)=>(await api.delete(`/cms/sources/${id}`)).data;
+export const fetchSourceNow=async(id:number)=>(await api.post<Record<string,unknown>>(`/cms/sources/${id}/fetch`)).data;
+export const runIngestion=async()=>(await api.post<{results:Array<Record<string,unknown>>;queue:IngestQueueCounts}>('/cms/ingestion/run')).data;
+export const fetchIngestQueue=async(status:string='new')=>(await api.get<{items:IngestedItem[];total:number;queue:IngestQueueCounts}>('/cms/ingestion/queue',{params:{status}})).data;
+export const importIngestedItem=async(id:number)=>(await api.post<{article_id:number;short_id:string;workflow_state:string}>(`/cms/ingestion/${id}/import`)).data;
+export const rejectIngestedItem=async(id:number,note?:string)=>(await api.post(`/cms/ingestion/${id}/reject`,{note:note||null})).data;

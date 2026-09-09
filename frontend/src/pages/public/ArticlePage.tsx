@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Pause, Volume2 } from 'lucide-react';
 
 import { ApiError } from '@/api/client';
 import { AdSlot } from '@/components/ads/AdSlot';
@@ -78,7 +77,6 @@ function useNewsArticleJsonLd(article: ArticleDetail | undefined) {
 function ReaderToolbar({ article }: { article: ArticleDetail }) {
   const { fontStep, setFontStep } = useReaderPrefs();
   const { t, language } = useI18n();
-  const script = language === 'te' ? 'te' : 'font-sans';
   // §16 audio news, v1: on-device Telugu speech. The headline leads so a
   // listener knows immediately which story started.
   const tts = useTts(`${article.title_te}. ${extractPlainText(article.body)}`);

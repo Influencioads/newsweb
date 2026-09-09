@@ -293,7 +293,7 @@ export default function Home() {
           />
           <div className="grid gap-x-7 gap-y-4 md:grid-cols-[1.5fr_1fr]">
             <div className="min-w-0">
-              <SecondaryCard article={data.mandal_block.articles[0]} />
+              <SecondaryCard article={data.mandal_block.articles[0]!} />
             </div>
             <div className="min-w-0 md:border-l md:border-rule md:pl-7">
               {data.mandal_block.articles.slice(1).map((a) => (

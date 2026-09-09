@@ -1,5 +1,3 @@
-import { useMutation } from '@tanstack/react-query';
-
 import { useI18n } from '@/i18n';
 import type { ReactionKind, ReactionSummary } from '@/types/public';
 

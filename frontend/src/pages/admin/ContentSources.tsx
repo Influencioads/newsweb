@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { Field, Section, Toggle, inputClass } from '@/components/admin/FormControls';
+import { Field, Section, inputClass } from '@/components/admin/FormControls';
 import * as cmsApi from '@/features/cms/api';
 import { useI18n } from '@/i18n';
 import type { ApiError } from '@/api/client';

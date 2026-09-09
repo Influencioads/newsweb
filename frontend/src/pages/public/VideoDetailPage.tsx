@@ -162,7 +162,7 @@ export default function VideoDetailPage() {
         {data.published_at ? (
           <>
             <span aria-hidden>·</span>
-            <span>{formatTime(data.published_at, language)}</span>
+            <span>{formatTime(data.published_at)}</span>
             <span aria-hidden>·</span>
             <span>{formatDate(data.published_at, language)}</span>
           </>

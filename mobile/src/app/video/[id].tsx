@@ -32,6 +32,11 @@ const REACTIONS: Array<{ kind: ReactionKind; glyph: string; te: string; en: stri
   { kind: 'angry', glyph: '😠', te: 'కోపం', en: 'Angry' },
 ];
 
+// YouTube error 153 is returned when an embedded player has no HTTP Referer
+// or equivalent client identity. Native WebViews do not reliably add one, so
+// identify this app with the same public origin that serves its API and web UI.
+const PLAYER_ORIGIN = 'https://telugunews.influencioweb.com';
+
 function relative(iso: string | null, te: boolean): string {
   if (!iso) return '';
   const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
@@ -110,6 +115,9 @@ export default function VideoScreen() {
 
   const data = video.data;
   const threads = (comments.data?.comments ?? []).filter((c) => c.parent_id == null);
+  const playerUrl = `${data.embed_url}?autoplay=1&rel=0&playsinline=1&origin=${encodeURIComponent(
+    PLAYER_ORIGIN,
+  )}&widget_referrer=${encodeURIComponent(PLAYER_ORIGIN)}`;
 
   return (
     <>
@@ -118,7 +126,10 @@ export default function VideoScreen() {
         {/* ------------------------------------------------------ player -- */}
         <View style={styles.player}>
           <WebView
-            source={{ uri: `${data.embed_url}?autoplay=1&rel=0&playsinline=1` }}
+            source={{
+              uri: playerUrl,
+              headers: { Referer: `${PLAYER_ORIGIN}/` },
+            }}
             style={styles.webview}
             allowsFullscreenVideo
             allowsInlineMediaPlayback

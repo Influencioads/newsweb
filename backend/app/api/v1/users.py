@@ -11,7 +11,7 @@ valid session — a subscriber holds no permission keys at all.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Request, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -42,7 +42,11 @@ def _get_or_create_prefs(db: Session, user_id: int) -> UserPreference:
 
 
 def _prefs_out(db: Session, prefs: UserPreference) -> PreferencesOut:
-    state = article_repo.get_state_by_code(db, prefs.state_code) if prefs.state_code else None
+    state = (
+        article_repo.get_state_by_code(db, prefs.state_code)
+        if prefs.state_code
+        else None
+    )
     district = db.get(District, prefs.district_id) if prefs.district_id else None
     mandal = db.get(Mandal, prefs.mandal_id) if prefs.mandal_id else None
     locality = db.get(Locality, prefs.locality_id) if prefs.locality_id else None
@@ -59,7 +63,9 @@ def _prefs_out(db: Session, prefs: UserPreference) -> PreferencesOut:
     )
 
 
-@router.get("/me/preferences", response_model=PreferencesOut, summary="My reading preferences")
+@router.get(
+    "/me/preferences", response_model=PreferencesOut, summary="My reading preferences"
+)
 def get_preferences(
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
@@ -137,7 +143,9 @@ def update_preferences(
                 None,
             )
             if mandal is None:
-                raise ValidationError(details={"mandal_slug": "not in the chosen district"})
+                raise ValidationError(
+                    details={"mandal_slug": "not in the chosen district"}
+                )
             if prefs.mandal_id != mandal.id:
                 prefs.locality_id = None
             prefs.mandal_id = mandal.id
@@ -157,7 +165,9 @@ def update_preferences(
                 None,
             )
             if locality is None:
-                raise ValidationError(details={"locality_slug": "not in the chosen mandal"})
+                raise ValidationError(
+                    details={"locality_slug": "not in the chosen mandal"}
+                )
             prefs.locality_id = locality.id
 
     for flag in ("notify_breaking", "notify_local", "notify_topics"):
@@ -195,7 +205,8 @@ def update_profile(
             raise ValidationError(
                 message_en="Contact support to change a verified email address.",
                 message_te="ధృవీకరించిన ఇమెయిల్ మార్చడానికి సపోర్ట్‌ను సంప్రదించండి.",
-                details={"email": "already verified"})
+                details={"email": "already verified"},
+            )
         existing = auth_service.get_user_by_email(db, address)
         if existing is not None and existing.id != principal.id:
             raise ValidationError(details={"email": "already registered"})

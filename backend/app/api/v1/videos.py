@@ -1,17 +1,17 @@
 """Video hub (updated doc §15, YouTube links only) — public list + CMS CRUD.
 
-    GET    /public/videos                 — published videos, newest first
-    GET    /public/videos/rails            — category-grouped rails for the hub
-    GET    /public/videos/{id}             — one video: channel, tags, counts, related
-    POST   /public/videos/{id}/view        — count a play
-    POST   /public/videos/{id}/share       — count a share
-    GET    /public/videos/{id}/comments    — visible threads
-    POST   /videos/{id}/comments           — add one (signed-in)
-    POST   /public/videos/{id}/reaction    — the three-way sentiment bar
-    GET    /cms/videos                    — full library (video.view)
-    POST   /cms/videos                    — add by YouTube URL (video.upload)
-    PATCH  /cms/videos/{id}               — edit / publish toggle (video.edit)
-    DELETE /cms/videos/{id}               — soft delete (video.edit)
+GET    /public/videos                 — published videos, newest first
+GET    /public/videos/rails            — category-grouped rails for the hub
+GET    /public/videos/{id}             — one video: channel, tags, counts, related
+POST   /public/videos/{id}/view        — count a play
+POST   /public/videos/{id}/share       — count a share
+GET    /public/videos/{id}/comments    — visible threads
+POST   /videos/{id}/comments           — add one (signed-in)
+POST   /public/videos/{id}/reaction    — the three-way sentiment bar
+GET    /cms/videos                    — full library (video.view)
+POST   /cms/videos                    — add by YouTube URL (video.upload)
+PATCH  /cms/videos/{id}               — edit / publish toggle (video.edit)
+DELETE /cms/videos/{id}               — soft delete (video.edit)
 """
 
 from __future__ import annotations
@@ -32,7 +32,12 @@ from app.core.deps import (
 from app.db.base import utcnow
 from app.db.session import get_db
 from app.models.content import Category
-from app.models.enums import AuditAction, CommentTargetType, FollowTargetType, ReactionKind
+from app.models.enums import (
+    AuditAction,
+    CommentTargetType,
+    FollowTargetType,
+    ReactionKind,
+)
 from app.models.geo import District
 from app.models.engagement import Follow
 from app.models.video import Video
@@ -118,9 +123,13 @@ def _channel_out(video: Video) -> ChannelOut | None:
     if channel is None:
         return None
     return ChannelOut(
-        id=channel.id, key=channel.youtube_channel_key, name=channel.name,
-        url=channel.url, avatar_url=channel.avatar_url,
-        is_verified=channel.is_verified, follower_count=channel.follower_count,
+        id=channel.id,
+        key=channel.youtube_channel_key,
+        name=channel.name,
+        url=channel.url,
+        avatar_url=channel.avatar_url,
+        is_verified=channel.is_verified,
+        follower_count=channel.follower_count,
     )
 
 
@@ -142,8 +151,11 @@ def _video_out(video: Video) -> VideoOut:
         share_count=video.share_count or 0,
         channel=_channel_out(video),
         tags=[
-            VideoTagOut(slug=link.tag.slug, name_te=link.tag.name_te, name_en=link.tag.name_en)
-            for link in sorted(video.tags, key=lambda x: x.sort) if link.tag
+            VideoTagOut(
+                slug=link.tag.slug, name_te=link.tag.name_te, name_en=link.tag.name_en
+            )
+            for link in sorted(video.tags, key=lambda x: x.sort)
+            if link.tag
         ],
     )
 
@@ -167,7 +179,9 @@ def public_videos(
     )
     if category:
         category_row = article_repo.get_category_by_slug(db, category)
-        stmt = stmt.where(Video.category_id == (category_row.id if category_row else -1))
+        stmt = stmt.where(
+            Video.category_id == (category_row.id if category_row else -1)
+        )
     rows = list(db.execute(stmt).unique().scalars())
     has_more = len(rows) > limit
     return VideoListOut(
@@ -176,8 +190,11 @@ def public_videos(
     )
 
 
-@router.get("/public/videos/rails", response_model=VideoRailsOut,
-            summary="Video hub: category tabs and a rail per category")
+@router.get(
+    "/public/videos/rails",
+    response_model=VideoRailsOut,
+    summary="Video hub: category tabs and a rail per category",
+)
 def video_rails(
     response: Response,
     per_rail: int = Query(default=8, ge=2, le=20),
@@ -190,17 +207,23 @@ def video_rails(
     the homepage sections follow.
     """
     response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
-    response.headers["CDN-Cache-Control"] = "public, s-maxage=120, stale-while-revalidate=300"
+    response.headers["CDN-Cache-Control"] = (
+        "public, s-maxage=120, stale-while-revalidate=300"
+    )
 
     live = [Video.is_published.is_(True), Video.deleted_at.is_(None)]
-    counts = dict(db.execute(
-        select(Video.category_id, func.count(Video.id))
-        .where(*live, Video.category_id.is_not(None))
-        .group_by(Video.category_id)
-    ).all())
+    counts = dict(
+        db.execute(
+            select(Video.category_id, func.count(Video.id))
+            .where(*live, Video.category_id.is_not(None))
+            .group_by(Video.category_id)
+        ).all()
+    )
 
     categories = db.scalars(
-        select(Category).where(Category.is_active.is_(True)).order_by(Category.sort, Category.id)
+        select(Category)
+        .where(Category.is_active.is_(True))
+        .order_by(Category.sort, Category.id)
     ).all()
 
     tabs: list[CategoryOut] = []
@@ -209,18 +232,31 @@ def video_rails(
         if int(counts.get(category.id, 0)) < 2:
             continue
         tabs.append(CategoryOut.model_validate(category))
-        rows = db.execute(
-            select(Video).where(*live, Video.category_id == category.id)
-            .order_by(Video.published_at.desc(), Video.id.desc()).limit(per_rail)
-        ).unique().scalars().all()
-        rails.append(VideoRailOut(
-            key=category.slug, title_te=category.name_te, title_en=category.name_en,
-            videos=[_video_out(v) for v in rows],
-        ))
+        rows = (
+            db.execute(
+                select(Video)
+                .where(*live, Video.category_id == category.id)
+                .order_by(Video.published_at.desc(), Video.id.desc())
+                .limit(per_rail)
+            )
+            .unique()
+            .scalars()
+            .all()
+        )
+        rails.append(
+            VideoRailOut(
+                key=category.slug,
+                title_te=category.name_te,
+                title_en=category.name_en,
+                videos=[_video_out(v) for v in rows],
+            )
+        )
     return VideoRailsOut(tabs=tabs, rails=rails)
 
 
-@router.get("/public/videos/{video_id}", response_model=VideoDetailOut, summary="One video")
+@router.get(
+    "/public/videos/{video_id}", response_model=VideoDetailOut, summary="One video"
+)
 def public_video(
     video_id: int,
     response: Response,
@@ -241,16 +277,22 @@ def public_video(
 
     following = False
     if principal is not None and video.channel_id:
-        following = db.scalar(select(Follow).where(
-            Follow.user_id == principal.id,
-            Follow.target_type == FollowTargetType.CHANNEL,
-            Follow.target_id == video.channel_id,
-        )) is not None
+        following = (
+            db.scalar(
+                select(Follow).where(
+                    Follow.user_id == principal.id,
+                    Follow.target_type == FollowTargetType.CHANNEL,
+                    Follow.target_id == video.channel_id,
+                )
+            )
+            is not None
+        )
 
     payload = VideoDetailOut(
         **_video_out(video).model_dump(),
         reactions=engagement_service.reaction_summary(
-            db, target_type=CommentTargetType.VIDEO, target_id=video.id, viewer=viewer),
+            db, target_type=CommentTargetType.VIDEO, target_id=video.id, viewer=viewer
+        ),
         related=[_video_out(v) for v in video_service.related(db, video)],
         following_channel=following,
     )
@@ -297,7 +339,9 @@ class VideoCommentIn(BaseModel):
     parent_id: int | None = None
 
 
-@router.get("/public/videos/{video_id}/comments", summary="Visible comments for a video")
+@router.get(
+    "/public/videos/{video_id}/comments", summary="Visible comments for a video"
+)
 def list_video_comments(
     video_id: int,
     response: Response,
@@ -311,24 +355,33 @@ def list_video_comments(
         response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
         response.headers["CDN-Cache-Control"] = "public, s-maxage=15"
     rows = engagement_repo.comments_for_target(
-        db, target_type=CommentTargetType.VIDEO, target_id=video.id,
-        limit=limit, offset=offset,
+        db,
+        target_type=CommentTargetType.VIDEO,
+        target_id=video.id,
+        limit=limit,
+        offset=offset,
     )
     me = principal.id if principal else None
     return {
         "total_visible": video.comment_count or 0,
         "comments": [
-            {"id": c.id, "parent_id": c.parent_id, "body": c.body,
-             "author_name_te": c.user.name_te if c.user else "పాఠకుడు",
-             "author_name_en": c.user.name_en if c.user else "Reader",
-             "is_mine": me is not None and c.user_id == me,
-             "created_at": c.created_at}
+            {
+                "id": c.id,
+                "parent_id": c.parent_id,
+                "body": c.body,
+                "author_name_te": c.user.name_te if c.user else "పాఠకుడు",
+                "author_name_en": c.user.name_en if c.user else "Reader",
+                "is_mine": me is not None and c.user_id == me,
+                "created_at": c.created_at,
+            }
             for c in rows
         ],
     }
 
 
-@router.post("/videos/{video_id}/comments", status_code=201, summary="Comment on a video")
+@router.post(
+    "/videos/{video_id}/comments", status_code=201, summary="Comment on a video"
+)
 def add_video_comment(
     video_id: int,
     payload: VideoCommentIn,
@@ -336,19 +389,30 @@ def add_video_comment(
     principal: Principal = Depends(get_current_principal),
 ) -> dict:
     comment = engagement_service.add_comment(
-        db, video_id=video_id, user_id=principal.id,
-        body=payload.body, parent_id=payload.parent_id,
+        db,
+        video_id=video_id,
+        user_id=principal.id,
+        body=payload.body,
+        parent_id=payload.parent_id,
     )
-    return {"id": comment.id, "parent_id": comment.parent_id, "body": comment.body,
-            "author_name_te": principal.user.name_te, "author_name_en": principal.user.name_en,
-            "is_mine": True, "created_at": comment.created_at}
+    return {
+        "id": comment.id,
+        "parent_id": comment.parent_id,
+        "body": comment.body,
+        "author_name_te": principal.user.name_te,
+        "author_name_en": principal.user.name_en,
+        "is_mine": True,
+        "created_at": comment.created_at,
+    }
 
 
 # --------------------------------------------------------------------------- #
 # CMS
 # --------------------------------------------------------------------------- #
 class VideoIn(BaseModel):
-    youtube_url: str = Field(min_length=11, max_length=300, description="Any YouTube URL or a raw id")
+    youtube_url: str = Field(
+        min_length=11, max_length=300, description="Any YouTube URL or a raw id"
+    )
     title_te: str = Field(min_length=3, max_length=400)
     title_en: str | None = Field(default=None, max_length=400)
     description_te: str | None = Field(default=None, max_length=2000)
@@ -378,12 +442,13 @@ def cms_videos(
             .order_by(Video.created_at.desc())
             .limit(limit)
             .offset(offset)
-        ).unique().scalars()
+        )
+        .unique()
+        .scalars()
     )
     return {
         "items": [
-            {**_video_out(v).model_dump(), "is_published": v.is_published}
-            for v in rows
+            {**_video_out(v).model_dump(), "is_published": v.is_published} for v in rows
         ]
     }
 
@@ -396,12 +461,16 @@ def add_video(
     p: Principal = Depends(require_permission("video.upload")),
 ) -> dict:
     category = (
-        db.execute(select(Category).where(Category.slug == payload.category_slug)).scalar_one_or_none()
+        db.execute(
+            select(Category).where(Category.slug == payload.category_slug)
+        ).scalar_one_or_none()
         if payload.category_slug
         else None
     )
     district = (
-        db.execute(select(District).where(District.slug == payload.district_slug)).scalar_one_or_none()
+        db.execute(
+            select(District).where(District.slug == payload.district_slug)
+        ).scalar_one_or_none()
         if payload.district_slug
         else None
     )
@@ -440,7 +509,9 @@ def edit_video(
     if "category_slug" in changes:
         slug = changes.pop("category_slug")
         category = (
-            db.execute(select(Category).where(Category.slug == slug)).scalar_one_or_none()
+            db.execute(
+                select(Category).where(Category.slug == slug)
+            ).scalar_one_or_none()
             if slug
             else None
         )
@@ -451,8 +522,13 @@ def edit_video(
         if value is not None or key in {"title_en", "description_te"}:
             setattr(video, key, value)
     audit_service.record(
-        db, action=AuditAction.UPDATE, entity_type="video", entity_id=video.id,
-        actor=p.user, after=payload.model_dump(exclude_unset=True), request=request,
+        db,
+        action=AuditAction.UPDATE,
+        entity_type="video",
+        entity_id=video.id,
+        actor=p.user,
+        after=payload.model_dump(exclude_unset=True),
+        request=request,
     )
     return {**_video_out(video).model_dump(), "is_published": video.is_published}
 
@@ -467,7 +543,11 @@ def delete_video(
     video = video_service.get_video(db, video_id)
     video.deleted_at = utcnow()
     audit_service.record(
-        db, action=AuditAction.DELETE, entity_type="video", entity_id=video.id,
-        actor=p.user, request=request,
+        db,
+        action=AuditAction.DELETE,
+        entity_type="video",
+        entity_id=video.id,
+        actor=p.user,
+        request=request,
     )
     return {"id": video.id, "deleted": True}

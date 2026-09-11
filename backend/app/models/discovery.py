@@ -33,7 +33,8 @@ class TrendingScore(PKMixin, Base):
         BigInteger, ForeignKey("articles.id", ondelete="CASCADE"), nullable=False
     )
     scope_type: Mapped[TrendingScope] = mapped_column(
-        Enum(TrendingScope, native_enum=False, length=10, validate_strings=True), nullable=False
+        Enum(TrendingScope, native_enum=False, length=10, validate_strings=True),
+        nullable=False,
     )
     scope_id: Mapped[int | None] = mapped_column(
         BigInteger, nullable=True, doc="category id or district id; NULL for global"
@@ -55,7 +56,8 @@ class Pin(PKMixin, TimestampMixin, Base):
         BigInteger, ForeignKey("articles.id", ondelete="CASCADE"), nullable=False
     )
     placement: Mapped[PinPlacement] = mapped_column(
-        Enum(PinPlacement, native_enum=False, length=10, validate_strings=True), nullable=False
+        Enum(PinPlacement, native_enum=False, length=10, validate_strings=True),
+        nullable=False,
     )
     category_id: Mapped[int | None] = mapped_column(
         BigInteger,

@@ -45,7 +45,11 @@ def parse_youtube_id(url_or_id: str) -> str:
                 candidate = (parse_qs(parsed.query).get("v") or [""])[0]
             else:
                 parts = path.split("/")
-                if parts and parts[0] in {"shorts", "embed", "live", "v"} and len(parts) > 1:
+                if (
+                    parts
+                    and parts[0] in {"shorts", "embed", "live", "v"}
+                    and len(parts) > 1
+                ):
                     candidate = parts[1]
 
     if not _ID_RE.match(candidate):
@@ -160,8 +164,9 @@ def get_or_create_channel(
         select(VideoChannel).where(VideoChannel.youtube_channel_key == key)
     ).scalar_one_or_none()
     if channel is None:
-        channel = VideoChannel(youtube_channel_key=key, name=name[:200], url=url,
-                               avatar_url=avatar_url)
+        channel = VideoChannel(
+            youtube_channel_key=key, name=name[:200], url=url, avatar_url=avatar_url
+        )
         db.add(channel)
         db.flush()
         return channel
@@ -197,7 +202,9 @@ def apply_tags(db: Session, video: Video, names: list[str]) -> None:
         seen.add(slug)
         tag = db.scalar(select(Tag).where(Tag.slug == slug))
         if tag is None:
-            tag = Tag(slug=slug, name_te=name[:140], name_en=name[:140], type=TagType.TOPIC)
+            tag = Tag(
+                slug=slug, name_te=name[:140], name_en=name[:140], type=TagType.TOPIC
+            )
             db.add(tag)
             db.flush()
         wanted.append(tag)

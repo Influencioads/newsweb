@@ -56,7 +56,9 @@ class S3Storage(StorageProvider):
                 raise StorageError(
                     message_en="Object storage is not configured.",
                     message_te="ఆబ్జెక్ట్ స్టోరేజ్ కాన్ఫిగర్ కాలేదు.",
-                    details={"missing": "ZATA_ACCESS_KEY / ZATA_SECRET_KEY / ZATA_BUCKET"},
+                    details={
+                        "missing": "ZATA_ACCESS_KEY / ZATA_SECRET_KEY / ZATA_BUCKET"
+                    },
                 )
             self._client = boto3.client(
                 "s3",
@@ -108,6 +110,10 @@ class S3Storage(StorageProvider):
             return True
         except Exception:  # noqa: BLE001
             return False
+
+    def read(self, key: str) -> bytes:
+        response = self.client.get_object(Bucket=self.bucket, Key=key)
+        return bytes(response["Body"].read())
 
     def url_for(self, key: str) -> str:
         if self.cdn_url:

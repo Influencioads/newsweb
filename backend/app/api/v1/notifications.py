@@ -44,7 +44,9 @@ class InboxOut(BaseModel):
     next_offset: int | None = None
 
 
-@router.get("/users/me/notifications", response_model=InboxOut, summary="My notification inbox")
+@router.get(
+    "/users/me/notifications", response_model=InboxOut, summary="My notification inbox"
+)
 def my_notifications(
     offset: int = Query(default=0, ge=0, le=1000),
     limit: int = Query(default=20, ge=1, le=50),
@@ -66,7 +68,9 @@ def my_notifications(
     article_ids = [n.article_id for n in rows if n.article_id]
     urls: dict[int, str] = {}
     if article_ids:
-        for article in db.execute(select(Article).where(Article.id.in_(article_ids))).scalars():
+        for article in db.execute(
+            select(Article).where(Article.id.in_(article_ids))
+        ).scalars():
             urls[article.id] = article.url_path
 
     return InboxOut(
@@ -162,7 +166,9 @@ def campaigns(
     }
 
 
-@router.post("/cms/notifications", status_code=201, summary="Compose and send a campaign")
+@router.post(
+    "/cms/notifications", status_code=201, summary="Compose and send a campaign"
+)
 def send_campaign(
     payload: CampaignIn,
     request: Request,

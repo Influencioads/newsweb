@@ -139,7 +139,9 @@ def process_image(
     primary_url = ""
 
     # Never upscale: a 900px source produces 400 and 800, not a blurry 1600.
-    widths = [w for w in RESPONSIVE_WIDTHS if w <= width] or [min(width, RESPONSIVE_WIDTHS[0])]
+    widths = [w for w in RESPONSIVE_WIDTHS if w <= width] or [
+        min(width, RESPONSIVE_WIDTHS[0])
+    ]
 
     for target in widths:
         resized = image.copy()
@@ -222,7 +224,9 @@ def create_image_media(
         )
 
     stamp = datetime.utcnow().strftime("%Y/%m")
-    safe_stem = "".join(c for c in filename.rsplit(".", 1)[0] if c.isalnum() or c in "-_")[:48]
+    safe_stem = "".join(
+        c for c in filename.rsplit(".", 1)[0] if c.isalnum() or c in "-_"
+    )[:48]
     import secrets
 
     key_prefix = f"images/{stamp}/{safe_stem or 'image'}-{secrets.token_hex(4)}"

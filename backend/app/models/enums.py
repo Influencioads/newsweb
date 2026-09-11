@@ -50,6 +50,10 @@ class RoleKey(StrEnum):
     AD_MANAGER = "ad_manager"
     SEO_ANALYST = "seo_analyst"
     MODERATOR = "moderator"
+    #: A reader whose identity has been checked, who may file stories. Holds no
+    #: CMS access at all — the role carries verified standing and a higher
+    #: submission quota, not the ability to write into the newsroom.
+    CONTRIBUTOR = "contributor"
     SUBSCRIBER = "subscriber"
 
 
@@ -166,6 +170,11 @@ class ArticleType(StrEnum):
     #: sub-editor rewrote — this is the publisher's own words, republished
     #: under agreement and labelled as such.
     SYNDICATED = "SYNDICATED"
+    #: Crawled, then rewritten in our own Telugu by the AI gateway, with the
+    #: original publisher credited. The opposite of SYNDICATED: none of the
+    #: source's sentences survive, which is why it may be stored for sources
+    #: whose licence would never permit republication.
+    AI_REWRITE = "AI_REWRITE"
 
 
 class TagType(StrEnum):
@@ -183,8 +192,8 @@ class EventType(StrEnum):
     trending (§8), analytics (§25) and personalization (§3.2) all read."""
 
     VIEW = "view"
-    READ = "read"          # value = seconds since the last heartbeat
-    SCROLL = "scroll"      # value = max scroll depth, percent
+    READ = "read"  # value = seconds since the last heartbeat
+    SCROLL = "scroll"  # value = max scroll depth, percent
     SHARE = "share"
     LIKE = "like"
     UNLIKE = "unlike"
@@ -398,3 +407,137 @@ class IngestStatus(StrEnum):
     IMPORTED = "imported"
     REJECTED = "rejected"
     DUPLICATE = "duplicate"
+
+
+class SourceBeat(StrEnum):
+    """What a crawl source is *for*.
+
+    Coverage is organised by beat rather than by geography because that is how
+    feeds actually exist. There is no RSS feed per mandal — there are roughly
+    1,290 mandals across the two states and a few dozen usable feeds — so a
+    mandal is derived from the text (see `gazetteer_service`), while the beat
+    is declared once per source and is what the hourly quota is shared out by.
+    """
+
+    GENERAL = "general"
+    NATIONAL = "national"
+    STATE = "state"
+    DISTRICT_LOCAL = "district_local"
+    BREAKING = "breaking"
+    SPORTS = "sports"
+    FILM = "film"
+    GOVT_JOBS = "govt_jobs"
+
+
+class RewriteStatus(StrEnum):
+    """How the AI rewrite of one ingested item ended.
+
+    `REFUSED` and `HUMAN_ONLY` are outcomes, not errors. A model that declines
+    a three-sentence stub instead of inventing five paragraphs around it has
+    done the right thing, and a story about a communal incident reaching a
+    human untouched is the design working.
+    """
+
+    NONE = "none"
+    PENDING = "pending"
+    READY = "ready"
+    #: The model declined: too little source material, or a sensitive subject.
+    REFUSED = "refused"
+    #: Our own pre-filter caught a sensitive subject, so no provider was called.
+    HUMAN_ONLY = "human_only"
+    #: Below the minimum word count, or the beat's quota was already spent.
+    SKIPPED = "skipped"
+    FAILED = "failed"
+
+
+class MandalMatchMethod(StrEnum):
+    """How an item's mandal was decided, so the queue can show its working.
+
+    `AMBIGUOUS` exists because Telugu mandal names collide across districts —
+    కొత్తపేట, గాంధీనగర్ and రామాపురం each name several places. Picking the
+    first match would put a Nellore story on a Karimnagar page and nobody would
+    notice for a week, so two distinct candidates means we decline and keep the
+    district.
+    """
+
+    NONE = "none"
+    SOURCE_DEFAULT = "source_default"
+    KEYWORD = "keyword"
+    AMBIGUOUS = "ambiguous"
+    EDITOR = "editor"
+
+
+class JobState(StrEnum):
+    """Which government a job notification belongs to (§ govt-jobs beat)."""
+
+    AP = "AP"
+    TS = "TS"
+    BOTH = "BOTH"
+    CENTRAL = "CENTRAL"
+
+
+class BulletinStatus(StrEnum):
+    """Where a three-hourly audio bulletin has got to.
+
+    `SKIPPED` is a real outcome, not a failure: a slot with no published
+    stories in its window should produce nothing rather than a bulletin that
+    says nothing.
+    """
+
+    PENDING = "pending"
+    SCRIPTED = "scripted"
+    READY = "ready"
+    PUBLISHED = "published"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+class ContributorType(StrEnum):
+    """What kind of contributor somebody is applying as (§ citizen journalism).
+
+    The three differ in what they must prove, not in what they may do: a
+    student journalist shows a college ID, a freelance one shows accreditation
+    or a portfolio, a citizen shows a government photo ID. All three end up
+    filing through the same moderated queue.
+    """
+
+    CITIZEN = "citizen"
+    FREELANCE = "freelance"
+    STUDENT = "student"
+
+
+class KycStatus(StrEnum):
+    """Where a contributor application has got to.
+
+    `MORE_INFO` is deliberately distinct from `REJECTED`: "your college ID was
+    unreadable, send another" and "no" are different answers and the applicant
+    needs to be able to tell them apart.
+    """
+
+    NOT_STARTED = "not_started"
+    DRAFT = "draft"
+    SUBMITTED = "submitted"
+    IN_REVIEW = "in_review"
+    MORE_INFO = "more_info"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
+
+
+class KycDocumentKind(StrEnum):
+    """What an applicant may upload.
+
+    **Aadhaar is deliberately absent.** Storing a full Aadhaar number without
+    being a UIDAI-registered entity is a compliance problem, not a schema
+    decision, and PAN / Voter ID / Driving Licence / Passport already cover
+    every applicant. If it is ever added, store the masked last four only.
+    """
+
+    PAN = "pan"
+    VOTER_ID = "voter_id"
+    DRIVING_LICENCE = "driving_licence"
+    PASSPORT = "passport"
+    PRESS_ACCREDITATION = "press_accreditation"
+    STUDENT_ID = "student_id"
+    COLLEGE_BONAFIDE = "college_bonafide"
+    SELFIE = "selfie"

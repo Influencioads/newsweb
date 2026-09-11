@@ -110,7 +110,9 @@ def ingest_beacon(
         return 0
     articles = {
         a.short_id: a
-        for a in db.execute(select(Article).where(Article.short_id.in_(short_ids))).scalars()
+        for a in db.execute(
+            select(Article).where(Article.short_id.in_(short_ids))
+        ).scalars()
     }
 
     sessions: dict[int, ReadingSession] = {}
@@ -200,7 +202,8 @@ def get_live_article(db: Session, short_id: str) -> Article:
     article = get_by_short_id(db, short_id)
     if article is None:
         raise NotFoundError(
-            message_en="That article is not available.", message_te="ఆ కథనం అందుబాటులో లేదు."
+            message_en="That article is not available.",
+            message_te="ఆ కథనం అందుబాటులో లేదు.",
         )
     return article
 
@@ -211,23 +214,33 @@ def set_like(db: Session, *, short_id: str, user_id: int, liked: bool) -> Articl
     if liked and existing is None:
         db.add(Like(article_id=article.id, user_id=user_id, created_at=utcnow()))
         article.like_count = (article.like_count or 0) + 1
-        _log_event(db, article_id=article.id, event_type=EventType.LIKE, user_id=user_id)
+        _log_event(
+            db, article_id=article.id, event_type=EventType.LIKE, user_id=user_id
+        )
     elif not liked and existing is not None:
         db.delete(existing)
         article.like_count = max((article.like_count or 0) - 1, 0)
-        _log_event(db, article_id=article.id, event_type=EventType.UNLIKE, user_id=user_id)
+        _log_event(
+            db, article_id=article.id, event_type=EventType.UNLIKE, user_id=user_id
+        )
     return article
 
 
-def set_bookmark(db: Session, *, short_id: str, user_id: int, bookmarked: bool) -> Article:
+def set_bookmark(
+    db: Session, *, short_id: str, user_id: int, bookmarked: bool
+) -> Article:
     article = get_live_article(db, short_id)
     existing = db.get(Bookmark, (article.id, user_id))
     if bookmarked and existing is None:
         db.add(Bookmark(article_id=article.id, user_id=user_id, created_at=utcnow()))
-        _log_event(db, article_id=article.id, event_type=EventType.BOOKMARK, user_id=user_id)
+        _log_event(
+            db, article_id=article.id, event_type=EventType.BOOKMARK, user_id=user_id
+        )
     elif not bookmarked and existing is not None:
         db.delete(existing)
-        _log_event(db, article_id=article.id, event_type=EventType.UNBOOKMARK, user_id=user_id)
+        _log_event(
+            db, article_id=article.id, event_type=EventType.UNBOOKMARK, user_id=user_id
+        )
     return article
 
 
@@ -276,8 +289,12 @@ def add_comment(
     if (short_id is None) == (video_id is None):
         raise ValidationError(details={"target": "exactly one of short_id or video_id"})
 
-    target_type = CommentTargetType.VIDEO if video_id is not None else CommentTargetType.ARTICLE
-    parent_obj = comment_parent(db, target_type, video_id if video_id is not None else short_id)
+    target_type = (
+        CommentTargetType.VIDEO if video_id is not None else CommentTargetType.ARTICLE
+    )
+    parent_obj = comment_parent(
+        db, target_type, video_id if video_id is not None else short_id
+    )
 
     text = body.strip()
     if not text:
@@ -285,7 +302,9 @@ def add_comment(
     if len(text) > COMMENT_MAX_LENGTH:
         raise ValidationError(details={"body": f"over {COMMENT_MAX_LENGTH} characters"})
 
-    own_id_field = "video_id" if target_type == CommentTargetType.VIDEO else "article_id"
+    own_id_field = (
+        "video_id" if target_type == CommentTargetType.VIDEO else "article_id"
+    )
     if parent_id is not None:
         parent = db.get(Comment, parent_id)
         if parent is None or getattr(parent, own_id_field) != parent_obj.id:
@@ -363,26 +382,41 @@ def set_reaction(
     viewer = _viewer_key(user_id, anon_id)
     parent_obj = comment_parent(db, target_type, target_key)
     if viewer is None:
-        return reaction_summary(db, target_type=target_type, target_id=parent_obj.id, viewer=None)
+        return reaction_summary(
+            db, target_type=target_type, target_id=parent_obj.id, viewer=None
+        )
 
-    existing = db.scalar(select(Reaction).where(
-        Reaction.target_type == target_type,
-        Reaction.target_id == parent_obj.id,
-        Reaction.viewer_key == viewer,
-    ))
+    existing = db.scalar(
+        select(Reaction).where(
+            Reaction.target_type == target_type,
+            Reaction.target_id == parent_obj.id,
+            Reaction.viewer_key == viewer,
+        )
+    )
     now = utcnow()
     if kind is None:
         if existing is not None:
             db.delete(existing)
     elif existing is None:
-        db.add(Reaction(target_type=target_type, target_id=parent_obj.id, viewer_key=viewer,
-                        user_id=user_id, kind=kind, created_at=now, updated_at=now))
+        db.add(
+            Reaction(
+                target_type=target_type,
+                target_id=parent_obj.id,
+                viewer_key=viewer,
+                user_id=user_id,
+                kind=kind,
+                created_at=now,
+                updated_at=now,
+            )
+        )
     else:
         existing.kind = kind
         existing.user_id = user_id
         existing.updated_at = now
     db.flush()
-    return reaction_summary(db, target_type=target_type, target_id=parent_obj.id, viewer=viewer)
+    return reaction_summary(
+        db, target_type=target_type, target_id=parent_obj.id, viewer=viewer
+    )
 
 
 def reaction_summary(
@@ -405,16 +439,20 @@ def reaction_summary(
     total = sum(counts.values())
     mine = None
     if viewer:
-        chosen = db.scalar(select(Reaction.kind).where(
-            Reaction.target_type == target_type,
-            Reaction.target_id == target_id,
-            Reaction.viewer_key == viewer,
-        ))
+        chosen = db.scalar(
+            select(Reaction.kind).where(
+                Reaction.target_type == target_type,
+                Reaction.target_id == target_id,
+                Reaction.viewer_key == viewer,
+            )
+        )
         mine = ReactionKind(chosen).value if chosen else None
     return {
         "total": total,
         "counts": counts,
-        "percent": {k: (round(v * 100 / total) if total else 0) for k, v in counts.items()},
+        "percent": {
+            k: (round(v * 100 / total) if total else 0) for k, v in counts.items()
+        },
         "mine": mine,
     }
 
@@ -522,7 +560,9 @@ def resolve_follow_target(
     else:
         row = db.execute(
             select(User).where(
-                User.author_slug == slug, User.is_author.is_(True), User.deleted_at.is_(None)
+                User.author_slug == slug,
+                User.is_author.is_(True),
+                User.deleted_at.is_(None),
             )
         ).scalar_one_or_none()
 

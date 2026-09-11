@@ -73,8 +73,10 @@ class TestForbiddenPermissions:
 class TestRoleMatrix:
     """§6.1 'Can do' column, asserted role by role."""
 
-    def test_all_thirteen_roles_are_defined(self) -> None:
-        assert len(ROLE_DEFINITIONS) == 13
+    def test_all_fourteen_roles_are_defined(self) -> None:
+        # Fourteen since citizen journalism: `contributor` is a reader whose
+        # identity was checked, holding no CMS access at all.
+        assert len(ROLE_DEFINITIONS) == 14
         assert set(ROLE_DEFINITIONS) == set(RoleKey)
 
     def test_levels_match_the_specification(self) -> None:

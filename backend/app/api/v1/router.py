@@ -13,6 +13,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     ads,
     audio,
+    bulletins,
     auth,
     cms_admin,
     cms_ai,
@@ -20,12 +21,16 @@ from app.api.v1 import (
     cms_dashboard,
     cms_discovery,
     cms_ingestion,
+    cms_kyc,
+    cms_voice,
+    contributor,
     creator,
     engagement,
     epaper,
     notifications,
     polls,
     public,
+    story_formats,
     users,
     videos,
 )
@@ -44,9 +49,14 @@ api_router.include_router(videos.router)
 api_router.include_router(creator.router)
 api_router.include_router(ads.router)
 api_router.include_router(audio.router)
+api_router.include_router(bulletins.router)
+api_router.include_router(story_formats.router)
 api_router.include_router(cms_articles.router)
 api_router.include_router(cms_dashboard.router)
 api_router.include_router(cms_admin.router)
 api_router.include_router(cms_ai.router)
 api_router.include_router(cms_discovery.router)
 api_router.include_router(cms_ingestion.router)
+api_router.include_router(cms_voice.router)
+api_router.include_router(cms_kyc.router)
+api_router.include_router(contributor.router)

@@ -30,7 +30,9 @@ class GoogleTts(TtsProvider):
     def available(self) -> bool:
         return bool(settings.GOOGLE_TTS_API_KEY)
 
-    def synthesise(self, text: str, *, language: str, voice: str | None = None) -> Synthesis:
+    def synthesise(
+        self, text: str, *, language: str, voice: str | None = None
+    ) -> Synthesis:
         if not self.available():
             raise AiProviderError(
                 message_en="GOOGLE_TTS_API_KEY is not set.",
@@ -52,10 +54,14 @@ class GoogleTts(TtsProvider):
             response.raise_for_status()
             encoded = response.json().get("audioContent")
         except httpx.HTTPError as exc:
-            raise AiProviderError(details={"provider": self.key, "error": str(exc)[:200]}) from exc
+            raise AiProviderError(
+                details={"provider": self.key, "error": str(exc)[:200]}
+            ) from exc
 
         if not encoded:
-            raise AiProviderError(details={"provider": self.key, "error": "empty response"})
+            raise AiProviderError(
+                details={"provider": self.key, "error": "empty response"}
+            )
         audio = base64.b64decode(encoded)
         return Synthesis(
             audio=audio,

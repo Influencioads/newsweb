@@ -71,6 +71,19 @@ class StorageProvider(ABC):
     def url_for(self, key: str) -> str:
         """Public (CDN) URL for a stored key."""
 
+    def read(self, key: str) -> bytes:
+        """Fetch an object's bytes through the application.
+
+        Needed for objects that must never have a public URL — an identity
+        document is read by streaming it to an authorised reviewer, not by
+        handing out a link. Providers that cannot do this raise, which is the
+        correct failure: a private object served from a public URL is worse
+        than one that cannot be served at all.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} cannot read objects back through the app"
+        )
+
     def presign_upload(
         self, key: str, *, content_type: str, max_bytes: int, expires_in: int = 900
     ) -> PresignedUpload:
@@ -79,7 +92,9 @@ class StorageProvider(ABC):
         Providers that cannot presign (local dev) fall back to an API-mediated
         upload endpoint, which is why this is not abstract.
         """
-        raise NotImplementedError(f"{self.key} storage does not support presigned uploads")
+        raise NotImplementedError(
+            f"{self.key} storage does not support presigned uploads"
+        )
 
     def supports_presign(self) -> bool:
         return False

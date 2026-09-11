@@ -35,7 +35,9 @@ class Media(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     __table_args__ = (
         Index("ix_media_type_created_at", "type", "created_at"),
         Index("ix_media_uploaded_by", "uploaded_by"),
-        Index("ix_media_storage_provider_storage_key", "storage_provider", "storage_key"),
+        Index(
+            "ix_media_storage_provider_storage_key", "storage_provider", "storage_key"
+        ),
         MYSQL_TABLE_ARGS,
     )
 
@@ -60,7 +62,9 @@ class Media(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     height: Mapped[int | None] = mapped_column(Integer, nullable=True)
     duration_sec: Mapped[float | None] = mapped_column(nullable=True)
     blurhash: Mapped[str | None] = mapped_column(
-        String(60), nullable=True, doc="Placeholder while the image loads — protects CLS (§10.3)"
+        String(60),
+        nullable=True,
+        doc="Placeholder while the image loads — protects CLS (§10.3)",
     )
 
     # §12.5 makes credit a hard requirement when the photo is not our own.

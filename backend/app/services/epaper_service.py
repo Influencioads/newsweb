@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import settings
 from app.core.errors import ConflictError, NotFoundError, ValidationError
+from app.core.fonts import telugu_font_path
 from app.db.base import utcnow
 from app.integrations.storage import get_storage
 from app.models.audio import AudioAsset
@@ -104,10 +105,26 @@ def _day_bounds(day: date) -> tuple[datetime, datetime]:
     return start, start + timedelta(days=1)
 
 
-def _ranked_articles(
-    db: Session, day: date, category_ids: list[int] | None = None
+def ranked_articles(
+    db: Session,
+    day: date,
+    category_ids: list[int] | None = None,
+    *,
+    since: datetime | None = None,
+    until: datetime | None = None,
 ) -> list[Article]:
+    """Published stories for `day`, best first.
+
+    Public because the audio bulletin wants exactly this ordering — breaking,
+    then featured, then what readers actually read — over a narrower window
+    than a whole day. `since`/`until` default to the IST day bounds, so every
+    existing caller behaves identically.
+    """
     start, end = _day_bounds(day)
+    if since is not None:
+        start = since
+    if until is not None:
+        end = until
     stmt = select(Article).where(
         Article.status == ArticleStatus.PUBLISHED,
         Article.deleted_at.is_(None),
@@ -397,13 +414,11 @@ def generate_pdf(db: Session, edition: EpaperEdition) -> EpaperAsset:
         from reportlab.pdfbase.ttfonts import TTFont
         from reportlab.pdfgen.canvas import Canvas
 
-        font_path = "/usr/share/fonts/truetype/noto/NotoSansTelugu-Regular.ttf"
-        font = "Helvetica"
-        try:
-            pdfmetrics.registerFont(TTFont("NotoTelugu", font_path))
-            font = "NotoTelugu"
-        except Exception:
-            pass
+        # A Latin fallback renders nothing at all in Telugu, so a missing font
+        # is a failed job, not a silently blank PDF. `telugu_font_path` raises
+        # rather than substituting Helvetica, which is the whole point of it.
+        font = "NotoTelugu"
+        pdfmetrics.registerFont(TTFont(font, str(telugu_font_path("regular"))))
         out = BytesIO()
         canvas = Canvas(out, pagesize=A4)
         width, height = A4
@@ -582,3 +597,8 @@ def generate_personal(
     db.flush()
     db.expire(edition, ["pages"])
     return edition
+
+
+#: The pre-existing private name. Kept so callers and tests written against it
+#: keep working — the function grew arguments, it did not change behaviour.
+_ranked_articles = ranked_articles

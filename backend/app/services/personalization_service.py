@@ -37,18 +37,18 @@ PROFILE_WINDOW_DAYS = 30
 CANDIDATE_POOL = 200
 FRESHNESS_TAU_HOURS = 24.0
 
-W_CATEGORY_READ = 1.0      # per article read in that category (capped)
-W_CATEGORY_PREF = 3.0      # explicit onboarding interest (§32)
+W_CATEGORY_READ = 1.0  # per article read in that category (capped)
+W_CATEGORY_PREF = 3.0  # explicit onboarding interest (§32)
 W_CATEGORY_FOLLOW = 4.0
 W_TAG_READ = 0.5
 W_TAG_FOLLOW = 3.0
-W_DISTRICT_HOME = 4.0      # reader's saved home district (§4)
+W_DISTRICT_HOME = 4.0  # reader's saved home district (§4)
 W_DISTRICT_FOLLOW = 3.0
-W_MANDAL_HOME = 2.0        # additional, on top of the district match
+W_MANDAL_HOME = 2.0  # additional, on top of the district match
 W_AUTHOR_FOLLOW = 4.0
-W_ENGAGEMENT = 1.5         # site-wide signal, normalised 0..1
-W_TAG_SEARCH = 1.5         # §12 search history — recent, explicit, but noisy
-W_CATEGORY_SKIP = 2.0      # §12 repeatedly served and never opened
+W_ENGAGEMENT = 1.5  # site-wide signal, normalised 0..1
+W_TAG_SEARCH = 1.5  # §12 search history — recent, explicit, but noisy
+W_CATEGORY_SKIP = 2.0  # §12 repeatedly served and never opened
 
 #: How many recent searches feed the profile. Beyond this the terms are old
 #: enough that they describe a different week's interests.
@@ -61,8 +61,13 @@ CATEGORY_READ_CAP = 6.0
 
 class Profile:
     __slots__ = (
-        "category_weights", "tag_weights", "author_ids", "district_ids",
-        "home_district_id", "home_mandal_id", "excluded_article_ids",
+        "category_weights",
+        "tag_weights",
+        "author_ids",
+        "district_ids",
+        "home_district_id",
+        "home_mandal_id",
+        "excluded_article_ids",
         "penalised_category_ids",
     )
 
@@ -79,8 +84,11 @@ class Profile:
     @property
     def is_empty(self) -> bool:
         return not (
-            self.category_weights or self.tag_weights or self.author_ids
-            or self.district_ids or self.home_district_id
+            self.category_weights
+            or self.tag_weights
+            or self.author_ids
+            or self.district_ids
+            or self.home_district_id
         )
 
 
@@ -162,12 +170,14 @@ def build_profile(db: Session, user_id: int) -> Profile:
     # it was the one §12 signal the engine was not reading. Terms are matched
     # against tag names rather than free-text so a typo cannot inject weight.
     search_terms = [
-        row for row in db.execute(
+        row
+        for row in db.execute(
             select(SearchQuery.normalized)
             .where(SearchQuery.user_id == user_id, SearchQuery.created_at >= since)
             .order_by(SearchQuery.created_at.desc())
             .limit(SEARCH_HISTORY_LIMIT)
-        ).scalars() if row
+        ).scalars()
+        if row
     ]
     if search_terms:
         from app.models.content import Tag
@@ -220,7 +230,10 @@ def _score(article: Article, profile: Profile, tag_ids: list[int], now) -> float
     if article.district_id is not None:
         if article.district_id == profile.home_district_id:
             score += W_DISTRICT_HOME
-            if article.mandal_id is not None and article.mandal_id == profile.home_mandal_id:
+            if (
+                article.mandal_id is not None
+                and article.mandal_id == profile.home_mandal_id
+            ):
                 score += W_MANDAL_HOME
         if article.district_id in profile.district_ids:
             score += W_DISTRICT_FOLLOW
@@ -240,7 +253,9 @@ def _score(article: Article, profile: Profile, tag_ids: list[int], now) -> float
     # Freshness is multiplicative: interest can raise a story, never resurrect
     # last week's front page (§3.2).
     age_hours = (
-        (now - article.published_at).total_seconds() / 3600 if article.published_at else 0.0
+        (now - article.published_at).total_seconds() / 3600
+        if article.published_at
+        else 0.0
     )
     return score * math.exp(-max(age_hours, 0.0) / FRESHNESS_TAU_HOURS)
 
@@ -336,9 +351,11 @@ def _trending_ids(db: Session, *, limit: int) -> list[int]:
     from app.models.discovery import TrendingScore
     from app.models.enums import TrendingScope
 
-    return list(db.execute(
-        select(TrendingScore.article_id)
-        .where(TrendingScore.scope_type == TrendingScope.GLOBAL)
-        .order_by(TrendingScore.score.desc())
-        .limit(limit)
-    ).scalars())
+    return list(
+        db.execute(
+            select(TrendingScore.article_id)
+            .where(TrendingScore.scope_type == TrendingScope.GLOBAL)
+            .order_by(TrendingScore.score.desc())
+            .limit(limit)
+        ).scalars()
+    )

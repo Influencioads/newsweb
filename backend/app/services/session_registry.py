@@ -69,7 +69,9 @@ def register_session(session_key: str, user_id: int, expires_at: datetime) -> No
     except redis.RedisError as exc:
         if not _allow_local_fallback():
             raise
-        logger.warning("session_registry_local_fallback", operation="register", error=str(exc))
+        logger.warning(
+            "session_registry_local_fallback", operation="register", error=str(exc)
+        )
         _local_register(session_key, user_id, expires_at)
 
 
@@ -108,7 +110,9 @@ def revoke_session(session_key: str, user_id: int | None = None) -> None:
             pipe.srem(_user_key(user_id), session_key)
         pipe.execute()
     except (redis.RedisError, ValueError) as exc:
-        logger.error("session_revoke_failed", session_key=session_key[:8], error=str(exc))
+        logger.error(
+            "session_revoke_failed", session_key=session_key[:8], error=str(exc)
+        )
 
 
 def revoke_all_for_user(user_id: int) -> list[str]:
@@ -126,7 +130,9 @@ def revoke_all_for_user(user_id: int) -> list[str]:
     except redis.RedisError as exc:
         if _allow_local_fallback():
             with _local_lock:
-                keys = [key for key, item in _local_sessions.items() if item[0] == user_id]
+                keys = [
+                    key for key, item in _local_sessions.items() if item[0] == user_id
+                ]
                 for key in keys:
                     _local_sessions.pop(key, None)
             return keys
@@ -179,5 +185,8 @@ def active_session_keys(user_id: int) -> list[str]:
         if not _allow_local_fallback():
             return []
         with _local_lock:
-            return sorted(key for key, item in _local_sessions.items()
-                          if item[0] == user_id and item[1] > datetime.now(timezone.utc))
+            return sorted(
+                key
+                for key, item in _local_sessions.items()
+                if item[0] == user_id and item[1] > datetime.now(timezone.utc)
+            )

@@ -22,6 +22,18 @@ type Values = Record<string, unknown>;
 
 const RATIO_KEYS = ['personal', 'local', 'trending', 'breaking'] as const;
 
+/** Mirrors the closed key set of `crawl.beat_quota`; the server rejects any other shape. */
+const BEAT_KEYS = [
+  { key: 'national', te: 'జాతీయం', en: 'National' },
+  { key: 'state', te: 'రాష్ట్రం', en: 'State' },
+  { key: 'district_local', te: 'జిల్లా / స్థానికం', en: 'District / local' },
+  { key: 'breaking', te: 'బ్రేకింగ్', en: 'Breaking' },
+  { key: 'sports', te: 'క్రీడలు', en: 'Sports' },
+  { key: 'film', te: 'సినిమా', en: 'Film' },
+  { key: 'govt_jobs', te: 'ఉద్యోగాలు', en: 'Government jobs' },
+  { key: 'general', te: 'సాధారణం', en: 'General' },
+] as const;
+
 function Group({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
   return <Section title={title} subtitle={hint}>{children}</Section>;
 }
@@ -122,6 +134,85 @@ export default function SettingsPage() {
                 onChange={(e) => set('ai.daily_suggestion_limit', Number(e.target.value))} />
             </label>
           </div>
+        </Group>
+
+        {/* ------------------------------------------------ hourly crawl -- */}
+        <Group
+          title={en ? 'Hourly crawl' : 'గంటవారీ క్రాల్'}
+          hint={en
+            ? 'How many stories are pulled and rewritten each hour, and from which beats. Rewrites still land in the review queue — nothing here publishes.'
+            : 'ప్రతి గంటకు ఎన్ని వార్తలు తేవాలి, ఏ బీట్ల నుంచి. పునర్లేఖనాలు సమీక్ష క్యూలోకే వెళ్తాయి — ఇక్కడ ఏదీ ప్రచురించదు.'}
+        >
+          <Toggle checked={bool('crawl.enabled')} onChange={(v) => set('crawl.enabled', v)}
+            label={en ? 'Run the hourly crawl' : 'గంటవారీ క్రాల్ నడపండి'}
+            hint={en
+              ? 'Off means no source is polled on a schedule and no provider is called.'
+              : 'ఆఫ్ అయితే షెడ్యూల్‌లో ఏ మూలాన్నీ తనిఖీ చేయదు, ఏ ప్రొవైడర్‌నూ పిలవదు.'} />
+
+          <Toggle checked={bool('crawl.rewrite_enabled')} onChange={(v) => set('crawl.rewrite_enabled', v)}
+            disabled={!bool('crawl.enabled') || !bool('ai.enabled')}
+            label={en ? 'Rewrite crawled stories in Telugu' : 'తెచ్చిన వార్తలను తెలుగులో తిరగరాయండి'}
+            hint={en
+              ? 'Needs AI switched on above. Off means the crawl only fills the queue with headlines and links.'
+              : 'పైన AI ఆన్ కావాలి. ఆఫ్ అయితే క్యూలో శీర్షికలు, లింక్‌లు మాత్రమే చేరతాయి.'} />
+
+          <Toggle checked={bool('crawl.html_fallback_enabled')} onChange={(v) => set('crawl.html_fallback_enabled', v)}
+            disabled={!bool('crawl.enabled')}
+            label={en ? 'Fetch article pages for stub feeds' : 'చిన్న ఫీడ్‌లకు వ్యాసం పేజీ తేండి'}
+            hint={en
+              ? 'Each source must also permit it and carry a written note. Text from an unlicensed source is used to build the prompt and then discarded — it is never stored.'
+              : 'ప్రతి మూలం కూడా అనుమతించాలి, కారణం రాసి ఉండాలి. లైసెన్స్ లేని మూలం పాఠ్యం భద్రపరచబడదు.'} />
+
+          <Toggle checked={bool('crawl.mandal_autotag')} onChange={(v) => set('crawl.mandal_autotag', v)}
+            label={en ? 'Guess the mandal from the story text' : 'వార్త నుంచి మండలాన్ని ఊహించండి'}
+            hint={en
+              ? 'Always a guess. The editor sees it with a confidence score and can change it in one click.'
+              : 'ఇది ఎప్పుడూ ఊహే. ఎడిటర్‌కు నమ్మకపు స్థాయితో కనిపిస్తుంది, ఒక్క క్లిక్‌లో మార్చవచ్చు.'} />
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="te mb-1 block text-[12px] font-bold text-ink">
+                {en ? 'Stories rewritten per hour (all beats)' : 'గంటకు పునర్లేఖనాలు (అన్ని బీట్లు)'}
+              </span>
+              <input type="number" min={0} max={500} className={inputClass}
+                value={num('crawl.hourly_item_cap')}
+                onChange={(e) => set('crawl.hourly_item_cap', Number(e.target.value))} />
+            </label>
+            <label className="block">
+              <span className="te mb-1 block text-[12px] font-bold text-ink">
+                {en ? 'Per-source hourly default' : 'మూలానికి గంటవారీ డిఫాల్ట్'}
+              </span>
+              <input type="number" min={0} max={500} className={inputClass}
+                value={num('crawl.per_source_default_cap')}
+                onChange={(e) => set('crawl.per_source_default_cap', Number(e.target.value))} />
+            </label>
+          </div>
+
+          <fieldset className="rounded-control border border-rule p-3">
+            <legend className="te px-1 text-[12px] font-bold text-ink">
+              {en ? 'Stories per hour, by beat' : 'బీట్ వారీగా గంటకు వార్తలు'}
+            </legend>
+            <p className="te mb-2 text-[11.5px] leading-telugu text-muted">
+              {en
+                ? 'Absolute counts, not shares — these need not add up to anything. Their total is capped by the hourly limit above.'
+                : 'ఇవి శాతాలు కావు, సంఖ్యలు — మొత్తం ఎంతైనా కావచ్చు. పైన ఉన్న గంటవారీ పరిమితి వర్తిస్తుంది.'}
+            </p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {BEAT_KEYS.map((beat) => (
+                <label key={beat.key} className="block">
+                  <span className="te mb-1 block text-[11.5px] font-semibold text-ink-soft">
+                    {en ? beat.en : beat.te}
+                  </span>
+                  <input type="number" min={0} max={500} className={inputClass}
+                    value={Number((draft['crawl.beat_quota'] as Record<string, number> | undefined)?.[beat.key] ?? 0)}
+                    onChange={(e) => set('crawl.beat_quota', {
+                      ...(draft['crawl.beat_quota'] as Record<string, number> ?? {}),
+                      [beat.key]: Number(e.target.value),
+                    })} />
+                </label>
+              ))}
+            </div>
+          </fieldset>
         </Group>
 
         {/* --------------------------------------------------- §20 voice -- */}

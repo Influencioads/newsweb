@@ -94,12 +94,16 @@ def clear_failed_attempts(identifier: str, ip: str | None) -> None:
 # Lookup
 # --------------------------------------------------------------------------- #
 def get_user_by_email(db: Session, email: str) -> User | None:
-    stmt = select(User).where(User.email == email.strip().lower(), User.deleted_at.is_(None))
+    stmt = select(User).where(
+        User.email == email.strip().lower(), User.deleted_at.is_(None)
+    )
     return db.execute(stmt).scalar_one_or_none()
 
 
 def get_user_by_phone(db: Session, phone: str) -> User | None:
-    stmt = select(User).where(User.phone == normalise_phone(phone), User.deleted_at.is_(None))
+    stmt = select(User).where(
+        User.phone == normalise_phone(phone), User.deleted_at.is_(None)
+    )
     return db.execute(stmt).scalar_one_or_none()
 
 
@@ -168,8 +172,11 @@ def create_session(
     user_agent = None
     if request is not None:
         forwarded = request.headers.get("x-forwarded-for")
-        ip = (forwarded.split(",")[0].strip() if forwarded else
-              (request.client.host if request.client else None))
+        ip = (
+            forwarded.split(",")[0].strip()
+            if forwarded
+            else (request.client.host if request.client else None)
+        )
         ip = ip[:45] if ip else None
         user_agent = request.headers.get("user-agent", "")[:400] or None
 
@@ -223,7 +230,9 @@ def rotate_refresh_token(
         retired_session_key = find_retired_session(token_hash)
         if retired_session_key:
             replayed = db.execute(
-                select(UserSession).where(UserSession.session_key == retired_session_key)
+                select(UserSession).where(
+                    UserSession.session_key == retired_session_key
+                )
             ).scalar_one_or_none()
             if replayed is not None:
                 logger.error(
@@ -293,7 +302,9 @@ def rotate_refresh_token(
     return session, access_token, new_raw, access_expires
 
 
-def revoke_one_session(db: Session, session: UserSession, reason: str = "logout") -> None:
+def revoke_one_session(
+    db: Session, session: UserSession, reason: str = "logout"
+) -> None:
     session.revoked_at = utcnow()
     session.revoked_reason = reason
     revoke_session(session.session_key, session.user_id)
@@ -339,7 +350,9 @@ def authenticate_password(
     check_login_allowed(identifier, ip)
 
     user = get_user_by_email(db, identifier)
-    password_ok = security.verify_password(password, user.password_hash if user else None)
+    password_ok = security.verify_password(
+        password, user.password_hash if user else None
+    )
 
     if user is None or not password_ok:
         register_failed_attempt(identifier, ip)
@@ -362,7 +375,11 @@ def authenticate_password(
     if user.two_factor_enabled:
         if not totp_code:
             raise TwoFactorRequiredError()
-        secret = security.decrypt_secret(user.two_factor_secret) if user.two_factor_secret else ""
+        secret = (
+            security.decrypt_secret(user.two_factor_secret)
+            if user.two_factor_secret
+            else ""
+        )
         if not security.verify_totp(secret, totp_code):
             register_failed_attempt(identifier, ip)
             audit_service.record_auth_event(
@@ -403,7 +420,9 @@ def _otp_fallback_allowed() -> bool:
 def _otp_store(normalised: str, otp: str) -> None:
     hashed = security.hash_otp(otp, normalised)
     try:
-        get_redis().setex(f"{_OTP_PREFIX}{normalised}", settings.OTP_TTL_SECONDS, hashed)
+        get_redis().setex(
+            f"{_OTP_PREFIX}{normalised}", settings.OTP_TTL_SECONDS, hashed
+        )
     except Exception as exc:  # noqa: BLE001
         if not _otp_fallback_allowed():
             logger.error("otp_store_failed", error=str(exc))
@@ -436,7 +455,9 @@ def _otp_clear(normalised: str) -> None:
     redis_delete(f"{_OTP_PREFIX}{normalised}")
 
 
-def request_otp(db: Session, phone: str, request: Request | None = None) -> tuple[str, int]:
+def request_otp(
+    db: Session, phone: str, request: Request | None = None
+) -> tuple[str, int]:
     """Issue an OTP. Returns (otp_or_empty, ttl_seconds).
 
     The OTP is only returned when OTP_DEV_ECHO is on, which `assert_production_safe`
@@ -622,7 +643,11 @@ def register_reader(
     db.add(user)
     db.flush()
     # SELF scope: a reader may act on their own records and nothing else.
-    db.add(UserRole(user_id=user.id, role_id=role.id, scope_type=ScopeType.SELF, scope_id=None))
+    db.add(
+        UserRole(
+            user_id=user.id, role_id=role.id, scope_type=ScopeType.SELF, scope_id=None
+        )
+    )
     db.flush()
     db.refresh(user)
 

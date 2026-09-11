@@ -57,18 +57,29 @@ def _payload(article: Article, asset) -> dict:
 
 @router.get("/public/articles/{short_id}/audio")
 def public_audio(short_id: str, response: Response, db: Session = Depends(get_db)):
-    article = db.scalar(select(Article).where(
-        Article.short_id == short_id, Article.status == ArticleStatus.PUBLISHED,
-        Article.deleted_at.is_(None)))
+    article = db.scalar(
+        select(Article).where(
+            Article.short_id == short_id,
+            Article.status == ArticleStatus.PUBLISHED,
+            Article.deleted_at.is_(None),
+        )
+    )
     if article is None:
         raise NotFoundError()
 
     if not tts_service.is_enabled(db, article):
         # §20: switched off means the player is hidden entirely — not that the
         # reader silently gets the device voice instead.
-        return {"available": False, "url": None, "mime": None, "duration_sec": 0,
-                "voice": None, "provider": None, "fallback": None,
-                "voice_enabled": False}
+        return {
+            "available": False,
+            "url": None,
+            "mime": None,
+            "duration_sec": 0,
+            "voice": None,
+            "provider": None,
+            "fallback": None,
+            "voice_enabled": False,
+        }
 
     asset = tts_service.existing_ready(db, article)
     if asset is None:
@@ -79,15 +90,21 @@ def public_audio(short_id: str, response: Response, db: Session = Depends(get_db
     # Cached like any other public read; the URL is content-hashed so a change
     # produces a different one rather than a stale hit.
     response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
-    response.headers["CDN-Cache-Control"] = "public, s-maxage=300, stale-while-revalidate=600"
+    response.headers["CDN-Cache-Control"] = (
+        "public, s-maxage=300, stale-while-revalidate=600"
+    )
     return _payload(article, asset)
 
 
 @router.post("/cms/articles/{article_id}/audio", status_code=201)
-async def upload_audio(article_id: int, request: Request, file: UploadFile = File(...),
-                       duration_sec: int = Form(0),
-                       db: Session = Depends(get_db),
-                       p: Principal = Depends(require_any_permission("article.edit", "article.edit_own"))):
+async def upload_audio(
+    article_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    duration_sec: int = Form(0),
+    db: Session = Depends(get_db),
+    p: Principal = Depends(require_any_permission("article.edit", "article.edit_own")),
+):
     """§19 — attach your own audio instead of a synthesised reading.
 
     For a recorded bulletin, an interview clip, or a presenter reading the
@@ -97,43 +114,76 @@ async def upload_audio(article_id: int, request: Request, file: UploadFile = Fil
     article = _article(db, article_id, p)
     raw = await file.read()
     asset = tts_service.attach_upload(
-        db, article, raw=raw, filename=file.filename or "audio",
+        db,
+        article,
+        raw=raw,
+        filename=file.filename or "audio",
         mime=file.content_type or "application/octet-stream",
-        duration_sec=duration_sec, requested_by=p.id,
+        duration_sec=duration_sec,
+        requested_by=p.id,
     )
-    audit_service.record(db, action=AuditAction.MEDIA_UPLOAD, entity_type="audio_asset",
-                         entity_id=asset.id, actor=p.user,
-                         after={"article_id": article.id, "bytes": asset.bytes,
-                                "mime": asset.mime}, request=request)
+    audit_service.record(
+        db,
+        action=AuditAction.MEDIA_UPLOAD,
+        entity_type="audio_asset",
+        entity_id=asset.id,
+        actor=p.user,
+        after={"article_id": article.id, "bytes": asset.bytes, "mime": asset.mime},
+        request=request,
+    )
     _purge_article_caches()
     return _payload(article, asset)
 
 
 @router.delete("/cms/articles/{article_id}/audio")
-def delete_audio(article_id: int, request: Request, db: Session = Depends(get_db),
-                 p: Principal = Depends(require_any_permission("article.edit", "article.edit_own"))):
+def delete_audio(
+    article_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    p: Principal = Depends(require_any_permission("article.edit", "article.edit_own")),
+):
     """Detach the uploaded file. Generated audio, if any, takes over again."""
     article = _article(db, article_id, p)
     removed = tts_service.remove_upload(db, article)
     if removed:
-        audit_service.record(db, action=AuditAction.MEDIA_DELETE, entity_type="audio_asset",
-                             entity_id=article.id, actor=p.user,
-                             after={"article_id": article.id}, request=request)
+        audit_service.record(
+            db,
+            action=AuditAction.MEDIA_DELETE,
+            entity_type="audio_asset",
+            entity_id=article.id,
+            actor=p.user,
+            after={"article_id": article.id},
+            request=request,
+        )
         _purge_article_caches()
-    return {"removed": removed, **_payload(article, tts_service.existing_ready(db, article))}
+    return {
+        "removed": removed,
+        **_payload(article, tts_service.existing_ready(db, article)),
+    }
 
 
 @router.post("/cms/articles/{article_id}/generate-audio")
-def generate_audio(article_id: int, request: Request, force: bool = False,
-                   db: Session = Depends(get_db),
-                   p: Principal = Depends(require_any_permission("article.edit", "article.edit_own"))):
+def generate_audio(
+    article_id: int,
+    request: Request,
+    force: bool = False,
+    db: Session = Depends(get_db),
+    p: Principal = Depends(require_any_permission("article.edit", "article.edit_own")),
+):
     article = _article(db, article_id, p)
     asset = tts_service.ensure_audio(db, article, requested_by=p.id, force=force)
-    audit_service.record(db, action=AuditAction.UPDATE, entity_type="audio_asset",
-                         entity_id=(asset.id if asset else "none"), actor=p.user,
-                         after={"article_id": article.id,
-                                "status": asset.status if asset else "unavailable"},
-                         request=request)
+    audit_service.record(
+        db,
+        action=AuditAction.UPDATE,
+        entity_type="audio_asset",
+        entity_id=(asset.id if asset else "none"),
+        actor=p.user,
+        after={
+            "article_id": article.id,
+            "status": asset.status if asset else "unavailable",
+        },
+        request=request,
+    )
     return {
         **_payload(article, asset),
         "global_voice_enabled": settings_service.voice_enabled(db),

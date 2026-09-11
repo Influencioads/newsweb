@@ -63,7 +63,9 @@ class BunnyStorage(StorageProvider):
             "Content-Type": content_type,
         }
         try:
-            resp = httpx.put(self._object_url(key), content=body, headers=headers, timeout=60)
+            resp = httpx.put(
+                self._object_url(key), content=body, headers=headers, timeout=60
+            )
             resp.raise_for_status()
         except httpx.HTTPError as exc:
             logger.error("bunny_put_failed", key=key, error=str(exc))
@@ -81,18 +83,32 @@ class BunnyStorage(StorageProvider):
         self._require_config()
         try:
             resp = httpx.delete(
-                self._object_url(key), headers={"AccessKey": self._access_key}, timeout=30
+                self._object_url(key),
+                headers={"AccessKey": self._access_key},
+                timeout=30,
             )
             return resp.status_code < 400
         except httpx.HTTPError as exc:
             logger.error("bunny_delete_failed", key=key, error=str(exc))
             return False
 
+    def read(self, key: str) -> bytes:
+        self._require_config()
+        response = httpx.get(
+            self._object_url(key),
+            headers={"AccessKey": self._access_key},
+            timeout=30,
+        )
+        response.raise_for_status()
+        return response.content
+
     def exists(self, key: str) -> bool:
         self._require_config()
         try:
             resp = httpx.head(
-                self._object_url(key), headers={"AccessKey": self._access_key}, timeout=15
+                self._object_url(key),
+                headers={"AccessKey": self._access_key},
+                timeout=15,
             )
             return resp.status_code == 200
         except httpx.HTTPError:

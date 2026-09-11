@@ -14,7 +14,16 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Enum, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import MYSQL_TABLE_ARGS, Base, PKMixin, TimestampMixin
@@ -26,7 +35,9 @@ class AudioAsset(PKMixin, TimestampMixin, Base):
     __tablename__ = "audio_assets"
     __table_args__ = (
         # The cache key of §21: one row per (article, exact text).
-        UniqueConstraint("article_id", "content_hash", name="uq_audio_assets_article_id_content_hash"),
+        UniqueConstraint(
+            "article_id", "content_hash", name="uq_audio_assets_article_id_content_hash"
+        ),
         Index("ix_audio_assets_status_created_at", "status", "created_at"),
         MYSQL_TABLE_ARGS,
     )
@@ -56,7 +67,22 @@ class AudioAsset(PKMixin, TimestampMixin, Base):
     bytes: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     duration_sec: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     char_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0, doc="Billing unit for most TTS providers (§21)"
+        Integer,
+        nullable=False,
+        default=0,
+        doc="Billing unit for most TTS providers (§21)",
+    )
+    segment_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        server_default="1",
+        doc=(
+            "How many provider calls this rendition took. Providers cap a "
+            "request in bytes, and Telugu costs three bytes a character, so "
+            "long copy is synthesised in pieces and joined. A value above 1 is "
+            "normal, not a fault."
+        ),
     )
 
     error: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -97,7 +97,9 @@ def compute_trending(db: Session) -> int:
             seconds = float(sum_value or 0)
             points = min(seconds / READ_SECONDS_PER_POINT, READ_POINTS_CAP)
         elif event_type == EventType.SCROLL:
-            points = SCROLL_DEEP_POINTS if (sum_value or 0) >= SCROLL_DEEP_THRESHOLD else 0.0
+            points = (
+                SCROLL_DEEP_POINTS if (sum_value or 0) >= SCROLL_DEEP_THRESHOLD else 0.0
+            )
         else:
             points = WEIGHTS.get(event_type, 0.0)
         if points:
@@ -114,7 +116,9 @@ def compute_trending(db: Session) -> int:
     ).all()
     for article_id, _user_id, last_at in comment_rows:
         age_hours = (now - last_at).total_seconds() / 3600 if last_at else 0.0
-        scores[article_id] = scores.get(article_id, 0.0) + COMMENT_WEIGHT * _decay(age_hours)
+        scores[article_id] = scores.get(article_id, 0.0) + COMMENT_WEIGHT * _decay(
+            age_hours
+        )
 
     # Only live articles trend; a draft accumulating CMS previews must not.
     articles = {
@@ -128,7 +132,11 @@ def compute_trending(db: Session) -> int:
         ).scalars()
     }
     scored = sorted(
-        ((article_id, s) for article_id, s in scores.items() if article_id in articles and s > 0),
+        (
+            (article_id, s)
+            for article_id, s in scores.items()
+            if article_id in articles and s > 0
+        ),
         key=lambda item: item[1],
         reverse=True,
     )

@@ -104,6 +104,64 @@ export interface ContentSource {
   language: string; fetch_interval_minutes: number; is_active: boolean;
   last_fetched_at: string | null; last_status: string | null;
   consecutive_failures: number; items_ingested: number; pending_items: number;
+  /** Hourly crawl configuration. */
+  beat: SourceBeat;
+  default_mandal_id: number | null;
+  max_items_per_hour: number;
+  allow_html_fallback: boolean;
+  rewrite_enabled: boolean;
+  mandal_autotag: boolean;
+}
+
+export type SourceBeat =
+  | 'general' | 'national' | 'state' | 'district_local'
+  | 'breaking' | 'sports' | 'film' | 'govt_jobs';
+
+export type RewriteStatus =
+  | 'none' | 'pending' | 'ready' | 'refused' | 'human_only' | 'skipped' | 'failed';
+
+export type MandalMatchMethod =
+  | 'none' | 'source_default' | 'keyword' | 'ambiguous' | 'editor';
+
+export interface IngestedRewrite {
+  id: number;
+  status: RewriteStatus;
+  title_te: string | null;
+  summary_te: string | null;
+  body_plain: string | null;
+  attribution_te: string | null;
+  word_count: number;
+  engine: string;
+  model: string | null;
+  confidence: number;
+  unverified: boolean;
+  similarity_percent: number;
+  refusal_reason: string | null;
+  created_at: string;
+}
+
+/** Never an assignment — a guess, with its working shown. */
+export interface MandalGuess {
+  mandal_id: number | null;
+  district_id: number | null;
+  method: MandalMatchMethod;
+  confidence: number;
+}
+
+export interface CrawlBeatStatus {
+  beat: SourceBeat; quota: number; used: number; sources: number;
+}
+
+export interface CrawlStatus {
+  enabled: boolean;
+  rewrite_enabled: boolean;
+  hourly_cap: number;
+  used_this_hour: number;
+  beats: CrawlBeatStatus[];
+  last_fetch_at: string | null;
+  /** No successful fetch for over two hours — usually a missing worker-ingest. */
+  stale: boolean;
+  queue: IngestQueueCounts;
 }
 
 export interface IngestedItem {
@@ -116,6 +174,116 @@ export interface IngestedItem {
   source: { id: number; slug: string; name: string; licence: SourceLicence;
             content_policy: ContentPolicy; full_text: boolean } | null;
   has_full_text: boolean;
+  mandal: MandalGuess;
+  requires_human: boolean;
+  rewrite_status: RewriteStatus;
+  rewrite: IngestedRewrite | null;
 }
 
 export type IngestQueueCounts = Record<IngestStatus, number>;
+
+export type AudioStatus = 'pending' | 'generating' | 'ready' | 'failed';
+
+export interface AudioAssetRow {
+  id: number;
+  article_id: number;
+  short_id: string | null;
+  title_te: string | null;
+  status: AudioStatus;
+  provider: string;
+  voice: string | null;
+  language: string;
+  duration_sec: number;
+  char_count: number;
+  bytes: number;
+  /** Above 1 means long copy was synthesised in pieces and joined. */
+  segment_count: number;
+  error: string | null;
+  generated_at: string | null;
+  url: string | null;
+}
+
+export type BulletinStatus =
+  | 'pending' | 'scripted' | 'ready' | 'published' | 'failed' | 'skipped';
+
+export interface BulletinItemRef {
+  position: number;
+  article_id: number;
+  short_id: string | null;
+  /** The canonical reader path, built server-side. */
+  url: string | null;
+  headline_te: string;
+}
+
+export interface BulletinRow {
+  id: number;
+  date: string;
+  slot: number;
+  slot_label_te: string;
+  status: BulletinStatus;
+  revision: number;
+  attempts: number;
+  script_te: string | null;
+  char_count: number;
+  target_chars: number;
+  duration_sec: number;
+  segment_count: number;
+  provider: string;
+  voice: string | null;
+  url: string | null;
+  error: string | null;
+  generated_at: string | null;
+  published_at: string | null;
+  items: BulletinItemRef[];
+}
+
+export interface BulletinList {
+  date: string;
+  enabled: boolean;
+  requires_approval: boolean;
+  items: BulletinRow[];
+  /** Slots not yet produced, so the desk can offer "Run now". */
+  missing_slots: number[];
+}
+
+export type KycStatus =
+  | 'not_started' | 'draft' | 'submitted' | 'in_review'
+  | 'more_info' | 'approved' | 'rejected' | 'expired';
+
+export type ContributorType = 'citizen' | 'freelance' | 'student';
+
+/** Metadata only. There is no url here, and there is none on the server. */
+export interface KycDocumentRow {
+  id: number;
+  kind: string;
+  mime: string;
+  bytes: number;
+  number_masked: string | null;
+  uploaded_at: string | null;
+  raw_path: string;
+}
+
+export interface KycProfileRow {
+  id: number;
+  user_id: number;
+  name_te: string | null;
+  phone: string | null;
+  phone_verified: boolean;
+  contributor_type: ContributorType | null;
+  status: KycStatus;
+  display_name_te: string;
+  organisation: string | null;
+  portfolio_url: string | null;
+  course_year: number | null;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
+  verified_badge: boolean;
+  expires_at: string | null;
+  provider: string;
+  document_count: number;
+  bio_te?: string | null;
+  internal_note?: string | null;
+  documents?: KycDocumentRow[];
+  missing?: string[][];
+}

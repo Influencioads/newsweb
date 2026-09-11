@@ -58,7 +58,9 @@ class StockImage:
         if code in {"cc0", "pdm"}:
             return "Public domain" if code == "pdm" else "CC0"
         label = f"CC {code.upper().replace('-', ' ')}"
-        return f"{label} {self.license_version}".strip() if self.license_version else label
+        return (
+            f"{label} {self.license_version}".strip() if self.license_version else label
+        )
 
     @property
     def attribution(self) -> str:

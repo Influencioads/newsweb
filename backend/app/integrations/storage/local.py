@@ -80,5 +80,10 @@ class LocalStorage(StorageProvider):
     def exists(self, key: str) -> bool:
         return self._path(key).exists()
 
+    def read(self, key: str) -> bytes:
+        # `_path` refuses to escape the storage root, so a crafted key cannot
+        # read /etc/passwd through this.
+        return self._path(key).read_bytes()
+
     def url_for(self, key: str) -> str:
         return f"{self.public_url}/{key.lstrip('/')}"

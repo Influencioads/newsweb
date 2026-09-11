@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api.v1 import health
+from app.api.v1 import crawler, health
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
@@ -45,7 +45,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         for p in problems:
             logger.error("unsafe_production_setting", problem=p)
         raise RuntimeError(
-            "Refusing to start in production with unsafe settings: " + "; ".join(problems)
+            "Refusing to start in production with unsafe settings: "
+            + "; ".join(problems)
         )
 
     logger.info(
@@ -88,15 +89,27 @@ app = FastAPI(
         {"name": "health", "description": "Liveness and readiness probes."},
         {"name": "auth", "description": "Login, OTP, 2FA, refresh rotation, sessions."},
         {"name": "public", "description": "Cached, unauthenticated reader endpoints."},
-        {"name": "cms", "description": "Newsroom CMS. Permission-guarded on every route."},
+        {
+            "name": "cms",
+            "description": "Newsroom CMS. Permission-guarded on every route.",
+        },
         {"name": "users", "description": "Users, roles, permissions, scopes."},
-        {"name": "articles", "description": "Article CRUD, versions, workflow transitions."},
+        {
+            "name": "articles",
+            "description": "Article CRUD, versions, workflow transitions.",
+        },
         {"name": "media", "description": "Media library and presigned uploads."},
         {"name": "epaper", "description": "Editions, pages, hotspots."},
-        {"name": "videos", "description": "Provider-agnostic video ingest and playback."},
+        {
+            "name": "videos",
+            "description": "Provider-agnostic video ingest and playback.",
+        },
         {"name": "ai", "description": "AI gateway: tasks, jobs, prompts, cost ledger."},
         {"name": "search", "description": "Meilisearch-backed search."},
-        {"name": "notifications", "description": "Push campaigns, compose/approve/send."},
+        {
+            "name": "notifications",
+            "description": "Push campaigns, compose/approve/send.",
+        },
         {"name": "audit", "description": "Append-only audit log (read-only)."},
     ],
 )
@@ -106,7 +119,7 @@ app.add_middleware(RequestContextMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origin_list,   # allowlist, never "*" (§12.1)
+    allow_origins=settings.cors_origin_list,  # allowlist, never "*" (§12.1)
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Request-ID", "Idempotency-Key"],
@@ -140,4 +153,10 @@ if settings.STORAGE_PROVIDER == "local":
 # Health probes live at the root: §12.3 monitors /health, and a load balancer
 # should not have to know the API version prefix to check liveness.
 app.include_router(health.router)
+
+# Crawler-facing routes also live at the root, not under /api/v1: robots.txt,
+# the sitemaps and the RSS feed have fixed well-known paths, and the /_og/*
+# stubs are what nginx sends link-preview crawlers to. See app/api/v1/crawler.py
+# for why this is a module here rather than a prerender service.
+app.include_router(crawler.router)
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)

@@ -113,5 +113,9 @@ def all_pins(db: Session, *, include_expired: bool = False) -> list[Pin]:
 
 
 def article_is_pinned(db: Session, article_id: int) -> bool:
-    stmt = select(Pin.id).where(Pin.article_id == article_id, *_active_pin_filter()).limit(1)
+    stmt = (
+        select(Pin.id)
+        .where(Pin.article_id == article_id, *_active_pin_filter())
+        .limit(1)
+    )
     return db.execute(stmt).scalar_one_or_none() is not None

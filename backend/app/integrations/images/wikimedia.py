@@ -33,6 +33,7 @@ logger = get_logger(__name__)
 
 API = "https://commons.wikimedia.org/w/api.php"
 
+
 def _user_agent() -> str:
     """Build the outbound User-Agent Wikimedia's policy requires.
 
@@ -129,7 +130,7 @@ class WikimediaSource(StockImageProvider):
             "format": "json",
             "generator": "search",
             "gsrsearch": f"{query} filetype:bitmap",
-            "gsrnamespace": "6",          # File:
+            "gsrnamespace": "6",  # File:
             "gsrlimit": str(max(limit * 3, 10)),
             "prop": "imageinfo",
             "iiprop": "url|size|extmetadata|mime",

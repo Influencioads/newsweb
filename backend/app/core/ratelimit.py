@@ -31,8 +31,10 @@ def _client_key(request: Request) -> str:
     if user_id is not None:
         return f"u:{user_id}"
     forwarded = request.headers.get("x-forwarded-for", "")
-    ip = forwarded.split(",")[0].strip() if forwarded else (
-        request.client.host if request.client else "unknown"
+    ip = (
+        forwarded.split(",")[0].strip()
+        if forwarded
+        else (request.client.host if request.client else "unknown")
     )
     return f"ip:{ip[:45]}"
 

@@ -45,11 +45,30 @@ ALLOWED_NODES = frozenset(
     }
 )
 
-ALLOWED_MARKS = frozenset({"bold", "italic", "underline", "strike", "link", "code", "superscript",
-                           "subscript", "highlight"})
+ALLOWED_MARKS = frozenset(
+    {
+        "bold",
+        "italic",
+        "underline",
+        "strike",
+        "link",
+        "code",
+        "superscript",
+        "subscript",
+        "highlight",
+    }
+)
 
 _BLOCK_NODES = frozenset(
-    {"paragraph", "heading", "blockquote", "codeBlock", "listItem", "figcaption", "pullQuote"}
+    {
+        "paragraph",
+        "heading",
+        "blockquote",
+        "codeBlock",
+        "listItem",
+        "figcaption",
+        "pullQuote",
+    }
 )
 
 
@@ -91,12 +110,16 @@ def sanitize(node: Any) -> Any | None:
         attrs = dict(node["attrs"])
         # A link mark can carry javascript: — strip any non-http(s) href.
         href = attrs.get("href")
-        if isinstance(href, str) and not href.startswith(("http://", "https://", "/", "#")):
+        if isinstance(href, str) and not href.startswith(
+            ("http://", "https://", "/", "#")
+        ):
             attrs.pop("href", None)
         cleaned["attrs"] = attrs
 
     if node_type == "text":
-        cleaned["text"] = normalize_text(str(node.get("text", "")), collapse_spaces=False)
+        cleaned["text"] = normalize_text(
+            str(node.get("text", "")), collapse_spaces=False
+        )
         marks = node.get("marks")
         if isinstance(marks, list):
             kept = []
@@ -186,7 +209,9 @@ def to_html(doc: dict[str, Any] | None) -> str:
             elif mtype == "highlight":
                 out = f"<mark>{out}</mark>"
             elif mtype == "link":
-                href = html.escape(str((mark.get("attrs") or {}).get("href", "")), quote=True)
+                href = html.escape(
+                    str((mark.get("attrs") or {}).get("href", "")), quote=True
+                )
                 if href:
                     out = f'<a href="{href}" rel="nofollow noopener">{out}</a>'
         return out

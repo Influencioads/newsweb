@@ -117,6 +117,35 @@ services:
     # solo pool: ffmpeg/PDF work is CPU-bound and must never starve the API (§2)
     command: ["celery", "-A", "app.workers.celery_app.celery", "worker", "-l", "info", "--pool=solo"]
 
+  # The crawl gets its own consumer because `crawl.*` routes to the `ingest`
+  # queue. Without this container those tasks queue in Redis forever and
+  # nothing reports an error — GET /cms/crawl/status is what makes that
+  # visible, via its `stale` flag.
+  worker-ingest:
+    profiles: ["app"]
+    build:
+      context: ./backend
+      dockerfile: ../infra/docker/api.Dockerfile
+    container_name: tn-worker-ingest
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      MEILISEARCH_URL: http://meilisearch:7700
+    volumes:
+      - ./backend:/app
+      - storage_data:/app/var/storage
+    depends_on:
+      api: {condition: service_started}
+    # solo pool is fine: the concurrency lives in the task's own thread pool,
+    # and the fetcher's per-host throttle is per *process* — a second replica
+    # would silently double our request rate at every publisher.
+    command: ["celery", "-A", "app.workers.celery_app.celery", "worker", "-l", "info", "--pool=solo", "-Q", "ingest"]
+
   beat:
     profiles: ["app"]
     build:

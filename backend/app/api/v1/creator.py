@@ -1,10 +1,10 @@
 """Creator submissions (updated doc §17) and the CMS assist endpoint (§18).
 
-    POST /users/me/submissions          — submit an article (signed-in reader)
-    GET  /users/me/submissions          — my submissions with status
-    GET  /cms/moderation/submissions    — moderation queue
-    POST /cms/moderation/submissions/{id}/approve | /reject
-    POST /cms/ai/assist                 — §18 suggestions (ai.use)
+POST /users/me/submissions          — submit an article (signed-in reader)
+GET  /users/me/submissions          — my submissions with status
+GET  /cms/moderation/submissions    — moderation queue
+POST /cms/moderation/submissions/{id}/approve | /reject
+POST /cms/ai/assist                 — §18 suggestions (ai.use)
 """
 
 from __future__ import annotations
@@ -16,7 +16,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.deps import Principal, get_current_principal, require_any_permission, require_permission
+from app.core.deps import (
+    Principal,
+    get_current_principal,
+    require_any_permission,
+    require_permission,
+)
 from app.core.errors import NotFoundError
 from app.core.ratelimit import rate_limit
 from app.db.session import get_db
@@ -53,7 +58,9 @@ class SubmissionOut(BaseModel):
     reviewed_at: datetime | None
 
 
-def _submission_out(submission: CreatorSubmission, article_url: str | None) -> SubmissionOut:
+def _submission_out(
+    submission: CreatorSubmission, article_url: str | None
+) -> SubmissionOut:
     return SubmissionOut(
         id=submission.id,
         title_te=submission.title_te,
@@ -114,16 +121,21 @@ def my_submissions(
             .where(CreatorSubmission.user_id == principal.id)
             .order_by(CreatorSubmission.created_at.desc())
             .limit(50)
-        ).unique().scalars()
+        )
+        .unique()
+        .scalars()
     )
     article_ids = [s.article_id for s in rows if s.article_id]
     urls: dict[int, str] = {}
     if article_ids:
-        for article in db.execute(select(Article).where(Article.id.in_(article_ids))).scalars():
+        for article in db.execute(
+            select(Article).where(Article.id.in_(article_ids))
+        ).scalars():
             if article.is_live:
                 urls[article.id] = article.url_path
     return [
-        _submission_out(s, urls.get(s.article_id) if s.article_id else None) for s in rows
+        _submission_out(s, urls.get(s.article_id) if s.article_id else None)
+        for s in rows
     ]
 
 
@@ -153,7 +165,9 @@ def submission_queue(
             .order_by(CreatorSubmission.created_at.asc())
             .limit(limit)
             .offset(offset)
-        ).unique().scalars()
+        )
+        .unique()
+        .scalars()
     )
     categories = {c.id: c for c in db.execute(select(Category)).scalars()}
     districts = {d.id: d for d in db.execute(select(District)).scalars()}
@@ -165,8 +179,12 @@ def submission_queue(
                 "body_te": s.body_te,
                 "creator_name_te": s.user.name_te if s.user else None,
                 "creator_phone": s.user.phone if s.user else None,
-                "category_slug": categories[s.category_id].slug if s.category_id in categories else None,
-                "district_slug": districts[s.district_id].slug if s.district_id in districts else None,
+                "category_slug": categories[s.category_id].slug
+                if s.category_id in categories
+                else None,
+                "district_slug": districts[s.district_id].slug
+                if s.district_id in districts
+                else None,
                 "status": s.status,
                 "review_note": s.review_note,
                 "article_id": s.article_id,
@@ -177,7 +195,10 @@ def submission_queue(
     }
 
 
-@router.post("/cms/moderation/submissions/{submission_id}/approve", summary="Approve into the review queue")
+@router.post(
+    "/cms/moderation/submissions/{submission_id}/approve",
+    summary="Approve into the review queue",
+)
 def approve_submission(
     submission_id: int,
     request: Request,
@@ -199,7 +220,9 @@ def approve_submission(
     return {"id": submission.id, "status": submission.status, "article_id": article.id}
 
 
-@router.post("/cms/moderation/submissions/{submission_id}/reject", summary="Reject with a note")
+@router.post(
+    "/cms/moderation/submissions/{submission_id}/reject", summary="Reject with a note"
+)
 def reject_submission(
     submission_id: int,
     payload: RejectIn,
@@ -227,13 +250,16 @@ def reject_submission(
 # --------------------------------------------------------------------------- #
 class AssistIn(BaseModel):
     article_id: int | None = Field(
-        default=None, description="Assist an existing draft; or pass title/body directly"
+        default=None,
+        description="Assist an existing draft; or pass title/body directly",
     )
     title_te: str | None = Field(default=None, max_length=400)
     body_plain: str | None = Field(default=None, max_length=60_000)
 
 
-@router.post("/cms/ai/assist", summary="Editorial suggestions (§18) — heuristic engine v1")
+@router.post(
+    "/cms/ai/assist", summary="Editorial suggestions (§18) — heuristic engine v1"
+)
 def assist(
     payload: AssistIn,
     db: Session = Depends(get_db),
@@ -252,5 +278,9 @@ def assist(
         summary = article.summary_te
         exclude = article.id
     return ai_assist_service.assist(
-        db, title_te=title, body_plain=body, summary_te=summary, exclude_article_id=exclude
+        db,
+        title_te=title,
+        body_plain=body,
+        summary_te=summary,
+        exclude_article_id=exclude,
     )

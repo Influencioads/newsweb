@@ -31,7 +31,9 @@ class AppSetting(PKMixin, TimestampMixin, Base):
     )
 
     key: Mapped[str] = mapped_column(
-        String(120), nullable=False, doc="Dotted key, e.g. 'ai.enabled' or 'feed.ratios'"
+        String(120),
+        nullable=False,
+        doc="Dotted key, e.g. 'ai.enabled' or 'feed.ratios'",
     )
     value: Mapped[dict[str, Any]] = mapped_column(
         JSON,

@@ -24,17 +24,29 @@ from app.core.errors import AiProviderError
 from app.core.logging import get_logger
 from app.db.base import utcnow
 from app.integrations.storage import get_storage
-from app.integrations.tts import get_tts
+from app.integrations.tts import TtsProvider, get_tts
 from app.models.audio import AudioAsset
 from app.models.content import Article
 from app.models.enums import AudioStatus
-from app.services import settings_service
+from app.services import audio_concat, settings_service
 
 logger = get_logger(__name__)
 
 #: Providers bill per character, and a 4 000-word feature is not a listening
 #: experience anyway. Long copy is truncated at a sentence boundary.
-MAX_CHARS = 5_000
+#:
+#: This is a *content* limit, not a provider limit. The provider's own ceiling
+#: is handled by `audio_concat.split_for_tts`, which is why this number could
+#: be raised: it used to be 5 000 because that is Google's request cap, but
+#: Google counts **bytes** and Telugu costs three of them per character, so the
+#: old value was simultaneously too large for the API and too small for a
+#: feature. Splitting fixed both halves.
+MAX_CHARS = 12_000
+
+#: The sentinel `voice.voice_name` carries when no specific voice is chosen.
+#: `settings_service` rejects empty strings for `kind="str"`, so the absence of
+#: a choice has to be spelled.
+DEFAULT_VOICE_SENTINEL = "default"
 
 
 def spoken_text(article: Article) -> str:
@@ -61,6 +73,18 @@ def spoken_text(article: Article) -> str:
 
 def content_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def configured_voice(db: Session) -> str | None:
+    """The admin's chosen voice, or None to let the adapter pick its default.
+
+    Deliberately *not* part of `content_hash`. Widening the hash would make a
+    voice change re-render — and re-bill — every rendition in the archive the
+    next time each story was opened. Changing voice is an explicit, bounded
+    action: the Voice screen's bulk regenerate, with `force=True`.
+    """
+    value = str(settings_service.get(db, "voice.voice_name") or "").strip()
+    return None if value in ("", DEFAULT_VOICE_SENTINEL) else value
 
 
 #: What an editor may attach by hand. Deliberately narrow: these are the
@@ -214,11 +238,24 @@ def remove_upload(db: Session, article: Article) -> bool:
     return True
 
 
-def _month_chars_used(db: Session) -> int:
-    start = datetime.now(timezone.utc).replace(
+def month_start() -> datetime:
+    return datetime.now(timezone.utc).replace(
         day=1, hour=0, minute=0, second=0, microsecond=0
     )
-    return int(
+
+
+def month_chars_used(db: Session) -> int:
+    """§21 accounting across every surface that spends on synthesis.
+
+    Public, because the audio bulletin bills against the same monthly ceiling
+    as article renditions. One budget, one number on the settings screen — two
+    counters would let each half quietly spend the whole allowance.
+    """
+    from app.models.bulletin import AudioBulletin
+    from app.models.enums import BulletinStatus
+
+    start = month_start()
+    articles = int(
         db.scalar(
             select(func.coalesce(func.sum(AudioAsset.char_count), 0)).where(
                 AudioAsset.created_at >= start, AudioAsset.status == AudioStatus.READY
@@ -226,6 +263,56 @@ def _month_chars_used(db: Session) -> int:
         )
         or 0
     )
+    bulletins = int(
+        db.scalar(
+            select(func.coalesce(func.sum(AudioBulletin.char_count), 0)).where(
+                AudioBulletin.created_at >= start,
+                AudioBulletin.status.in_(
+                    (BulletinStatus.READY, BulletinStatus.PUBLISHED)
+                ),
+            )
+        )
+        or 0
+    )
+    return articles + bulletins
+
+
+#: The pre-existing private name, kept so nothing that already imports it breaks.
+_month_chars_used = month_chars_used
+
+
+def synthesise_long(
+    text: str,
+    *,
+    language: str,
+    voice: str | None,
+    provider: TtsProvider,
+) -> tuple[bytes, str, int, str, int]:
+    """Synthesise text of any length, returning
+    `(audio, mime, duration_sec, voice, segment_count)`.
+
+    Splits on the provider's byte ceiling and joins the result. Raises
+    `AiProviderError` on the first failing chunk rather than storing partial
+    audio: half a news story that stops mid-sentence is worse than no audio,
+    because the reader has no way to tell it is incomplete.
+    """
+    chunks = audio_concat.split_for_tts(text)
+    if not chunks:
+        raise AiProviderError(details={"tts": "nothing to synthesise"})
+
+    segments: list[bytes] = []
+    mime = "audio/mpeg"
+    estimated = 0
+    used_voice = voice or ""
+    for chunk in chunks:
+        result = provider.synthesise(chunk, language=language, voice=voice)
+        segments.append(result.audio)
+        mime = result.mime
+        estimated += result.duration_sec
+        used_voice = result.voice
+
+    audio, measured = audio_concat.concat(segments, mime)
+    return audio, mime, measured or estimated, used_voice, len(segments)
 
 
 def existing_ready(db: Session, article: Article) -> AudioAsset | None:
@@ -291,6 +378,7 @@ def ensure_audio(
 
     provider_name = str(settings_service.get(db, "voice.provider") or "local")
     language = str(settings_service.get(db, "voice.language") or "te-IN")
+    voice_name = configured_voice(db)
     provider = get_tts(provider_name)
     if not provider.available():
         logger.info(
@@ -299,7 +387,7 @@ def ensure_audio(
         return None
 
     budget = settings_service.get_int(db, "voice.monthly_char_budget")
-    if budget and _month_chars_used(db) + len(text) > budget:
+    if budget and month_chars_used(db) + len(text) > budget:
         logger.warning("tts_budget_exceeded", article_id=article.id, budget=budget)
         return None
 
@@ -315,20 +403,22 @@ def ensure_audio(
     db.flush()
 
     try:
-        result = provider.synthesise(text, language=language)
-    except AiProviderError as exc:
+        audio, mime, duration_sec, used_voice, segments = synthesise_long(
+            text, language=language, voice=voice_name, provider=provider
+        )
+    except (AiProviderError, ValueError) as exc:
         row.status = AudioStatus.FAILED
-        row.error = str(exc.details)[:500]
+        row.error = str(getattr(exc, "details", exc))[:500]
         db.flush()
         logger.warning("tts_failed", article_id=article.id, provider=provider.key)
         return None
 
-    extension = "mp3" if result.mime == "audio/mpeg" else "wav"
+    extension = "mp3" if mime == "audio/mpeg" else "wav"
     key = f"audio/{article.short_id}/{digest[:16]}.{extension}"
     stored = get_storage().put(
         key,
-        result.audio,
-        content_type=result.mime,
+        audio,
+        content_type=mime,
         # Immutable by construction: the hash is in the key, so a change is a
         # different object rather than a new version of this one.
         cache_control="public, max-age=31536000, immutable",
@@ -337,10 +427,11 @@ def ensure_audio(
     row.status = AudioStatus.READY
     row.storage_key = key
     row.url = stored.url
-    row.mime = result.mime
-    row.bytes = len(result.audio)
-    row.duration_sec = result.duration_sec
-    row.voice = result.voice
+    row.mime = mime
+    row.bytes = len(audio)
+    row.duration_sec = duration_sec
+    row.voice = used_voice
+    row.segment_count = segments
     row.generated_at = utcnow()
     row.error = None
     article.audio_asset_id = row.id
@@ -351,6 +442,7 @@ def ensure_audio(
         provider=provider.key,
         chars=row.char_count,
         bytes=row.bytes,
+        segments=segments,
     )
     return row
 
@@ -358,7 +450,7 @@ def ensure_audio(
 def usage_summary(db: Session) -> dict[str, int]:
     """§21 reporting for the settings screen."""
     budget = settings_service.get_int(db, "voice.monthly_char_budget")
-    used = _month_chars_used(db)
+    used = month_chars_used(db)
     return {
         "chars_this_month": used,
         "monthly_budget": budget,

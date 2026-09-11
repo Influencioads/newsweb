@@ -10,7 +10,16 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, Enum, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import MYSQL_TABLE_ARGS, Base, PKMixin, TimestampMixin
@@ -76,7 +85,8 @@ class AdCampaign(PKMixin, TimestampMixin, Base):
     image_url: Mapped[str] = mapped_column(String(600), nullable=False)
     target_url: Mapped[str] = mapped_column(String(600), nullable=False)
     placement: Mapped[AdPlacement] = mapped_column(
-        Enum(AdPlacement, native_enum=False, length=15, validate_strings=True), nullable=False
+        Enum(AdPlacement, native_enum=False, length=15, validate_strings=True),
+        nullable=False,
     )
     #: NULL = untargeted; set = only that category/district sees it (§26).
     category_id: Mapped[int | None] = mapped_column(
@@ -89,7 +99,10 @@ class AdCampaign(PKMixin, TimestampMixin, Base):
     ends_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     weight: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=1, doc="Rotation weight among matching campaigns"
+        Integer,
+        nullable=False,
+        default=1,
+        doc="Rotation weight among matching campaigns",
     )
     impressions: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     clicks: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)

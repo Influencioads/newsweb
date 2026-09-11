@@ -73,11 +73,17 @@ class Principal:
     def require_level(self, minimum: int, *, reason: str = "") -> None:
         if self.level < minimum:
             raise PermissionDeniedError(
-                details={"required_level": minimum, "your_level": self.level, "reason": reason}
+                details={
+                    "required_level": minimum,
+                    "your_level": self.level,
+                    "reason": reason,
+                }
             )
 
     # ---------------------------------------------------------------- scoping
-    def in_scope(self, *, district_id: int | None = None, mandal_id: int | None = None) -> bool:
+    def in_scope(
+        self, *, district_id: int | None = None, mandal_id: int | None = None
+    ) -> bool:
         """Is this resource inside the caller's geographic scope? (brief §7)"""
         if self.is_global:
             return True

@@ -25,7 +25,12 @@ from app.core.ratelimit import rate_limit
 from app.db.session import get_db
 from pydantic import BaseModel, Field
 
-from app.models.enums import CommentTargetType, FollowTargetType, ReactionKind, ReportTargetType
+from app.models.enums import (
+    CommentTargetType,
+    FollowTargetType,
+    ReactionKind,
+    ReportTargetType,
+)
 from app.repositories import engagement_repo
 from app.schemas.engagement import (
     BeaconIn,
@@ -89,27 +94,39 @@ def ingest_events(
 # --------------------------------------------------------------------------- #
 # like / bookmark / flags
 # --------------------------------------------------------------------------- #
-@router.post("/articles/{short_id}/like", response_model=EngagementCountsOut, summary="Like")
+@router.post(
+    "/articles/{short_id}/like", response_model=EngagementCountsOut, summary="Like"
+)
 def like(
     short_id: str,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ) -> EngagementCountsOut:
-    article = engagement_service.set_like(db, short_id=short_id, user_id=principal.id, liked=True)
+    article = engagement_service.set_like(
+        db, short_id=short_id, user_id=principal.id, liked=True
+    )
     return EngagementCountsOut.model_validate(article, from_attributes=True)
 
 
-@router.delete("/articles/{short_id}/like", response_model=EngagementCountsOut, summary="Unlike")
+@router.delete(
+    "/articles/{short_id}/like", response_model=EngagementCountsOut, summary="Unlike"
+)
 def unlike(
     short_id: str,
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ) -> EngagementCountsOut:
-    article = engagement_service.set_like(db, short_id=short_id, user_id=principal.id, liked=False)
+    article = engagement_service.set_like(
+        db, short_id=short_id, user_id=principal.id, liked=False
+    )
     return EngagementCountsOut.model_validate(article, from_attributes=True)
 
 
-@router.post("/articles/{short_id}/bookmark", response_model=MyArticleFlagsOut, summary="Bookmark")
+@router.post(
+    "/articles/{short_id}/bookmark",
+    response_model=MyArticleFlagsOut,
+    summary="Bookmark",
+)
 def bookmark(
     short_id: str,
     db: Session = Depends(get_db),
@@ -118,12 +135,16 @@ def bookmark(
     article = engagement_service.set_bookmark(
         db, short_id=short_id, user_id=principal.id, bookmarked=True
     )
-    liked, bookmarked = engagement_repo.my_flags(db, article_id=article.id, user_id=principal.id)
+    liked, bookmarked = engagement_repo.my_flags(
+        db, article_id=article.id, user_id=principal.id
+    )
     return MyArticleFlagsOut(liked=liked, bookmarked=bookmarked)
 
 
 @router.delete(
-    "/articles/{short_id}/bookmark", response_model=MyArticleFlagsOut, summary="Remove bookmark"
+    "/articles/{short_id}/bookmark",
+    response_model=MyArticleFlagsOut,
+    summary="Remove bookmark",
 )
 def unbookmark(
     short_id: str,
@@ -133,7 +154,9 @@ def unbookmark(
     article = engagement_service.set_bookmark(
         db, short_id=short_id, user_id=principal.id, bookmarked=False
     )
-    liked, bookmarked = engagement_repo.my_flags(db, article_id=article.id, user_id=principal.id)
+    liked, bookmarked = engagement_repo.my_flags(
+        db, article_id=article.id, user_id=principal.id
+    )
     return MyArticleFlagsOut(liked=liked, bookmarked=bookmarked)
 
 
@@ -149,7 +172,9 @@ def my_article_flags(
     principal: Principal = Depends(get_current_principal),
 ) -> MyArticleFlagsOut:
     article = engagement_service.get_live_article(db, short_id)
-    liked, bookmarked = engagement_repo.my_flags(db, article_id=article.id, user_id=principal.id)
+    liked, bookmarked = engagement_repo.my_flags(
+        db, article_id=article.id, user_id=principal.id
+    )
     return MyArticleFlagsOut(liked=liked, bookmarked=bookmarked)
 
 
@@ -190,7 +215,9 @@ def list_comments(
     )
     return CommentListOut(
         total_visible=article.comment_count,
-        comments=[_comment_out(c, principal.id if principal else None) for c in comments],
+        comments=[
+            _comment_out(c, principal.id if principal else None) for c in comments
+        ],
     )
 
 
@@ -223,7 +250,9 @@ class ReactionIn(BaseModel):
     anon_id: str | None = Field(default=None, max_length=64)
 
 
-@router.post("/public/articles/{short_id}/reaction", summary="Set my reaction to a story")
+@router.post(
+    "/public/articles/{short_id}/reaction", summary="Set my reaction to a story"
+)
 def set_article_reaction(
     short_id: str,
     payload: ReactionIn,
@@ -248,7 +277,9 @@ def delete_comment(
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
 ) -> dict:
-    engagement_service.delete_own_comment(db, comment_id=comment_id, user_id=principal.id)
+    engagement_service.delete_own_comment(
+        db, comment_id=comment_id, user_id=principal.id
+    )
     return {"ok": True}
 
 
@@ -305,7 +336,11 @@ def report_comment(
 # --------------------------------------------------------------------------- #
 # follows (§12)
 # --------------------------------------------------------------------------- #
-@router.post("/follow", response_model=FollowStateOut, summary="Follow a category/tag/place/author")
+@router.post(
+    "/follow",
+    response_model=FollowStateOut,
+    summary="Follow a category/tag/place/author",
+)
 def follow(
     payload: FollowIn,
     db: Session = Depends(get_db),
@@ -338,7 +373,9 @@ def unfollow(
     return FollowStateOut(following=False)
 
 
-@router.get("/users/me/follows", response_model=FollowListOut, summary="Everything I follow")
+@router.get(
+    "/users/me/follows", response_model=FollowListOut, summary="Everything I follow"
+)
 def my_follows(
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
@@ -380,7 +417,9 @@ def my_follows(
             continue  # target deleted since
         slug, name_te, name_en = info
         follows.append(
-            FollowOut(target_type=f.target_type, slug=slug, name_te=name_te, name_en=name_en)
+            FollowOut(
+                target_type=f.target_type, slug=slug, name_te=name_te, name_en=name_en
+            )
         )
     return FollowListOut(follows=follows)
 
@@ -388,7 +427,9 @@ def my_follows(
 # --------------------------------------------------------------------------- #
 # my library: bookmarks, history, following feed
 # --------------------------------------------------------------------------- #
-@router.get("/users/me/bookmarks", response_model=BookmarksOut, summary="My saved articles")
+@router.get(
+    "/users/me/bookmarks", response_model=BookmarksOut, summary="My saved articles"
+)
 def my_bookmarks(
     limit: int = Query(default=20, ge=1, le=50),
     offset: int = Query(default=0, ge=0, le=1000),
@@ -405,7 +446,9 @@ def my_bookmarks(
     )
 
 
-@router.get("/users/me/history", response_model=HistoryOut, summary="My reading history")
+@router.get(
+    "/users/me/history", response_model=HistoryOut, summary="My reading history"
+)
 def my_history(
     limit: int = Query(default=20, ge=1, le=50),
     offset: int = Query(default=0, ge=0, le=1000),

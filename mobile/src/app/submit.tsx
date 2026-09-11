@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
@@ -79,6 +79,18 @@ export default function SubmitScreen() {
         <ScrollView contentContainerStyle={styles.scroll}>
           <Text style={styles.hint}>{t('submit.hint')}</Text>
 
+          {/* The route into citizen journalism proper: verified contributors
+              may send more, attach photographs, and carry a verified byline. */}
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/contributor')}
+            style={styles.contributorLink}
+          >
+            <Text style={styles.contributorLinkText}>
+              క్రమం తప్పకుండా రాస్తారా? విలేకరిగా ధృవీకరించుకోండి →
+            </Text>
+          </Pressable>
+
           <Text style={styles.label}>{t('submit.headline')} *</Text>
           <TextInput
             value={title}
@@ -152,6 +164,13 @@ export default function SubmitScreen() {
 }
 
 const useStyles = makeStyles((color) => ({
+  contributorLink: { minHeight: 44, justifyContent: 'center', marginBottom: 12 },
+  contributorLinkText: {
+    fontFamily: font.teluguSemiBold,
+    fontSize: 13,
+    lineHeight: 22,
+    color: color.brand,
+  },
   scroll: { padding: 16 },
   hint: { fontFamily: font.telugu, fontSize: 13, lineHeight: 22, color: color.muted, marginBottom: 12 },
   label: {

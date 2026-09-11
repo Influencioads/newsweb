@@ -9,7 +9,14 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from app.models.enums import ScopeType, SessionPlatform, UserStatus
 
@@ -67,7 +74,9 @@ class LogoutRequest(BaseModel):
     refresh_token: str | None = Field(
         default=None, description="Omit to sign out only the current session"
     )
-    all_devices: bool = Field(default=False, description="Sign out every device for this account")
+    all_devices: bool = Field(
+        default=False, description="Sign out every device for this account"
+    )
 
 
 class RegisterRequest(BaseModel):
@@ -180,7 +189,9 @@ class LoginResponse(BaseModel):
 
 
 class OtpRequestResponse(BaseModel):
-    sent: bool = Field(description="Always true — the response never reveals whether the number is registered")
+    sent: bool = Field(
+        description="Always true — the response never reveals whether the number is registered"
+    )
     expires_in_seconds: int
     dev_otp: str | None = Field(
         default=None,
@@ -208,7 +219,9 @@ class SessionOut(BaseModel):
 
 class TwoFactorSetupOut(BaseModel):
     secret: str = Field(description="Base32 TOTP secret — shown once, at enrolment")
-    provisioning_uri: str = Field(description="otpauth:// URI for the authenticator app QR code")
+    provisioning_uri: str = Field(
+        description="otpauth:// URI for the authenticator app QR code"
+    )
 
 
 class SimpleMessage(BaseModel):

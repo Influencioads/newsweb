@@ -17,7 +17,9 @@ class LocalTts(TtsProvider):
     key = "local"
     can_synthesise = False
 
-    def synthesise(self, text: str, *, language: str, voice: str | None = None) -> Synthesis:
+    def synthesise(
+        self, text: str, *, language: str, voice: str | None = None
+    ) -> Synthesis:
         raise AiProviderError(
             message_en="No server-side voice provider is configured.",
             message_te="సర్వర్ వాయిస్ ప్రొవైడర్ కాన్ఫిగర్ చేయలేదు.",

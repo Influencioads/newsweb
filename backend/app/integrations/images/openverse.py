@@ -43,7 +43,10 @@ class OpenverseSource(StockImageProvider):
         }
         try:
             resp = httpx.get(
-                API, params=params, headers={"User-Agent": USER_AGENT}, timeout=self.timeout
+                API,
+                params=params,
+                headers={"User-Agent": USER_AGENT},
+                timeout=self.timeout,
             )
             resp.raise_for_status()
             payload = resp.json()

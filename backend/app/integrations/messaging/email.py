@@ -26,7 +26,9 @@ def configured() -> bool:
     return bool(settings.SMTP_URL)
 
 
-def send(to: str, *, subject: str, body_text: str, body_html: str | None = None) -> bool:
+def send(
+    to: str, *, subject: str, body_text: str, body_html: str | None = None
+) -> bool:
     """Deliver one message. Returns False on failure — callers must not fail a
     registration because mail was slow; the user can request a new link."""
     if not configured():

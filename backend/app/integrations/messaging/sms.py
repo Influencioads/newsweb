@@ -33,7 +33,10 @@ def send_otp(phone: str, otp: str) -> bool:
     try:
         response = httpx.post(
             _ENDPOINT,
-            headers={"authkey": settings.MSG91_AUTH_KEY, "Content-Type": "application/json"},
+            headers={
+                "authkey": settings.MSG91_AUTH_KEY,
+                "Content-Type": "application/json",
+            },
             json={
                 "template_id": settings.MSG91_TEMPLATE_ID,
                 "short_url": "0",

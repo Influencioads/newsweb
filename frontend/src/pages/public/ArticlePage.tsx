@@ -2,23 +2,25 @@ import { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
-import { ApiError } from '@/api/client';
+import { ApiError, api } from '@/api/client';
 import { AdSlot } from '@/components/ads/AdSlot';
 import { VideoStrip } from '@/components/video/VideoStrip';
 import { GridCard } from '@/components/article/ArticleCard';
 import { ArticleGallery } from '@/components/article/ArticleGallery';
 import { ArticleRenderer } from '@/components/article/ArticleRenderer';
 import { ImageCaption, NewsImage } from '@/components/media/NewsImage';
-import { useReadingBeacon, trackShare } from '@/features/engagement/beacon';
+import { useReadingBeacon } from '@/features/engagement/beacon';
 import { CommentsSection } from '@/features/engagement/components/CommentsSection';
 import { EngagementBar } from '@/features/engagement/components/EngagementBar';
 import { FollowButton } from '@/features/engagement/components/FollowButton';
 import * as publicApi from '@/features/public/api';
 import { AudioPlayer } from '@/components/article/AudioPlayer';
+import { ArticleVideo } from '@/components/article/ArticleVideo';
+import { ShareSheet } from '@/components/article/ShareSheet';
 import { extractPlainText, useTts } from '@/features/reader/tts';
 import { useI18n } from '@/i18n';
 import { FONT_STEPS, useReaderPrefs } from '@/stores/readerPrefs';
-import type { ArticleDetail } from '@/types/public';
+import type { ArticleDetail, StoryFormats } from '@/types/public';
 import { PollCard } from '@/features/epaper/PollCard';
 import { formatDate, formatTime, readingTime } from '@/utils/time';
 
@@ -82,15 +84,16 @@ function ReaderToolbar({ article }: { article: ArticleDetail }) {
   // listener knows immediately which story started.
   const tts = useTts(`${article.title_te}. ${extractPlainText(article.body)}`);
 
-  function shareToWhatsApp() {
-    // §4.6 — WhatsApp is the #1 distribution channel. The Latin slug in the URL
-    // is what keeps the shared link readable rather than percent-encoded.
-    const url = `${window.location.origin}${article.url}`;
-    const shared = language === 'en' && article.title_en ? article.title_en : article.title_te;
-    const text = encodeURIComponent(`${shared}\n${url}`);
-    trackShare(article.short_id);
-    window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
-  }
+  // Which of the four formats this story actually has. A host that cannot
+  // shape Telugu reports `card.available: false`, and the download button
+  // simply is not offered rather than handing out an unreadable image.
+  const { data: formats } = useQuery({
+    queryKey: ['formats', article.short_id],
+    queryFn: async () =>
+      (await api.get<StoryFormats>(`/public/articles/${article.short_id}/formats`)).data,
+    retry: false,
+    staleTime: 5 * 60_000,
+  });
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -123,13 +126,15 @@ function ReaderToolbar({ article }: { article: ArticleDetail }) {
         deviceTts={tts}
       />
 
-      <button
-        type="button"
-        onClick={shareToWhatsApp}
-        className="flex min-h-tap items-center rounded-control border border-rule px-3 font-sans text-[11px] font-semibold text-success"
-      >
-        WhatsApp
-      </button>
+      {/* §4.6 — WhatsApp is the #1 distribution channel. The Latin slug keeps
+          the shared link readable, and the link preview now carries a rendered
+          Telugu headline card (see app/api/v1/crawler.py). */}
+      <ShareSheet
+        shortId={article.short_id}
+        url={article.url}
+        title={language === 'en' && article.title_en ? article.title_en : article.title_te}
+        cardAvailable={formats?.card.available ?? false}
+      />
     </div>
   );
 }
@@ -327,6 +332,8 @@ export default function ArticlePage() {
         {/* Body — Tiptap JSON rendered as React */}
         <div className="mt-5">
           <ArticleRenderer doc={data.body} />
+          {/* Renders nothing when the story has no video — no placeholder. */}
+          <ArticleVideo video={data.video} />
           {data.poll ? <PollCard poll={data.poll} /> : null}
         </div>
 

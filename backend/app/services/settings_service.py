@@ -86,6 +86,19 @@ SPECS: dict[str, Spec] = {
         "bool",
         "Allow generated article TTS. Per-article voice must also be enabled.",
     ),
+    "voice.voice_name": Spec(
+        "default",
+        "str",
+        "Provider voice id, or 'default' to let the adapter choose. Changing "
+        "this does not re-render existing audio — use the Voice screen's "
+        "regenerate, which is the only action that spends again.",
+    ),
+    "voice.backfill_enabled": Spec(
+        False,
+        "bool",
+        "Let the nightly job generate audio for recently published stories "
+        "that have none. Stops at 90% of the monthly character budget.",
+    ),
     # --- E-Paper / polls ----------------------------------------------------
     "epaper.enabled": Spec(True, "bool", "Show published E-Paper editions to readers."),
     "epaper.auto_generate": Spec(
@@ -123,6 +136,146 @@ SPECS: dict[str, Spec] = {
     ),
     # --- §6 submissions -----------------------------------------------------
     "submissions.enabled": Spec(True, "bool", "Accept reader-submitted articles."),
+    "submissions.require_phone_verification": Spec(
+        True,
+        "bool",
+        "Require a verified phone number before a reader may submit. Defaults "
+        "on because verification_service already documents this as the rule; "
+        "the toggle exists so a launch-day problem is a setting, not a deploy.",
+    ),
+    "submissions.require_kyc": Spec(
+        False,
+        "bool",
+        "Accept submissions only from verified contributors. Off by default — "
+        "closing the door to unverified readers entirely is a policy decision, "
+        "not a security default.",
+    ),
+    # --- citizen journalism -------------------------------------------------
+    "kyc.enabled": Spec(True, "bool", "Accept contributor applications."),
+    "kyc.provider": Spec(
+        "manual",
+        "str",
+        "Who decides an application: 'manual' means a person in the admin "
+        "queue. An unknown name falls back to manual rather than locking "
+        "applicants out.",
+    ),
+    # --- sharing ------------------------------------------------------------
+    "share_card.enabled": Spec(
+        True,
+        "bool",
+        "Render a WhatsApp share card for each story. Automatically inactive "
+        "on a host whose Pillow cannot shape Telugu — see the deployment "
+        "notes; readers then share text and a link, as before.",
+    ),
+    # --- three-hourly audio bulletin ----------------------------------------
+    "bulletin.enabled": Spec(
+        False,
+        "bool",
+        "Produce and serve the three-hourly audio bulletin. Off stops the "
+        "schedule and hides every bulletin, including ones already live — this "
+        "is the emergency stop.",
+    ),
+    "bulletin.requires_approval": Spec(
+        False,
+        "bool",
+        "Hold each rendered bulletin at Ready until an editor publishes it. Off "
+        "(the default) publishes on schedule, which is safe because a bulletin "
+        "is assembled only from stories an editor already approved and "
+        "published; the AI writes the joining sentences, not the facts.",
+    ),
+    "bulletin.ai_script_enabled": Spec(
+        False,
+        "bool",
+        "Let the AI provider write the linking phrases between stories. Off "
+        "uses fixed Telugu connectives. Story text always comes from published "
+        "copy either way.",
+    ),
+    "bulletin.target_seconds": Spec(
+        180, "int", "Target bulletin length in seconds."
+    ),
+    "bulletin.story_limit": Spec(
+        8, "int", "Maximum stories read in one bulletin."
+    ),
+    # --- hourly crawl -------------------------------------------------------
+    # Every default here is chosen so that applying the migration changes
+    # nothing: the master switch is off, and every pre-existing source lands in
+    # the GENERAL beat, whose quota is zero.
+    "crawl.enabled": Spec(
+        False,
+        "bool",
+        "Master switch for the hourly crawl. Off means no source is polled on "
+        "a schedule and no provider is called.",
+    ),
+    "crawl.hourly_item_cap": Spec(
+        60,
+        "int",
+        "How many stories may be sent to the AI rewrite in one hour, across "
+        "every beat. This is the spend ceiling.",
+    ),
+    "crawl.beat_quota": Spec(
+        {
+            "general": 0,
+            "national": 10,
+            "state": 0,
+            "district_local": 20,
+            "breaking": 10,
+            "sports": 6,
+            "film": 8,
+            "govt_jobs": 6,
+        },
+        "counts",
+        "How the hourly cap is shared out between beats, as absolute counts. "
+        "Unlike feed ratios these need not total anything — 'how many stories "
+        "an hour' is a number, not a share.",
+    ),
+    "crawl.per_source_default_cap": Spec(
+        8,
+        "int",
+        "Per-hour ceiling for a source that does not set its own. Stops one "
+        "busy aggregator consuming a whole beat's quota.",
+    ),
+    "crawl.rewrite_enabled": Spec(
+        False,
+        "bool",
+        "Run the Telugu AI rewrite. Off means the crawl only fills the review "
+        "queue with headlines and links.",
+    ),
+    "crawl.rewrite_min_words": Spec(
+        45,
+        "int",
+        "Items with less source text than this are never rewritten — there is "
+        "nothing to rewrite, and a model asked anyway will invent.",
+    ),
+    "crawl.html_fallback_enabled": Spec(
+        False,
+        "bool",
+        "Allow fetching the article page when a feed carries only a stub. The "
+        "source must also permit it, and must carry a written licence note.",
+    ),
+    "crawl.mandal_autotag": Spec(
+        True,
+        "bool",
+        "Guess a mandal from the story text when the source has no default. "
+        "Always a guess: the editor sees it with its confidence and can change it.",
+    ),
+    "crawl.mandal_min_name_len": Spec(
+        4,
+        "int",
+        "Ignore gazetteer names shorter than this. Short Telugu place names "
+        "are ordinary words as often as they are places.",
+    ),
+    "crawl.breaking_hourly_cap": Spec(
+        20,
+        "int",
+        "Rewrites per hour for the breaking beat, which runs on its own faster "
+        "schedule. Hourly breaking news is not breaking.",
+    ),
+    "crawl.max_age_hours": Spec(
+        18,
+        "int",
+        "Ignore feed entries older than this. A source that republishes its "
+        "archive should not fill the queue with last month's news.",
+    ),
 }
 
 
@@ -187,6 +340,27 @@ def _coerce(key: str, value: Any) -> Any:
         if not isinstance(value, str) or not value.strip():
             raise ValidationError(details={key: "must be a non-empty string"})
         return value.strip()[:120]
+    if spec.kind == "counts":
+        # Shaped like `ratios` but without the sum-to-100 rule: these are
+        # absolute hourly counts, and forcing them to total anything would
+        # mean changing one beat silently changes another.
+        if not isinstance(value, dict):
+            raise ValidationError(details={key: "must be an object of counts"})
+        expected = set(SPECS[key].default)
+        if set(value) != expected:
+            raise ValidationError(
+                details={key: f"must contain exactly {sorted(expected)}"}
+            )
+        counts: dict[str, int] = {}
+        for name, number in value.items():
+            if (
+                isinstance(number, bool)
+                or not isinstance(number, int)
+                or not 0 <= number <= 500
+            ):
+                raise ValidationError(details={key: f"{name} must be 0-500"})
+            counts[name] = number
+        return counts
     if spec.kind == "ratios":
         if not isinstance(value, dict):
             raise ValidationError(details={key: "must be an object of percentages"})
@@ -258,6 +432,22 @@ def ai_enabled(db: Session) -> bool:
 def voice_enabled(db: Session) -> bool:
     """§20 global half of the switch."""
     return get_bool(db, "voice.enabled")
+
+
+def bulletin_enabled(db: Session) -> bool:
+    """The reader-facing half of the bulletin switch."""
+    return get_bool(db, "bulletin.enabled")
+
+
+def crawl_enabled(db: Session) -> bool:
+    """Whether the hourly crawl may run at all."""
+    return get_bool(db, "crawl.enabled")
+
+
+def crawl_rewrite_enabled(db: Session) -> bool:
+    """The rewrite needs the crawl on, AI permitted by the environment, and an
+    admin to have switched AI on — three separate decisions, all required."""
+    return crawl_enabled(db) and ai_enabled(db) and get_bool(db, "crawl.rewrite_enabled")
 
 
 def feed_ratios(db: Session) -> dict[str, int]:

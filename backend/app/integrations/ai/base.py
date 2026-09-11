@@ -1,8 +1,9 @@
 """LLM provider contract (updated doc §15–17).
 
-Two calls, because that is all §15–17 needs: propose topics, and write a draft
-from one. Both return plain Python structures — no vendor types leak into the
-service layer, so a provider swap is a settings change.
+Three calls: propose topics, write a draft from one, and rewrite somebody
+else's report as our own Telugu copy. All return plain Python structures — no
+vendor types leak into the service layer, so a provider swap is a settings
+change.
 
 Everything here is *suggestion* machinery. No method publishes, and none can:
 the service turns a draft into an ordinary Article in the SUBMITTED state, and
@@ -34,6 +35,27 @@ class DraftText:
     confidence: float = 0.5
 
 
+@dataclass(slots=True)
+class RewriteText:
+    """The result of rewriting an external report.
+
+    `refused` is the field that earns its place. Given three sentences of feed
+    stub, a model will cheerfully produce eight confident paragraphs of
+    invented detail — names, numbers, quotes — and nothing downstream can tell
+    the difference. So the contract gives it a way to decline, and the service
+    treats a refusal as a normal outcome rather than a failure.
+    """
+
+    title_te: str
+    summary_te: str
+    paragraphs_te: list[str]
+    confidence: float = 0.5
+    #: The model could not stand behind a claim it kept. Shown to the editor.
+    unverified: bool = False
+    refused: bool = False
+    refusal_reason: str | None = None
+
+
 class AiProvider(ABC):
     key: str = "base"
 
@@ -52,4 +74,29 @@ class AiProvider(ABC):
         `sources` carries publisher names and URLs so the model can attribute,
         not so it can reproduce: implementations must instruct the model to
         write in its own words and never to copy sentences.
+        """
+
+    @abstractmethod
+    def rewrite_item(
+        self,
+        *,
+        headline: str,
+        body_text: str,
+        publisher: str,
+        source_url: str,
+        language_in: str = "te",
+        target_words: int = 220,
+    ) -> RewriteText:
+        """Rewrite an external report as original Telugu copy.
+
+        `body_text` is somebody else's words. Implementations must instruct the
+        model to reproduce none of them, to add no fact the input does not
+        contain, and to refuse rather than invent. The service appends the
+        attribution itself and does not rely on the model to do it.
+
+        This is abstract rather than a default implementation on purpose: it
+        forces every provider to answer, and the keyless provider's answer —
+        headline, excerpt, credit, nothing invented — is exactly the
+        legally-safe excerpt import the platform did before AI existed. The
+        pipeline degrades instead of failing.
         """

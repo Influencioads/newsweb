@@ -44,7 +44,9 @@ PALETTES: dict[str, tuple[tuple[int, int, int], ...]] = {
 WIDTH, HEIGHT = 1600, 900
 
 
-def _lerp(a: tuple[int, int, int], b: tuple[int, int, int], t: float) -> tuple[int, int, int]:
+def _lerp(
+    a: tuple[int, int, int], b: tuple[int, int, int], t: float
+) -> tuple[int, int, int]:
     return tuple(round(a[c] + (b[c] - a[c]) * t) for c in range(3))  # type: ignore[return-value]
 
 
@@ -273,7 +275,9 @@ def _figure_node(media: Media, caption: str) -> dict:
             },
             {
                 "type": "figcaption",
-                "content": [{"type": "text", "text": f"{caption} · ఫోటో: {media.credit}"}],
+                "content": [
+                    {"type": "text", "text": f"{caption} · ఫోటో: {media.credit}"}
+                ],
             },
         ],
     }
@@ -318,7 +322,9 @@ def seed_inline_and_gallery_images(
             )
 
             body = dict(article.body or {"type": "doc", "content": []})
-            content = [n for n in (body.get("content") or []) if n.get("type") != "figure"]
+            content = [
+                n for n in (body.get("content") or []) if n.get("type") != "figure"
+            ]
             insert_at = 1 if len(content) > 1 else len(content)
             content.insert(insert_at, _figure_node(media, captions[0]))
             body["content"] = content

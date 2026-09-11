@@ -30,7 +30,9 @@ class TtsProvider(ABC):
     can_synthesise: bool = True
 
     @abstractmethod
-    def synthesise(self, text: str, *, language: str, voice: str | None = None) -> Synthesis:
+    def synthesise(
+        self, text: str, *, language: str, voice: str | None = None
+    ) -> Synthesis:
         """Render `text` to audio. Raises AiProviderError on failure."""
 
     def available(self) -> bool:

@@ -32,6 +32,7 @@ const NAV: NavItem[] = [
   { to: '/admin/ai', labelTe: 'AI సూచనలు', labelEn: 'AI suggestions', permission: 'ai.use' },
   { to: '/admin/sources', labelTe: 'కంటెంట్ మూలాలు', labelEn: 'Content sources', permission: 'article.review' },
   { to: '/admin/moderation', labelTe: 'మోడరేషన్', labelEn: 'Moderation', permission: 'comment.moderate' },
+  { to: '/admin/kyc', labelTe: 'విలేకరి దరఖాస్తులు', labelEn: 'Contributors', permission: 'kyc.review' },
   { to: '/admin/trending', labelTe: 'ట్రెండింగ్', labelEn: 'Trending', permission: 'dashboard.view' },
   { to: '/admin/pins', labelTe: 'పిన్‌లు', labelEn: 'Pins', permission: 'article.publish' },
   { to: '/admin/notifications', labelTe: 'నోటిఫికేషన్లు', labelEn: 'Notifications', permission: 'push.create' },
@@ -46,6 +47,8 @@ const NAV: NavItem[] = [
   { to: '/admin/users', labelTe: 'వినియోగదారులు', labelEn: 'Users', permission: 'user.view' },
   { to: '/admin/roles', labelTe: 'పాత్రలు', labelEn: 'Roles', permission: 'role.view' },
   { to: '/admin/audit', labelTe: 'ఆడిట్', labelEn: 'Audit', permission: 'audit.view' },
+  { to: '/admin/voice', labelTe: 'వాయిస్', labelEn: 'Voice', permission: 'voice.manage' },
+  { to: '/admin/bulletins', labelTe: 'బులెటిన్లు', labelEn: 'Bulletins', permission: 'voice.manage' },
   { to: '/admin/settings', labelTe: 'సెట్టింగ్స్', labelEn: 'Settings', permission: 'settings.view' },
 ];
 

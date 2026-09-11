@@ -9,6 +9,11 @@ import ArticleEditor from './pages/admin/ArticleEditor';
 import ReviewQueue from './pages/admin/ReviewQueue';
 import { AuditPage, MediaPage, ModerationPage, RolesPage, TaxonomyPage, UsersPage } from './pages/admin/ManagementPages';
 import SettingsPage from './pages/admin/SettingsPage';
+import BulletinsPage from './pages/admin/BulletinsPage';
+import KycPage from './pages/admin/KycPage';
+import BulletinPage from './pages/public/BulletinPage';
+import ContributorApplyPage from './pages/public/ContributorApplyPage';
+import VoicePage from './pages/admin/VoicePage';
 import AiSuggestionsPage from './pages/admin/AiSuggestions';
 import ContentSourcesPage from './pages/admin/ContentSources';
 import PendingArticlesPage from './pages/admin/PendingArticles';
@@ -75,6 +80,8 @@ export default function App() {
         <Route path="/my-epaper" element={<MyEpaperPage />} />
         <Route path="/my-epaper/edition/:personalId" element={<EpaperPage />} />
         <Route path="/my-epaper/edition/:personalId/page/:page" element={<EpaperPage />} />
+        <Route path="/bulletin" element={<BulletinPage />} />
+        <Route path="/contributor" element={<ContributorApplyPage />} />
         <Route path="/topic/:slug" element={<TopicPage />} />
         <Route path="/polls/:id" element={<PollPage />} />
         <Route path="/live" element={<LiveNewsPage />} />
@@ -129,6 +136,9 @@ export default function App() {
           <Route path="/admin/users" element={<UsersPage />} />
           <Route path="/admin/roles" element={<RolesPage />} />
           <Route path="/admin/audit" element={<AuditPage />} />
+          <Route path="/admin/voice" element={<VoicePage />} />
+          <Route path="/admin/bulletins" element={<BulletinsPage />} />
+          <Route path="/admin/kyc" element={<KycPage />} />
           <Route path="/admin/settings" element={<SettingsPage />} />
           <Route path="/admin/epaper" element={<AdminEpaperPage />} />
           <Route path="/admin/polls" element={<AdminPollsPage />} />

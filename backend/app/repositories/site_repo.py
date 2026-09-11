@@ -11,7 +11,9 @@ from app.db.base import utcnow
 from app.models.site import HomepageSection, SearchQuery
 
 
-def homepage_sections(db: Session, *, enabled_only: bool = True) -> list[HomepageSection]:
+def homepage_sections(
+    db: Session, *, enabled_only: bool = True
+) -> list[HomepageSection]:
     stmt = select(HomepageSection).order_by(HomepageSection.sort, HomepageSection.id)
     if enabled_only:
         stmt = stmt.where(HomepageSection.is_enabled.is_(True))
@@ -22,7 +24,9 @@ def get_section(db: Session, section_id: int) -> HomepageSection | None:
     return db.get(HomepageSection, section_id)
 
 
-def log_search(db: Session, *, query: str, results_count: int, user_id: int | None) -> None:
+def log_search(
+    db: Session, *, query: str, results_count: int, user_id: int | None
+) -> None:
     """Fire-and-forget: a failed log write must never fail the search response,
     so callers wrap this in a broad try/except."""
     q = query.strip()[:200]

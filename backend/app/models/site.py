@@ -12,7 +12,16 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, Enum, ForeignKey, Index, Integer, String, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import MYSQL_TABLE_ARGS, Base, PKMixin, TimestampMixin
@@ -48,7 +57,10 @@ class HomepageSection(PKMixin, TimestampMixin, Base):
     sort: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     item_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=7, doc="Articles requested for this block (§24)"
+        Integer,
+        nullable=False,
+        default=7,
+        doc="Articles requested for this block (§24)",
     )
     #: A block with fewer live stories than this renders nothing rather than a
     #: broken-looking stub (same rule the hardcoded home used).

@@ -108,9 +108,13 @@ def seed_roles(db: Session, permissions: dict[str, Permission]) -> dict[str, Rol
         current = {rp.permission.key: rp for rp in role.permissions if rp.permission}
         for key in keys:
             if key not in permissions:
-                raise RuntimeError(f"Role {role_key} references unknown permission '{key}'")
+                raise RuntimeError(
+                    f"Role {role_key} references unknown permission '{key}'"
+                )
             if key not in current:
-                db.add(RolePermission(role_id=role.id, permission_id=permissions[key].id))
+                db.add(
+                    RolePermission(role_id=role.id, permission_id=permissions[key].id)
+                )
         for key, rp in current.items():
             if key not in keys:
                 db.delete(rp)
@@ -152,7 +156,8 @@ def seed_homepage_sections(db: Session, categories: dict[str, "Category"]) -> in
     """
     existing_keys = {s.key for s in db.execute(select(HomepageSection)).scalars()}
     next_sort = (
-        max((s.sort for s in db.execute(select(HomepageSection)).scalars()), default=-1) + 1
+        max((s.sort for s in db.execute(select(HomepageSection)).scalars()), default=-1)
+        + 1
     )
     created = 0
     # The §8 trending block leads the section list; the engine behind it fills
@@ -228,17 +233,35 @@ def seed_demo_events(db: Session) -> int:
         for reader in range(readers):
             anon = f"demo-{index}-{reader}"
             age = rng.uniform(0.5, 30.0)
-            db.add(ArticleEvent(article_id=article.id, anon_id=anon, event_type=EventType.VIEW,
-                                created_at=now - timedelta(hours=age)))
+            db.add(
+                ArticleEvent(
+                    article_id=article.id,
+                    anon_id=anon,
+                    event_type=EventType.VIEW,
+                    created_at=now - timedelta(hours=age),
+                )
+            )
             created += 1
             if rng.random() < 0.5:
-                db.add(ArticleEvent(article_id=article.id, anon_id=anon, event_type=EventType.READ,
-                                    value=rng.randint(20, 110),
-                                    created_at=now - timedelta(hours=age)))
+                db.add(
+                    ArticleEvent(
+                        article_id=article.id,
+                        anon_id=anon,
+                        event_type=EventType.READ,
+                        value=rng.randint(20, 110),
+                        created_at=now - timedelta(hours=age),
+                    )
+                )
                 created += 1
             if rng.random() < 0.25:
-                db.add(ArticleEvent(article_id=article.id, anon_id=anon, event_type=EventType.SHARE,
-                                    created_at=now - timedelta(hours=age)))
+                db.add(
+                    ArticleEvent(
+                        article_id=article.id,
+                        anon_id=anon,
+                        event_type=EventType.SHARE,
+                        created_at=now - timedelta(hours=age),
+                    )
+                )
                 article.share_count = (article.share_count or 0) + 1
                 created += 1
         article.view_count = (article.view_count or 0) + readers
@@ -250,8 +273,18 @@ def seed_demo_events(db: Session) -> int:
 #: (youtube_id, title_te, title_en, category_slug) — placeholder ids for the
 #: demo library; production editors paste real newsroom links.
 DEMO_VIDEOS: tuple[tuple[str, str, str, str], ...] = (
-    ("dQw4w9WgXcQ", "అమరావతి పనుల డ్రోన్ దృశ్యాలు", "Amaravati works drone view", "andhra-pradesh"),
-    ("jNQXAC9IVRw", "హైదరాబాద్ మెట్రో రెండో దశ వివరణ", "Hyderabad Metro phase 2 explainer", "telangana"),
+    (
+        "dQw4w9WgXcQ",
+        "అమరావతి పనుల డ్రోన్ దృశ్యాలు",
+        "Amaravati works drone view",
+        "andhra-pradesh",
+    ),
+    (
+        "jNQXAC9IVRw",
+        "హైదరాబాద్ మెట్రో రెండో దశ వివరణ",
+        "Hyderabad Metro phase 2 explainer",
+        "telangana",
+    ),
     ("M7lc1UVf-VE", "ఈవారం సినీ విశేషాలు", "This week in cinema", "cinema"),
     ("ysz5S6PUM-U", "పోలవరం ప్రాజెక్టు క్షేత్రస్థాయి నివేదిక", "Polavaram ground report", "politics"),
 )
@@ -308,7 +341,9 @@ def seed_districts(db: Session) -> dict[str, District]:
     return existing
 
 
-def seed_mandals(db: Session, districts: dict[str, District]) -> dict[tuple[str, str], Mandal]:
+def seed_mandals(
+    db: Session, districts: dict[str, District]
+) -> dict[tuple[str, str], Mandal]:
     existing = {
         (m.district.slug, m.slug): m
         for m in db.execute(select(Mandal)).scalars()
@@ -336,17 +371,91 @@ def seed_mandals(db: Session, districts: dict[str, District]) -> dict[tuple[str,
 # demo data — development only
 # --------------------------------------------------------------------------- #
 #: (local_part, name_te, name_en, role, scope_type, scope_slug, phone)
-DEMO_STAFF: tuple[tuple[str, str, str, RoleKey, ScopeType, str | None, str | None], ...] = (
-    ("superadmin", "సూపర్ అడ్మిన్", "Super Admin", RoleKey.SUPER_ADMIN, ScopeType.GLOBAL, None, None),
-    ("srinivas", "శ్రీనివాస్", "Srinivas", RoleKey.EDITOR_IN_CHIEF, ScopeType.GLOBAL, None, None),
-    ("lakshmi", "లక్ష్మి దేవి", "Lakshmi Devi", RoleKey.DESK_EDITOR, ScopeType.DISTRICT, "visakhapatnam", None),
+DEMO_STAFF: tuple[
+    tuple[str, str, str, RoleKey, ScopeType, str | None, str | None], ...
+] = (
+    (
+        "superadmin",
+        "సూపర్ అడ్మిన్",
+        "Super Admin",
+        RoleKey.SUPER_ADMIN,
+        ScopeType.GLOBAL,
+        None,
+        None,
+    ),
+    (
+        "srinivas",
+        "శ్రీనివాస్",
+        "Srinivas",
+        RoleKey.EDITOR_IN_CHIEF,
+        ScopeType.GLOBAL,
+        None,
+        None,
+    ),
+    (
+        "lakshmi",
+        "లక్ష్మి దేవి",
+        "Lakshmi Devi",
+        RoleKey.DESK_EDITOR,
+        ScopeType.DISTRICT,
+        "visakhapatnam",
+        None,
+    ),
     ("kiran", "కిరణ్", "Kiran", RoleKey.SUB_EDITOR, ScopeType.GLOBAL, None, None),
-    ("ravi", "రవి కుమార్", "Ravi Kumar", RoleKey.REPORTER, ScopeType.DISTRICT, "guntur", "919848000001"),
-    ("suresh", "సురేష్", "Suresh", RoleKey.REPORTER, ScopeType.DISTRICT, "srikakulam", "919848000002"),
-    ("anusha", "అనూష", "Anusha", RoleKey.STRINGER, ScopeType.MANDAL, "parvathipuram", "919848000003"),
-    ("durga", "దుర్గ", "Durga", RoleKey.STRINGER, ScopeType.MANDAL, "anakapalli-rural", "919848000004"),
-    ("dtp", "DTP ఆపరేటర్", "DTP Operator", RoleKey.DTP_OPERATOR, ScopeType.DISTRICT, "visakhapatnam", None),
-    ("photo", "ఫోటో డెస్క్", "Photo Desk", RoleKey.PHOTO_VIDEO, ScopeType.GLOBAL, None, None),
+    (
+        "ravi",
+        "రవి కుమార్",
+        "Ravi Kumar",
+        RoleKey.REPORTER,
+        ScopeType.DISTRICT,
+        "guntur",
+        "919848000001",
+    ),
+    (
+        "suresh",
+        "సురేష్",
+        "Suresh",
+        RoleKey.REPORTER,
+        ScopeType.DISTRICT,
+        "srikakulam",
+        "919848000002",
+    ),
+    (
+        "anusha",
+        "అనూష",
+        "Anusha",
+        RoleKey.STRINGER,
+        ScopeType.MANDAL,
+        "parvathipuram",
+        "919848000003",
+    ),
+    (
+        "durga",
+        "దుర్గ",
+        "Durga",
+        RoleKey.STRINGER,
+        ScopeType.MANDAL,
+        "anakapalli-rural",
+        "919848000004",
+    ),
+    (
+        "dtp",
+        "DTP ఆపరేటర్",
+        "DTP Operator",
+        RoleKey.DTP_OPERATOR,
+        ScopeType.DISTRICT,
+        "visakhapatnam",
+        None,
+    ),
+    (
+        "photo",
+        "ఫోటో డెస్క్",
+        "Photo Desk",
+        RoleKey.PHOTO_VIDEO,
+        ScopeType.GLOBAL,
+        None,
+        None,
+    ),
 )
 
 
@@ -386,7 +495,11 @@ def seed_demo_users(
         # Demo accounts never get 2FA — it would make local development
         # unusable. That is exactly why they must not exist in production.
         user.two_factor_enabled = False
-        user.is_author = role_key in {RoleKey.REPORTER, RoleKey.STRINGER, RoleKey.DESK_EDITOR}
+        user.is_author = role_key in {
+            RoleKey.REPORTER,
+            RoleKey.STRINGER,
+            RoleKey.DESK_EDITOR,
+        }
         user.author_slug = local if user.is_author else None
         user.designation_te = roles[role_key.value].label_te
         db.flush()
@@ -403,13 +516,18 @@ def seed_demo_users(
                 UserRole.user_id == user.id,
                 UserRole.role_id == role.id,
                 UserRole.scope_type == scope_type,
-                UserRole.scope_id.is_(scope_id) if scope_id is None else UserRole.scope_id == scope_id,
+                UserRole.scope_id.is_(scope_id)
+                if scope_id is None
+                else UserRole.scope_id == scope_id,
             )
         ).scalar_one_or_none()
         if exists is None:
             db.add(
                 UserRole(
-                    user_id=user.id, role_id=role.id, scope_type=scope_type, scope_id=scope_id
+                    user_id=user.id,
+                    role_id=role.id,
+                    scope_type=scope_type,
+                    scope_id=scope_id,
                 )
             )
         credentials.append((email, password or "(unchanged)"))
@@ -436,7 +554,9 @@ def run(include_demo: bool = False, reset_passwords: bool = False) -> None:
         demo_articles = 0
         demo_images = 0
         if include_demo:
-            credentials = seed_demo_users(db, roles, districts, mandals, reset_passwords)
+            credentials = seed_demo_users(
+                db, roles, districts, mandals, reset_passwords
+            )
             demo_articles = seed_demo_articles(db, categories, tags)
             demo_images = seed_article_images(db)
             seed_demo_events(db)
@@ -458,7 +578,9 @@ def run(include_demo: bool = False, reset_passwords: bool = False) -> None:
     print(f"  districts   {len(AP_DISTRICTS)} AP + {len(TS_DISTRICTS)} TS")
     print(f"  categories  {len(CATEGORIES)}")
     if include_demo:
-        print(f"  demo articles written this run: {demo_articles} (of {len(DEMO_ARTICLES)})")
+        print(
+            f"  demo articles written this run: {demo_articles} (of {len(DEMO_ARTICLES)})"
+        )
         print(f"  demo hero images generated:     {demo_images}")
 
     if credentials:
@@ -485,6 +607,8 @@ if __name__ == "__main__":
     if args.reset_passwords:
         args.demo = True
     if args.demo and settings.is_production:
-        print("Refusing: --demo cannot be used with APP_ENV=production", file=sys.stderr)
+        print(
+            "Refusing: --demo cannot be used with APP_ENV=production", file=sys.stderr
+        )
         raise SystemExit(2)
     run(include_demo=args.demo, reset_passwords=args.reset_passwords)

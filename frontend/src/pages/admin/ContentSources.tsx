@@ -5,7 +5,10 @@ import { Field, Section, inputClass } from '@/components/admin/FormControls';
 import * as cmsApi from '@/features/cms/api';
 import { useI18n } from '@/i18n';
 import type { ApiError } from '@/api/client';
-import type { ContentPolicy, ContentSource, IngestedItem, SourceLicence } from '@/types/cms';
+import type {
+  ContentPolicy, ContentSource, IngestedItem, MandalMatchMethod,
+  RewriteStatus, SourceBeat, SourceLicence,
+} from '@/types/cms';
 
 /**
  * §17 — where our content comes from, and what we are allowed to do with it.
@@ -30,6 +33,35 @@ const LICENCES: Array<{ value: SourceLicence; te: string; en: string; fullText: 
   { value: 'own_network', te: 'మన సొంత నెట్‌వర్క్', en: 'Our own network', fullText: true },
   { value: 'rss_public', te: 'బహిరంగ RSS (ఒప్పందం లేదు)', en: 'Public RSS (no agreement)', fullText: false },
 ];
+
+const BEATS: Array<{ value: SourceBeat; te: string; en: string }> = [
+  { value: 'general', te: 'సాధారణం', en: 'General (no hourly quota)' },
+  { value: 'national', te: 'జాతీయం', en: 'National' },
+  { value: 'state', te: 'రాష్ట్రం', en: 'State' },
+  { value: 'district_local', te: 'జిల్లా / స్థానికం', en: 'District / local' },
+  { value: 'breaking', te: 'బ్రేకింగ్', en: 'Breaking' },
+  { value: 'sports', te: 'క్రీడలు', en: 'Sports' },
+  { value: 'film', te: 'సినిమా', en: 'Film' },
+  { value: 'govt_jobs', te: 'ఉద్యోగాలు', en: 'Government jobs' },
+];
+
+const REWRITE_LABEL: Record<RewriteStatus, { te: string; en: string; tone: string }> = {
+  none: { te: 'పునర్లేఖనం లేదు', en: 'Not rewritten', tone: 'bg-canvas text-muted' },
+  pending: { te: 'వేచి ఉంది', en: 'Pending', tone: 'bg-canvas text-muted' },
+  ready: { te: 'సిద్ధం', en: 'Rewritten', tone: 'bg-ai/12 text-ai' },
+  refused: { te: 'నిరాకరించింది', en: 'Model declined', tone: 'bg-partial/15 text-partial' },
+  human_only: { te: 'మనిషి చదవాలి', en: 'Needs a person', tone: 'bg-breaking-tint text-breaking' },
+  skipped: { te: 'సరిపడా సమాచారం లేదు', en: 'Too little source text', tone: 'bg-canvas text-muted' },
+  failed: { te: 'విఫలమైంది', en: 'Failed', tone: 'bg-breaking-tint text-breaking' },
+};
+
+const MANDAL_LABEL: Record<MandalMatchMethod, { te: string; en: string }> = {
+  none: { te: 'మండలం తెలియదు', en: 'No mandal' },
+  source_default: { te: 'మూలం నిర్ణయించింది', en: 'Pinned by source' },
+  keyword: { te: 'వార్త నుంచి ఊహించాం', en: 'Guessed from the text' },
+  ambiguous: { te: 'ఒకటి కంటే ఎక్కువ — ఎంచుకోండి', en: 'Several matched — pick one' },
+  editor: { te: 'ఎడిటర్ ఎంచుకున్నారు', en: 'Set by an editor' },
+};
 
 const POLICIES: Array<{ value: ContentPolicy; te: string; en: string }> = [
   { value: 'link_only', te: 'లింక్ మాత్రమే', en: 'Link only' },
@@ -59,11 +91,17 @@ function AddSourceForm({ onDone }: { onDone: () => void }) {
   const [policy, setPolicy] = useState<ContentPolicy>('excerpt_only');
   const [note, setNote] = useState('');
   const [interval, setInterval] = useState(30);
+  const [beat, setBeat] = useState<SourceBeat>('general');
+  const [perHour, setPerHour] = useState(8);
+  const [rewrite, setRewrite] = useState(false);
+  const [htmlFallback, setHtmlFallback] = useState(false);
 
   const create = useMutation({
     mutationFn: () => cmsApi.createSource({
       slug, name, feed_url: feedUrl, licence, content_policy: policy,
       licence_note: note || null, fetch_interval_minutes: interval,
+      beat, max_items_per_hour: perHour,
+      rewrite_enabled: rewrite, allow_html_fallback: htmlFallback,
     }),
     onSuccess: onDone,
   });
@@ -122,7 +160,51 @@ function AddSourceForm({ onDone }: { onDone: () => void }) {
           </Field>
         </div>
 
-        {policy === 'full_text' ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label={en ? 'Beat' : 'బీట్'}
+            hint={en
+              ? 'Decides which hourly quota this source draws from. General has none.'
+              : 'ఏ గంటవారీ కోటా నుంచి తీసుకోవాలో నిర్ణయిస్తుంది. సాధారణానికి కోటా లేదు.'}
+          >
+            <select value={beat} onChange={(e) => setBeat(e.target.value as SourceBeat)} className={inputClass}>
+              {BEATS.map((b) => (
+                <option key={b.value} value={b.value}>{en ? b.en : b.te}</option>
+              ))}
+            </select>
+          </Field>
+          <Field
+            label={en ? 'Max stories per hour' : 'గంటకు గరిష్ఠ వార్తలు'}
+            hint={en
+              ? 'Stops one busy feed consuming the whole beat budget.'
+              : 'ఒకే ఫీడ్ మొత్తం కోటాను తినకుండా ఆపుతుంది.'}
+          >
+            <input type="number" min={0} max={500} value={perHour}
+              onChange={(e) => setPerHour(Number(e.target.value))} className={`${inputClass} max-w-[160px]`} />
+          </Field>
+        </div>
+
+        <label className="te flex items-start gap-2 text-[12.5px] leading-telugu text-ink-soft">
+          <input type="checkbox" checked={rewrite} onChange={(e) => setRewrite(e.target.checked)}
+            className="mt-0.5 h-4 w-4" />
+          <span>
+            {en
+              ? 'Rewrite this source in our own Telugu, crediting the publisher. The result still goes to an editor.'
+              : 'ఈ మూలాన్ని మన సొంత తెలుగులో రాయండి, ప్రచురణకర్తకు క్రెడిట్ ఇస్తూ. ఫలితం ఎడిటర్ వద్దకే వెళ్తుంది.'}
+          </span>
+        </label>
+
+        <label className="te flex items-start gap-2 text-[12.5px] leading-telugu text-ink-soft">
+          <input type="checkbox" checked={htmlFallback}
+            onChange={(e) => setHtmlFallback(e.target.checked)} className="mt-0.5 h-4 w-4" />
+          <span>
+            {en
+              ? 'When the feed carries only a stub, fetch the article page. Needs a written note below saying why that is acceptable for this publisher.'
+              : 'ఫీడ్‌లో చిన్న ముక్క మాత్రమే ఉంటే వ్యాసం పేజీని తెండి. ఇది ఈ ప్రచురణకర్తకు ఎందుకు సమ్మతమో కింద రాయాలి.'}
+          </span>
+        </label>
+
+        {policy === 'full_text' || htmlFallback ? (
           <Field
             label={en ? 'Which agreement permits this?' : 'ఏ ఒప్పందం దీన్ని అనుమతిస్తుంది?'}
             required
@@ -155,14 +237,75 @@ function AddSourceForm({ onDone }: { onDone: () => void }) {
   );
 }
 
-function QueueRow({ item, onImport, onReject, busy }: {
+/** The rewrite, the refusal, or nothing — whichever actually happened.
+ *
+ * A refusal is shown rather than hidden. "The model declined because the
+ * source had three sentences" is something an editor acts on; hiding it would
+ * make the queue look like nothing had been tried.
+ */
+function RewritePanel({ item, onRewrite, busy }: {
   item: IngestedItem;
-  onImport: () => void;
-  onReject: () => void;
+  onRewrite: () => void;
   busy: boolean;
 }) {
   const { language } = useI18n();
   const en = language === 'en';
+  const [open, setOpen] = useState(false);
+  const rewrite = item.rewrite;
+  const label = REWRITE_LABEL[item.rewrite_status];
+
+  return (
+    <div className="mt-2 rounded-control border border-rule-soft bg-canvas/60 p-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`inline-block rounded-chip px-2 py-0.5 font-sans text-[10.5px] font-bold ${label.tone}`}>
+          {en ? label.en : label.te}
+        </span>
+        {rewrite && item.rewrite_status === 'ready' ? (
+          <span className="font-sans text-[11px] text-muted">
+            {rewrite.engine}
+            {rewrite.model ? ` · ${rewrite.model}` : ''}
+            {` · ${Math.round(rewrite.confidence * 100)}%`}
+            {rewrite.unverified ? ` · ${en ? 'has unverified claims' : 'ధృవీకరించని అంశాలు'}` : ''}
+          </span>
+        ) : null}
+        {rewrite?.refusal_reason ? (
+          <span className="font-sans text-[11px] text-muted">{rewrite.refusal_reason}</span>
+        ) : null}
+        {item.rewrite_status !== 'ready' && item.rewrite_status !== 'human_only' ? (
+          <button type="button" disabled={busy} onClick={onRewrite}
+            className="te ml-auto min-h-[28px] rounded-control border border-ai px-2.5 text-[11.5px] font-semibold text-ai disabled:opacity-50">
+            {en ? 'Rewrite now' : 'ఇప్పుడే రాయించండి'}
+          </button>
+        ) : null}
+      </div>
+
+      {rewrite && item.rewrite_status === 'ready' ? (
+        <>
+          <button type="button" onClick={() => setOpen((v) => !v)}
+            className="te mt-1.5 text-left text-[13px] font-bold leading-telugu text-ai underline">
+            {rewrite.title_te}
+          </button>
+          {open ? (
+            <p className="te mt-1 whitespace-pre-line text-[12.5px] leading-telugu text-ink-soft">
+              {rewrite.body_plain}
+            </p>
+          ) : null}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function QueueRow({ item, onImport, onReject, onRewrite, busy }: {
+  item: IngestedItem;
+  onImport: (useRewrite: boolean) => void;
+  onReject: () => void;
+  onRewrite: () => void;
+  busy: boolean;
+}) {
+  const { language } = useI18n();
+  const en = language === 'en';
+  const hasRewrite = item.rewrite_status === 'ready';
   return (
     <article className="flex gap-3 rounded-card border border-rule bg-white p-3.5 shadow-card dark:bg-surface">
       {item.image_url ? (
@@ -202,11 +345,31 @@ function QueueRow({ item, onImport, onReject, busy }: {
           ) : null}
         </p>
 
+        <p className="mt-1.5 font-sans text-[11px] text-muted">
+          {en ? MANDAL_LABEL[item.mandal.method].en : MANDAL_LABEL[item.mandal.method].te}
+          {item.mandal.confidence > 0 ? ` · ${Math.round(item.mandal.confidence * 100)}%` : ''}
+          {item.mandal.method === 'keyword' ? (
+            <span className="ml-1 text-partial">
+              {en ? '(a guess — check it)' : '(ఇది ఊహ — సరిచూడండి)'}
+            </span>
+          ) : null}
+        </p>
+
+        <RewritePanel item={item} onRewrite={onRewrite} busy={busy} />
+
         <div className="mt-2.5 flex flex-wrap gap-2 border-t border-rule pt-2.5">
-          <button type="button" disabled={busy} onClick={onImport}
+          <button type="button" disabled={busy} onClick={() => onImport(hasRewrite)}
             className="te min-h-[32px] rounded-control bg-brand px-3 text-[12px] font-bold text-white disabled:opacity-50">
-            {en ? 'Import as draft' : 'డ్రాఫ్ట్‌గా తీసుకోండి'}
+            {hasRewrite
+              ? (en ? 'Send rewrite to review' : 'పునర్లేఖనాన్ని సమీక్షకు పంపండి')
+              : (en ? 'Import as draft' : 'డ్రాఫ్ట్‌గా తీసుకోండి')}
           </button>
+          {hasRewrite ? (
+            <button type="button" disabled={busy} onClick={() => onImport(false)}
+              className="te min-h-[32px] rounded-control border border-rule px-3 text-[12px] font-semibold text-ink-soft disabled:opacity-50">
+              {en ? 'Import the excerpt instead' : 'బదులుగా సారాంశాన్ని తీసుకోండి'}
+            </button>
+          ) : null}
           <button type="button" disabled={busy} onClick={onReject}
             className="te min-h-[32px] rounded-control border border-rule px-3 text-[12px] font-semibold text-muted disabled:opacity-50">
             {en ? 'Reject' : 'తిరస్కరించండి'}
@@ -217,11 +380,88 @@ function QueueRow({ item, onImport, onReject, busy }: {
   );
 }
 
+/** Quota used this hour, and whether the crawl worker is actually alive.
+ *
+ * `stale` is the field that matters: crawl tasks route to their own Celery
+ * queue, so a deployment missing the `worker-ingest` container queues them in
+ * Redis forever and nothing else anywhere reports a failure.
+ */
+function CoverageTab() {
+  const { language } = useI18n();
+  const en = language === 'en';
+  const status = useQuery({ queryKey: ['cms', 'crawl-status'], queryFn: cmsApi.fetchCrawlStatus });
+  const data = status.data;
+  if (!data) return null;
+
+  return (
+    <div className="space-y-4">
+      {!data.enabled ? (
+        <p className="te rounded-control border border-rule bg-canvas p-3 text-[12.5px] leading-telugu text-ink-soft">
+          {en
+            ? 'The hourly crawl is switched off. Turn it on in Settings — nothing is fetched or rewritten on a schedule until you do.'
+            : 'గంటవారీ క్రాల్ ఆఫ్‌లో ఉంది. సెట్టింగ్స్‌లో ఆన్ చేయండి — అప్పటివరకు షెడ్యూల్‌లో ఏమీ జరగదు.'}
+        </p>
+      ) : null}
+
+      {data.enabled && data.stale ? (
+        <p role="alert" className="te rounded-control border border-breaking-border bg-breaking-tint p-3 text-[12.5px] leading-telugu text-breaking">
+          {en
+            ? 'No source has been fetched successfully for over two hours. Check that the worker-ingest container is running — crawl tasks go to their own queue and pile up silently without it.'
+            : 'రెండు గంటలుగా ఏ మూలం నుంచీ విజయవంతంగా తేలేదు. worker-ingest కంటైనర్ నడుస్తోందో చూడండి.'}
+        </p>
+      ) : null}
+
+      <div className="rounded-card border border-rule bg-white p-4 shadow-card dark:bg-surface">
+        <p className="font-sans text-[12px] text-muted">
+          {en ? 'Rewrites this hour' : 'ఈ గంటలో పునర్లేఖనాలు'}
+        </p>
+        <p className="font-sans text-[26px] font-extrabold tabular-nums text-ink">
+          {data.used_this_hour}
+          <span className="text-[15px] font-semibold text-muted"> / {data.hourly_cap}</span>
+        </p>
+        <p className="te mt-1 text-[11.5px] text-muted">
+          {data.last_fetch_at
+            ? `${en ? 'Last fetch' : 'చివరి ఫెచ్'}: ${new Date(data.last_fetch_at).toLocaleString('en-IN')}`
+            : (en ? 'Never fetched' : 'ఎప్పుడూ తేలేదు')}
+        </p>
+      </div>
+
+      <div className="overflow-x-auto rounded-card border border-rule bg-white shadow-card dark:bg-surface">
+        <table className="w-full min-w-[520px] text-left">
+          <thead className="bg-paper font-sans text-[10px] uppercase tracking-wide text-muted">
+            <tr>
+              <th className="px-3 py-2.5">{en ? 'Beat' : 'బీట్'}</th>
+              <th className="px-3 py-2.5">{en ? 'Sources' : 'మూలాలు'}</th>
+              <th className="px-3 py-2.5">{en ? 'Used / quota' : 'వాడినవి / కోటా'}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.beats.map((row) => (
+              <tr key={row.beat} className="border-t border-rule-soft">
+                <td className="te px-3 py-2.5 text-[12.5px] text-ink">
+                  {BEATS.find((b) => b.value === row.beat)?.[en ? 'en' : 'te'] ?? row.beat}
+                </td>
+                <td className="px-3 py-2.5 font-sans text-[12px] tabular-nums text-ink-soft">{row.sources}</td>
+                <td className="px-3 py-2.5 font-sans text-[12px] tabular-nums text-ink-soft">
+                  <span className={row.quota > 0 && row.used >= row.quota ? 'font-bold text-partial' : ''}>
+                    {row.used}
+                  </span>
+                  {' / '}{row.quota}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function ContentSourcesPage() {
   const { language } = useI18n();
   const en = language === 'en';
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<'queue' | 'sources'>('queue');
+  const [tab, setTab] = useState<'queue' | 'sources' | 'coverage'>('queue');
   const [adding, setAdding] = useState(false);
 
   const sources = useQuery({ queryKey: ['cms', 'sources'], queryFn: cmsApi.fetchSources });
@@ -230,10 +470,19 @@ export default function ContentSourcesPage() {
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ['cms', 'sources'] });
     void queryClient.invalidateQueries({ queryKey: ['cms', 'ingest-queue'] });
+    void queryClient.invalidateQueries({ queryKey: ['cms', 'crawl-status'] });
   };
 
   const run = useMutation({ mutationFn: cmsApi.runIngestion, onSuccess: refresh });
-  const importItem = useMutation({ mutationFn: (id: number) => cmsApi.importIngestedItem(id), onSuccess: refresh });
+  const rewriteOne = useMutation({
+    mutationFn: (id: number) => cmsApi.rewriteIngestedItem(id),
+    onSuccess: refresh,
+  });
+  const importItem = useMutation({
+    mutationFn: ({ id, useRewrite }: { id: number; useRewrite: boolean }) =>
+      cmsApi.importIngestedItem(id, { use_rewrite: useRewrite }),
+    onSuccess: refresh,
+  });
   const reject = useMutation({ mutationFn: (id: number) => cmsApi.rejectIngestedItem(id), onSuccess: refresh });
   const fetchOne = useMutation({ mutationFn: (id: number) => cmsApi.fetchSourceNow(id), onSuccess: refresh });
   const toggle = useMutation({
@@ -258,14 +507,16 @@ export default function ContentSourcesPage() {
       </header>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        {(['queue', 'sources'] as const).map((key) => (
+        {(['queue', 'sources', 'coverage'] as const).map((key) => (
           <button key={key} type="button" onClick={() => setTab(key)} aria-pressed={tab === key}
             className={`te min-h-[34px] rounded-chip border px-3.5 text-[12.5px] font-semibold ${
               tab === key ? 'border-brand bg-brand text-white' : 'border-rule bg-white text-ink dark:bg-surface'
             }`}>
             {key === 'queue'
               ? `${en ? 'Queue' : 'క్యూ'} (${counts?.new ?? 0})`
-              : `${en ? 'Sources' : 'మూలాలు'} (${sources.data?.total ?? 0})`}
+              : key === 'sources'
+                ? `${en ? 'Sources' : 'మూలాలు'} (${sources.data?.total ?? 0})`
+                : (en ? 'Coverage' : 'కవరేజ్')}
           </button>
         ))}
         <button type="button" disabled={run.isPending} onClick={() => run.mutate()}
@@ -286,8 +537,9 @@ export default function ContentSourcesPage() {
         <div className="space-y-3">
           {queue.data?.items.map((item) => (
             <QueueRow key={item.id} item={item}
-              busy={importItem.isPending || reject.isPending}
-              onImport={() => importItem.mutate(item.id)}
+              busy={importItem.isPending || reject.isPending || rewriteOne.isPending}
+              onImport={(useRewrite) => importItem.mutate({ id: item.id, useRewrite })}
+              onRewrite={() => rewriteOne.mutate(item.id)}
               onReject={() => reject.mutate(item.id)} />
           ))}
           {queue.data && queue.data.items.length === 0 ? (
@@ -296,6 +548,8 @@ export default function ContentSourcesPage() {
             </p>
           ) : null}
         </div>
+      ) : tab === 'coverage' ? (
+        <CoverageTab />
       ) : (
         <div className="space-y-4">
           <div className="overflow-x-auto rounded-card border border-rule bg-white shadow-card dark:bg-surface">

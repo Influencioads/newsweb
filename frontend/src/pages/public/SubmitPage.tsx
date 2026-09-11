@@ -92,6 +92,17 @@ export default function SubmitPage() {
             ? 'మీ ప్రాంత విశేషాలు, విజయగాథలు రాయండి. మోడరేషన్, సంపాదకీయ సమీక్ష తర్వాత మీ పేరుతో ప్రచురిస్తాం.'
             : 'Write what is happening around you. After moderation and editorial review it publishes with your name.'}
         </p>
+        <p className={`${teCls} mt-2 text-[12.5px] leading-telugu text-muted`}>
+          {te
+            ? 'క్రమం తప్పకుండా రాస్తారా? '
+            : 'Filing regularly? '}
+          <Link to="/contributor" className="font-semibold text-brand underline">
+            {te ? 'విలేకరిగా ధృవీకరించుకోండి' : 'Get verified as a contributor'}
+          </Link>
+          {te
+            ? ' — ఎక్కువ కథనాలు పంపవచ్చు, ఫోటోలు జోడించవచ్చు, మీ పేరుపై ధృవీకరణ గుర్తు.'
+            : ' — send more stories, attach photographs, and carry a verified byline.'}
+        </p>
       </div>
 
       <form

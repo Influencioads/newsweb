@@ -21,12 +21,16 @@ from app.models.content import Article, WorkflowTransition
 from app.models.creator import CreatorSubmission
 from app.models.enums import ArticleStatus, SubmissionStatus, WorkflowState
 from app.models.user import User
-from app.services import tiptap
+from app.services import kyc_service, settings_service, tiptap
 from app.telugu.normalize import normalize_headline, normalize_text
 from app.telugu.transliterate import slugify
 
 #: A creator may hold at most this many submissions awaiting review — a spam
 #: guard that never blocks a genuine contributor (§17 moderation history).
+#:
+#: Now a floor rather than a fixed cap: a verified contributor gets a higher
+#: one (see `kyc_service.PENDING_LIMITS`). The unverified number is unchanged,
+#: so nothing about existing readers' experience moves.
 MAX_PENDING_PER_USER = 5
 
 TITLE_MIN = 10
@@ -69,6 +73,34 @@ def create_submission(
             message_en="Please accept the content guidelines first.",
             message_te="ముందుగా కంటెంట్ మార్గదర్శకాలను అంగీకరించండి.",
         )
+
+    # Three gates that were documented and not enforced. `submissions.enabled`
+    # has existed in SPECS since the setting screen shipped and nothing read
+    # it; `verification_service`'s own docstring says verification "is what
+    # unlocks submitting an article (§6)" and nothing checked that either.
+    if not settings_service.get_bool(db, "submissions.enabled"):
+        raise ConflictError(
+            message_en="Reader submissions are closed right now.",
+            message_te="ప్రస్తుతం పాఠకుల రచనలు స్వీకరించడం లేదు.",
+        )
+
+    user = db.get(User, user_id)
+    if settings_service.get_bool(db, "submissions.require_phone_verification"):
+        if user is None or user.phone_verified_at is None:
+            raise ValidationError(
+                message_en="Verify your phone number before submitting.",
+                message_te="రచన పంపే ముందు మీ ఫోన్ నంబర్ ధృవీకరించండి.",
+                details={"phone": "not verified"},
+            )
+
+    if settings_service.get_bool(db, "submissions.require_kyc") and not (
+        kyc_service.is_approved(db, user_id)
+    ):
+        raise ConflictError(
+            message_en="Only verified contributors can submit right now.",
+            message_te="ప్రస్తుతం ధృవీకరించిన విలేకరులు మాత్రమే రచనలు పంపగలరు.",
+            details={"kyc": "approval required"},
+        )
     title = normalize_headline(title_te or "").strip()
     body = normalize_text(body_te or "").strip()
     if len(title) < TITLE_MIN:
@@ -82,10 +114,12 @@ def create_submission(
             CreatorSubmission.status == SubmissionStatus.PENDING,
         )
     ).scalar()
-    if int(pending or 0) >= MAX_PENDING_PER_USER:
+    limit = kyc_service.pending_limit(db, user_id)
+    if int(pending or 0) >= limit:
         raise ConflictError(
             message_en="You already have submissions awaiting review. Please wait for those first.",
             message_te="మీ గత సమర్పణలు సమీక్షలో ఉన్నాయి. అవి పూర్తయ్యే వరకు వేచి ఉండండి.",
+            details={"limit": str(limit)},
         )
 
     submission = CreatorSubmission(
@@ -134,9 +168,10 @@ def approve_submission(
         district_id=submission.district_id,
         # §17 "published with creator attribution" — the byline is the creator;
         # author_id stays NULL so no staff author page claims the piece.
-        byline_te=creator.name_te if creator else "పాఠక రచయిత",
+        byline_te=_byline_for(db, creator),
+        byline_badge=kyc_service.badge_for(db, submission.user_id),
         source_type="contributed",
-        source_credit=creator.name_te if creator else None,
+        source_credit=_byline_for(db, creator),
         status=ArticleStatus.PENDING,
         workflow_state=WorkflowState.SUBMITTED,
         created_by=moderator_id,
@@ -161,6 +196,21 @@ def approve_submission(
     submission.reviewed_at = utcnow()
     submission.article_id = article.id
     return submission, article
+
+
+def _byline_for(db: Session, creator: User | None) -> str:
+    """The name that appears on the story.
+
+    A verified contributor's chosen display name wins over their account name:
+    a pen name and a legal name are different things, and only one of them was
+    ever meant to be public.
+    """
+    if creator is None:
+        return "పాఠక రచయిత"
+    profile = kyc_service.profile_for(db, creator.id)
+    if profile is not None and profile.display_name_te:
+        return profile.display_name_te
+    return creator.name_te or "పాఠక రచయిత"
 
 
 def reject_submission(

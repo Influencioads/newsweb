@@ -56,7 +56,11 @@ def _jaccard(a: set[str], b: set[str]) -> float:
 
 
 def find_duplicates(
-    db: Session, *, title_te: str, body_plain: str, exclude_article_id: int | None = None
+    db: Session,
+    *,
+    title_te: str,
+    body_plain: str,
+    exclude_article_id: int | None = None,
 ) -> list[dict]:
     """§18 duplicate detection: top similar recent stories with a percentage.
 
@@ -115,7 +119,12 @@ def suggest_tags(db: Session, *, text: str, limit: int = 6) -> list[dict]:
                 if tag.slug not in seen:
                     seen.add(tag.slug)
                     suggestions.append(
-                        {"slug": tag.slug, "name_te": tag.name_te, "type": tag.type, "exists": True}
+                        {
+                            "slug": tag.slug,
+                            "name_te": tag.name_te,
+                            "type": tag.type,
+                            "exists": True,
+                        }
                     )
                 break
 
@@ -158,7 +167,9 @@ def suggest_category(db: Session, *, title_te: str, body_plain: str) -> dict | N
     )
     neighbours: list[tuple[float, Article]] = []
     for candidate in db.execute(stmt).unique().scalars():
-        similarity = _jaccard(probe, _tokens(f"{candidate.title_te} {candidate.body_plain or ''}"))
+        similarity = _jaccard(
+            probe, _tokens(f"{candidate.title_te} {candidate.body_plain or ''}")
+        )
         if similarity > 0.05:
             neighbours.append((similarity, candidate))
     neighbours.sort(key=lambda pair: pair[0], reverse=True)
@@ -170,11 +181,16 @@ def suggest_category(db: Session, *, title_te: str, body_plain: str) -> dict | N
         return None
     best_id = max(votes, key=lambda k: votes[k])
     category = next(
-        (a.category for _s, a in neighbours if a.category_id == best_id and a.category), None
+        (a.category for _s, a in neighbours if a.category_id == best_id and a.category),
+        None,
     )
     if category is None:
         return None
-    return {"slug": category.slug, "name_te": category.name_te, "name_en": category.name_en}
+    return {
+        "slug": category.slug,
+        "name_te": category.name_te,
+        "name_en": category.name_en,
+    }
 
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[።.!?॥])\s+|\n+")
@@ -183,7 +199,9 @@ _SENTENCE_SPLIT = re.compile(r"(?<=[።.!?॥])\s+|\n+")
 def extract_summary(body_plain: str, *, max_words: int = SUMMARY_MAX_WORDS) -> str:
     """Lead-sentence extract (§14/§18 'short-news summary'). News writing puts
     the story in the first sentences; the editor trims from there."""
-    sentences = [s.strip() for s in _SENTENCE_SPLIT.split(body_plain or "") if s.strip()]
+    sentences = [
+        s.strip() for s in _SENTENCE_SPLIT.split(body_plain or "") if s.strip()
+    ]
     words: list[str] = []
     for sentence in sentences:
         sentence_words = sentence.split()
@@ -196,7 +214,9 @@ def extract_summary(body_plain: str, *, max_words: int = SUMMARY_MAX_WORDS) -> s
 
 
 def suggest_seo(*, title_te: str, summary_te: str | None, body_plain: str) -> dict:
-    description_source = (summary_te or "").strip() or extract_summary(body_plain, max_words=30)
+    description_source = (summary_te or "").strip() or extract_summary(
+        body_plain, max_words=30
+    )
     return {
         "seo_title": (title_te or "").strip()[:SEO_TITLE_MAX],
         "seo_description": description_source[:SEO_DESCRIPTION_MAX],
@@ -215,10 +235,17 @@ def assist(
     return {
         "engine": ENGINE,
         "duplicates": find_duplicates(
-            db, title_te=title_te, body_plain=body_plain, exclude_article_id=exclude_article_id
+            db,
+            title_te=title_te,
+            body_plain=body_plain,
+            exclude_article_id=exclude_article_id,
         ),
         "suggested_tags": suggest_tags(db, text=text),
-        "suggested_category": suggest_category(db, title_te=title_te, body_plain=body_plain),
+        "suggested_category": suggest_category(
+            db, title_te=title_te, body_plain=body_plain
+        ),
         "summary_te": extract_summary(body_plain),
-        "seo": suggest_seo(title_te=title_te, summary_te=summary_te, body_plain=body_plain),
+        "seo": suggest_seo(
+            title_te=title_te, summary_te=summary_te, body_plain=body_plain
+        ),
     }

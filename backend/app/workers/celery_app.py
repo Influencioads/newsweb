@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from celery import Celery
+from celery.schedules import crontab
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -28,9 +29,41 @@ celery = Celery(
     backend=settings.CELERY_RESULT_BACKEND,
 )
 celery.conf.update(timezone="Asia/Kolkata", enable_utc=True, task_track_started=True)
+
+# The crawl gets its own queue so a slow publisher can never delay e-paper
+# generation or audio. The existing worker has no `-Q`, so it consumes only the
+# default queue and is unaffected — but that also means a deployment without a
+# `worker-ingest` container silently queues crawl tasks in Redis forever with
+# nothing reporting an error. `GET /cms/crawl/status` exposes the last
+# successful fetch time precisely so that failure is visible.
+celery.conf.task_routes = {"crawl.*": {"queue": "ingest"}}
+
 celery.conf.beat_schedule = {
     "epaper-scheduler": {"task": "epaper.schedule", "schedule": 300.0},
     "epaper-audio": {"task": "epaper.audio", "schedule": 600.0},
+    # Fetch at :05, rewrite at :20 — two independent entries, not a chain.
+    "crawl-hourly": {"task": "crawl.hourly", "schedule": crontab(minute="5")},
+    "crawl-rewrite": {"task": "crawl.rewrite_pass", "schedule": crontab(minute="20")},
+    "crawl-breaking": {"task": "crawl.breaking", "schedule": 300.0},
+    # Six slots a day, on the IST hour. A real crontab rather than the
+    # e-paper's tick-and-compare, because these times are a product decision
+    # and not an admin setting.
+    "bulletin-slots": {
+        "task": "bulletin.run_slot",
+        "schedule": crontab(minute="0", hour="6,9,12,15,18,21"),
+    },
+    # A provider blip at 06:00 becomes a fifteen-minute delay, not a missing
+    # morning bulletin.
+    "bulletin-retry": {
+        "task": "bulletin.retry",
+        "schedule": crontab(minute="15,45", hour="6-22"),
+    },
+    # Overnight, when nobody is generating audio by hand.
+    "voice-backfill": {"task": "voice.backfill", "schedule": crontab(minute="20", hour="2")},
+    # Identity documents past their retention window. Not optional: this is
+    # what makes "we verify contributors" different from "we keep strangers'
+    # passport scans forever".
+    "kyc-purge": {"task": "kyc.purge", "schedule": crontab(minute="40", hour="3")},
 }
 
 
@@ -89,3 +122,8 @@ def generate_epaper_audio() -> dict[str, int]:
                     if tts_service.ensure_audio(db, link.article) is not None:
                         generated += 1
     return {"generated": generated}
+
+
+# Registering the task modules last: they import `celery` from this module, so
+# importing them at the top would be circular.
+from app.workers import tasks  # noqa: E402,F401

@@ -65,6 +65,21 @@ services:
     depends_on:
       api: {condition: service_healthy}
 
+  # Consumer for the `ingest` queue, where every `crawl.*` task is routed.
+  # Without it those tasks accumulate in Redis with no error anywhere; the
+  # `stale` flag on GET /cms/crawl/status is the detection mechanism.
+  #
+  # Keep this at ONE replica. The fetcher's robots cache and its 2 s per-host
+  # throttle are per-process, so a second replica doubles the request rate we
+  # present to every publisher without anything looking wrong from the inside.
+  worker-ingest:
+    <<: *api-image
+    command: ["celery", "-A", "app.workers.celery_app.celery", "worker", "-l", "info", "--concurrency=1", "-Q", "ingest"]
+    volumes:
+      - storage_data:/app/var/storage
+    depends_on:
+      api: {condition: service_healthy}
+
   beat:
     <<: *api-image
     command: ["celery", "-A", "app.workers.celery_app.celery", "beat", "-l", "info"]

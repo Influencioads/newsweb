@@ -96,6 +96,19 @@ export interface ArticleDetail extends ArticleCard {
   gallery: MediaOut[];
   related: ArticleCard[];
   poll: import('./epaper').Poll | null;
+  /** Present only when the story has a published video. */
+  video: VideoRef | null;
+}
+
+/** Just enough to embed a video beside its story. */
+export interface VideoRef {
+  id: number;
+  youtube_id: string;
+  title_te: string | null;
+  duration_sec: number;
+  embed_url: string;
+  watch_url: string;
+  thumbnail_url: string;
 }
 
 export interface BreakingItem {
@@ -263,4 +276,30 @@ export interface SiteConfig {
   categories: NavCategoryOut[];
   states: StateOut[];
   districts: DistrictOut[];
+}
+
+/** What `GET /public/articles/{short_id}/formats` reports. */
+export interface FormatSlot {
+  available: boolean;
+  url: string | null;
+}
+
+export interface StoryFormats {
+  short_id: string;
+  url: string;
+  title_te: string;
+  article: FormatSlot;
+  /** The same payload shape the audio player already consumes. */
+  audio: {
+    available: boolean;
+    url: string | null;
+    duration_sec: number;
+    voice_enabled: boolean;
+  };
+  card: FormatSlot;
+  video: FormatSlot & {
+    embed_url: string | null;
+    thumbnail_url: string | null;
+    duration_sec: number;
+  };
 }

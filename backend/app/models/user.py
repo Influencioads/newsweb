@@ -141,7 +141,9 @@ class RolePermission(Base):
     )
 
     role: Mapped["Role"] = relationship(back_populates="permissions")
-    permission: Mapped["Permission"] = relationship(back_populates="roles", lazy="joined")
+    permission: Mapped["Permission"] = relationship(
+        back_populates="roles", lazy="joined"
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -169,11 +171,17 @@ class User(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     # §4 verification. NULL = unverified; the timestamp doubles as the audit of
     # when it happened. Readers who registered by OTP get phone_verified_at set
     # at first login, because the OTP *is* the proof.
-    email_verified_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
-    phone_verified_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    email_verified_at: Mapped[datetime | None] = mapped_column(
+        UTCDateTime, nullable=True
+    )
+    phone_verified_at: Mapped[datetime | None] = mapped_column(
+        UTCDateTime, nullable=True
+    )
 
     password_hash: Mapped[str | None] = mapped_column(
-        String(255), nullable=True, doc="argon2id or bcrypt. Never plaintext, never MD5/SHA (§6.2)"
+        String(255),
+        nullable=True,
+        doc="argon2id or bcrypt. Never plaintext, never MD5/SHA (§6.2)",
     )
     status: Mapped[UserStatus] = mapped_column(
         Enum(UserStatus, native_enum=False, length=20, validate_strings=True),
@@ -184,16 +192,22 @@ class User(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
 
     # §6.2 — mandatory TOTP for desk staff, admin and super_admin.
     two_factor_secret: Mapped[str | None] = mapped_column(
-        String(255), nullable=True, doc="Encrypted TOTP secret; never returned by any API"
+        String(255),
+        nullable=True,
+        doc="Encrypted TOTP secret; never returned by any API",
     )
-    two_factor_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    two_factor_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
 
     avatar_media_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     bio_te: Mapped[str | None] = mapped_column(Text, nullable=True)
     designation_te: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
     # Author page (§10.3 requires author as a Person with a real author page).
-    author_slug: Mapped[str | None] = mapped_column(String(120), nullable=True, unique=True)
+    author_slug: Mapped[str | None] = mapped_column(
+        String(120), nullable=True, unique=True
+    )
     is_author: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     last_login_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
@@ -273,7 +287,11 @@ class UserRole(PKMixin, TimestampMixin, Base):
     __tablename__ = "user_roles"
     __table_args__ = (
         UniqueConstraint(
-            "user_id", "role_id", "scope_type", "scope_id", name="uq_user_roles_assignment"
+            "user_id",
+            "role_id",
+            "scope_type",
+            "scope_id",
+            name="uq_user_roles_assignment",
         ),
         Index("ix_user_roles_user_id_role_id", "user_id", "role_id"),
         Index("ix_user_roles_scope", "scope_type", "scope_id"),
@@ -343,7 +361,9 @@ class UserSession(PKMixin, TimestampMixin, Base):
         default=SessionPlatform.UNKNOWN,
     )
     refresh_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    ip: Mapped[str | None] = mapped_column(String(45), nullable=True, doc="IPv4 or IPv6")
+    ip: Mapped[str | None] = mapped_column(
+        String(45), nullable=True, doc="IPv4 or IPv6"
+    )
     user_agent: Mapped[str | None] = mapped_column(String(400), nullable=True)
 
     expires_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)

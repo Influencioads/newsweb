@@ -44,7 +44,10 @@ def _scrub(data: dict[str, Any] | None) -> dict[str, Any] | None:
     """Strip secrets before they are persisted (brief §37)."""
     if data is None:
         return None
-    return {k: ("[redacted]" if k.lower() in _REDACTED_FIELDS else v) for k, v in data.items()}
+    return {
+        k: ("[redacted]" if k.lower() in _REDACTED_FIELDS else v)
+        for k, v in data.items()
+    }
 
 
 def _client_ip(request: Request | None) -> str | None:
@@ -86,7 +89,9 @@ def record(
         after=_scrub(after),
         note=note,
         ip=_client_ip(request),
-        user_agent=(request.headers.get("user-agent", "")[:400] or None) if request else None,
+        user_agent=(request.headers.get("user-agent", "")[:400] or None)
+        if request
+        else None,
         request_id=getattr(request.state, "request_id", None) if request else None,
     )
     db.add(entry)
@@ -125,7 +130,9 @@ def list_for_entity(
 ) -> list[AuditLog]:
     stmt = (
         select(AuditLog)
-        .where(AuditLog.entity_type == entity_type, AuditLog.entity_id == str(entity_id))
+        .where(
+            AuditLog.entity_type == entity_type, AuditLog.entity_id == str(entity_id)
+        )
         .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
         .limit(limit)
     )

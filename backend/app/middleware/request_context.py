@@ -24,7 +24,9 @@ REQUEST_ID_HEADER = "X-Request-ID"
 class RequestContextMiddleware(BaseHTTPMiddleware):
     """Assign a request id and emit one structured access line per request."""
 
-    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
         # Honour an upstream id (nginx / load balancer) so a trace survives the hop.
         request_id = request.headers.get(REQUEST_ID_HEADER) or uuid.uuid4().hex[:16]
         request.state.request_id = request_id
@@ -65,11 +67,15 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Security headers (§12.1)."""
 
-    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
         response = await call_next(request)
 
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault(
+            "Referrer-Policy", "strict-origin-when-cross-origin"
+        )
         # §12.1: allow only our own e-paper iframes.
         response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         response.headers.setdefault(
@@ -80,7 +86,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             # The API serves JSON plus the OpenAPI docs page. `unsafe-inline`/CDN
             # allowances are scoped to the docs routes only; every other response
             # gets the strict policy.
-            if request.url.path in ("/docs", "/redoc", f"{settings.API_V1_PREFIX}/openapi.json"):
+            if request.url.path in (
+                "/docs",
+                "/redoc",
+                f"{settings.API_V1_PREFIX}/openapi.json",
+            ):
                 csp = (
                     "default-src 'self'; "
                     "img-src 'self' data: https://fastapi.tiangolo.com; "

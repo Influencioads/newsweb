@@ -12,7 +12,14 @@ from app.integrations.tts.bhashini import BhashiniTts
 from app.integrations.tts.google import GoogleTts
 from app.integrations.tts.local import LocalTts
 
-__all__ = ["BhashiniTts", "GoogleTts", "LocalTts", "Synthesis", "TtsProvider", "get_tts"]
+__all__ = [
+    "BhashiniTts",
+    "GoogleTts",
+    "LocalTts",
+    "Synthesis",
+    "TtsProvider",
+    "get_tts",
+]
 
 _PROVIDERS: dict[str, type[TtsProvider]] = {
     "local": LocalTts,

@@ -22,6 +22,7 @@ import { EmptyState, ErrorState, LoadingState } from "@/components/Feedback";
 import { SectionHeader } from "@/components/SectionHeader";
 import { VideoStrip } from "@/components/VideoStrip";
 import { PollCard } from "@/components/PollCard";
+import { BulletinCard } from "@/components/BulletinCard";
 import { useI18n } from "@/lib/i18n";
 import { font } from "@/lib/theme";
 import { makeStyles, useColors } from "@/lib/useTheme";
@@ -270,6 +271,10 @@ export default function HomeScreen() {
               ))}
             </>
           ) : null}
+
+          {/* Renders nothing when no bulletin is on air — the ordinary case
+              between slots, and also when an admin has switched them off. */}
+          <BulletinCard />
 
           {polls.data?.[0] ? <PollCard poll={polls.data[0]} /> : null}
 

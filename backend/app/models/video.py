@@ -9,7 +9,16 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import MYSQL_TABLE_ARGS, Base, PKMixin, SoftDeleteMixin, TimestampMixin
@@ -27,7 +36,9 @@ class VideoChannel(PKMixin, TimestampMixin, Base):
 
     __tablename__ = "video_channels"
     __table_args__ = (
-        UniqueConstraint("youtube_channel_key", name="uq_video_channels_youtube_channel_key"),
+        UniqueConstraint(
+            "youtube_channel_key", name="uq_video_channels_youtube_channel_key"
+        ),
         MYSQL_TABLE_ARGS,
     )
 
@@ -39,7 +50,10 @@ class VideoChannel(PKMixin, TimestampMixin, Base):
     avatar_url: Mapped[str | None] = mapped_column(String(700), nullable=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     follower_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0, server_default="0",
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
         doc="Followers on *our* platform, not YouTube's subscriber count",
     )
 
@@ -78,11 +92,14 @@ class Video(PKMixin, TimestampMixin, SoftDeleteMixin, Base):
     # Denormalised like the article counters, for the same reason: the video
     # page must not need three COUNT(*) queries to render its footer.
     like_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0, server_default="0")
+        Integer, nullable=False, default=0, server_default="0"
+    )
     comment_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0, server_default="0")
+        Integer, nullable=False, default=0, server_default="0"
+    )
     share_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0, server_default="0")
+        Integer, nullable=False, default=0, server_default="0"
+    )
     created_by: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )

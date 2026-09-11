@@ -28,7 +28,9 @@ from app.core.errors import TokenExpiredError, UnauthorizedError
 # --------------------------------------------------------------------------- #
 # argon2id with OWASP-recommended parameters. bcrypt stays supported so an
 # imported legacy hash still verifies and can be re-hashed on next login.
-_argon2 = PasswordHasher(time_cost=3, memory_cost=64 * 1024, parallelism=4, hash_len=32, salt_len=16)
+_argon2 = PasswordHasher(
+    time_cost=3, memory_cost=64 * 1024, parallelism=4, hash_len=32, salt_len=16
+)
 
 
 def hash_password(password: str) -> str:
@@ -55,7 +57,9 @@ def verify_password(password: str, password_hash: str | None) -> bool:
         if password_hash.startswith(("$2a$", "$2b$", "$2y$")):
             import bcrypt
 
-            return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
+            return bcrypt.checkpw(
+                password.encode("utf-8"), password_hash.encode("utf-8")
+            )
     except (VerifyMismatchError, VerificationError, InvalidHashError, ValueError):
         return False
     return False
@@ -88,7 +92,9 @@ def hash_token(token: str) -> str:
     database alone does not allow token lookup.
     """
     return hmac.new(
-        settings.JWT_REFRESH_SECRET.encode("utf-8"), token.encode("utf-8"), hashlib.sha256
+        settings.JWT_REFRESH_SECRET.encode("utf-8"),
+        token.encode("utf-8"),
+        hashlib.sha256,
     ).hexdigest()
 
 
@@ -138,10 +144,14 @@ def create_access_token(
     }
     if extra:
         payload.update(extra)
-    return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM), expires
+    return jwt.encode(
+        payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM
+    ), expires
 
 
-def create_refresh_token(*, user_id: int, session_key: str) -> tuple[str, str, datetime]:
+def create_refresh_token(
+    *, user_id: int, session_key: str
+) -> tuple[str, str, datetime]:
     """Return (raw_token, storage_hash, expiry).
 
     The raw token goes to the client exactly once; only the hash is persisted.
@@ -182,7 +192,9 @@ def hash_otp(otp: str, identifier: str) -> str:
     """Bind the OTP hash to the identifier so a code issued for one phone cannot
     be replayed against another."""
     return hmac.new(
-        settings.JWT_SECRET.encode("utf-8"), f"{identifier}:{otp}".encode(), hashlib.sha256
+        settings.JWT_SECRET.encode("utf-8"),
+        f"{identifier}:{otp}".encode(),
+        hashlib.sha256,
     ).hexdigest()
 
 
@@ -198,7 +210,9 @@ def generate_totp_secret() -> str:
 
 
 def totp_provisioning_uri(secret: str, account: str) -> str:
-    return pyotp.TOTP(secret).provisioning_uri(name=account, issuer_name=settings.APP_NAME)
+    return pyotp.TOTP(secret).provisioning_uri(
+        name=account, issuer_name=settings.APP_NAME
+    )
 
 
 def verify_totp(secret: str, code: str) -> bool:
@@ -231,4 +245,6 @@ def decrypt_secret(ciphertext: str) -> str:
     try:
         return _fernet().decrypt(ciphertext.encode("utf-8")).decode("utf-8")
     except InvalidToken as exc:
-        raise RuntimeError("Could not decrypt secret — has ENCRYPTION_KEY changed?") from exc
+        raise RuntimeError(
+            "Could not decrypt secret — has ENCRYPTION_KEY changed?"
+        ) from exc

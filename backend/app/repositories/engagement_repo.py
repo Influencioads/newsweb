@@ -7,8 +7,20 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.content import Article, ArticleTag
-from app.models.engagement import Bookmark, Comment, Follow, Like, ReadingSession, Report
-from app.models.enums import CommentStatus, CommentTargetType, FollowTargetType, ReportStatus
+from app.models.engagement import (
+    Bookmark,
+    Comment,
+    Follow,
+    Like,
+    ReadingSession,
+    Report,
+)
+from app.models.enums import (
+    CommentStatus,
+    CommentTargetType,
+    FollowTargetType,
+    ReportStatus,
+)
 from app.repositories.article_repo import published_query
 
 
@@ -87,7 +99,9 @@ def comments_for_target(
     target type, so the two surfaces cannot leak threads into each other.
     """
     owner_column = (
-        Comment.video_id if target_type == CommentTargetType.VIDEO else Comment.article_id
+        Comment.video_id
+        if target_type == CommentTargetType.VIDEO
+        else Comment.article_id
     )
     top = (
         select(Comment)
@@ -120,8 +134,11 @@ def comments_for_article(
 ) -> list[Comment]:
     """Article threads. Thin wrapper so existing call sites read unchanged."""
     return comments_for_target(
-        db, target_type=CommentTargetType.ARTICLE, target_id=article_id,
-        limit=limit, offset=offset,
+        db,
+        target_type=CommentTargetType.ARTICLE,
+        target_id=article_id,
+        limit=limit,
+        offset=offset,
     )
 
 
@@ -130,7 +147,11 @@ def comment_queue(
 ) -> tuple[list[Comment], int]:
     where = [Comment.status == status] if status else []
     stmt = (
-        select(Comment).where(*where).order_by(Comment.created_at.desc()).limit(limit).offset(offset)
+        select(Comment)
+        .where(*where)
+        .order_by(Comment.created_at.desc())
+        .limit(limit)
+        .offset(offset)
     )
     total = int(db.execute(select(func.count(Comment.id)).where(*where)).scalar() or 0)
     return list(db.execute(stmt).unique().scalars()), total
@@ -141,7 +162,11 @@ def report_queue(
 ) -> tuple[list[Report], int]:
     where = [Report.status == status] if status else []
     stmt = (
-        select(Report).where(*where).order_by(Report.created_at.desc()).limit(limit).offset(offset)
+        select(Report)
+        .where(*where)
+        .order_by(Report.created_at.desc())
+        .limit(limit)
+        .offset(offset)
     )
     total = int(db.execute(select(func.count(Report.id)).where(*where)).scalar() or 0)
     return list(db.execute(stmt).scalars()), total
@@ -151,7 +176,11 @@ def report_queue(
 # follows
 # --------------------------------------------------------------------------- #
 def follows_for_user(db: Session, *, user_id: int) -> list[Follow]:
-    stmt = select(Follow).where(Follow.user_id == user_id).order_by(Follow.created_at.desc())
+    stmt = (
+        select(Follow)
+        .where(Follow.user_id == user_id)
+        .order_by(Follow.created_at.desc())
+    )
     return list(db.execute(stmt).scalars())
 
 
@@ -182,7 +211,9 @@ def following_feed(
         predicates.append(Article.author_id.in_(ids))
     if ids := by_type.get(FollowTargetType.TAG):
         predicates.append(
-            Article.id.in_(select(ArticleTag.article_id).where(ArticleTag.tag_id.in_(ids)))
+            Article.id.in_(
+                select(ArticleTag.article_id).where(ArticleTag.tag_id.in_(ids))
+            )
         )
 
     stmt = (

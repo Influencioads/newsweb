@@ -155,6 +155,20 @@ class Settings(BaseSettings):
     TESSERACT_BIN: str = "tesseract"
     PDFTOPPM_BIN: str = "pdftoppm"
 
+    # --- private storage for identity documents -----------------------------
+    # A SEPARATE bucket, never the media one. Leave blank in development and
+    # documents go to var/storage/private, which nothing serves.
+    KYC_STORAGE_ENDPOINT: str = ""
+    KYC_STORAGE_BUCKET: str = ""
+    KYC_STORAGE_ACCESS_KEY: str = ""
+    KYC_STORAGE_SECRET_KEY: str = ""
+
+    # --- server-side Telugu rendering ---------------------------------------
+    # Blank means "use the fonts bundled at app/assets/fonts". Point this at a
+    # directory only to override them; see app/core/fonts.py for why we never
+    # fall back to a Latin face.
+    TELUGU_FONT_DIR: str = ""
+
     # --- security (§12.1) ---------------------------------------------------
     CORS_ORIGINS: str = "http://localhost:5174,http://127.0.0.1:5174"
     RATE_LIMIT_GLOBAL_PER_MIN: int = 100
@@ -216,7 +230,9 @@ class Settings(BaseSettings):
         if not self.is_production:
             return problems
         if self.OTP_DEV_ECHO:
-            problems.append("OTP_DEV_ECHO must be false in production (leaks OTP in API response)")
+            problems.append(
+                "OTP_DEV_ECHO must be false in production (leaks OTP in API response)"
+            )
         if not self.SECURE_COOKIES:
             problems.append("SECURE_COOKIES must be true in production")
         if not self.HSTS_ENABLED:
@@ -226,7 +242,9 @@ class Settings(BaseSettings):
         if self.JWT_SECRET == self.JWT_REFRESH_SECRET:
             problems.append("JWT_SECRET and JWT_REFRESH_SECRET must differ")
         if not self.ENCRYPTION_KEY:
-            problems.append("ENCRYPTION_KEY is required to encrypt AI provider keys at rest (§7.1)")
+            problems.append(
+                "ENCRYPTION_KEY is required to encrypt AI provider keys at rest (§7.1)"
+            )
         if not self.MYSQL_PASSWORD:
             problems.append("MYSQL_PASSWORD is required")
         return problems

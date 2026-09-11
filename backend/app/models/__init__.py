@@ -13,6 +13,7 @@ So model modules are registered here, once, rather than at each call site.
 from app.db.base import Base
 from app.models.ai import AiArticleDraft, AiSource, AiSuggestion
 from app.models.audio import AudioAsset
+from app.models.bulletin import AudioBulletin, AudioBulletinItem
 from app.models.epaper import (
     EpaperAsset,
     EpaperEdition,
@@ -48,8 +49,10 @@ from app.models.engagement import (
 )
 from app.models.notify import Notification, NotificationCampaign, PushDevice
 from app.models.poll import Poll, PollOption, PollVote, TrendingTopic
-from app.models.geo import District, Locality, Mandal, State
-from app.models.ingestion import ContentSource, IngestedItem
+from app.models.geo import District, Locality, Mandal, MandalAlias, State
+from app.models.ingestion import ContentSource, IngestedItem, IngestedRewrite
+from app.models.jobs import JobPosting
+from app.models.kyc import ContributorProfile, KycDocument
 from app.models.media import ArticleMedia, Media
 from app.models.reader import UserPreference
 from app.models.setting import AppSetting
@@ -65,6 +68,13 @@ from app.models.user import (
 from app.models.video import Video, VideoChannel, VideoTag
 
 __all__ = [
+    "KycDocument",
+    "ContributorProfile",
+    "AudioBulletinItem",
+    "AudioBulletin",
+    "JobPosting",
+    "IngestedRewrite",
+    "MandalAlias",
     "AdCampaign",
     "AiArticleDraft",
     "AiSource",

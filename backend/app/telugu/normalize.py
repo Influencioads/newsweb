@@ -47,18 +47,18 @@ _INVISIBLE = {
 
 #: Word/WhatsApp punctuation that must not reach the database.
 _PUNCTUATION_MAP = {
-    " ": " ",   # non-breaking space
-    " ": " ",   # figure space
-    " ": " ",   # narrow no-break space
-    "‘": "'",   # left single quote
-    "’": "'",   # right single quote / apostrophe
+    " ": " ",  # non-breaking space
+    " ": " ",  # figure space
+    " ": " ",  # narrow no-break space
+    "‘": "'",  # left single quote
+    "’": "'",  # right single quote / apostrophe
     "‚": "'",
     "‛": "'",
-    "“": '"',   # left double quote
-    "”": '"',   # right double quote
+    "“": '"',  # left double quote
+    "”": '"',  # right double quote
     "„": '"',
-    "′": "'",   # prime
-    "″": '"',   # double prime
+    "′": "'",  # prime
+    "″": '"',  # double prime
 }
 
 TELUGU_DIGITS = "౦౧౨౩౪౫౬౭౮౯"

@@ -35,16 +35,17 @@ from sqlalchemy.orm import Session
 from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.core.logging import get_logger
 from app.db.base import utcnow
-from app.integrations.feeds import FeedEntry, fetch_feed
+from app.integrations.feeds import FeedEntry, FeedResult, fetch_feed
 from app.models.content import Article
 from app.models.enums import (
     ArticleStatus,
     ArticleType,
     IngestStatus,
+    MandalMatchMethod,
     WorkflowState,
 )
 from app.models.ingestion import ContentSource, IngestedItem
-from app.services import tiptap
+from app.services import gazetteer_service, settings_service, tiptap
 
 logger = get_logger(__name__)
 
@@ -198,6 +199,8 @@ def _store_entry(
         words = len(strip_html(body).split()) if body else 0
     # Otherwise `content_html` stays NULL. Not truncated — absent.
 
+    mandal_id, method, confidence = _resolve_mandal(db, source, entry.title, summary)
+
     item = IngestedItem(
         source_id=source.id,
         guid=entry.guid,
@@ -214,9 +217,46 @@ def _store_entry(
         fetched_at=utcnow(),
         content_hash=digest,
         status=IngestStatus.NEW,
+        matched_mandal_id=mandal_id,
+        matched_district_id=(
+            gazetteer_service.district_of(db, mandal_id) or source.default_district_id
+        ),
+        mandal_match_method=method,
+        mandal_match_confidence=confidence,
     )
     db.add(item)
     return item
+
+
+def _resolve_mandal(
+    db: Session, source: ContentSource, title: str, summary: str
+) -> tuple[int | None, MandalMatchMethod, float]:
+    """Where this item happened, in three tiers of decreasing certainty.
+
+    A pinned source mandal is a fact an admin asserted. A keyword hit is a
+    guess. Nothing is a perfectly acceptable answer — the district still
+    applies, and an editor fills the rest in at import.
+    """
+    if source.default_mandal_id:
+        return source.default_mandal_id, MandalMatchMethod.SOURCE_DEFAULT, 1.0
+    if not source.mandal_autotag:
+        return None, MandalMatchMethod.NONE, 0.0
+    try:
+        if not settings_service.get_bool(db, "crawl.mandal_autotag"):
+            return None, MandalMatchMethod.NONE, 0.0
+        min_len = settings_service.get_int(db, "crawl.mandal_min_name_len")
+        return gazetteer_service.resolve(
+            db,
+            title=title or "",
+            summary=summary or "",
+            district_id=source.default_district_id,
+            min_name_len=min_len,
+        )
+    except Exception as exc:  # noqa: BLE001
+        # A gazetteer problem must not stop a story being ingested. The item
+        # keeps its district and an editor assigns the mandal by hand.
+        logger.warning("mandal_match_failed", source=source.slug, error=str(exc)[:200])
+        return None, MandalMatchMethod.NONE, 0.0
 
 
 def fetch_source(db: Session, source: ContentSource) -> dict[str, Any]:
@@ -224,6 +264,19 @@ def fetch_source(db: Session, source: ContentSource) -> dict[str, Any]:
     result = fetch_feed(
         source.feed_url, etag=source.etag, last_modified=source.last_modified
     )
+    return apply_result(db, source, result)
+
+
+def apply_result(
+    db: Session, source: ContentSource, result: FeedResult
+) -> dict[str, Any]:
+    """Record a fetch that has already happened.
+
+    Split out from `fetch_source` so the hourly crawl can do the *network* part
+    on a thread pool and every database write on the calling thread — a
+    `Session` is not thread-safe, and a crawl that shared one across threads
+    would corrupt state in ways that surface much later as impossible data.
+    """
     source.last_fetched_at = utcnow()
     source.last_status = result.status
 
@@ -362,14 +415,33 @@ def _body_document(item: IngestedItem, source: ContentSource) -> dict[str, Any]:
 
 
 def import_item(
-    db: Session, item: IngestedItem, *, actor_id: int | None, auto: bool = False
+    db: Session,
+    item: IngestedItem,
+    *,
+    actor_id: int | None,
+    auto: bool = False,
+    use_rewrite: bool = True,
+    mandal_id: int | None = None,
+    district_id: int | None = None,
+    category_id: int | None = None,
 ) -> Article:
-    """Turn a queued item into a DRAFT article.
+    """Turn a queued item into an article awaiting review.
 
     Never PUBLISHED, never SUBMITTED-and-approved: an editor still reads it.
     `source_type='syndicated'` plus a mandatory `source_credit` means the
     publish gate in `workflow_service` already refuses to let it go live
     without attribution.
+
+    Two shapes come out of here:
+
+      * **With a ready rewrite** — our own Telugu words, crediting the
+        publisher. Lands in SUBMITTED, because machine copy sitting unnoticed
+        in an editor's drafts is how it eventually gets published by accident.
+      * **Without one** — the pre-existing behaviour, unchanged: headline,
+        excerpt, link, DRAFT.
+
+    `author_id` is the importing editor either way, which is what makes the
+    two-person rule bite: they cannot then approve their own import.
     """
     from nanoid import generate
 
@@ -386,52 +458,83 @@ def import_item(
     if source is None:
         raise ValidationError(message_en="The item has no source.")
 
-    title = normalize_headline(item.title)
-    body = _body_document(item, source)
+    rewrite = item.ready_rewrite if use_rewrite else None
+
+    if rewrite is not None:
+        title = normalize_headline(rewrite.title_te) or normalize_headline(item.title)
+        body = rewrite.body or _body_document(item, source)
+        summary = rewrite.summary_te or item.summary
+    else:
+        title = normalize_headline(item.title)
+        body = _body_document(item, source)
+        summary = item.summary
     doc, plain, html, words, seconds = tiptap.derive(body)
+
+    resolved_mandal = mandal_id if mandal_id is not None else item.matched_mandal_id
+    resolved_district = (
+        district_id
+        if district_id is not None
+        else (item.matched_district_id or source.default_district_id)
+    )
 
     article = Article(
         short_id=generate(size=6),
         slug=slugify(title)[:180] or "syndicated",
         title_te=title,
         title_en=item.title if (item.language or "").startswith("en") else None,
-        summary_te=item.summary,
+        summary_te=summary,
         body=doc,
         body_plain=plain,
         body_html=html,
         word_count=words,
         reading_time_sec=seconds,
-        category_id=source.default_category_id,
-        district_id=source.default_district_id,
+        category_id=(
+            category_id if category_id is not None else source.default_category_id
+        ),
+        district_id=resolved_district,
+        mandal_id=resolved_mandal,
         author_id=actor_id,
         created_by=actor_id,
-        article_source_type="IMPORTED",
+        article_source_type="AI_REWRITE" if rewrite is not None else "IMPORTED",
         updated_by=actor_id,
         # §17 attribution. `workflow_service` blocks publication of a non-own
-        # source without a credit, so this is not decoration.
+        # source without a credit, so this is not decoration. A rewrite is our
+        # own words, but the *facts* are still the publisher's reporting, so
+        # the credit requirement applies to it identically.
         source_type="syndicated",
         source_credit=source.name,
         canonical_url=item.canonical_url,
-        article_type=ArticleType.SYNDICATED,
-        status=ArticleStatus.DRAFT,
-        workflow_state=WorkflowState.DRAFT,
+        article_type=(
+            ArticleType.AI_REWRITE if rewrite is not None else ArticleType.SYNDICATED
+        ),
+        # A rewrite goes straight into the review queue; an excerpt import keeps
+        # the old DRAFT behaviour so nothing about existing sources changes.
+        status=ArticleStatus.PENDING if rewrite is not None else ArticleStatus.DRAFT,
+        workflow_state=(
+            WorkflowState.SUBMITTED if rewrite is not None else WorkflowState.DRAFT
+        ),
         byline_te=(item.author or source.name)[:200],
         published_at=None,
+        ai_generated=rewrite is not None,
+        ai_model=(rewrite.model if rewrite is not None else None),
+        ai_confidence=(rewrite.confidence if rewrite is not None else None),
     )
     db.add(article)
     db.flush()
 
+    if rewrite is not None:
+        note = f"AI rewrite of {source.name} imported for review"
+    elif auto:
+        note = f"Auto-imported from {source.name}"
+    else:
+        note = f"Imported from {source.name}"
     db.add(
         WorkflowTransition(
             article_id=article.id,
             from_state=None,
-            to_state=WorkflowState.DRAFT,
+            to_state=article.workflow_state,
             actor_id=actor_id,
-            note=(
-                f"Auto-imported from {source.name}"
-                if auto
-                else f"Imported from {source.name}"
-            ),
+            note=note,
             created_at=utcnow(),
         )
     )

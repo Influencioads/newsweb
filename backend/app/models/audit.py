@@ -44,7 +44,12 @@ class AuditLog(PKMixin, Base):
     __tablename__ = "audit_log"
     __table_args__ = (
         # §5: the lookup pattern is "history of this entity, newest first".
-        Index("ix_audit_log_entity_type_entity_id_created_at", "entity_type", "entity_id", "created_at"),
+        Index(
+            "ix_audit_log_entity_type_entity_id_created_at",
+            "entity_type",
+            "entity_id",
+            "created_at",
+        ),
         Index("ix_audit_log_actor_id_created_at", "actor_id", "created_at"),
         Index("ix_audit_log_action_created_at", "action", "created_at"),
         MYSQL_TABLE_ARGS,
@@ -69,7 +74,8 @@ class AuditLog(PKMixin, Base):
         String(64), nullable=True, doc="String, because some entities key on short_id"
     )
     action: Mapped[AuditAction] = mapped_column(
-        Enum(AuditAction, native_enum=False, length=30, validate_strings=True), nullable=False
+        Enum(AuditAction, native_enum=False, length=30, validate_strings=True),
+        nullable=False,
     )
 
     before: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
@@ -79,11 +85,16 @@ class AuditLog(PKMixin, Base):
     ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(400), nullable=True)
     request_id: Mapped[str | None] = mapped_column(
-        String(64), nullable=True, doc="Correlates the audit row with the structured log line"
+        String(64),
+        nullable=True,
+        doc="Correlates the audit row with the structured log line",
     )
 
     created_at: Mapped[datetime] = mapped_column(
-        UTCDateTime, nullable=False, default=utcnow, server_default=text("CURRENT_TIMESTAMP")
+        UTCDateTime,
+        nullable=False,
+        default=utcnow,
+        server_default=text("CURRENT_TIMESTAMP"),
     )
 
     def __repr__(self) -> str:  # pragma: no cover

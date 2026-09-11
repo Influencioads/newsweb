@@ -18,7 +18,12 @@ from app.core.logging import get_logger
 from app.db.base import utcnow
 from app.models.content import Article, ArticleTag, Category
 from app.models.engagement import Follow
-from app.models.enums import FollowTargetType, NotificationKind, RoleKey, SessionPlatform
+from app.models.enums import (
+    FollowTargetType,
+    NotificationKind,
+    RoleKey,
+    SessionPlatform,
+)
 from app.models.geo import District
 from app.models.notify import Notification, NotificationCampaign, PushDevice
 from app.models.reader import UserPreference
@@ -40,7 +45,12 @@ def _push_transport_send(user_ids: list[int], title: str, db: Session) -> None:
         select(func.count(PushDevice.id)).where(PushDevice.user_id.in_(user_ids))
     ).scalar()
     # TODO(phase-later): batch-send via firebase-admin once credentials ship.
-    logger.info("push_would_send", recipients=len(user_ids), devices=int(tokens or 0), title=title[:60])
+    logger.info(
+        "push_would_send",
+        recipients=len(user_ids),
+        devices=int(tokens or 0),
+        title=title[:60],
+    )
 
 
 def _notify(
@@ -84,7 +94,9 @@ def _pref_map(db: Session, user_ids: set[int]) -> dict[int, UserPreference]:
     return {p.user_id: p for p in rows}
 
 
-def _followers(db: Session, target_type: FollowTargetType, target_ids: list[int]) -> set[int]:
+def _followers(
+    db: Session, target_type: FollowTargetType, target_ids: list[int]
+) -> set[int]:
     if not target_ids:
         return set()
     rows = db.execute(
@@ -115,7 +127,8 @@ def fan_out_for_article(db: Session, article: Article) -> int:
         candidates = _all_reader_ids(db)
         prefs = _pref_map(db, candidates)
         audience = {
-            uid for uid in candidates
+            uid
+            for uid in candidates
             if uid not in notified and (uid not in prefs or prefs[uid].notify_breaking)
         }
         total += _notify(
@@ -143,7 +156,8 @@ def fan_out_for_article(db: Session, article: Article) -> int:
         candidates |= set(home_rows)
         prefs = _pref_map(db, candidates)
         audience = {
-            uid for uid in candidates
+            uid
+            for uid in candidates
             if uid not in notified and (uid not in prefs or prefs[uid].notify_local)
         }
         total += _notify(
@@ -161,7 +175,8 @@ def fan_out_for_article(db: Session, article: Article) -> int:
     if article.category_id:
         candidates |= _followers(db, FollowTargetType.CATEGORY, [article.category_id])
     tag_ids = [
-        row for row in db.execute(
+        row
+        for row in db.execute(
             select(ArticleTag.tag_id).where(ArticleTag.article_id == article.id)
         ).scalars()
     ]
@@ -170,7 +185,8 @@ def fan_out_for_article(db: Session, article: Article) -> int:
         candidates |= _followers(db, FollowTargetType.AUTHOR, [article.author_id])
     prefs = _pref_map(db, candidates)
     audience = {
-        uid for uid in candidates
+        uid
+        for uid in candidates
         if uid not in notified and (uid not in prefs or prefs[uid].notify_topics)
     }
     total += _notify(
@@ -206,23 +222,31 @@ def send_campaign(
         user_ids = _all_reader_ids(db)
     elif audience.startswith("district:"):
         slug = audience.split(":", 1)[1]
-        district = db.execute(select(District).where(District.slug == slug)).scalar_one_or_none()
+        district = db.execute(
+            select(District).where(District.slug == slug)
+        ).scalar_one_or_none()
         if district is None:
             raise ValidationError(details={"audience": "unknown district"})
         user_ids = _followers(db, FollowTargetType.DISTRICT, [district.id])
         user_ids |= set(
             db.execute(
-                select(UserPreference.user_id).where(UserPreference.district_id == district.id)
+                select(UserPreference.user_id).where(
+                    UserPreference.district_id == district.id
+                )
             ).scalars()
         )
     elif audience.startswith("category:"):
         slug = audience.split(":", 1)[1]
-        category = db.execute(select(Category).where(Category.slug == slug)).scalar_one_or_none()
+        category = db.execute(
+            select(Category).where(Category.slug == slug)
+        ).scalar_one_or_none()
         if category is None:
             raise ValidationError(details={"audience": "unknown category"})
         user_ids = _followers(db, FollowTargetType.CATEGORY, [category.id])
     else:
-        raise ValidationError(details={"audience": "all | district:<slug> | category:<slug>"})
+        raise ValidationError(
+            details={"audience": "all | district:<slug> | category:<slug>"}
+        )
 
     campaign = NotificationCampaign(
         title_te=title_te[:400],
@@ -274,7 +298,9 @@ def mark_read(db: Session, user_id: int, ids: list[int] | None) -> int:
 def register_device(
     db: Session, *, user_id: int, token: str, platform: SessionPlatform
 ) -> PushDevice:
-    device = db.execute(select(PushDevice).where(PushDevice.token == token)).scalar_one_or_none()
+    device = db.execute(
+        select(PushDevice).where(PushDevice.token == token)
+    ).scalar_one_or_none()
     if device is None:
         device = PushDevice(user_id=user_id, token=token, platform=platform)
         db.add(device)

@@ -41,7 +41,11 @@ ARTICLE_QUERIES: dict[str, tuple[str, ...]] = {
     "k9Rt4w": ("Srikakulam", "monsoon Andhra Pradesh", "flood India"),
     "m2Vc7h": ("Hyderabad Metro Rail", "Hyderabad Metro station", "Hyderabad"),
     "p5Jd1x": ("Araku Valley", "Parvathipuram", "tribal Andhra Pradesh"),
-    "t8Ln3q": ("Rajiv Gandhi International Cricket Stadium", "cricket stadium India", "Hyderabad"),
+    "t8Ln3q": (
+        "Rajiv Gandhi International Cricket Stadium",
+        "cricket stadium India",
+        "Hyderabad",
+    ),
     "f4Wz9b": ("Ramoji Film City", "cinema hall India", "Telugu cinema"),
     "x2Fd91": ("sugarcane India", "Anakapalli", "sugarcane field"),
     "n6Hs2k": ("chilli India", "Khammam", "Guntur chilli"),
@@ -51,7 +55,11 @@ ARTICLE_QUERIES: dict[str, tuple[str, ...]] = {
     "g8Kr2d": ("National Highway India", "highway Andhra Pradesh", "road India"),
     "h3Nm7c": ("paddy field Andhra Pradesh", "agriculture India", "farmer India"),
     "j9Pw4t": ("HITEC City", "Hyderabad IT", "Cyberabad"),
-    "q4Lz8m": ("power transmission India", "electricity India", "thermal power station India"),
+    "q4Lz8m": (
+        "power transmission India",
+        "electricity India",
+        "thermal power station India",
+    ),
     "s2Vx6r": ("Warangal", "Kakatiya Medical College", "hospital India"),
     "u5Cd3j": ("athletics India", "stadium Hyderabad", "sports India"),
     "w8Bn1f": ("film shooting India", "Telugu film", "movie camera"),
@@ -104,7 +112,9 @@ def _store(
     try:
         raw = source.download(image)
     except Exception as exc:  # noqa: BLE001 - one bad photo must not stop the run
-        logger.warning("photo_download_failed", url=image.image_url[:80], error=str(exc))
+        logger.warning(
+            "photo_download_failed", url=image.image_url[:80], error=str(exc)
+        )
         return None
 
     if len(raw) > MAX_SOURCE_BYTES:
@@ -226,7 +236,8 @@ def _import_for_article(
                     n for n in (body.get("content") or []) if n.get("type") != "figure"
                 ]
                 content.insert(
-                    1 if len(content) > 1 else len(content), _figure_node(media, caption)
+                    1 if len(content) > 1 else len(content),
+                    _figure_node(media, caption),
                 )
                 body["content"] = content
 
@@ -287,23 +298,33 @@ def run(replace: bool = False, gallery_size: int = 2) -> None:
             gallery += g
         except Exception as exc:  # noqa: BLE001 - keep going, report at the end
             failed += 1
-            logger.error("article_photo_import_failed", article_id=article_id, error=str(exc))
-        print(f"  [{index}/{len(article_ids)}] hero={heroes} inline={inline} gallery={gallery}",
-              flush=True)
+            logger.error(
+                "article_photo_import_failed", article_id=article_id, error=str(exc)
+            )
+        print(
+            f"  [{index}/{len(article_ids)}] hero={heroes} inline={inline} gallery={gallery}",
+            flush=True,
+        )
 
     print()
     print(f"Licensed photos imported: hero={heroes} inline={inline} gallery={gallery}")
     if failed:
         print(f"Articles that failed entirely: {failed}")
-    print("Every image carries creator + licence in `media.credit` / `media.copyright`.")
+    print(
+        "Every image carries creator + licence in `media.credit` / `media.copyright`."
+    )
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Import licensed photographs for demo articles")
+    parser = argparse.ArgumentParser(
+        description="Import licensed photographs for demo articles"
+    )
     parser.add_argument(
         "--replace", action="store_true", help="remove generated placeholders first"
     )
-    parser.add_argument("--gallery", type=int, default=2, help="gallery images per article")
+    parser.add_argument(
+        "--gallery", type=int, default=2, help="gallery images per article"
+    )
     args = parser.parse_args()
     if settings.is_production:
         print("Refusing to run in production", file=sys.stderr)

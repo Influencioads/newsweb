@@ -257,6 +257,11 @@ export default function ArticleEditor() {
     onSuccess: (article) => setActivePins(article.active_pins ?? []),
   });
 
+  /** The endpoint and the API thunk both already existed; nothing called it. */
+  const generateAudio = useMutation({
+    mutationFn: () => cmsApi.generateArticleAudio(Number(id), false),
+  });
+
   const save = useMutation({
     mutationFn: (p: Record<string, unknown>) =>
       editing ? cmsApi.updateArticle(Number(id), p) : cmsApi.createArticle(p),
@@ -411,8 +416,6 @@ export default function ArticleEditor() {
             <Toggle checked={isExclusive} onChange={setIsExclusive} label="ఎక్స్‌క్లూజివ్" />
             <Toggle checked={isFeatured} onChange={setIsFeatured}
               label="ఫీచర్డ్" hint="ఎడిటర్ ఎంపిక రైలులో చూపుతుంది" />
-            <Toggle checked={voiceEnabled} onChange={setVoiceEnabled}
-              label="వాయిస్ (వినండి)" hint="సైట్ సెట్టింగ్‌లో వాయిస్ ఆన్ ఉంటేనే పనిచేస్తుంది" />
           </div>
           <Field label="ప్రచురణ తేదీ & సమయం · Publish at" hint="ఖాళీగా ఉంచితే వెంటనే ప్రచురిస్తుంది">
             <input type="datetime-local" value={scheduledAt}
@@ -440,11 +443,33 @@ export default function ArticleEditor() {
           title="ఆడియో · Audio"
           subtitle="§19 — సొంత రికార్డింగ్ జోడించండి, లేదా వదిలేస్తే వాయిస్ దానంతట చదువుతుంది"
         >
+          {/* Both halves of the §20 switch now sit together: whether this
+              story may be read aloud at all, and the button that does it. */}
+          <Toggle checked={voiceEnabled} onChange={setVoiceEnabled}
+            label="వాయిస్ (వినండి)" hint="సైట్ సెట్టింగ్‌లో వాయిస్ ఆన్ ఉంటేనే పనిచేస్తుంది" />
+
           <AudioAttachment
             articleId={editing ? Number(id) : null}
             audio={audio}
             onChange={setAudio}
           />
+
+          {editing && voiceEnabled ? (
+            <div className="mt-3 border-t border-rule pt-3">
+              <button type="button" disabled={generateAudio.isPending}
+                onClick={() => generateAudio.mutate()}
+                className="te min-h-tap rounded-control border border-brand px-4 text-[13px] font-bold text-brand disabled:opacity-50">
+                {generateAudio.isPending ? 'తయారవుతోంది…' : 'ఇప్పుడే తయారు చేయండి'}
+              </button>
+              {generateAudio.data ? (
+                <p className="te mt-2 text-[12px] leading-telugu text-muted">
+                  {generateAudio.data.available
+                    ? `సిద్ధం · ${generateAudio.data.duration_sec}s · ${generateAudio.data.provider ?? ''}`
+                    : 'తయారు కాలేదు — సెట్టింగ్‌లలో వాయిస్, ప్రొవైడర్, నెలవారీ పరిమితి చూడండి.'}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </Section>
 
         <Section title="SEO">

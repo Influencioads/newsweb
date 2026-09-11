@@ -12,7 +12,7 @@ import {
   View,
 } from "react-native";
 
-import { absoluteMediaUrl, API_ORIGIN } from "@/api/client";
+import { API_ORIGIN, absoluteMediaUrl, api } from "@/api/client";
 import * as publicApi from "@/api/public";
 import { RowCard } from "@/components/ArticleCard";
 import { BodyRenderer } from "@/components/BodyRenderer";
@@ -26,6 +26,7 @@ import { timeAgo, useI18n } from "@/lib/i18n";
 import { color, font, FONT_SCALE, FONT_STEPS } from "@/lib/theme";
 import { makeStyles } from "@/lib/useTheme";
 import { ArticleAudio } from "@/components/ArticleAudio";
+import { ShareSheet } from "@/components/ShareSheet";
 import { extractPlainText, useTts } from "@/lib/tts";
 import { usePrefs } from "@/stores/prefs";
 
@@ -65,17 +66,20 @@ export default function ArticleScreen() {
       reportScroll(((contentOffset.y + 0.5) / scrollable) * 100);
   }
 
-  async function share() {
-    if (!data) return;
-    trackShare(data.short_id);
-    try {
-      await Share.share({
-        message: `${data.title_te}\n${API_ORIGIN}${data.url}`,
-      });
-    } catch {
-      // Reader dismissed the sheet — nothing to do.
-    }
-  }
+  // Which of the four formats this story has. A host that cannot shape Telugu
+  // reports `card.available: false`, and the card button is simply not offered.
+  const formats = useQuery({
+    queryKey: ["formats", shortId],
+    queryFn: async () =>
+      (
+        await api.get<{ card: { available: boolean } }>(
+          `/public/articles/${shortId}/formats`,
+        )
+      ).data,
+    enabled: Boolean(shortId),
+    retry: false,
+    staleTime: 5 * 60_000,
+  });
 
   return (
     <>
@@ -150,13 +154,12 @@ export default function ArticleScreen() {
                 listenLabel={t("article.listen")}
                 stopLabel={t("article.stopListening")}
               />
-              <Pressable
-                onPress={share}
-                accessibilityRole="button"
-                style={styles.shareButton}
-              >
-                <Text style={styles.shareText}>↗ {t("article.share")}</Text>
-              </Pressable>
+              <ShareSheet
+                shortId={data.short_id}
+                url={data.url}
+                title={data.title_te}
+                cardAvailable={formats.data?.card.available ?? false}
+              />
             </View>
 
             {/* §4.1 font switcher — required on the reading surface. */}

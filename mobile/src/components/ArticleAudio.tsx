@@ -34,21 +34,25 @@ function format(seconds: number): string {
 }
 
 export function ArticleAudio({
-  shortId, deviceSpeaking, onToggleDevice, listenLabel, stopLabel,
+  shortId, deviceSpeaking, onToggleDevice, listenLabel, stopLabel, endpoint,
 }: {
   shortId: string;
   deviceSpeaking: boolean;
   onToggleDevice: () => void;
   listenLabel: string;
   stopLabel: string;
+  /** Defaults to this article's audio route; the bulletin passes its own,
+   *  which returns the same payload shape. */
+  endpoint?: string;
 }) {
   const styles = useStyles();
   const color = useColors();
   const { isTelugu } = useI18n();
+  const source = endpoint ?? `/public/articles/${shortId}/audio`;
 
   const audio = useQuery({
-    queryKey: ['audio', shortId],
-    queryFn: async () => (await api.get<AudioState>(`/public/articles/${shortId}/audio`)).data,
+    queryKey: ['audio', source],
+    queryFn: async () => (await api.get<AudioState>(source)).data,
     retry: false,
     staleTime: 5 * 60_000,
   });

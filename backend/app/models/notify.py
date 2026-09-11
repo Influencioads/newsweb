@@ -10,7 +10,15 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Enum, ForeignKey, Index, Integer, String, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import MYSQL_TABLE_ARGS, Base, PKMixin, TimestampMixin
@@ -30,7 +38,8 @@ class Notification(PKMixin, Base):
         BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     kind: Mapped[NotificationKind] = mapped_column(
-        Enum(NotificationKind, native_enum=False, length=10, validate_strings=True), nullable=False
+        Enum(NotificationKind, native_enum=False, length=10, validate_strings=True),
+        nullable=False,
     )
     title_te: Mapped[str] = mapped_column(String(400), nullable=False)
     body_te: Mapped[str | None] = mapped_column(String(1000), nullable=True)
@@ -38,7 +47,9 @@ class Notification(PKMixin, Base):
         BigInteger, ForeignKey("articles.id", ondelete="CASCADE"), nullable=True
     )
     campaign_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("notification_campaigns.id", ondelete="SET NULL"), nullable=True
+        BigInteger,
+        ForeignKey("notification_campaigns.id", ondelete="SET NULL"),
+        nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
     read_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
@@ -81,6 +92,7 @@ class PushDevice(PKMixin, TimestampMixin, Base):
     )
     token: Mapped[str] = mapped_column(String(400), nullable=False)
     platform: Mapped[SessionPlatform] = mapped_column(
-        Enum(SessionPlatform, native_enum=False, length=20, validate_strings=True), nullable=False
+        Enum(SessionPlatform, native_enum=False, length=20, validate_strings=True),
+        nullable=False,
     )
     last_seen_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)

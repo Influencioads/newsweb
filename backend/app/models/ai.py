@@ -69,7 +69,10 @@ class AiSuggestion(PKMixin, TimestampMixin, Base):
         server_default=AiSuggestionStatus.NEW.value,
     )
     score: Mapped[float] = mapped_column(
-        Float, nullable=False, default=0.0, doc="Ranking hint, 0..1 — never a publish gate"
+        Float,
+        nullable=False,
+        default=0.0,
+        doc="Ranking hint, 0..1 — never a publish gate",
     )
     engine: Mapped[str] = mapped_column(String(60), nullable=False, default="heuristic")
     model: Mapped[str | None] = mapped_column(String(80), nullable=True)
@@ -109,7 +112,9 @@ class AiSource(PKMixin, TimestampMixin, Base):
     title: Mapped[str | None] = mapped_column(String(500), nullable=True)
     url: Mapped[str] = mapped_column(String(900), nullable=False)
     licence: Mapped[str] = mapped_column(
-        String(60), nullable=False, default="unknown",
+        String(60),
+        nullable=False,
+        default="unknown",
         doc="What we are permitted to do with it: api | rss | press-release | cc-by | unknown",
     )
     excerpt: Mapped[str | None] = mapped_column(
@@ -157,7 +162,10 @@ class AiArticleDraft(PKMixin, TimestampMixin, Base):
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     word_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     requires_review: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=True, server_default="1",
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default="1",
         doc="Never settable to False by any API — kept as a column so the intent is explicit in the data",
     )
 

@@ -26,6 +26,7 @@ from app.core.redis_client import cache_get, cache_set
 from app.db.base import utcnow
 from app.db.session import get_db
 from app.models.content import Article
+from app.models.video import Video
 from app.models.enums import HomeSectionKind, PinPlacement, TrendingScope
 from app.repositories import article_repo, discovery_repo, site_repo
 from app.services import trending_service
@@ -42,8 +43,8 @@ from app.schemas.public import (
     HomeSectionOut,
     LocalFeedOut,
     LocalityOut,
-    LocationsOut,
     LocationStateOut,
+    LocationsOut,
     MandalOut,
     MediaOut,
     NavCategoryOut,
@@ -52,6 +53,7 @@ from app.schemas.public import (
     SiteConfigOut,
     StateOut,
     TagOut,
+    VideoRefOut,
 )
 
 router = APIRouter(prefix="/public", tags=["public"])
@@ -581,6 +583,30 @@ def get_article(
         ],
         related=_cards(article_repo.related(db, article), db, districts),
         poll=poll_service.serialize(attached_polls[0]) if attached_polls else None,
+        video=_video_out(db, article),
+    )
+
+
+def _video_out(db: Session, article: Article) -> VideoRefOut | None:
+    """The story's video, when it has one that is actually live.
+
+    None means the reader page renders no video slot at all. An unpublished or
+    deleted video is the same as no video — showing a dead embed would be
+    worse than showing nothing.
+    """
+    if not article.video_id:
+        return None
+    video = db.get(Video, article.video_id)
+    if video is None or not video.is_published or video.deleted_at is not None:
+        return None
+    return VideoRefOut(
+        id=video.id,
+        youtube_id=video.youtube_id,
+        title_te=video.title_te,
+        duration_sec=video.duration_sec or 0,
+        embed_url=video.embed_url,
+        watch_url=video.watch_url,
+        thumbnail_url=video.thumbnail_url,
     )
 
 

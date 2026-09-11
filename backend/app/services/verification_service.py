@@ -32,7 +32,9 @@ _TTL_SECONDS = 24 * 60 * 60
 
 def _store(token: str, user_id: int) -> bool:
     try:
-        get_redis().setex(f"{_EMAIL_PREFIX}{security.hash_token(token)}", _TTL_SECONDS, str(user_id))
+        get_redis().setex(
+            f"{_EMAIL_PREFIX}{security.hash_token(token)}", _TTL_SECONDS, str(user_id)
+        )
         return True
     except Exception as exc:  # noqa: BLE001
         logger.error("verification_store_failed", error=str(exc)[:200])
@@ -81,7 +83,8 @@ def confirm_email(db: Session, token: str) -> User:
     if not raw:
         raise UnauthorizedError(
             message_en="This verification link is invalid or has expired.",
-            message_te="ఈ ధృవీకరణ లింక్ చెల్లదు లేదా గడువు ముగిసింది.")
+            message_te="ఈ ధృవీకరణ లింక్ చెల్లదు లేదా గడువు ముగిసింది.",
+        )
 
     user = db.get(User, int(raw))
     if user is None:

@@ -98,9 +98,43 @@ class Mandal(PKMixin, TimestampMixin, Base):
     localities: Mapped[list["Locality"]] = relationship(
         back_populates="mandal", cascade="all, delete-orphan"
     )
+    aliases: Mapped[list["MandalAlias"]] = relationship(
+        back_populates="mandal", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<Mandal {self.slug}>"
+
+
+class MandalAlias(PKMixin, TimestampMixin, Base):
+    """Other spellings a mandal is written under, for text matching.
+
+    A gazetteer built only from the canonical `name_te` misses most of what
+    reporters actually write: transliteration varies, English copy uses a
+    different romanisation, and several mandals are known locally by a town
+    name that is not the mandal headquarters' official name. Aliases are how
+    the desk teaches the matcher without a code change.
+    """
+
+    __tablename__ = "mandal_aliases"
+    __table_args__ = (
+        UniqueConstraint("mandal_id", "alias", name="uq_mandal_aliases_mandal_alias"),
+        Index("ix_mandal_aliases_alias", "alias"),
+        MYSQL_TABLE_ARGS,
+    )
+
+    mandal_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("mandals.id", ondelete="CASCADE"), nullable=False
+    )
+    alias: Mapped[str] = mapped_column(String(120), nullable=False)
+    lang: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="te", server_default="te"
+    )
+
+    mandal: Mapped["Mandal"] = relationship(back_populates="aliases")
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<MandalAlias {self.alias!r} -> {self.mandal_id}>"
 
 
 class Locality(PKMixin, TimestampMixin, Base):

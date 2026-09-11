@@ -1,8 +1,8 @@
 """Auth routes (§13).
 
-    POST /auth/otp/request   POST /auth/otp/verify   POST /auth/login
-    POST /auth/refresh       POST /auth/logout       POST /auth/2fa/*
-    GET  /auth/me            GET  /auth/sessions     DELETE /auth/sessions/{id}
+POST /auth/otp/request   POST /auth/otp/verify   POST /auth/login
+POST /auth/refresh       POST /auth/logout       POST /auth/2fa/*
+GET  /auth/me            GET  /auth/sessions     DELETE /auth/sessions/{id}
 """
 
 from __future__ import annotations
@@ -113,7 +113,9 @@ def login(
 
     principal = build_principal(user, session.session_key)
     return LoginResponse(
-        tokens=TokenPair(access_token=access, refresh_token=refresh, expires_at=expires),
+        tokens=TokenPair(
+            access_token=access, refresh_token=refresh, expires_at=expires
+        ),
         me=_me_payload(principal),
     )
 
@@ -145,7 +147,10 @@ def request_otp(
     response_model=LoginResponse,
     summary="Verify an OTP and sign in",
     description="Single-use. A verified code is deleted immediately.",
-    responses={401: {"description": "INVALID_OTP"}, 429: {"description": "ACCOUNT_LOCKED"}},
+    responses={
+        401: {"description": "INVALID_OTP"},
+        429: {"description": "ACCOUNT_LOCKED"},
+    },
 )
 def verify_otp(
     payload: OtpVerifyRequest, request: Request, db: Session = Depends(get_db)
@@ -171,7 +176,9 @@ def verify_otp(
 
     principal = build_principal(user, session.session_key)
     return LoginResponse(
-        tokens=TokenPair(access_token=access, refresh_token=refresh, expires_at=expires),
+        tokens=TokenPair(
+            access_token=access, refresh_token=refresh, expires_at=expires
+        ),
         me=_me_payload(principal),
     )
 
@@ -186,12 +193,17 @@ def verify_otp(
         "number **creates** a subscriber account — there is no separate signup "
         "form. Staff accounts sign in exactly as before via `/auth/otp/verify`."
     ),
-    responses={401: {"description": "INVALID_OTP"}, 429: {"description": "ACCOUNT_LOCKED"}},
+    responses={
+        401: {"description": "INVALID_OTP"},
+        429: {"description": "ACCOUNT_LOCKED"},
+    },
 )
 def verify_reader_otp(
     payload: OtpVerifyRequest, request: Request, db: Session = Depends(get_db)
 ) -> ReaderLoginResponse:
-    user, is_new = auth_service.verify_otp_reader(db, payload.phone, payload.otp, request)
+    user, is_new = auth_service.verify_otp_reader(
+        db, payload.phone, payload.otp, request
+    )
     session, access, refresh_token, expires = auth_service.create_session(
         db,
         user,
@@ -236,7 +248,9 @@ def verify_reader_otp(
         "account is usable immediately — verification gates submitting an "
         "article (§6), not reading."
     ),
-    responses={400: {"description": "VALIDATION_ERROR — email or phone already registered"}},
+    responses={
+        400: {"description": "VALIDATION_ERROR — email or phone already registered"}
+    },
 )
 def register(
     payload: RegisterRequest, request: Request, db: Session = Depends(get_db)
@@ -273,7 +287,9 @@ def register(
 
     principal = build_principal(user, session.session_key)
     return ReaderLoginResponse(
-        tokens=TokenPair(access_token=access, refresh_token=refresh_token, expires_at=expires),
+        tokens=TokenPair(
+            access_token=access, refresh_token=refresh_token, expires_at=expires
+        ),
         me=_me_payload(principal),
         is_new_account=True,
     )
@@ -285,7 +301,9 @@ def register(
     summary="Confirm an email address",
     responses={401: {"description": "UNAUTHORIZED — link invalid or expired"}},
 )
-def verify_email(payload: VerifyEmailRequest, db: Session = Depends(get_db)) -> SimpleMessage:
+def verify_email(
+    payload: VerifyEmailRequest, db: Session = Depends(get_db)
+) -> SimpleMessage:
     from app.services import verification_service
 
     verification_service.confirm_email(db, payload.token)
@@ -305,7 +323,9 @@ def resend_verification(
     verification_service.send_email_verification(db, principal.user)
     # Always the same answer, verified or not — this endpoint must not report
     # account state to anyone holding a stolen token.
-    return SimpleMessage(message="If the address needs verifying, a link is on its way.")
+    return SimpleMessage(
+        message="If the address needs verifying, a link is on its way."
+    )
 
 
 @router.post(
@@ -370,10 +390,14 @@ def logout(
     db: Session = Depends(get_db),
 ) -> SimpleMessage:
     if payload.all_devices:
-        count = auth_service.revoke_all_user_sessions(db, principal.id, reason="logout_all")
+        count = auth_service.revoke_all_user_sessions(
+            db, principal.id, reason="logout_all"
+        )
         note = f"logout all devices ({count})"
     else:
-        stmt = select(UserSession).where(UserSession.session_key == principal.session_key)
+        stmt = select(UserSession).where(
+            UserSession.session_key == principal.session_key
+        )
         session = db.execute(stmt).scalar_one_or_none()
         if session is not None:
             auth_service.revoke_one_session(db, session, reason="logout")
@@ -504,7 +528,9 @@ def request_password_reset(
     responses={401: {"description": "Invalid or expired token"}},
 )
 def confirm_password_reset(
-    payload: PasswordResetConfirmRequest, request: Request, db: Session = Depends(get_db)
+    payload: PasswordResetConfirmRequest,
+    request: Request,
+    db: Session = Depends(get_db),
 ) -> SimpleMessage:
     user = auth_service.consume_password_reset(db, payload.token, payload.new_password)
     audit_service.record_auth_event(

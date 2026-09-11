@@ -115,7 +115,9 @@ def cache_get(key: str) -> Any | None:
 
 def cache_set(key: str, value: Any, ttl_seconds: int) -> None:
     try:
-        get_redis().setex(CACHE_PREFIX + key, ttl_seconds, json.dumps(value, default=str))
+        get_redis().setex(
+            CACHE_PREFIX + key, ttl_seconds, json.dumps(value, default=str)
+        )
     except redis.RedisError as exc:
         logger.warning("cache_unavailable", op="set", key=key, error=str(exc))
 
@@ -133,7 +135,9 @@ def cache_delete_prefix(prefix: str) -> int:
             client.delete(key)
             deleted += 1
     except redis.RedisError as exc:
-        logger.warning("cache_unavailable", op="invalidate", prefix=prefix, error=str(exc))
+        logger.warning(
+            "cache_unavailable", op="invalidate", prefix=prefix, error=str(exc)
+        )
     return deleted
 
 

@@ -42,7 +42,9 @@ class UTCDateTime(TypeDecorator[datetime]):
             return dialect.type_descriptor(MYSQL_DATETIME(fsp=6))
         return dialect.type_descriptor(DateTime(timezone=True))
 
-    def process_bind_param(self, value: datetime | None, dialect: Dialect) -> datetime | None:
+    def process_bind_param(
+        self, value: datetime | None, dialect: Dialect
+    ) -> datetime | None:
         if value is None:
             return None
         if value.tzinfo is None:
@@ -50,7 +52,9 @@ class UTCDateTime(TypeDecorator[datetime]):
             return value
         return value.astimezone(timezone.utc).replace(tzinfo=None)
 
-    def process_result_value(self, value: datetime | None, dialect: Dialect) -> datetime | None:
+    def process_result_value(
+        self, value: datetime | None, dialect: Dialect
+    ) -> datetime | None:
         if value is None:
             return None
         if value.tzinfo is None:

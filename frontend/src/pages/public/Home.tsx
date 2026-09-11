@@ -11,6 +11,7 @@ import {
   SecondaryCard,
 } from "@/components/article/ArticleCard";
 import { AdSlot } from "@/components/ads/AdSlot";
+import { BulletinCard } from "@/components/bulletin/BulletinCard";
 import { VideoStrip } from "@/components/video/VideoStrip";
 import * as engagementApi from "@/features/engagement/api";
 import * as publicApi from "@/features/public/api";
@@ -232,6 +233,9 @@ export default function Home() {
 
   return (
     <main className="mx-auto max-w-[1200px] px-4 pb-8 pt-4">
+      {/* Renders nothing when no bulletin is on air, including when an admin
+          has flipped the kill switch — so it never leaves an empty slot. */}
+      <BulletinCard />
       <section
         aria-label={language === "te" ? "ట్రెండింగ్ వార్తలు" : "Trending news"}
         className="mb-4 flex items-center gap-3 overflow-x-auto border-b border-rule pb-3"

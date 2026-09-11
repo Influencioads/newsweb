@@ -23,6 +23,29 @@
       name="description"
       content="తెలుగు వార్తలు, ఈ-పేపర్, వీడియోలు — ఆంధ్రప్రదేశ్ మరియు తెలంగాణ జిల్లా వార్తలతో."
     />
+
+    <!--
+      A baseline link preview for every route that is not an article. Article
+      URLs never reach this file when a crawler asks for them: nginx sends
+      link-preview bots to the API's /_og/article/* stub, which carries the
+      real headline and a rendered Telugu card. See app/api/v1/crawler.py.
+
+      These stay static on purpose. A SPA cannot set og: tags in time —
+      WhatsApp and Facebook do not run JavaScript at all — so anything dynamic
+      here would be read as nothing.
+    -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="టాప్ తెలుగు న్యూస్" />
+    <meta property="og:title" content="టాప్ తెలుగు న్యూస్ · Top Telugu News" />
+    <meta
+      property="og:description"
+      content="తెలుగు వార్తలు, ఈ-పేపర్, వీడియోలు — ఆంధ్రప్రదేశ్ మరియు తెలంగాణ జిల్లా వార్తలతో."
+    />
+    <meta property="og:image" content="/og-default.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="te_IN" />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>
     <div id="root"></div>

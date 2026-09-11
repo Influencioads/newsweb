@@ -45,7 +45,12 @@ class ArticleEvent(PKMixin, Base):
 
     __tablename__ = "article_events"
     __table_args__ = (
-        Index("ix_article_events_article_id_type_created_at", "article_id", "event_type", "created_at"),
+        Index(
+            "ix_article_events_article_id_type_created_at",
+            "article_id",
+            "event_type",
+            "created_at",
+        ),
         Index("ix_article_events_user_id_created_at", "user_id", "created_at"),
         Index("ix_article_events_created_at", "created_at"),
         MYSQL_TABLE_ARGS,
@@ -60,7 +65,8 @@ class ArticleEvent(PKMixin, Base):
     #: Client-generated stable id for anonymous readers (localStorage/device).
     anon_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     event_type: Mapped[EventType] = mapped_column(
-        Enum(EventType, native_enum=False, length=20, validate_strings=True), nullable=False
+        Enum(EventType, native_enum=False, length=20, validate_strings=True),
+        nullable=False,
     )
     value: Mapped[int | None] = mapped_column(
         Integer, nullable=True, doc="READ: seconds · SCROLL: max depth percent"
@@ -78,7 +84,10 @@ class ReadingSession(PKMixin, Base):
     __tablename__ = "reading_sessions"
     __table_args__ = (
         UniqueConstraint(
-            "article_id", "viewer_key", "day", name="uq_reading_sessions_article_viewer_day"
+            "article_id",
+            "viewer_key",
+            "day",
+            name="uq_reading_sessions_article_viewer_day",
         ),
         Index("ix_reading_sessions_user_id_updated_at", "user_id", "updated_at"),
         MYSQL_TABLE_ARGS,
@@ -141,8 +150,15 @@ class Comment(PKMixin, TimestampMixin, Base):
 
     __tablename__ = "comments"
     __table_args__ = (
-        Index("ix_comments_article_id_status_created_at", "article_id", "status", "created_at"),
-        Index("ix_comments_video_id_status_created_at", "video_id", "status", "created_at"),
+        Index(
+            "ix_comments_article_id_status_created_at",
+            "article_id",
+            "status",
+            "created_at",
+        ),
+        Index(
+            "ix_comments_video_id_status_created_at", "video_id", "status", "created_at"
+        ),
         Index("ix_comments_user_id_created_at", "user_id", "created_at"),
         Index("ix_comments_status_created_at", "status", "created_at"),
         MYSQL_TABLE_ARGS,
@@ -195,23 +211,29 @@ class Reaction(PKMixin, Base):
 
     __tablename__ = "reactions"
     __table_args__ = (
-        UniqueConstraint("target_type", "target_id", "viewer_key", name="uq_reactions_target_viewer"),
+        UniqueConstraint(
+            "target_type", "target_id", "viewer_key", name="uq_reactions_target_viewer"
+        ),
         Index("ix_reactions_target", "target_type", "target_id"),
         MYSQL_TABLE_ARGS,
     )
 
     target_type: Mapped[CommentTargetType] = mapped_column(
-        Enum(CommentTargetType, native_enum=False, length=10, validate_strings=True), nullable=False
+        Enum(CommentTargetType, native_enum=False, length=10, validate_strings=True),
+        nullable=False,
     )
     target_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     viewer_key: Mapped[str] = mapped_column(
-        String(80), nullable=False, doc="user:<id> or anon:<anon_id>, as in reading_sessions"
+        String(80),
+        nullable=False,
+        doc="user:<id> or anon:<anon_id>, as in reading_sessions",
     )
     user_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     kind: Mapped[ReactionKind] = mapped_column(
-        Enum(ReactionKind, native_enum=False, length=10, validate_strings=True), nullable=False
+        Enum(ReactionKind, native_enum=False, length=10, validate_strings=True),
+        nullable=False,
     )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
@@ -228,14 +250,17 @@ class Report(PKMixin, TimestampMixin, Base):
     )
 
     target_type: Mapped[ReportTargetType] = mapped_column(
-        Enum(ReportTargetType, native_enum=False, length=10, validate_strings=True), nullable=False
+        Enum(ReportTargetType, native_enum=False, length=10, validate_strings=True),
+        nullable=False,
     )
     target_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     user_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     reason: Mapped[str] = mapped_column(
-        String(30), nullable=False, doc="spam | abuse | misinformation | copyright | other"
+        String(30),
+        nullable=False,
+        doc="spam | abuse | misinformation | copyright | other",
     )
     note: Mapped[str | None] = mapped_column(String(500), nullable=True)
     status: Mapped[ReportStatus] = mapped_column(
@@ -260,7 +285,9 @@ class Follow(PKMixin, Base):
 
     __tablename__ = "follows"
     __table_args__ = (
-        UniqueConstraint("user_id", "target_type", "target_id", name="uq_follows_user_target"),
+        UniqueConstraint(
+            "user_id", "target_type", "target_id", name="uq_follows_user_target"
+        ),
         Index("ix_follows_target", "target_type", "target_id"),
         Index("ix_follows_user_id", "user_id"),
         MYSQL_TABLE_ARGS,
@@ -270,7 +297,8 @@ class Follow(PKMixin, Base):
         BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     target_type: Mapped[FollowTargetType] = mapped_column(
-        Enum(FollowTargetType, native_enum=False, length=10, validate_strings=True), nullable=False
+        Enum(FollowTargetType, native_enum=False, length=10, validate_strings=True),
+        nullable=False,
     )
     target_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)

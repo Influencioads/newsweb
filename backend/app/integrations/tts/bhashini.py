@@ -28,7 +28,9 @@ class BhashiniTts(TtsProvider):
     def available(self) -> bool:
         return bool(settings.BHASHINI_API_KEY and settings.BHASHINI_ENDPOINT)
 
-    def synthesise(self, text: str, *, language: str, voice: str | None = None) -> Synthesis:
+    def synthesise(
+        self, text: str, *, language: str, voice: str | None = None
+    ) -> Synthesis:
         if not self.available():
             raise AiProviderError(
                 message_en="BHASHINI_API_KEY / BHASHINI_ENDPOINT are not set.",
@@ -36,14 +38,16 @@ class BhashiniTts(TtsProvider):
             )
         gender = voice or settings.BHASHINI_VOICE or "female"
         payload = {
-            "pipelineTasks": [{
-                "taskType": "tts",
-                "config": {
-                    "language": {"sourceLanguage": language.split("-")[0]},
-                    "gender": gender,
-                    "samplingRate": 22050,
-                },
-            }],
+            "pipelineTasks": [
+                {
+                    "taskType": "tts",
+                    "config": {
+                        "language": {"sourceLanguage": language.split("-")[0]},
+                        "gender": gender,
+                        "samplingRate": 22050,
+                    },
+                }
+            ],
             "inputData": {"input": [{"source": text}]},
         }
         headers = {"Authorization": settings.BHASHINI_API_KEY}
@@ -61,10 +65,14 @@ class BhashiniTts(TtsProvider):
             audio_list = (body.get("pipelineResponse") or [{}])[0].get("audio") or []
             encoded = (audio_list[0] if audio_list else {}).get("audioContent")
         except (httpx.HTTPError, IndexError, AttributeError, ValueError) as exc:
-            raise AiProviderError(details={"provider": self.key, "error": str(exc)[:200]}) from exc
+            raise AiProviderError(
+                details={"provider": self.key, "error": str(exc)[:200]}
+            ) from exc
 
         if not encoded:
-            raise AiProviderError(details={"provider": self.key, "error": "empty response"})
+            raise AiProviderError(
+                details={"provider": self.key, "error": "empty response"}
+            )
         return Synthesis(
             audio=base64.b64decode(encoded),
             mime="audio/wav",

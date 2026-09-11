@@ -31,20 +31,28 @@ function format(seconds: number): string {
 }
 
 export function AudioPlayer({
-  shortId, readingLabel, deviceTts,
+  shortId, readingLabel, deviceTts, endpoint,
 }: {
   shortId: string;
   readingLabel: string;
   /** The existing Web Speech hook, used when there is no server file. */
   deviceTts: { state: TtsState; toggle: () => void; stop: () => void };
+  /**
+   * Where to fetch the audio payload from. Defaults to this article's own
+   * route; the three-hourly bulletin passes its own, which returns the same
+   * shape. Everything else in this component — the scrubber, the speeds, the
+   * `voice_enabled` short-circuit — works unchanged.
+   */
+  endpoint?: string;
 }) {
   const { language } = useI18n();
   const te = language === 'te';
   const script = te ? 'te' : 'font-sans';
+  const source = endpoint ?? `/public/articles/${shortId}/audio`;
 
   const audioState = useQuery({
-    queryKey: ['audio', shortId],
-    queryFn: async () => (await api.get<AudioState>(`/public/articles/${shortId}/audio`)).data,
+    queryKey: ['audio', source],
+    queryFn: async () => (await api.get<AudioState>(source)).data,
     // Generation happens server-side on first request and can take a moment;
     // a failed fetch must not remove the device-voice fallback, so errors
     // resolve to "no file" rather than propagating.

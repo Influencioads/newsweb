@@ -158,6 +158,18 @@ class ArticleCardOut(BaseModel):
     reading_time_sec: int
 
 
+class VideoRefOut(BaseModel):
+    """Just enough to embed a video beside its story."""
+
+    id: int
+    youtube_id: str
+    title_te: str | None = None
+    duration_sec: int = 0
+    embed_url: str
+    watch_url: str
+    thumbnail_url: str
+
+
 class ArticleDetailOut(ArticleCardOut):
     """Full article for the reader page (mockup 1c)."""
 
@@ -186,6 +198,15 @@ class ArticleDetailOut(ArticleCardOut):
     )
     related: list[ArticleCardOut] = Field(default_factory=list)
     poll: dict[str, Any] | None = None
+    video: VideoRefOut | None = Field(
+        default=None,
+        description=(
+            "The story's video, when it has one. `Article.video_id` has existed "
+            "since the video hub shipped, but no reader schema ever exposed it, "
+            "so a linked video could not be shown. Absent means the article "
+            "renders no video slot at all — not a placeholder."
+        ),
+    )
 
 
 class BreakingItemOut(BaseModel):

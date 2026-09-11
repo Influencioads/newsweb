@@ -48,8 +48,11 @@ class PinIn(BaseModel):
     category_slug: str | None = None
     district_slug: str | None = None
     duration_minutes: int = Field(
-        default=1440, gt=0, le=60 * 24 * 7,
-        description="§8 presets: 5/10/15/30/60/180/360/720/1440/4320 minutes, or any custom value")
+        default=1440,
+        gt=0,
+        le=60 * 24 * 7,
+        description="§8 presets: 5/10/15/30/60/180/360/720/1440/4320 minutes, or any custom value",
+    )
     note: str | None = Field(default=None, max_length=200)
 
 
@@ -100,7 +103,9 @@ def create_pin(
             select(Category).where(Category.slug == (payload.category_slug or ""))
         ).scalar_one_or_none()
         if category is None:
-            raise ValidationError(details={"category_slug": "required for a category pin"})
+            raise ValidationError(
+                details={"category_slug": "required for a category pin"}
+            )
         category_id = category.id
     elif payload.placement == PinPlacement.LOCAL:
         district = db.execute(
@@ -238,7 +243,11 @@ def analytics(
     ).one()
 
     top_articles = db.execute(
-        select(Article.title_te, Article.short_id, func.count(ReadingSession.id).label("reads"))
+        select(
+            Article.title_te,
+            Article.short_id,
+            func.count(ReadingSession.id).label("reads"),
+        )
         .join(ReadingSession, ReadingSession.article_id == Article.id)
         .where(ReadingSession.updated_at >= week_ago)
         .group_by(Article.id)
@@ -247,7 +256,11 @@ def analytics(
     ).all()
 
     top_categories = db.execute(
-        select(Category.name_te, Category.slug, func.count(ReadingSession.id).label("reads"))
+        select(
+            Category.name_te,
+            Category.slug,
+            func.count(ReadingSession.id).label("reads"),
+        )
         .join(Article, Article.category_id == Category.id)
         .join(ReadingSession, ReadingSession.article_id == Article.id)
         .where(ReadingSession.updated_at >= week_ago)
@@ -257,7 +270,11 @@ def analytics(
     ).all()
 
     top_districts = db.execute(
-        select(District.name_te, District.slug, func.count(ReadingSession.id).label("reads"))
+        select(
+            District.name_te,
+            District.slug,
+            func.count(ReadingSession.id).label("reads"),
+        )
         .join(Article, Article.district_id == District.id)
         .join(ReadingSession, ReadingSession.article_id == Article.id)
         .where(ReadingSession.updated_at >= week_ago)

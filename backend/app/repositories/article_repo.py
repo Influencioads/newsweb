@@ -74,7 +74,9 @@ def latest(
     if author_id is not None:
         stmt = stmt.where(Article.author_id == author_id)
     if tag_id is not None:
-        stmt = stmt.join(ArticleTag, ArticleTag.article_id == Article.id).where(ArticleTag.tag_id == tag_id)
+        stmt = stmt.join(ArticleTag, ArticleTag.article_id == Article.id).where(
+            ArticleTag.tag_id == tag_id
+        )
     if exclude_ids:
         stmt = stmt.where(Article.id.notin_(exclude_ids))
     if before is not None:
@@ -88,7 +90,11 @@ def latest(
                 Article.summary_te.ilike(term),
             )
         )
-    stmt = stmt.order_by(Article.published_at.desc(), Article.id.desc()).limit(limit).offset(offset)
+    stmt = (
+        stmt.order_by(Article.published_at.desc(), Article.id.desc())
+        .limit(limit)
+        .offset(offset)
+    )
     return list(db.execute(stmt).unique().scalars())
 
 
@@ -185,7 +191,10 @@ def count_published(db: Session) -> int:
     from sqlalchemy import func
 
     return int(
-        db.execute(select(func.count(Article.id)).where(and_(*published_filter()))).scalar() or 0
+        db.execute(
+            select(func.count(Article.id)).where(and_(*published_filter()))
+        ).scalar()
+        or 0
     )
 
 
@@ -220,7 +229,9 @@ def get_district_by_slug(db: Session, slug: str) -> District | None:
 
 
 def get_mandal_by_slug(db: Session, slug: str) -> Mandal | None:
-    return db.execute(select(Mandal).where(Mandal.slug == slug, Mandal.is_active.is_(True))).scalar_one_or_none()
+    return db.execute(
+        select(Mandal).where(Mandal.slug == slug, Mandal.is_active.is_(True))
+    ).scalar_one_or_none()
 
 
 def local_feed(
@@ -285,7 +296,9 @@ def search(
 
     term = q.strip()
     stmt = published_query()
-    count_stmt = select(func.count(distinct(Article.id))).where(and_(*published_filter()))
+    count_stmt = select(func.count(distinct(Article.id))).where(
+        and_(*published_filter())
+    )
 
     alias_match = Article.id.in_(
         select(ArticleSearchAlias.article_id).where(
@@ -384,11 +397,19 @@ def localities_for_mandal(db: Session, mandal_id: int) -> list[Locality]:
 
 
 def get_author_by_slug(db: Session, slug: str) -> User | None:
-    return db.execute(select(User).where(User.author_slug == slug, User.is_author.is_(True), User.deleted_at.is_(None))).scalar_one_or_none()
+    return db.execute(
+        select(User).where(
+            User.author_slug == slug,
+            User.is_author.is_(True),
+            User.deleted_at.is_(None),
+        )
+    ).scalar_one_or_none()
 
 
 def get_tag_by_slug(db: Session, slug: str) -> Tag | None:
-    return db.execute(select(Tag).where(Tag.slug == slug, Tag.is_active.is_(True))).scalar_one_or_none()
+    return db.execute(
+        select(Tag).where(Tag.slug == slug, Tag.is_active.is_(True))
+    ).scalar_one_or_none()
 
 
 def gallery_media(db: Session, article_id: int) -> list:

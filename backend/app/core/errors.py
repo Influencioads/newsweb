@@ -194,7 +194,9 @@ class SelfApprovalDeniedError(AppError):
 
     code = "SELF_APPROVAL_DENIED"
     status_code = status.HTTP_403_FORBIDDEN
-    message_en = "You cannot approve your own article. A second senior editor must approve it."
+    message_en = (
+        "You cannot approve your own article. A second senior editor must approve it."
+    )
     message_te = "మీ సొంత కథనాన్ని మీరే ఆమోదించలేరు. మరో సీనియర్ ఎడిటర్ ఆమోదించాలి."
 
 

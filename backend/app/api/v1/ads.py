@@ -74,13 +74,19 @@ def serve_ad(
                 AdCampaign.ends_at > now,
             )
         ).scalars()
-        if (c.category_id is None or (category_row and c.category_id == category_row.id))
-        and (c.district_id is None or (district_row and c.district_id == district_row.id))
+        if (
+            c.category_id is None or (category_row and c.category_id == category_row.id)
+        )
+        and (
+            c.district_id is None or (district_row and c.district_id == district_row.id)
+        )
     ]
     if not candidates:
         return None
 
-    chosen = random.choices(candidates, weights=[max(c.weight, 1) for c in candidates])[0]
+    chosen = random.choices(candidates, weights=[max(c.weight, 1) for c in candidates])[
+        0
+    ]
     chosen.impressions = (chosen.impressions or 0) + 1
     return AdOut(
         id=chosen.id,
@@ -151,7 +157,9 @@ def list_ads(
     _p: Principal = Depends(require_permission("ads.manage")),
 ) -> dict:
     rows = list(
-        db.execute(select(AdCampaign).order_by(AdCampaign.created_at.desc()).limit(100)).scalars()
+        db.execute(
+            select(AdCampaign).order_by(AdCampaign.created_at.desc()).limit(100)
+        ).scalars()
     )
     return {"items": [_ad_row(c) for c in rows]}
 

@@ -319,6 +319,15 @@ class Article(PKMixin, TimestampMixin, SoftDeleteMixin, ActorMixin, Base):
         BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     byline_te: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    byline_badge: Mapped[str | None] = mapped_column(
+        String(30),
+        nullable=True,
+        doc=(
+            "citizen | freelance | student — a verified contributor's standing, "
+            "denormalised onto the article so the reader's hot path never joins "
+            "to contributor_profiles to render a byline chip."
+        ),
+    )
     source_credit: Mapped[str | None] = mapped_column(
         String(200),
         nullable=True,

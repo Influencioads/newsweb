@@ -25,11 +25,12 @@ export const PIN_PRESETS: Array<[number, string]> = [
 function Countdown({ seconds }: { seconds: number }) {
   const [left, setLeft] = useState(seconds);
   useEffect(() => setLeft(seconds), [seconds]);
+  const running = left > 0;
   useEffect(() => {
-    if (left <= 0) return;
+    if (!running) return;
     const id = window.setInterval(() => setLeft((v) => Math.max(0, v - 1)), 1000);
     return () => window.clearInterval(id);
-  }, [left > 0]);
+  }, [running]);
   if (left <= 0) return <span className="font-sans text-[11px] font-bold text-muted">ముగిసింది</span>;
   const h = Math.floor(left / 3600);
   const m = Math.floor((left % 3600) / 60);

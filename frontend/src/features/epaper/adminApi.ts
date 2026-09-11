@@ -42,7 +42,7 @@ export const createTemplate = (payload: Omit<PageTemplate, "id">) =>
 export const updateTemplate = (row: PageTemplate) =>
   api.patch(
     `/admin/epaper/templates/${row.id}`,
-    (({ id, ...payload }) => payload)(row),
+    (({ id: _id, ...payload }) => payload)(row),
   );
 export const hideTemplate = (id: number) =>
   api.delete(`/admin/epaper/templates/${id}`);

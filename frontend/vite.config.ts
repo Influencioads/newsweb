@@ -23,6 +23,7 @@ export default defineConfig({
     sourcemap: true,
     // §10.3 Core Web Vitals: keep the initial bundle small. Vendor chunks are
     // split so a CMS-only dependency never lands in the reader's critical path.
+    // Route-level code is split by React.lazy in App.tsx.
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -43,6 +44,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    include: ['src/**/*.test.{ts,tsx}'],
+    passWithNoTests: true,
     css: false,
   },
 } as Parameters<typeof defineConfig>[0]);

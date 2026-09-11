@@ -7,6 +7,30 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
     <!--
+      Theme + font scale before first paint. Reads the same localStorage key the
+      Zustand store persists (tn.reader-prefs) so a dark-mode reader never sees a
+      white flash and an A++ reader never sees small text jump. Must stay tiny,
+      synchronous and dependency-free.
+    -->
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem('tn.reader-prefs');
+          var st = raw ? (JSON.parse(raw).state || {}) : {};
+          var theme = st.theme || 'system';
+          var dark = theme === 'dark' || (theme === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          var root = document.documentElement;
+          if (dark) root.classList.add('dark');
+          root.style.colorScheme = dark ? 'dark' : 'light';
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', dark ? '#201B16' : '#A61C24');
+          var scale = { 'A-': 0.9, 'A': 1, 'A+': 1.15, 'A++': 1.32 }[st.fontStep];
+          if (scale) root.style.setProperty('--reader-scale', String(scale));
+        } catch (e) {}
+      })();
+    </script>
+
+    <!--
       §4.1: preload the 400-weight Telugu BODY font only. Preloading more than one
       face delays LCP on the 4G mid-range Android we are targeting (§10.3).
     -->
@@ -49,6 +73,8 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Portal target for dialogs, sheets and toasts (components/ui/Dialog, Toast). -->
+    <div id="overlay-root"></div>
     <noscript>
       <div style="padding: 24px; font-family: 'Noto Sans Telugu', sans-serif; line-height: 1.7">
         ఈ వెబ్‌సైట్ చూడటానికి JavaScript అవసరం.

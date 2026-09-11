@@ -61,7 +61,7 @@ export function BulletinCard() {
         </span>
       </div>
 
-      {/* eslint-disable-next-line jsx-a11y/media-has-caption -- the headline list below is the transcript */}
+      {/* The headline list below is the transcript. */}
       <audio controls preload="none" src={data.url} className="mt-2.5 w-full" />
 
       {data.items.length ? (

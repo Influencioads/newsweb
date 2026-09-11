@@ -28,11 +28,12 @@ const PIN_PRESETS: Array<[string, string]> = [['5','5m'],['10','10m'],['15','15m
 function Countdown({ seconds }: { seconds: number }) {
   const [left, setLeft] = useState(seconds);
   useEffect(() => { setLeft(seconds); }, [seconds]);
+  const running = left > 0;
   useEffect(() => {
-    if (left <= 0) return;
+    if (!running) return;
     const id = window.setInterval(() => setLeft((v) => Math.max(0, v - 1)), 1000);
     return () => window.clearInterval(id);
-  }, [left > 0]);
+  }, [running]);
   if (left <= 0) return <span className="font-sans text-[11px] font-bold text-muted">expired</span>;
   const h = Math.floor(left / 3600), m = Math.floor((left % 3600) / 60), sec = left % 60;
   return <span className="font-sans text-[11px] font-bold tabular-nums text-brand">{h ? `${h}h ` : ''}{String(m).padStart(2,'0')}:{String(sec).padStart(2,'0')}</span>;

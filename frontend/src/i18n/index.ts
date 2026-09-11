@@ -90,6 +90,56 @@ export function useI18n() {
   };
 }
 
+/** Font class + lang attribute for a piece of text in a known script. */
+export interface ScriptAttrs {
+  lang: Language;
+  /** `te` (Noto Sans Telugu, lh 1.7) or `font-sans` (Inter). */
+  cls: 'te' | 'font-sans';
+  /** `th` (Anek Telugu, lh 1.5) or `font-sans` — for headlines. */
+  head: 'th' | 'font-sans';
+  telugu: boolean;
+}
+
+/**
+ * Script helper for chrome and content.
+ *
+ *   const s = useScript();
+ *   <button className={cn(s.body, 'text-ui')}>{t('nav.signIn')}</button>
+ *   <h2 {...s.forText(a.title_te, a.title_en)} className={cn(head.head, …)}>
+ *
+ * `te` / `body` / `head` describe the *interface* language. `forText` inspects a
+ * bilingual DB pair and returns the attributes for whichever value `pick` will
+ * render, so an English page still tags a Telugu-only headline with lang="te".
+ */
+export function useScript() {
+  const { language, pick, isFallback } = useI18n();
+  const te = language === 'te';
+  const forText = (teValue: string | null | undefined, enValue: string | null | undefined): ScriptAttrs => {
+    const telugu = te || isFallback(teValue, enValue);
+    return {
+      lang: telugu ? 'te' : 'en',
+      cls: telugu ? 'te' : 'font-sans',
+      head: telugu ? 'th' : 'font-sans',
+      telugu,
+    };
+  };
+  return {
+    language,
+    te,
+    /** Body-copy font class for chrome in the interface language. */
+    body: (te ? 'te' : 'font-sans') as 'te' | 'font-sans',
+    /** Headline font class for chrome in the interface language. */
+    head: (te ? 'th' : 'font-sans') as 'th' | 'font-sans',
+    pick,
+    forText,
+    /** Convenience: text + attrs for a bilingual pair in one call. */
+    text: (teValue: string | null | undefined, enValue: string | null | undefined) => ({
+      text: pick(teValue, enValue),
+      ...forText(teValue, enValue),
+    }),
+  };
+}
+
 export function isLanguage(value: unknown): value is Language {
   return typeof value === 'string' && (LANGUAGES as readonly string[]).includes(value);
 }

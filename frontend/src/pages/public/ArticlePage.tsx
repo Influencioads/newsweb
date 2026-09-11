@@ -19,6 +19,7 @@ import { extractPlainText, useTts } from '@/features/reader/tts';
 import { useI18n } from '@/i18n';
 import { FONT_STEPS, useReaderPrefs } from '@/stores/readerPrefs';
 import type { ArticleDetail } from '@/types/public';
+import { PollCard } from '@/features/epaper/PollCard';
 import { formatDate, formatTime, readingTime } from '@/utils/time';
 
 /**
@@ -326,6 +327,7 @@ export default function ArticlePage() {
         {/* Body — Tiptap JSON rendered as React */}
         <div className="mt-5">
           <ArticleRenderer doc={data.body} />
+          {data.poll ? <PollCard poll={data.poll} /> : null}
         </div>
 
         {/* AI disclosure (§7.2) — non-optional when AI assisted the draft. */}

@@ -26,6 +26,9 @@ import TrendingPage from './pages/public/TrendingPage';
 import SectionPage from './pages/public/SectionPage';
 import SearchPage from './pages/public/SearchPage';
 import EpaperPage from './pages/public/EpaperPage';
+import MyEpaperPage from './pages/public/MyEpaperPage';
+import { PollPage, TopicPage } from './pages/public/CommunityPages';
+import { AdminEpaperPage, AdminPollsPage } from './pages/admin/PublishingPages';
 import LiveNewsPage from './pages/public/LiveNewsPage';
 import { AuthorPage, DistrictPage, MandalPage, PhotoGalleryPage, TagPage, WebStoriesPage } from './pages/public/DiscoveryPages';
 import ShortNewsPage from './pages/public/ShortNewsPage';
@@ -67,6 +70,13 @@ export default function App() {
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/following" element={<FollowingPage />} />
         <Route path="/epaper" element={<EpaperPage />} />
+        <Route path="/epaper/:date" element={<EpaperPage />} />
+        <Route path="/epaper/:date/page/:page" element={<EpaperPage />} />
+        <Route path="/my-epaper" element={<MyEpaperPage />} />
+        <Route path="/my-epaper/edition/:personalId" element={<EpaperPage />} />
+        <Route path="/my-epaper/edition/:personalId/page/:page" element={<EpaperPage />} />
+        <Route path="/topic/:slug" element={<TopicPage />} />
+        <Route path="/polls/:id" element={<PollPage />} />
         <Route path="/live" element={<LiveNewsPage />} />
         <Route path="/live-blog" element={<LiveNewsPage />} />
         <Route path="/district/:slug" element={<DistrictPage />} />
@@ -120,6 +130,8 @@ export default function App() {
           <Route path="/admin/roles" element={<RolesPage />} />
           <Route path="/admin/audit" element={<AuditPage />} />
           <Route path="/admin/settings" element={<SettingsPage />} />
+          <Route path="/admin/epaper" element={<AdminEpaperPage />} />
+          <Route path="/admin/polls" element={<AdminPollsPage />} />
         </Route>
       </Route>
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />

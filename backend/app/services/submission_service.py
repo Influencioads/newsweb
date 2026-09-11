@@ -37,11 +37,15 @@ BODY_MAX = 20_000
 def plain_text_to_tiptap(text: str) -> dict[str, Any]:
     """Paragraphs split on blank lines; single newlines become hard breaks.
     Creators write plain text — the doc structure is built for them."""
-    paragraphs = [p.strip() for p in text.replace("\r\n", "\n").split("\n\n") if p.strip()]
+    paragraphs = [
+        p.strip() for p in text.replace("\r\n", "\n").split("\n\n") if p.strip()
+    ]
     content: list[dict[str, Any]] = []
     for paragraph in paragraphs:
         nodes: list[dict[str, Any]] = []
-        for i, line in enumerate(line for line in paragraph.split("\n") if line.strip()):
+        for i, line in enumerate(
+            line for line in paragraph.split("\n") if line.strip()
+        ):
             if i > 0:
                 nodes.append({"type": "hardBreak"})
             nodes.append({"type": "text", "text": line.strip()})
@@ -136,6 +140,7 @@ def approve_submission(
         status=ArticleStatus.PENDING,
         workflow_state=WorkflowState.SUBMITTED,
         created_by=moderator_id,
+        article_source_type="USER",
         updated_by=moderator_id,
     )
     db.add(article)

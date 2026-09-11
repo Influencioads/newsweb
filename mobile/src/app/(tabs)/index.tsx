@@ -1,27 +1,32 @@
-import { useQuery } from '@tanstack/react-query';
-import { router } from 'expo-router';
+import { useQuery } from "@tanstack/react-query";
+import { router } from "expo-router";
 import {
+  Linking,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
+  Share,
   Text,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import * as engagementApi from '@/api/engagement';
-import * as notificationsApi from '@/api/notifications';
-import * as publicApi from '@/api/public';
-import { CompactCard, LeadCard, RowCard } from '@/components/ArticleCard';
-import { EmptyState, ErrorState, LoadingState } from '@/components/Feedback';
-import { SectionHeader } from '@/components/SectionHeader';
-import { VideoStrip } from '@/components/VideoStrip';
-import { useI18n } from '@/lib/i18n';
-import { font } from '@/lib/theme';
-import { makeStyles, useColors } from '@/lib/useTheme';
-import { useAuth } from '@/stores/auth';
-import { usePrefs } from '@/stores/prefs';
+import * as engagementApi from "@/api/engagement";
+import * as notificationsApi from "@/api/notifications";
+import * as publicApi from "@/api/public";
+import * as epaperApi from "@/api/epaper";
+import { API_BASE } from "@/api/client";
+import { CompactCard, LeadCard, RowCard } from "@/components/ArticleCard";
+import { EmptyState, ErrorState, LoadingState } from "@/components/Feedback";
+import { SectionHeader } from "@/components/SectionHeader";
+import { VideoStrip } from "@/components/VideoStrip";
+import { PollCard } from "@/components/PollCard";
+import { useI18n } from "@/lib/i18n";
+import { font } from "@/lib/theme";
+import { makeStyles, useColors } from "@/lib/useTheme";
+import { useAuth } from "@/stores/auth";
+import { usePrefs } from "@/stores/prefs";
 
 /**
  * Home feed: breaking strip, lead story, secondary rows, latest rail, then the
@@ -33,15 +38,15 @@ export default function HomeScreen() {
   const { t, pick } = useI18n();
   const edition = usePrefs((s) => s.edition);
   const mandal = usePrefs((s) => s.mandal);
-  const authed = useAuth((s) => s.status === 'authenticated');
+  const authed = useAuth((s) => s.status === "authenticated");
 
   const home = useQuery({
-    queryKey: ['home', edition, mandal],
+    queryKey: ["home", edition, mandal],
     queryFn: () => publicApi.fetchHome(edition, mandal),
   });
 
   const unread = useQuery({
-    queryKey: ['inbox-unread'],
+    queryKey: ["inbox-unread"],
     queryFn: () => notificationsApi.fetchInbox(0),
     enabled: authed,
     refetchInterval: 60_000,
@@ -51,16 +56,24 @@ export default function HomeScreen() {
   // §3.2 personalized rail — fetched separately so the shared home payload
   // stays cacheable; anonymous readers simply never see the block.
   const forYou = useQuery({
-    queryKey: ['for-you-home'],
+    queryKey: ["for-you-home"],
     queryFn: () => engagementApi.fetchForYou(0, 5),
     enabled: authed,
     staleTime: 120_000,
   });
 
   const config = useQuery({
-    queryKey: ['config'],
+    queryKey: ["config"],
     queryFn: publicApi.fetchSiteConfig,
     staleTime: 300_000,
+  });
+  const topics = useQuery({
+    queryKey: ["top-topics"],
+    queryFn: epaperApi.fetchTopics,
+  });
+  const polls = useQuery({
+    queryKey: ["big-question"],
+    queryFn: () => epaperApi.fetchPolls(true),
   });
 
   const editionName = (() => {
@@ -70,40 +83,40 @@ export default function HomeScreen() {
   })();
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={["top"]}>
       {/* ------------------------------------------------ masthead ---------- */}
       <View style={styles.masthead}>
         <Text style={styles.mastheadTitle}>టాప్ తెలుగు న్యూస్</Text>
         <View style={styles.mastheadActions}>
           <Pressable
-            onPress={() => router.push('/short-news')}
+            onPress={() => router.push("/short-news")}
             accessibilityRole="button"
-            accessibilityLabel={t('shorts.title')}
+            accessibilityLabel={t("shorts.title")}
             style={styles.editionChip}
           >
-            <Text style={styles.editionText}>⚡ {t('shorts.title')}</Text>
+            <Text style={styles.editionText}>⚡ {t("shorts.title")}</Text>
           </Pressable>
           <Pressable
-            onPress={() => router.push('/local')}
+            onPress={() => router.push("/local")}
             accessibilityRole="button"
             style={styles.editionChip}
           >
             <Text style={styles.editionText}>
-              ◉ {editionName ?? t('local.chooseDistrict')}
+              ◉ {editionName ?? t("local.chooseDistrict")}
             </Text>
           </Pressable>
           {authed ? (
             <Pressable
-              onPress={() => router.push('/notifications')}
+              onPress={() => router.push("/notifications")}
               accessibilityRole="button"
-              accessibilityLabel={t('notify.title')}
+              accessibilityLabel={t("notify.title")}
               style={styles.bell}
             >
               <Text style={styles.bellGlyph}>🔔</Text>
               {(unread.data?.unread ?? 0) > 0 ? (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>
-                    {unread.data!.unread > 99 ? '99+' : unread.data!.unread}
+                    {unread.data!.unread > 99 ? "99+" : unread.data!.unread}
                   </Text>
                 </View>
               ) : null}
@@ -129,14 +142,14 @@ export default function HomeScreen() {
           {/* -------------------------------------------- breaking ---------- */}
           {home.data.breaking.length ? (
             <View style={styles.breakingBar}>
-              <Text style={styles.breakingLabel}>⚡ {t('home.breaking')}</Text>
+              <Text style={styles.breakingLabel}>⚡ {t("home.breaking")}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {home.data.breaking.map((item) => (
                   <Pressable
                     key={item.short_id}
                     onPress={() =>
                       router.push({
-                        pathname: '/article/[shortId]',
+                        pathname: "/article/[shortId]",
                         params: { shortId: item.short_id },
                       })
                     }
@@ -152,6 +165,93 @@ export default function HomeScreen() {
             </View>
           ) : null}
 
+          {home.data.epaper ? (
+            <View
+              style={[
+                styles.epaper,
+                { borderColor: color.brand, backgroundColor: color.paper },
+              ]}
+            >
+              <Text style={[styles.epaperKicker, { color: color.brand }]}>
+                📰 TODAY’S TOP TELUGU NEWS — E-PAPER
+              </Text>
+              <Text style={[styles.epaperTitle, { color: color.ink }]}>
+                వార్తాపత్రికలా చదవండి
+              </Text>
+              <Text style={{ color: color.muted }}>
+                {home.data.epaper.pub_date} · {home.data.epaper.page_count}{" "}
+                పేజీలు
+              </Text>
+              <View style={styles.epaperButtons}>
+                <Pressable
+                  style={[
+                    styles.epaperPrimary,
+                    { backgroundColor: color.brand },
+                  ]}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/epaper/[date]",
+                      params: { date: home.data!.epaper!.pub_date },
+                    })
+                  }
+                >
+                  <Text style={{ color: color.onBrand, fontWeight: "800" }}>
+                    చదవండి
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.epaperSecondary, { borderColor: color.brand }]}
+                  onPress={() => router.push({ pathname: "/epaper/[date]", params: { date: home.data!.epaper!.pub_date } })}
+                ><Text style={{ color: color.brand, fontWeight: "800" }}>🎧 వినండి</Text></Pressable>
+                <Pressable
+                  style={[styles.epaperSecondary, { borderColor: color.rule }]}
+                  onPress={() => Share.share({ message: `Today's Telugu News\nhttps://telugunews.influencioweb.com/epaper/${home.data!.epaper!.pub_date}/page/1` })}
+                ><Text style={{ color: color.ink, fontWeight: "800" }}>షేర్</Text></Pressable>
+                <Pressable
+                  style={[styles.epaperSecondary, { borderColor: color.rule }]}
+                  onPress={() => Linking.openURL(`${API_BASE}/epaper/${home.data!.epaper!.pub_date}/pdf`)}
+                ><Text style={{ color: color.ink, fontWeight: "800" }}>PDF</Text></Pressable>
+                <Pressable
+                  style={[styles.epaperSecondary, { borderColor: color.brand }]}
+                  onPress={() => router.push("/my-epaper")}
+                >
+                  <Text style={{ color: color.brand, fontWeight: "800" }}>
+                    నా ఈ-పేపర్
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+
+          {topics.data?.items.length ? (
+            <View>
+              <SectionHeader title="🔥 ప్రజలు మాట్లాడుకుంటున్న టాప్ 3 అంశాలు" />
+              {topics.data.items.map((x, i) => (
+                <Pressable
+                  key={x.slug}
+                  style={[
+                    styles.topic,
+                    { borderColor: color.rule, backgroundColor: color.paper },
+                  ]}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/topic/[slug]",
+                      params: { slug: x.slug },
+                    })
+                  }
+                >
+                  <Text style={[styles.topicNumber, { color: color.brand }]}>
+                    {i + 1}
+                  </Text>
+                  <Text style={[styles.topicTitle, { color: color.ink }]}>
+                    {x.title_te}
+                  </Text>
+                  <Text style={{ color: color.brand }}>›</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+
           {/* -------------------------------------------- top of the page --- */}
           {home.data.lead ? <LeadCard article={home.data.lead} /> : null}
           {home.data.secondary.map((article) => (
@@ -164,19 +264,24 @@ export default function HomeScreen() {
           {/* -------------------------------------------- for you (§3.2) ---- */}
           {authed && (forYou.data?.articles.length ?? 0) >= 3 ? (
             <>
-              <SectionHeader title={t('foryou.title')} />
+              <SectionHeader title={t("foryou.title")} />
               {forYou.data!.articles.map((article) => (
                 <RowCard key={`fy-${article.short_id}`} article={article} />
               ))}
             </>
           ) : null}
 
+          {polls.data?.[0] ? <PollCard poll={polls.data[0]} /> : null}
+
           {/* -------------------------------------------- latest rail ------- */}
           {home.data.latest.length ? (
             <>
-              <SectionHeader title={t('home.latest')} />
+              <SectionHeader title={t("home.latest")} />
               {home.data.latest.slice(0, 6).map((article) => (
-                <CompactCard key={`latest-${article.short_id}`} article={article} />
+                <CompactCard
+                  key={`latest-${article.short_id}`}
+                  article={article}
+                />
               ))}
             </>
           ) : null}
@@ -185,8 +290,11 @@ export default function HomeScreen() {
           {home.data.mandal_block?.articles.length ? (
             <View>
               <SectionHeader
-                title={pick(home.data.mandal_block.title_te, home.data.mandal_block.title_en)}
-                onSeeAll={() => router.push('/local')}
+                title={pick(
+                  home.data.mandal_block.title_te,
+                  home.data.mandal_block.title_en,
+                )}
+                onSeeAll={() => router.push("/local")}
               />
               <LeadCard article={home.data.mandal_block.articles[0]} />
               {home.data.mandal_block.articles.slice(1, 5).map((article) => (
@@ -204,19 +312,26 @@ export default function HomeScreen() {
               <SectionHeader
                 title={pick(section.title_te, section.title_en)}
                 onSeeAll={() =>
-                  section.key === 'trending'
-                    ? router.push('/trending')
-                    : router.push({ pathname: '/section/[slug]', params: { slug: section.key } })
+                  section.key === "trending"
+                    ? router.push("/trending")
+                    : router.push({
+                        pathname: "/section/[slug]",
+                        params: { slug: section.key },
+                      })
                 }
               />
-              {section.articles[0] ? <LeadCard article={section.articles[0]} /> : null}
+              {section.articles[0] ? (
+                <LeadCard article={section.articles[0]} />
+              ) : null}
               {section.articles.slice(1, 5).map((article) => (
                 <RowCard key={article.short_id} article={article} />
               ))}
             </View>
           ))}
 
-          {!home.data.lead && !home.data.sections.length ? <EmptyState /> : null}
+          {!home.data.lead && !home.data.sections.length ? (
+            <EmptyState />
+          ) : null}
           <View style={styles.footerSpace} />
         </ScrollView>
       ) : null}
@@ -232,9 +347,9 @@ const useStyles = makeStyles((color) => ({
     borderBottomColor: color.brand,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   mastheadTitle: {
     fontFamily: font.headlineHeavy,
@@ -242,7 +357,7 @@ const useStyles = makeStyles((color) => ({
     lineHeight: 34,
     color: color.brand,
   },
-  mastheadActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  mastheadActions: { flexDirection: "row", alignItems: "center", gap: 8 },
   editionChip: {
     borderWidth: 1,
     borderColor: color.rule,
@@ -254,22 +369,32 @@ const useStyles = makeStyles((color) => ({
   bell: { padding: 4 },
   bellGlyph: { fontSize: 18 },
   badge: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     right: -2,
     backgroundColor: color.breaking,
     borderRadius: 8,
     minWidth: 16,
     height: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 3,
   },
-  badgeText: { color: color.white, fontSize: 9, fontWeight: '700', lineHeight: 12 },
-  editionText: { fontFamily: font.telugu, fontSize: 11.5, lineHeight: 17, color: color.muted },
+  badgeText: {
+    color: color.white,
+    fontSize: 9,
+    fontWeight: "700",
+    lineHeight: 12,
+  },
+  editionText: {
+    fontFamily: font.telugu,
+    fontSize: 11.5,
+    lineHeight: 17,
+    color: color.muted,
+  },
   breakingBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: color.breaking,
     paddingVertical: 7,
     paddingLeft: 12,
@@ -282,6 +407,43 @@ const useStyles = makeStyles((color) => ({
     marginRight: 10,
   },
   breakingItem: { marginRight: 22, maxWidth: 320 },
-  breakingText: { fontFamily: font.telugu, fontSize: 13, lineHeight: 20, color: color.white },
+  breakingText: {
+    fontFamily: font.telugu,
+    fontSize: 13,
+    lineHeight: 20,
+    color: color.white,
+  },
+  epaper: { margin: 12, padding: 18, borderWidth: 2, borderRadius: 10 },
+  epaperKicker: { fontWeight: "800", fontSize: 11, letterSpacing: 0.6 },
+  epaperTitle: {
+    fontFamily: font.headlineHeavy,
+    fontSize: 26,
+    lineHeight: 40,
+    marginTop: 7,
+  },
+  epaperButtons: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 },
+  epaperPrimary: {
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: 7,
+  },
+  epaperSecondary: {
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: 7,
+    borderWidth: 1,
+  },
+  topic: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  topicNumber: { fontSize: 22, fontWeight: "900" },
+  topicTitle: { fontFamily: font.teluguBold, fontSize: 15, flex: 1 },
   footerSpace: { height: 24 },
 }));

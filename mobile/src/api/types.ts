@@ -98,6 +98,7 @@ export interface ArticleDetail extends ArticleCard {
   correction_note_te: string | null;
   gallery: MediaOut[];
   related: ArticleCard[];
+  poll: import('./epaper').Poll | null;
 }
 
 export interface BreakingItem {
@@ -126,6 +127,7 @@ export interface HomePayload {
   latest: ArticleCard[];
   breaking: BreakingItem[];
   sections: HomeSection[];
+  epaper: {edition_slug:string;pub_date:string;thumb_url:string|null;page_count:number}|null;
   generated_at: string;
 }
 

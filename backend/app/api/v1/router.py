@@ -22,7 +22,9 @@ from app.api.v1 import (
     cms_ingestion,
     creator,
     engagement,
+    epaper,
     notifications,
+    polls,
     public,
     users,
     videos,
@@ -35,6 +37,8 @@ api_router.include_router(auth.router)
 api_router.include_router(public.router)
 api_router.include_router(users.router)
 api_router.include_router(engagement.router)
+api_router.include_router(epaper.router)
+api_router.include_router(polls.router)
 api_router.include_router(notifications.router)
 api_router.include_router(videos.router)
 api_router.include_router(creator.router)

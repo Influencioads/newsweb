@@ -45,7 +45,8 @@ class MediaOut(BaseModel):
     width: int | None
     height: int | None
     blurhash: str | None = Field(
-        default=None, description="Placeholder shown while the image loads (protects CLS)"
+        default=None,
+        description="Placeholder shown while the image loads (protects CLS)",
     )
     ai_generated: bool = Field(
         default=False,
@@ -184,6 +185,7 @@ class ArticleDetailOut(ArticleCardOut):
         description="Additional photographs for this story, in editorial order",
     )
     related: list[ArticleCardOut] = Field(default_factory=list)
+    poll: dict[str, Any] | None = None
 
 
 class BreakingItemOut(BaseModel):
@@ -232,7 +234,8 @@ class HomeOut(BaseModel):
     )
     briefs: list[ArticleCardOut] = Field(default_factory=list)
     latest: list[ArticleCardOut] = Field(
-        default_factory=list, description="Right rail, newest first, with relative timestamps"
+        default_factory=list,
+        description="Right rail, newest first, with relative timestamps",
     )
     breaking: list[BreakingItemOut] = Field(default_factory=list)
     sections: list[HomeSectionOut] = Field(default_factory=list)
@@ -245,7 +248,8 @@ class CategoryFeedOut(BaseModel):
     district: DistrictOut | None
     articles: list[ArticleCardOut]
     next_cursor: str | None = Field(
-        default=None, description="Opaque cursor for the next page (§13 cursor pagination)"
+        default=None,
+        description="Opaque cursor for the next page (§13 cursor pagination)",
     )
 
 
@@ -270,7 +274,8 @@ class SearchResultsOut(BaseModel):
     total: int
     articles: list[ArticleCardOut]
     next_offset: int | None = Field(
-        default=None, description="Pass back as `offset` for the next page; null when exhausted"
+        default=None,
+        description="Pass back as `offset` for the next page; null when exhausted",
     )
 
 

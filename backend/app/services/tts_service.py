@@ -65,10 +65,18 @@ def content_hash(text: str) -> str:
 
 #: What an editor may attach by hand. Deliberately narrow: these are the
 #: containers every browser and both mobile platforms decode natively.
-ALLOWED_AUDIO_MIMES = frozenset({
-    "audio/mpeg", "audio/mp3", "audio/mp4", "audio/aac",
-    "audio/wav", "audio/x-wav", "audio/ogg", "audio/webm",
-})
+ALLOWED_AUDIO_MIMES = frozenset(
+    {
+        "audio/mpeg",
+        "audio/mp3",
+        "audio/mp4",
+        "audio/aac",
+        "audio/wav",
+        "audio/x-wav",
+        "audio/ogg",
+        "audio/webm",
+    }
+)
 MAX_AUDIO_BYTES = 50 * 1024 * 1024
 
 #: Marks a rendition that a person uploaded rather than a provider generated.
@@ -78,11 +86,13 @@ UPLOAD_PROVIDER = "upload"
 def uploaded_asset(db: Session, article: Article) -> AudioAsset | None:
     """The hand-attached file for this article, if there is one."""
     return db.scalar(
-        select(AudioAsset).where(
+        select(AudioAsset)
+        .where(
             AudioAsset.article_id == article.id,
             AudioAsset.provider == UPLOAD_PROVIDER,
             AudioAsset.status == AudioStatus.READY,
-        ).order_by(AudioAsset.created_at.desc())
+        )
+        .order_by(AudioAsset.created_at.desc())
     )
 
 
@@ -100,12 +110,21 @@ def is_enabled(db: Session, article: Article) -> bool:
         return False
     if uploaded_asset(db, article) is not None:
         return True
-    return settings_service.voice_enabled(db)
+    return settings_service.voice_enabled(db) and settings_service.get_bool(
+        db, "voice.article_tts_enabled"
+    )
 
 
-def attach_upload(db: Session, article: Article, *, raw: bytes, filename: str,
-                  mime: str, duration_sec: int = 0,
-                  requested_by: int | None = None) -> AudioAsset:
+def attach_upload(
+    db: Session,
+    article: Article,
+    *,
+    raw: bytes,
+    filename: str,
+    mime: str,
+    duration_sec: int = 0,
+    requested_by: int | None = None,
+) -> AudioAsset:
     """Store an editor's own audio file as this article's rendition (§19).
 
     Replaces any previous upload rather than accumulating them: the article has
@@ -114,20 +133,32 @@ def attach_upload(db: Session, article: Article, *, raw: bytes, filename: str,
     from app.core.errors import FileTooLargeError, UnsupportedMediaTypeError
 
     if mime not in ALLOWED_AUDIO_MIMES:
-        raise UnsupportedMediaTypeError(details={"mime": mime,
-                                                 "allowed": sorted(ALLOWED_AUDIO_MIMES)})
+        raise UnsupportedMediaTypeError(
+            details={"mime": mime, "allowed": sorted(ALLOWED_AUDIO_MIMES)}
+        )
     if not raw:
         raise UnsupportedMediaTypeError(details={"file": "empty"})
     if len(raw) > MAX_AUDIO_BYTES:
-        raise FileTooLargeError(details={"bytes": len(raw), "max_bytes": MAX_AUDIO_BYTES})
+        raise FileTooLargeError(
+            details={"bytes": len(raw), "max_bytes": MAX_AUDIO_BYTES}
+        )
 
     digest = hashlib.sha256(raw).hexdigest()
-    extension = {"audio/mpeg": "mp3", "audio/mp3": "mp3", "audio/mp4": "m4a",
-                 "audio/aac": "aac", "audio/wav": "wav", "audio/x-wav": "wav",
-                 "audio/ogg": "ogg", "audio/webm": "webm"}.get(mime, "bin")
+    extension = {
+        "audio/mpeg": "mp3",
+        "audio/mp3": "mp3",
+        "audio/mp4": "m4a",
+        "audio/aac": "aac",
+        "audio/wav": "wav",
+        "audio/x-wav": "wav",
+        "audio/ogg": "ogg",
+        "audio/webm": "webm",
+    }.get(mime, "bin")
     key = f"audio/{article.short_id}/upload-{digest[:16]}.{extension}"
     stored = get_storage().put(
-        key, raw, content_type=mime,
+        key,
+        raw,
+        content_type=mime,
         cache_control="public, max-age=31536000, immutable",
     )
 
@@ -136,8 +167,11 @@ def attach_upload(db: Session, article: Article, *, raw: bytes, filename: str,
         db.delete(previous)
         db.flush()
 
-    row = db.scalar(select(AudioAsset).where(
-        AudioAsset.article_id == article.id, AudioAsset.content_hash == digest))
+    row = db.scalar(
+        select(AudioAsset).where(
+            AudioAsset.article_id == article.id, AudioAsset.content_hash == digest
+        )
+    )
     if row is None:
         row = AudioAsset(article_id=article.id, content_hash=digest)
         db.add(row)
@@ -181,11 +215,17 @@ def remove_upload(db: Session, article: Article) -> bool:
 
 
 def _month_chars_used(db: Session) -> int:
-    start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    return int(db.scalar(
-        select(func.coalesce(func.sum(AudioAsset.char_count), 0))
-        .where(AudioAsset.created_at >= start, AudioAsset.status == AudioStatus.READY)
-    ) or 0)
+    start = datetime.now(timezone.utc).replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0
+    )
+    return int(
+        db.scalar(
+            select(func.coalesce(func.sum(AudioAsset.char_count), 0)).where(
+                AudioAsset.created_at >= start, AudioAsset.status == AudioStatus.READY
+            )
+        )
+        or 0
+    )
 
 
 def existing_ready(db: Session, article: Article) -> AudioAsset | None:
@@ -207,8 +247,13 @@ def existing_ready(db: Session, article: Article) -> AudioAsset | None:
     )
 
 
-def ensure_audio(db: Session, article: Article, *, requested_by: int | None = None,
-                 force: bool = False) -> AudioAsset | None:
+def ensure_audio(
+    db: Session,
+    article: Article,
+    *,
+    requested_by: int | None = None,
+    force: bool = False,
+) -> AudioAsset | None:
     """Return a ready rendition, generating one only if necessary.
 
     Returns None whenever audio is not possible — switched off, no provider,
@@ -230,8 +275,11 @@ def ensure_audio(db: Session, article: Article, *, requested_by: int | None = No
         return None
     digest = content_hash(text)
 
-    row = db.scalar(select(AudioAsset).where(
-        AudioAsset.article_id == article.id, AudioAsset.content_hash == digest))
+    row = db.scalar(
+        select(AudioAsset).where(
+            AudioAsset.article_id == article.id, AudioAsset.content_hash == digest
+        )
+    )
     if row is not None and row.status == AudioStatus.READY and not force:
         # §21 cache hit — the words did not change, so nothing is spent.
         if article.audio_asset_id != row.id:
@@ -245,7 +293,9 @@ def ensure_audio(db: Session, article: Article, *, requested_by: int | None = No
     language = str(settings_service.get(db, "voice.language") or "te-IN")
     provider = get_tts(provider_name)
     if not provider.available():
-        logger.info("tts_provider_unavailable", provider=provider_name, article_id=article.id)
+        logger.info(
+            "tts_provider_unavailable", provider=provider_name, article_id=article.id
+        )
         return None
 
     budget = settings_service.get_int(db, "voice.monthly_char_budget")
@@ -254,7 +304,9 @@ def ensure_audio(db: Session, article: Article, *, requested_by: int | None = No
         return None
 
     if row is None:
-        row = AudioAsset(article_id=article.id, content_hash=digest, requested_by=requested_by)
+        row = AudioAsset(
+            article_id=article.id, content_hash=digest, requested_by=requested_by
+        )
         db.add(row)
     row.status = AudioStatus.GENERATING
     row.provider = provider.key
@@ -274,7 +326,9 @@ def ensure_audio(db: Session, article: Article, *, requested_by: int | None = No
     extension = "mp3" if result.mime == "audio/mpeg" else "wav"
     key = f"audio/{article.short_id}/{digest[:16]}.{extension}"
     stored = get_storage().put(
-        key, result.audio, content_type=result.mime,
+        key,
+        result.audio,
+        content_type=result.mime,
         # Immutable by construction: the hash is in the key, so a change is a
         # different object rather than a new version of this one.
         cache_control="public, max-age=31536000, immutable",
@@ -291,8 +345,13 @@ def ensure_audio(db: Session, article: Article, *, requested_by: int | None = No
     row.error = None
     article.audio_asset_id = row.id
     db.flush()
-    logger.info("tts_generated", article_id=article.id, provider=provider.key,
-                chars=row.char_count, bytes=row.bytes)
+    logger.info(
+        "tts_generated",
+        article_id=article.id,
+        provider=provider.key,
+        chars=row.char_count,
+        bytes=row.bytes,
+    )
     return row
 
 
@@ -304,8 +363,20 @@ def usage_summary(db: Session) -> dict[str, int]:
         "chars_this_month": used,
         "monthly_budget": budget,
         "percent_used": round(used * 100 / budget) if budget else 0,
-        "assets_ready": int(db.scalar(select(func.count(AudioAsset.id)).where(
-            AudioAsset.status == AudioStatus.READY)) or 0),
-        "assets_failed": int(db.scalar(select(func.count(AudioAsset.id)).where(
-            AudioAsset.status == AudioStatus.FAILED)) or 0),
+        "assets_ready": int(
+            db.scalar(
+                select(func.count(AudioAsset.id)).where(
+                    AudioAsset.status == AudioStatus.READY
+                )
+            )
+            or 0
+        ),
+        "assets_failed": int(
+            db.scalar(
+                select(func.count(AudioAsset.id)).where(
+                    AudioAsset.status == AudioStatus.FAILED
+                )
+            )
+            or 0
+        ),
     }

@@ -31,18 +31,24 @@ class ArticleWrite(BaseModel):
     gallery_media_ids: list[int] | None = Field(default=None, max_length=40)
     video_id: int | None = None
     video_youtube_url: str | None = Field(
-        default=None, max_length=300,
-        description="Pasting a YouTube URL creates/reuses a Video row and links it.")
+        default=None,
+        max_length=300,
+        description="Pasting a YouTube URL creates/reuses a Video row and links it.",
+    )
 
     # taxonomy
     tags: list[str] | None = Field(
-        default=None, max_length=25,
-        description="Tag names or slugs. Unknown names are created as topic tags.")
+        default=None,
+        max_length=25,
+        description="Tag names or slugs. Unknown names are created as topic tags.",
+    )
 
     # byline and provenance
     byline_te: str | None = Field(default=None, max_length=200)
     author_id: int | None = None
-    source_type: str = Field(default="own", pattern=r"^(own|agency|contributed|syndicated)$")
+    source_type: str = Field(
+        default="own", pattern=r"^(own|agency|contributed|syndicated)$"
+    )
     source_credit: str | None = Field(default=None, max_length=200)
     article_type: ArticleType | None = None
 
@@ -53,7 +59,9 @@ class ArticleWrite(BaseModel):
     voice_enabled: bool = True
 
     # SEO (§1)
-    slug: str | None = Field(default=None, max_length=180, pattern=r"^[a-z0-9][a-z0-9-]*$")
+    slug: str | None = Field(
+        default=None, max_length=180, pattern=r"^[a-z0-9][a-z0-9-]*$"
+    )
     seo_title: str | None = Field(default=None, max_length=200)
     seo_description: str | None = Field(default=None, max_length=400)
     canonical_url: str | None = Field(default=None, max_length=500)
@@ -90,7 +98,9 @@ class ArticlePatch(BaseModel):
 
     byline_te: str | None = Field(default=None, max_length=200)
     author_id: int | None = None
-    source_type: str | None = Field(default=None, pattern=r"^(own|agency|contributed|syndicated)$")
+    source_type: str | None = Field(
+        default=None, pattern=r"^(own|agency|contributed|syndicated)$"
+    )
     source_credit: str | None = Field(default=None, max_length=200)
     article_type: ArticleType | None = None
 
@@ -99,7 +109,9 @@ class ArticlePatch(BaseModel):
     is_featured: bool | None = None
     voice_enabled: bool | None = None
 
-    slug: str | None = Field(default=None, max_length=180, pattern=r"^[a-z0-9][a-z0-9-]*$")
+    slug: str | None = Field(
+        default=None, max_length=180, pattern=r"^[a-z0-9][a-z0-9-]*$"
+    )
     seo_title: str | None = Field(default=None, max_length=200)
     seo_description: str | None = Field(default=None, max_length=400)
     canonical_url: str | None = Field(default=None, max_length=500)
@@ -188,6 +200,9 @@ class CmsArticleOut(BaseModel):
     seo_description: str | None = None
     canonical_url: str | None = None
     approved_by: int | None
+    reviewed_by: int | None = None
+    published_by: int | None = None
+    article_source_type: str = "ADMIN"
     approved_at: datetime | None
     published_at: datetime | None
     scheduled_at: datetime | None = None

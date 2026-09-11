@@ -95,6 +95,7 @@ export interface ArticleDetail extends ArticleCard {
   /** Additional photographs (article_media.role = 'gallery'), editorial order. */
   gallery: MediaOut[];
   related: ArticleCard[];
+  poll: import('./epaper').Poll | null;
 }
 
 export interface BreakingItem {

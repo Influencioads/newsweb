@@ -46,43 +46,83 @@ class Spec:
 SPECS: dict[str, Spec] = {
     # --- §18 AI control -----------------------------------------------------
     "ai.enabled": Spec(
-        False, "bool",
-        "Master switch for every AI feature. Off means no provider is ever called."),
+        False,
+        "bool",
+        "Master switch for every AI feature. Off means no provider is ever called.",
+    ),
     "ai.auto_suggest": Spec(
-        False, "bool",
-        "Run the daily topic-discovery pass. Suggestions still need an editor."),
+        False,
+        "bool",
+        "Run the daily topic-discovery pass. Suggestions still need an editor.",
+    ),
     "ai.provider": Spec(
-        env_settings.AI_DEFAULT_PROVIDER, "str",
-        "Which provider adapter to use: heuristic | gemini | openai | anthropic."),
+        env_settings.AI_DEFAULT_PROVIDER,
+        "str",
+        "Which provider adapter to use: heuristic | gemini | openai | anthropic.",
+    ),
     "ai.daily_suggestion_limit": Spec(
-        20, "int", "Maximum suggestions generated per day — the §18 cost ceiling."),
+        20, "int", "Maximum suggestions generated per day — the §18 cost ceiling."
+    ),
     "ai.min_score": Spec(
-        0.35, "float", "Suggestions scoring below this are not shown."),
+        0.35, "float", "Suggestions scoring below this are not shown."
+    ),
     # --- §20 / §21 voice ----------------------------------------------------
     "voice.enabled": Spec(
-        False, "bool",
+        False,
+        "bool",
         "Generate spoken audio with a TTS provider. Off hides the Listen button "
         "on stories that would have been synthesised; audio an editor uploaded "
-        "by hand still plays, because it costs nothing to serve."),
-    "voice.provider": Spec(
-        "local", "str", "TTS adapter: local | google | bhashini."),
+        "by hand still plays, because it costs nothing to serve.",
+    ),
+    "voice.provider": Spec("local", "str", "TTS adapter: local | google | bhashini."),
     "voice.language": Spec("te-IN", "str", "Synthesis language tag."),
     "voice.auto_generate_on_publish": Spec(
-        False, "bool",
-        "Generate audio the moment a story publishes, instead of on first request."),
+        False,
+        "bool",
+        "Generate audio the moment a story publishes, instead of on first request.",
+    ),
+    "voice.article_tts_enabled": Spec(
+        True,
+        "bool",
+        "Allow generated article TTS. Per-article voice must also be enabled.",
+    ),
+    # --- E-Paper / polls ----------------------------------------------------
+    "epaper.enabled": Spec(True, "bool", "Show published E-Paper editions to readers."),
+    "epaper.auto_generate": Spec(
+        False, "bool", "Generate today's draft edition on schedule."
+    ),
+    "epaper.auto_generate_time": Spec(
+        "05:00", "str", "Daily E-Paper draft generation time in Asia/Kolkata."
+    ),
+    "epaper.audio_enabled": Spec(
+        False, "bool", "Expose the cached E-Paper audio playlist."
+    ),
+    "epaper.personalized_enabled": Spec(
+        True, "bool", "Allow readers to save personalized editions."
+    ),
+    "polls.enabled": Spec(True, "bool", "Show active polls and accept votes."),
+    "ai.research_enabled": Spec(
+        False, "bool", "Allow licensed multi-source AI research."
+    ),
     "voice.monthly_char_budget": Spec(
-        2_000_000, "int",
-        "Hard character ceiling per calendar month (§21). Generation stops at the limit."),
+        2_000_000,
+        "int",
+        "Hard character ceiling per calendar month (§21). Generation stops at the limit.",
+    ),
     # --- §35 feed balance ---------------------------------------------------
     "feed.ratios": Spec(
-        {"personal": 40, "local": 25, "trending": 25, "breaking": 10}, "ratios",
-        "How the personalised feed is composed, in percent. Must total 100."),
+        {"personal": 40, "local": 25, "trending": 25, "breaking": 10},
+        "ratios",
+        "How the personalised feed is composed, in percent. Must total 100.",
+    ),
     # --- §9 breaking --------------------------------------------------------
     "breaking.default_duration_minutes": Spec(
-        1440, "int", "How long a breaking story stays in the ticker without an explicit end."),
+        1440,
+        "int",
+        "How long a breaking story stays in the ticker without an explicit end.",
+    ),
     # --- §6 submissions -----------------------------------------------------
-    "submissions.enabled": Spec(
-        True, "bool", "Accept reader-submitted articles."),
+    "submissions.enabled": Spec(True, "bool", "Accept reader-submitted articles."),
 }
 
 
@@ -152,7 +192,9 @@ def _coerce(key: str, value: Any) -> Any:
             raise ValidationError(details={key: "must be an object of percentages"})
         expected = set(SPECS[key].default)
         if set(value) != expected:
-            raise ValidationError(details={key: f"must contain exactly {sorted(expected)}"})
+            raise ValidationError(
+                details={key: f"must contain exactly {sorted(expected)}"}
+            )
         clean: dict[str, int] = {}
         for name, pct in value.items():
             if isinstance(pct, bool) or not isinstance(pct, int) or not 0 <= pct <= 100:
@@ -164,14 +206,20 @@ def _coerce(key: str, value: Any) -> Any:
     raise ValidationError(details={key: "unsupported setting type"})
 
 
-def set_many(db: Session, changes: dict[str, Any], actor_id: int | None) -> dict[str, Any]:
+def set_many(
+    db: Session, changes: dict[str, Any], actor_id: int | None
+) -> dict[str, Any]:
     """Write validated settings. Returns the full resolved set afterwards."""
     unknown = sorted(set(changes) - set(SPECS))
     if unknown:
         raise ValidationError(details={"keys": f"unknown settings: {unknown}"})
 
-    rows = {r.key: r for r in db.scalars(
-        select(AppSetting).where(AppSetting.key.in_(list(changes)))).all()}
+    rows = {
+        r.key: r
+        for r in db.scalars(
+            select(AppSetting).where(AppSetting.key.in_(list(changes)))
+        ).all()
+    }
     for key, raw in changes.items():
         value = _coerce(key, raw)
         row = rows.get(key)
@@ -188,8 +236,12 @@ def set_many(db: Session, changes: dict[str, Any], actor_id: int | None) -> dict
 def describe() -> list[dict[str, Any]]:
     """Metadata for the admin screen so the UI need not hard-code the list."""
     return [
-        {"key": key, "kind": spec.kind, "default": spec.default,
-         "description": spec.description}
+        {
+            "key": key,
+            "kind": spec.kind,
+            "default": spec.default,
+            "description": spec.description,
+        }
         for key, spec in SPECS.items()
     ]
 

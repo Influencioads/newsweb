@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         default-libmysqlclient-dev \
         ffmpeg \
         libmagic1 \
+        fonts-noto-core \
         poppler-utils \
         tesseract-ocr \
         tesseract-ocr-tel \

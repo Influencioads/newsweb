@@ -1,23 +1,33 @@
-import { useQuery } from '@tanstack/react-query';
-import { Image } from 'expo-image';
-import { Stack, useLocalSearchParams } from 'expo-router';
-import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { useQuery } from "@tanstack/react-query";
+import { Image } from "expo-image";
+import { Stack, useLocalSearchParams } from "expo-router";
+import {
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-import { absoluteMediaUrl, API_ORIGIN } from '@/api/client';
-import * as publicApi from '@/api/public';
-import { RowCard } from '@/components/ArticleCard';
-import { BodyRenderer } from '@/components/BodyRenderer';
-import { Comments } from '@/components/Comments';
-import { EngagementRow } from '@/components/EngagementRow';
-import { ErrorState, LoadingState } from '@/components/Feedback';
-import { FollowChip } from '@/components/FollowChip';
-import { trackShare, useReadingBeacon } from '@/lib/beacon';
-import { timeAgo, useI18n } from '@/lib/i18n';
-import { color, font, FONT_SCALE, FONT_STEPS } from '@/lib/theme';
-import { makeStyles } from '@/lib/useTheme';
-import { ArticleAudio } from '@/components/ArticleAudio';
-import { extractPlainText, useTts } from '@/lib/tts';
-import { usePrefs } from '@/stores/prefs';
+import { absoluteMediaUrl, API_ORIGIN } from "@/api/client";
+import * as publicApi from "@/api/public";
+import { RowCard } from "@/components/ArticleCard";
+import { BodyRenderer } from "@/components/BodyRenderer";
+import { Comments } from "@/components/Comments";
+import { PollCard } from "@/components/PollCard";
+import { EngagementRow } from "@/components/EngagementRow";
+import { ErrorState, LoadingState } from "@/components/Feedback";
+import { FollowChip } from "@/components/FollowChip";
+import { trackShare, useReadingBeacon } from "@/lib/beacon";
+import { timeAgo, useI18n } from "@/lib/i18n";
+import { color, font, FONT_SCALE, FONT_STEPS } from "@/lib/theme";
+import { makeStyles } from "@/lib/useTheme";
+import { ArticleAudio } from "@/components/ArticleAudio";
+import { extractPlainText, useTts } from "@/lib/tts";
+import { usePrefs } from "@/stores/prefs";
 
 /**
  * Article page (§5): headline, sub-head, hero with credit, byline and times,
@@ -31,7 +41,7 @@ export default function ArticleScreen() {
   const { fontStep, setFontStep } = usePrefs();
 
   const article = useQuery({
-    queryKey: ['article', shortId],
+    queryKey: ["article", shortId],
     queryFn: () => publicApi.fetchArticle(shortId!),
     enabled: Boolean(shortId),
   });
@@ -44,12 +54,15 @@ export default function ArticleScreen() {
 
   // §16 audio news, v1: the platform's Telugu voice. Headline first so a
   // listener knows immediately which story started.
-  const tts = useTts(data ? `${data.title_te}. ${extractPlainText(data.body)}` : '');
+  const tts = useTts(
+    data ? `${data.title_te}. ${extractPlainText(data.body)}` : "",
+  );
 
   function onScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
     const scrollable = contentSize.height - layoutMeasurement.height;
-    if (scrollable > 0) reportScroll(((contentOffset.y + 0.5) / scrollable) * 100);
+    if (scrollable > 0)
+      reportScroll(((contentOffset.y + 0.5) / scrollable) * 100);
   }
 
   async function share() {
@@ -68,24 +81,44 @@ export default function ArticleScreen() {
     <>
       <Stack.Screen
         options={{
-          title: data?.category ? pick(data.category.name_te, data.category.name_en) : '',
+          title: data?.category
+            ? pick(data.category.name_te, data.category.name_en)
+            : "",
         }}
       />
       {article.isLoading ? <LoadingState /> : null}
-      {article.isError ? <ErrorState onRetry={() => article.refetch()} /> : null}
+      {article.isError ? (
+        <ErrorState onRetry={() => article.refetch()} />
+      ) : null}
 
       {data ? (
-        <ScrollView style={styles.scroll} onScroll={onScroll} scrollEventThrottle={400}>
+        <ScrollView
+          style={styles.scroll}
+          onScroll={onScroll}
+          scrollEventThrottle={400}
+        >
           <View style={styles.head}>
-            {data.is_breaking ? <Text style={styles.breaking}>{t('home.breaking')}</Text> : null}
-            {data.is_exclusive ? (
-              <Text style={styles.exclusive}>★ {t('article.exclusive')}</Text>
+            {data.is_breaking ? (
+              <Text style={styles.breaking}>{t("home.breaking")}</Text>
             ) : null}
-            <Text style={[styles.title, { fontSize: 25 * scale, lineHeight: 38 * scale }]}>
+            {data.is_exclusive ? (
+              <Text style={styles.exclusive}>★ {t("article.exclusive")}</Text>
+            ) : null}
+            <Text
+              style={[
+                styles.title,
+                { fontSize: 25 * scale, lineHeight: 38 * scale },
+              ]}
+            >
               {data.title_te}
             </Text>
             {data.sub_title_te ? (
-              <Text style={[styles.subTitle, { fontSize: 16 * scale, lineHeight: 26 * scale }]}>
+              <Text
+                style={[
+                  styles.subTitle,
+                  { fontSize: 16 * scale, lineHeight: 26 * scale },
+                ]}
+              >
                 {data.sub_title_te}
               </Text>
             ) : null}
@@ -94,16 +127,19 @@ export default function ArticleScreen() {
               <View style={{ flex: 1 }}>
                 {data.byline_te || data.author ? (
                   <Text style={styles.byline}>
-                    {data.byline_te ?? pick(data.author?.name_te, data.author?.name_en)}
+                    {data.byline_te ??
+                      pick(data.author?.name_te, data.author?.name_en)}
                   </Text>
                 ) : null}
                 <Text style={styles.time}>
                   {[
-                    data.district ? pick(data.district.name_te, data.district.name_en) : null,
+                    data.district
+                      ? pick(data.district.name_te, data.district.name_en)
+                      : null,
                     timeAgo(data.published_at, language),
                   ]
                     .filter(Boolean)
-                    .join(' · ')}
+                    .join(" · ")}
                 </Text>
               </View>
               {/* §19 — server audio when it exists, device voice otherwise. */}
@@ -111,11 +147,15 @@ export default function ArticleScreen() {
                 shortId={data.short_id}
                 deviceSpeaking={tts.speaking}
                 onToggleDevice={tts.toggle}
-                listenLabel={t('article.listen')}
-                stopLabel={t('article.stopListening')}
+                listenLabel={t("article.listen")}
+                stopLabel={t("article.stopListening")}
               />
-              <Pressable onPress={share} accessibilityRole="button" style={styles.shareButton}>
-                <Text style={styles.shareText}>↗ {t('article.share')}</Text>
+              <Pressable
+                onPress={share}
+                accessibilityRole="button"
+                style={styles.shareButton}
+              >
+                <Text style={styles.shareText}>↗ {t("article.share")}</Text>
               </Pressable>
             </View>
 
@@ -127,10 +167,16 @@ export default function ArticleScreen() {
                   onPress={() => setFontStep(step)}
                   accessibilityRole="button"
                   accessibilityState={{ selected: fontStep === step }}
-                  style={[styles.fontStep, fontStep === step && styles.fontStepActive]}
+                  style={[
+                    styles.fontStep,
+                    fontStep === step && styles.fontStepActive,
+                  ]}
                 >
                   <Text
-                    style={[styles.fontStepText, fontStep === step && styles.fontStepTextActive]}
+                    style={[
+                      styles.fontStepText,
+                      fontStep === step && styles.fontStepTextActive,
+                    ]}
                   >
                     {step}
                   </Text>
@@ -147,11 +193,13 @@ export default function ArticleScreen() {
                 contentFit="cover"
                 placeholder={data.hero.blurhash ?? undefined}
                 transition={200}
-                accessibilityLabel={data.hero.alt_te ?? ''}
+                accessibilityLabel={data.hero.alt_te ?? ""}
               />
               {data.hero.caption_te || data.hero.credit ? (
                 <Text style={styles.heroCaption}>
-                  {[data.hero.caption_te, data.hero.credit].filter(Boolean).join(' · ')}
+                  {[data.hero.caption_te, data.hero.credit]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </Text>
               ) : null}
             </View>
@@ -159,11 +207,13 @@ export default function ArticleScreen() {
 
           <View style={styles.body}>
             {data.ai_generated ? (
-              <Text style={styles.aiLabel}>◆ {t('article.aiLabel')}</Text>
+              <Text style={styles.aiLabel}>◆ {t("article.aiLabel")}</Text>
             ) : null}
             {data.correction_note_te ? (
               <View style={styles.correction}>
-                <Text style={styles.correctionText}>{data.correction_note_te}</Text>
+                <Text style={styles.correctionText}>
+                  {data.correction_note_te}
+                </Text>
               </View>
             ) : null}
             <BodyRenderer doc={data.body} />
@@ -176,7 +226,7 @@ export default function ArticleScreen() {
 
             {/* Follow the threads this story belongs to (§12) */}
             <View style={styles.followRow}>
-              <Text style={styles.followLabel}>{t('engage.follow')}</Text>
+              <Text style={styles.followLabel}>{t("engage.follow")}</Text>
               {data.category ? (
                 <FollowChip
                   targetType="category"
@@ -200,13 +250,15 @@ export default function ArticleScreen() {
               ) : null}
             </View>
 
+            {data.poll ? <PollCard poll={data.poll} /> : null}
+
             {/* Comments (§5) */}
             <Comments shortId={data.short_id} />
           </View>
 
           {data.related.length ? (
             <View style={styles.related}>
-              <Text style={styles.relatedTitle}>{t('article.related')}</Text>
+              <Text style={styles.relatedTitle}>{t("article.related")}</Text>
               {data.related.map((item) => (
                 <RowCard key={item.short_id} article={item} />
               ))}
@@ -239,16 +291,26 @@ const useStyles = makeStyles((color) => ({
   title: { fontFamily: font.teluguBold, color: color.ink },
   subTitle: { fontFamily: font.telugu, color: color.inkSoft, marginTop: 8 },
   metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
     marginTop: 12,
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: color.rule,
   },
-  byline: { fontFamily: font.teluguSemiBold, fontSize: 13.5, lineHeight: 21, color: color.ink },
-  time: { fontFamily: font.telugu, fontSize: 12, lineHeight: 18, color: color.mutedLight },
+  byline: {
+    fontFamily: font.teluguSemiBold,
+    fontSize: 13.5,
+    lineHeight: 21,
+    color: color.ink,
+  },
+  time: {
+    fontFamily: font.telugu,
+    fontSize: 12,
+    lineHeight: 18,
+    color: color.mutedLight,
+  },
   shareButton: {
     borderWidth: 1,
     borderColor: color.rule,
@@ -256,21 +318,37 @@ const useStyles = makeStyles((color) => ({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  shareText: { fontFamily: font.teluguSemiBold, fontSize: 12.5, lineHeight: 19, color: color.brand },
+  shareText: {
+    fontFamily: font.teluguSemiBold,
+    fontSize: 12.5,
+    lineHeight: 19,
+    color: color.brand,
+  },
   listenActive: { backgroundColor: color.brandTint, borderColor: color.brand },
-  fontRow: { flexDirection: 'row', gap: 4, marginTop: 10 },
+  fontRow: { flexDirection: "row", gap: 4, marginTop: 10 },
   fontStep: {
     minWidth: 40,
-    alignItems: 'center',
+    alignItems: "center",
     borderRadius: 6,
     paddingVertical: 5,
     borderWidth: 1,
     borderColor: color.rule,
   },
-  fontStepActive: { backgroundColor: color.brandTint, borderColor: color.brand },
-  fontStepText: { fontFamily: font.teluguSemiBold, fontSize: 12, color: color.muted },
+  fontStepActive: {
+    backgroundColor: color.brandTint,
+    borderColor: color.brand,
+  },
+  fontStepText: {
+    fontFamily: font.teluguSemiBold,
+    fontSize: 12,
+    color: color.muted,
+  },
   fontStepTextActive: { color: color.brand },
-  hero: { width: '100%', aspectRatio: 16 / 9, backgroundColor: color.placeholder },
+  hero: {
+    width: "100%",
+    aspectRatio: 16 / 9,
+    backgroundColor: color.placeholder,
+  },
   heroCaption: {
     fontFamily: font.telugu,
     fontSize: 12,
@@ -284,7 +362,7 @@ const useStyles = makeStyles((color) => ({
     fontFamily: font.teluguSemiBold,
     fontSize: 12,
     lineHeight: 18,
-    color: '#6D4FC4',
+    color: "#6D4FC4",
     marginBottom: 10,
   },
   correction: {
@@ -295,7 +373,12 @@ const useStyles = makeStyles((color) => ({
     borderRadius: 6,
     marginBottom: 12,
   },
-  correctionText: { fontFamily: font.telugu, fontSize: 13, lineHeight: 21, color: color.ink },
+  correctionText: {
+    fontFamily: font.telugu,
+    fontSize: 13,
+    lineHeight: 21,
+    color: color.ink,
+  },
   sourceCredit: {
     fontFamily: font.telugu,
     fontSize: 12.5,
@@ -304,14 +387,23 @@ const useStyles = makeStyles((color) => ({
     marginTop: 8,
   },
   followRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
     gap: 8,
     marginTop: 14,
   },
-  followLabel: { fontFamily: font.teluguSemiBold, fontSize: 12.5, lineHeight: 19, color: color.muted },
-  related: { borderTopWidth: 2, borderTopColor: color.ink, backgroundColor: color.canvas },
+  followLabel: {
+    fontFamily: font.teluguSemiBold,
+    fontSize: 12.5,
+    lineHeight: 19,
+    color: color.muted,
+  },
+  related: {
+    borderTopWidth: 2,
+    borderTopColor: color.ink,
+    backgroundColor: color.canvas,
+  },
   relatedTitle: {
     fontFamily: font.headline,
     fontSize: 18,

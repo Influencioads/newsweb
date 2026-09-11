@@ -40,7 +40,6 @@ from app.models.content import Article
 from app.models.enums import (
     ArticleStatus,
     ArticleType,
-    ContentPolicy,
     IngestStatus,
     WorkflowState,
 )
@@ -51,10 +50,27 @@ logger = get_logger(__name__)
 
 #: Tags a syndicated body may keep. No script, no iframe, no style — the text
 #: arrives from outside and is treated accordingly.
-ALLOWED_TAGS = frozenset({
-    "p", "br", "strong", "em", "b", "i", "u", "blockquote",
-    "ul", "ol", "li", "h2", "h3", "h4", "a", "figure", "figcaption",
-})
+ALLOWED_TAGS = frozenset(
+    {
+        "p",
+        "br",
+        "strong",
+        "em",
+        "b",
+        "i",
+        "u",
+        "blockquote",
+        "ul",
+        "ol",
+        "li",
+        "h2",
+        "h3",
+        "h4",
+        "a",
+        "figure",
+        "figcaption",
+    }
+)
 ALLOWED_ATTRIBUTES = {"a": ["href", "title"]}
 
 #: Length of the excerpt an unlicensed source may keep — a standfirst, the
@@ -89,7 +105,9 @@ def _drop_dangerous_blocks(html: str) -> str:
 def strip_html(value: str | None) -> str:
     if not value:
         return ""
-    text = bleach.clean(_drop_dangerous_blocks(value), tags=set(), attributes={}, strip=True)
+    text = bleach.clean(
+        _drop_dangerous_blocks(value), tags=set(), attributes={}, strip=True
+    )
     return re.sub(r"\s+", " ", text).strip()
 
 
@@ -115,8 +133,12 @@ def sanitise_body(html: str | None) -> str:
     """
     if not html:
         return ""
-    return bleach.clean(_drop_dangerous_blocks(html), tags=set(ALLOWED_TAGS),
-                        attributes=ALLOWED_ATTRIBUTES, strip=True).strip()
+    return bleach.clean(
+        _drop_dangerous_blocks(html),
+        tags=set(ALLOWED_TAGS),
+        attributes=ALLOWED_ATTRIBUTES,
+        strip=True,
+    ).strip()
 
 
 def content_hash(title: str, summary: str) -> str:
@@ -137,25 +159,33 @@ def content_hash(title: str, summary: str) -> str:
 def due_sources(db: Session) -> list[ContentSource]:
     """Sources whose polling interval has elapsed."""
     now = utcnow()
-    rows = db.scalars(select(ContentSource).where(
-        ContentSource.is_active.is_(True),
-        ContentSource.consecutive_failures < MAX_CONSECUTIVE_FAILURES,
-    )).all()
+    rows = db.scalars(
+        select(ContentSource).where(
+            ContentSource.is_active.is_(True),
+            ContentSource.consecutive_failures < MAX_CONSECUTIVE_FAILURES,
+        )
+    ).all()
     return [
-        s for s in rows
+        s
+        for s in rows
         if s.last_fetched_at is None
-        or (now - s.last_fetched_at) >= timedelta(minutes=max(5, s.fetch_interval_minutes))
+        or (now - s.last_fetched_at)
+        >= timedelta(minutes=max(5, s.fetch_interval_minutes))
     ]
 
 
-def _store_entry(db: Session, source: ContentSource, entry: FeedEntry) -> IngestedItem | None:
+def _store_entry(
+    db: Session, source: ContentSource, entry: FeedEntry
+) -> IngestedItem | None:
     """Persist one feed entry, keeping only what the licence permits."""
     summary = make_excerpt(entry.summary, entry.content_html)
     digest = content_hash(entry.title, summary)
 
-    if db.scalar(select(IngestedItem).where(
-        IngestedItem.source_id == source.id, IngestedItem.guid == entry.guid
-    )):
+    if db.scalar(
+        select(IngestedItem).where(
+            IngestedItem.source_id == source.id, IngestedItem.guid == entry.guid
+        )
+    ):
         return None
     # The same wire copy from a second partner is a duplicate, not news.
     if db.scalar(select(IngestedItem).where(IngestedItem.content_hash == digest)):
@@ -191,8 +221,9 @@ def _store_entry(db: Session, source: ContentSource, entry: FeedEntry) -> Ingest
 
 def fetch_source(db: Session, source: ContentSource) -> dict[str, Any]:
     """Poll one source. Never raises — a bad feed is a recorded status."""
-    result = fetch_feed(source.feed_url, etag=source.etag,
-                        last_modified=source.last_modified)
+    result = fetch_feed(
+        source.feed_url, etag=source.etag, last_modified=source.last_modified
+    )
     source.last_fetched_at = utcnow()
     source.last_status = result.status
 
@@ -200,8 +231,12 @@ def fetch_source(db: Session, source: ContentSource) -> dict[str, Any]:
         source.consecutive_failures += 1
         source.last_error_at = utcnow()
         logger.warning("ingest_source_failed", source=source.slug, status=result.status)
-        return {"source": source.slug, "status": result.status, "new": 0,
-                "error": result.error}
+        return {
+            "source": source.slug,
+            "status": result.status,
+            "new": 0,
+            "error": result.error,
+        }
 
     source.consecutive_failures = 0
     if result.not_modified:
@@ -219,10 +254,15 @@ def fetch_source(db: Session, source: ContentSource) -> dict[str, Any]:
     source.items_ingested = (source.items_ingested or 0) + created
     db.flush()
 
-    logger.info("ingest_source_done", source=source.slug, seen=len(result.entries),
-                new=created)
-    return {"source": source.slug, "status": "ok",
-            "seen": len(result.entries), "new": created}
+    logger.info(
+        "ingest_source_done", source=source.slug, seen=len(result.entries), new=created
+    )
+    return {
+        "source": source.slug,
+        "status": "ok",
+        "seen": len(result.entries),
+        "new": created,
+    }
 
 
 def run_all(db: Session, *, only_slug: str | None = None) -> list[dict[str, Any]]:
@@ -251,9 +291,13 @@ def _auto_import(db: Session, source: ContentSource) -> int:
     import is not automatic publication, and §6.3's two-person rule is not
     negotiable for feeds either.
     """
-    items = db.scalars(select(IngestedItem).where(
-        IngestedItem.source_id == source.id, IngestedItem.status == IngestStatus.NEW
-    ).limit(25)).all()
+    items = db.scalars(
+        select(IngestedItem)
+        .where(
+            IngestedItem.source_id == source.id, IngestedItem.status == IngestStatus.NEW
+        )
+        .limit(25)
+    ).all()
     count = 0
     for item in items:
         try:
@@ -267,9 +311,7 @@ def _auto_import(db: Session, source: ContentSource) -> int:
 # --------------------------------------------------------------------------- #
 # review and import
 # --------------------------------------------------------------------------- #
-AUTO_NOTICE_TE = (
-    "ఈ కథనం {source} ఫీడ్ నుంచి యథాతథంగా తీసుకోబడింది; సంపాదక సమీక్ష జరగలేదు."
-)
+AUTO_NOTICE_TE = "ఈ కథనం {source} ఫీడ్ నుంచి యథాతథంగా తీసుకోబడింది; సంపాదక సమీక్ష జరగలేదు."
 
 
 def get_item(db: Session, item_id: int) -> IngestedItem:
@@ -279,7 +321,9 @@ def get_item(db: Session, item_id: int) -> IngestedItem:
     return item
 
 
-def reject_item(db: Session, item_id: int, *, actor_id: int, note: str | None) -> IngestedItem:
+def reject_item(
+    db: Session, item_id: int, *, actor_id: int, note: str | None
+) -> IngestedItem:
     item = get_item(db, item_id)
     item.status = IngestStatus.REJECTED
     item.reviewed_by, item.reviewed_at = actor_id, utcnow()
@@ -317,8 +361,9 @@ def _body_document(item: IngestedItem, source: ContentSource) -> dict[str, Any]:
     }
 
 
-def import_item(db: Session, item: IngestedItem, *, actor_id: int | None,
-                auto: bool = False) -> Article:
+def import_item(
+    db: Session, item: IngestedItem, *, actor_id: int | None, auto: bool = False
+) -> Article:
     """Turn a queued item into a DRAFT article.
 
     Never PUBLISHED, never SUBMITTED-and-approved: an editor still reads it.
@@ -333,8 +378,10 @@ def import_item(db: Session, item: IngestedItem, *, actor_id: int | None,
     from app.telugu.transliterate import slugify
 
     if item.status == IngestStatus.IMPORTED and item.article_id:
-        raise ConflictError(message_en="That item was already imported.",
-                            details={"article_id": item.article_id})
+        raise ConflictError(
+            message_en="That item was already imported.",
+            details={"article_id": item.article_id},
+        )
     source = item.source
     if source is None:
         raise ValidationError(message_en="The item has no source.")
@@ -349,12 +396,16 @@ def import_item(db: Session, item: IngestedItem, *, actor_id: int | None,
         title_te=title,
         title_en=item.title if (item.language or "").startswith("en") else None,
         summary_te=item.summary,
-        body=doc, body_plain=plain, body_html=html,
-        word_count=words, reading_time_sec=seconds,
+        body=doc,
+        body_plain=plain,
+        body_html=html,
+        word_count=words,
+        reading_time_sec=seconds,
         category_id=source.default_category_id,
         district_id=source.default_district_id,
         author_id=actor_id,
         created_by=actor_id,
+        article_source_type="IMPORTED",
         updated_by=actor_id,
         # §17 attribution. `workflow_service` blocks publication of a non-own
         # source without a credit, so this is not decoration.
@@ -370,13 +421,20 @@ def import_item(db: Session, item: IngestedItem, *, actor_id: int | None,
     db.add(article)
     db.flush()
 
-    db.add(WorkflowTransition(
-        article_id=article.id, from_state=None, to_state=WorkflowState.DRAFT,
-        actor_id=actor_id,
-        note=(f"Auto-imported from {source.name}" if auto
-              else f"Imported from {source.name}"),
-        created_at=utcnow(),
-    ))
+    db.add(
+        WorkflowTransition(
+            article_id=article.id,
+            from_state=None,
+            to_state=WorkflowState.DRAFT,
+            actor_id=actor_id,
+            note=(
+                f"Auto-imported from {source.name}"
+                if auto
+                else f"Imported from {source.name}"
+            ),
+            created_at=utcnow(),
+        )
+    )
 
     if auto:
         # The same line the big aggregators carry. A reader deserves to know
@@ -388,15 +446,21 @@ def import_item(db: Session, item: IngestedItem, *, actor_id: int | None,
     item.reviewed_by, item.reviewed_at = actor_id, utcnow()
     db.flush()
 
-    logger.info("ingest_item_imported", item_id=item.id, article_id=article.id,
-                source=source.slug, auto=auto)
+    logger.info(
+        "ingest_item_imported",
+        item_id=item.id,
+        article_id=article.id,
+        source=source.slug,
+        auto=auto,
+    )
     return article
 
 
 def queue_counts(db: Session) -> dict[str, int]:
     rows = db.execute(
-        select(IngestedItem.status, func.count(IngestedItem.id))
-        .group_by(IngestedItem.status)
+        select(IngestedItem.status, func.count(IngestedItem.id)).group_by(
+            IngestedItem.status
+        )
     ).all()
     counts = {status.value: 0 for status in IngestStatus}
     for status, count in rows:

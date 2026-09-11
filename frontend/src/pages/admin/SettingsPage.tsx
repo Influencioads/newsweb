@@ -173,6 +173,20 @@ export default function SettingsPage() {
           </div>
         </Group>
 
+        <Group
+          title={en ? 'E-Paper & polls' : 'ఈ-పేపర్ & పోల్స్'}
+          hint={en ? 'Daily generation creates a reviewable draft; it never publishes automatically.' : 'రోజువారీ జనరేషన్ సమీక్షించదగిన డ్రాఫ్ట్‌ను మాత్రమే సృష్టిస్తుంది; స్వయంగా ప్రచురించదు.'}
+        >
+          <Toggle checked={bool('epaper.enabled')} onChange={(v) => set('epaper.enabled', v)} label={en ? 'Enable public E-Paper' : 'పబ్లిక్ ఈ-పేపర్ ఆన్'} />
+          <Toggle checked={bool('epaper.auto_generate')} onChange={(v) => set('epaper.auto_generate', v)} label={en ? 'Auto-generate daily draft' : 'రోజువారీ డ్రాఫ్ట్ ఆటో జనరేట్'} />
+          <label className="block max-w-xs"><span className="te mb-1 block text-[12px] font-bold">{en ? 'Generation time (IST)' : 'జనరేషన్ సమయం (IST)'}</span><input type="time" className={inputClass} value={str('epaper.auto_generate_time')} onChange={(e) => set('epaper.auto_generate_time', e.target.value)} /></label>
+          <Toggle checked={bool('epaper.audio_enabled')} onChange={(v) => set('epaper.audio_enabled', v)} label={en ? 'Audio edition' : 'ఆడియో ఎడిషన్'} />
+          <Toggle checked={bool('voice.article_tts_enabled')} onChange={(v) => set('voice.article_tts_enabled', v)} label={en ? 'Article TTS' : 'కథనం TTS'} />
+          <Toggle checked={bool('epaper.personalized_enabled')} onChange={(v) => set('epaper.personalized_enabled', v)} label={en ? 'Personalized E-Paper' : 'వ్యక్తిగత ఈ-పేపర్'} />
+          <Toggle checked={bool('polls.enabled')} onChange={(v) => set('polls.enabled', v)} label={en ? 'Polls and Big Question' : 'పోల్స్ మరియు బిగ్ క్వశ్చన్'} />
+          <Toggle checked={bool('ai.research_enabled')} onChange={(v) => set('ai.research_enabled', v)} disabled={!bool('ai.enabled')} label={en ? 'AI multiple-source research' : 'AI బహుళ మూలాల పరిశోధన'} />
+        </Group>
+
         {/* --------------------------------------------------- §35 mix ---- */}
         <Group
           title={en ? 'Feed balance (§34–35)' : 'ఫీడ్ సమతుల్యత (§34–35)'}

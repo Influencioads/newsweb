@@ -76,13 +76,18 @@ def _coverage_gaps(db: Session, limit: int) -> list[dict[str, Any]]:
     copyright question. A category or district that has gone quiet is a real
     newsroom prompt, so this is a genuine fallback rather than a placeholder."""
     since = utcnow() - timedelta(days=3)
-    published = [Article.status == ArticleStatus.PUBLISHED, Article.deleted_at.is_(None)]
+    published = [
+        Article.status == ArticleStatus.PUBLISHED,
+        Article.deleted_at.is_(None),
+    ]
 
-    recent_by_category = dict(db.execute(
-        select(Article.category_id, func.count(Article.id))
-        .where(*published, Article.published_at >= since)
-        .group_by(Article.category_id)
-    ).all())
+    recent_by_category = dict(
+        db.execute(
+            select(Article.category_id, func.count(Article.id))
+            .where(*published, Article.published_at >= since)
+            .group_by(Article.category_id)
+        ).all()
+    )
     ideas: list[dict[str, Any]] = []
     for category in db.scalars(
         select(Category).where(Category.is_active.is_(True)).order_by(Category.sort)
@@ -90,55 +95,74 @@ def _coverage_gaps(db: Session, limit: int) -> list[dict[str, Any]]:
         count = int(recent_by_category.get(category.id, 0))
         if count >= 3:
             continue
-        ideas.append({
-            "topic_te": f"{category.name_te} — తాజా కథనం అవసరం",
-            "topic_en": f"{category.name_en} needs a fresh story",
-            "rationale_te": (f"గత 3 రోజుల్లో ఈ విభాగంలో {count} కథనాలు మాత్రమే "
-                             f"ప్రచురించాం."),
-            "category_id": category.id,
-            "score": round(min(1.0, (3 - count) / 3), 2),
-        })
+        ideas.append(
+            {
+                "topic_te": f"{category.name_te} — తాజా కథనం అవసరం",
+                "topic_en": f"{category.name_en} needs a fresh story",
+                "rationale_te": (f"గత 3 రోజుల్లో ఈ విభాగంలో {count} కథనాలు మాత్రమే ప్రచురించాం."),
+                "category_id": category.id,
+                "score": round(min(1.0, (3 - count) / 3), 2),
+            }
+        )
 
-    recent_by_district = dict(db.execute(
-        select(Article.district_id, func.count(Article.id))
-        .where(*published, Article.published_at >= since, Article.district_id.is_not(None))
-        .group_by(Article.district_id)
-    ).all())
+    recent_by_district = dict(
+        db.execute(
+            select(Article.district_id, func.count(Article.id))
+            .where(
+                *published,
+                Article.published_at >= since,
+                Article.district_id.is_not(None),
+            )
+            .group_by(Article.district_id)
+        ).all()
+    )
     for district in db.scalars(
-        select(District).where(District.is_active.is_(True)).order_by(District.sort).limit(20)
+        select(District)
+        .where(District.is_active.is_(True))
+        .order_by(District.sort)
+        .limit(20)
     ).all():
         if int(recent_by_district.get(district.id, 0)) > 0:
             continue
-        ideas.append({
-            "topic_te": f"{district.name_te} జిల్లా — స్థానిక వార్త అవసరం",
-            "topic_en": f"{district.name_en} district has no recent local story",
-            "rationale_te": "గత 3 రోజుల్లో ఈ జిల్లా నుంచి కథనం ప్రచురించలేదు.",
-            "district_id": district.id,
-            "score": 0.6,
-        })
+        ideas.append(
+            {
+                "topic_te": f"{district.name_te} జిల్లా — స్థానిక వార్త అవసరం",
+                "topic_en": f"{district.name_en} district has no recent local story",
+                "rationale_te": "గత 3 రోజుల్లో ఈ జిల్లా నుంచి కథనం ప్రచురించలేదు.",
+                "district_id": district.id,
+                "score": 0.6,
+            }
+        )
 
     ideas.sort(key=lambda i: i["score"], reverse=True)
     return ideas[:limit]
 
 
-def generate_suggestions(db: Session, *, limit: int | None = None,
-                         actor_id: int | None = None) -> list[AiSuggestion]:
+def generate_suggestions(
+    db: Session, *, limit: int | None = None, actor_id: int | None = None
+) -> list[AiSuggestion]:
     """§16 — build today's suggestion list. Idempotent within a day: an open
     suggestion with the same topic is not duplicated."""
     if not settings_service.ai_enabled(db):
         raise ConflictError(
             message_en="AI is switched off. Enable it in Settings first.",
-            message_te="AI ఆఫ్‌లో ఉంది. ముందుగా సెట్టింగ్స్‌లో ఆన్ చేయండి.")
+            message_te="AI ఆఫ్‌లో ఉంది. ముందుగా సెట్టింగ్స్‌లో ఆన్ చేయండి.",
+        )
 
     cap = limit or settings_service.get_int(db, "ai.daily_suggestion_limit")
     cap = max(1, min(cap, 50))
     today = utcnow() - timedelta(hours=24)
-    made_today = int(db.scalar(select(func.count(AiSuggestion.id)).where(
-        AiSuggestion.created_at >= today)) or 0)
+    made_today = int(
+        db.scalar(
+            select(func.count(AiSuggestion.id)).where(AiSuggestion.created_at >= today)
+        )
+        or 0
+    )
     if made_today >= cap:
         raise ConflictError(
             message_en=f"Today's suggestion limit ({cap}) is already reached.",
-            details={"limit": cap, "created_today": made_today})
+            details={"limit": cap, "created_today": made_today},
+        )
     room = cap - made_today
 
     provider_name = str(settings_service.get(db, "ai.provider") or "heuristic")
@@ -148,27 +172,39 @@ def generate_suggestions(db: Session, *, limit: int | None = None,
     raw: list[dict[str, Any]] = []
     if provider.key != "heuristic":
         try:
-            for idea in provider.propose_topics(context=_recent_coverage(db), limit=room):
+            for idea in provider.propose_topics(
+                context=_recent_coverage(db), limit=room
+            ):
                 if idea.score < min_score:
                     continue
                 category = None
                 if idea.category_slug:
-                    category = db.scalar(select(Category).where(Category.slug == idea.category_slug))
-                raw.append({
-                    "topic_te": idea.topic_te, "topic_en": idea.topic_en,
-                    "rationale_te": idea.rationale_te,
-                    "category_id": category.id if category else None,
-                    "score": idea.score, "sources": idea.sources,
-                })
+                    category = db.scalar(
+                        select(Category).where(Category.slug == idea.category_slug)
+                    )
+                raw.append(
+                    {
+                        "topic_te": idea.topic_te,
+                        "topic_en": idea.topic_en,
+                        "rationale_te": idea.rationale_te,
+                        "category_id": category.id if category else None,
+                        "score": idea.score,
+                        "sources": idea.sources,
+                    }
+                )
         except Exception:  # noqa: BLE001 — a provider outage falls back, never 500s
-            logger.warning("ai_provider_topics_failed", provider=provider.key, exc_info=True)
+            logger.warning(
+                "ai_provider_topics_failed", provider=provider.key, exc_info=True
+            )
 
     if not raw:
         raw = _coverage_gaps(db, room)
 
     existing = {
-        s.topic_te for s in db.scalars(
-            select(AiSuggestion).where(AiSuggestion.status == AiSuggestionStatus.NEW)).all()
+        s.topic_te
+        for s in db.scalars(
+            select(AiSuggestion).where(AiSuggestion.status == AiSuggestionStatus.NEW)
+        ).all()
     }
     created: list[AiSuggestion] = []
     for item in raw:
@@ -190,8 +226,12 @@ def generate_suggestions(db: Session, *, limit: int | None = None,
         _attach_sources(db, suggestion, item.get("sources") or [])
         created.append(suggestion)
 
-    logger.info("ai_suggestions_generated", count=len(created), engine=provider.key,
-                actor_id=actor_id)
+    logger.info(
+        "ai_suggestions_generated",
+        count=len(created),
+        engine=provider.key,
+        actor_id=actor_id,
+    )
     return created
 
 
@@ -209,15 +249,19 @@ def _attach_sources(db: Session, suggestion: AiSuggestion, sources: list[dict]) 
         if allowed and not any(host.endswith(a) for a in allowed):
             continue
         licence = str(source.get("licence") or "unknown").lower()
-        db.add(AiSource(
-            suggestion_id=suggestion.id,
-            publisher=publisher[:200],
-            title=(str(source.get("title"))[:500] if source.get("title") else None),
-            url=url[:900],
-            licence=licence if licence in PERMITTED_LICENCES else "unknown",
-            # Kept short on purpose: verification, not reproduction.
-            excerpt=(str(source.get("excerpt"))[:400] if source.get("excerpt") else None),
-        ))
+        db.add(
+            AiSource(
+                suggestion_id=suggestion.id,
+                publisher=publisher[:200],
+                title=(str(source.get("title"))[:500] if source.get("title") else None),
+                url=url[:900],
+                licence=licence if licence in PERMITTED_LICENCES else "unknown",
+                # Kept short on purpose: verification, not reproduction.
+                excerpt=(
+                    str(source.get("excerpt"))[:400] if source.get("excerpt") else None
+                ),
+            )
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -230,17 +274,19 @@ def get_suggestion(db: Session, suggestion_id: int) -> AiSuggestion:
     return row
 
 
-def reject_suggestion(db: Session, suggestion_id: int, *, actor_id: int,
-                      note: str | None) -> AiSuggestion:
+def reject_suggestion(
+    db: Session, suggestion_id: int, *, actor_id: int, note: str | None
+) -> AiSuggestion:
     suggestion = get_suggestion(db, suggestion_id)
     suggestion.status = AiSuggestionStatus.REJECTED
     suggestion.reviewed_by, suggestion.reviewed_at = actor_id, utcnow()
-    suggestion.review_note = (note or None)
+    suggestion.review_note = note or None
     return suggestion
 
 
-def create_draft(db: Session, suggestion_id: int, *, actor_id: int,
-                 notes: str | None = None) -> AiArticleDraft:
+def create_draft(
+    db: Session, suggestion_id: int, *, actor_id: int, notes: str | None = None
+) -> AiArticleDraft:
     """§15 — write copy for an accepted suggestion. Still nothing readers see."""
     if not settings_service.ai_enabled(db):
         raise ConflictError(message_en="AI is switched off.")
@@ -256,10 +302,13 @@ def create_draft(db: Session, suggestion_id: int, *, actor_id: int,
         sources=sources,
     )
 
-    body = {"type": "doc", "content": [
-        {"type": "paragraph", "content": [{"type": "text", "text": p}]}
-        for p in text.paragraphs_te
-    ]}
+    body = {
+        "type": "doc",
+        "content": [
+            {"type": "paragraph", "content": [{"type": "text", "text": p}]}
+            for p in text.paragraphs_te
+        ],
+    }
     _, plain, _, words, _ = tiptap.derive(body)
 
     draft = AiArticleDraft(
@@ -312,8 +361,10 @@ def convert_draft(db: Session, draft_id: int, principal) -> Article:
 
     draft = get_draft(db, draft_id)
     if draft.status == AiDraftStatus.CONVERTED and draft.article_id:
-        raise ConflictError(message_en="That draft already became an article.",
-                            details={"article_id": draft.article_id})
+        raise ConflictError(
+            message_en="That draft already became an article.",
+            details={"article_id": draft.article_id},
+        )
     if draft.status == AiDraftStatus.DISCARDED:
         raise ConflictError(message_en="That draft was discarded.")
     if not draft.body:
@@ -331,12 +382,16 @@ def convert_draft(db: Session, draft_id: int, principal) -> Article:
         slug=slugify(title)[:180] or "ai-draft",
         title_te=title,
         summary_te=draft.summary_te,
-        body=body, body_plain=plain, body_html=html,
-        word_count=words, reading_time_sec=seconds,
+        body=body,
+        body_plain=plain,
+        body_html=html,
+        word_count=words,
+        reading_time_sec=seconds,
         category_id=draft.category_id,
         district_id=draft.district_id,
         author_id=principal.id,
         created_by=principal.id,
+        article_source_type="AI_DRAFT",
         updated_by=principal.id,
         # Provenance is not optional and is not editable through the API.
         ai_generated=True,
@@ -352,10 +407,16 @@ def convert_draft(db: Session, draft_id: int, principal) -> Article:
     db.add(article)
     db.flush()
 
-    db.add(WorkflowTransition(article_id=article.id, from_state=None,
-                              to_state=WorkflowState.SUBMITTED, actor_id=principal.id,
-                              note=f"AI draft #{draft.id} converted for review",
-                              created_at=utcnow()))
+    db.add(
+        WorkflowTransition(
+            article_id=article.id,
+            from_state=None,
+            to_state=WorkflowState.SUBMITTED,
+            actor_id=principal.id,
+            note=f"AI draft #{draft.id} converted for review",
+            created_at=utcnow(),
+        )
+    )
     draft.status = AiDraftStatus.CONVERTED
     draft.article_id = article.id
     if draft.suggestion:

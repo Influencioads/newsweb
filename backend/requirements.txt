@@ -42,6 +42,7 @@ feedparser==6.0.11          # RSS/Atom/JSON ingestion (§17) — pure python, no
 python-slugify==8.0.4
 nanoid==2.0.0               # 6-char shortId (§4.5)
 Pillow==11.1.0              # image derivatives, EXIF strip
+reportlab==4.2.5            # cached daily E-Paper PDF generation
 blurhash==1.1.4              # pure-python; the C `blurhash-python` needs MSVC on Windows
 
 # --- observability -----------------------------------------------------

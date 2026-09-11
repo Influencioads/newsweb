@@ -63,7 +63,10 @@ class Category(PKMixin, TimestampMixin, Base):
     sort: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     show_in_nav: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=True, doc="Appears in the masthead nav (mockup 1b)"
+        Boolean,
+        nullable=False,
+        default=True,
+        doc="Appears in the masthead nav (mockup 1b)",
     )
     seo_title: Mapped[str | None] = mapped_column(String(180), nullable=True)
     seo_description: Mapped[str | None] = mapped_column(String(320), nullable=True)
@@ -158,14 +161,21 @@ class Article(PKMixin, TimestampMixin, SoftDeleteMixin, ActorMixin, Base):
         Index("ix_articles_locality_id_published_at", "locality_id", "published_at"),
         # MySQL has no partial index; this composite serves the public feed query
         # `WHERE status='published' AND deleted_at IS NULL ORDER BY published_at DESC`.
-        Index("ix_articles_status_deleted_at_published_at", "status", "deleted_at", "published_at"),
+        Index(
+            "ix_articles_status_deleted_at_published_at",
+            "status",
+            "deleted_at",
+            "published_at",
+        ),
         # §5: "articles(workflow_state, updated_at) — the editor queue query"
         Index("ix_articles_workflow_state_updated_at", "workflow_state", "updated_at"),
         Index("ix_articles_author_id_published_at", "author_id", "published_at"),
         Index("ix_articles_slug", "slug"),
         Index("ix_articles_scheduled_at", "scheduled_at"),
         # §25 pending queue filters by production origin before anything else.
-        Index("ix_articles_article_type_workflow_state", "article_type", "workflow_state"),
+        Index(
+            "ix_articles_article_type_workflow_state", "article_type", "workflow_state"
+        ),
         MYSQL_TABLE_ARGS,
     )
 
@@ -180,7 +190,9 @@ class Article(PKMixin, TimestampMixin, SoftDeleteMixin, ActorMixin, Base):
     # --- headline and copy -------------------------------------------------
     title_te: Mapped[str] = mapped_column(String(400), nullable=False)
     title_en: Mapped[str | None] = mapped_column(
-        String(400), nullable=True, doc="Transliterated/English headline — required for search (§4.4)"
+        String(400),
+        nullable=True,
+        doc="Transliterated/English headline — required for search (§4.4)",
     )
     sub_title_te: Mapped[str | None] = mapped_column(String(500), nullable=True)
     summary_te: Mapped[str | None] = mapped_column(
@@ -194,7 +206,9 @@ class Article(PKMixin, TimestampMixin, SoftDeleteMixin, ActorMixin, Base):
         Text, nullable=True, doc="Derived from body on save; feeds Meilisearch (§4.4)"
     )
     body_html: Mapped[str | None] = mapped_column(
-        Text, nullable=True, doc="Derived cache for RSS and crawlers. Never authoritative."
+        Text,
+        nullable=True,
+        doc="Derived cache for RSS and crawlers. Never authoritative.",
     )
 
     # --- placement ---------------------------------------------------------
@@ -233,8 +247,12 @@ class Article(PKMixin, TimestampMixin, SoftDeleteMixin, ActorMixin, Base):
         # audio_assets.article_id points back here, so the pair is a cycle:
         # use_alter lets create_all emit this constraint as a separate ALTER
         # instead of failing to order the two CREATE TABLEs.
-        ForeignKey("audio_assets.id", ondelete="SET NULL", use_alter=True,
-                   name="fk_articles_audio_asset_id_audio_assets"),
+        ForeignKey(
+            "audio_assets.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_articles_audio_asset_id_audio_assets",
+        ),
         nullable=True,
         doc="Current ready TTS rendition (§19); recomputed when the body changes",
     )
@@ -257,7 +275,10 @@ class Article(PKMixin, TimestampMixin, SoftDeleteMixin, ActorMixin, Base):
     )
     is_exclusive: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_featured: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False, server_default="0",
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="0",
         doc="Editor's pick — eligible for the featured rail (§1)",
     )
     article_type: Mapped[ArticleType] = mapped_column(
@@ -268,11 +289,15 @@ class Article(PKMixin, TimestampMixin, SoftDeleteMixin, ActorMixin, Base):
         doc="Production origin (§23) — distinct from source_type's copyright origin",
     )
     voice_enabled: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=True, server_default="1",
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default="1",
         doc="Per-article half of the §20 voice control; the global switch also has to be on",
     )
     breaking_until: Mapped[datetime | None] = mapped_column(
-        UTCDateTime, nullable=True,
+        UTCDateTime,
+        nullable=True,
         doc="§9 duration control. NULL falls back to 24h after publication.",
     )
 
@@ -300,7 +325,10 @@ class Article(PKMixin, TimestampMixin, SoftDeleteMixin, ActorMixin, Base):
         doc="Agency credit (PTI/IANS/ANI). Publishing is blocked without it when source != own.",
     )
     source_type: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="own", server_default="own",
+        String(20),
+        nullable=False,
+        default="own",
+        server_default="own",
         doc="own | agency | contributed | syndicated",
     )
 
@@ -343,7 +371,9 @@ class Article(PKMixin, TimestampMixin, SoftDeleteMixin, ActorMixin, Base):
     scheduled_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     first_published_at: Mapped[datetime | None] = mapped_column(
-        UTCDateTime, nullable=True, doc="Kept across unpublish/republish for NewsArticle JSON-LD"
+        UTCDateTime,
+        nullable=True,
+        doc="Kept across unpublish/republish for NewsArticle JSON-LD",
     )
     corrected_at: Mapped[datetime | None] = mapped_column(
         UTCDateTime, nullable=True, doc="Drives the 'సవరించబడింది: {date}' line (§12.5)"
@@ -360,6 +390,16 @@ class Article(PKMixin, TimestampMixin, SoftDeleteMixin, ActorMixin, Base):
     approved_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     published_by: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    reviewed_by: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    article_source_type: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="ADMIN",
+        server_default="ADMIN",
+        doc="Editorial origin: ADMIN/EDITOR/REPORTER/USER/AI_SUGGESTION/AI_DRAFT/IMPORTED",
     )
 
     # --- relationships -----------------------------------------------------
@@ -422,7 +462,9 @@ class ArticleSearchAlias(PKMixin, Base):
 
     __tablename__ = "article_search_aliases"
     __table_args__ = (
-        UniqueConstraint("article_id", "alias", name="uq_article_search_aliases_article_id_alias"),
+        UniqueConstraint(
+            "article_id", "alias", name="uq_article_search_aliases_article_id_alias"
+        ),
         Index("ix_article_search_aliases_alias", "alias"),
         MYSQL_TABLE_ARGS,
     )
@@ -446,7 +488,9 @@ class ArticleVersion(PKMixin, Base):
 
     __tablename__ = "article_versions"
     __table_args__ = (
-        UniqueConstraint("article_id", "version", name="uq_article_versions_article_id_version"),
+        UniqueConstraint(
+            "article_id", "version", name="uq_article_versions_article_id_version"
+        ),
         Index("ix_article_versions_article_id_created_at", "article_id", "created_at"),
         MYSQL_TABLE_ARGS,
     )
@@ -473,7 +517,9 @@ class WorkflowTransition(PKMixin, Base):
 
     __tablename__ = "workflow_transitions"
     __table_args__ = (
-        Index("ix_workflow_transitions_article_id_created_at", "article_id", "created_at"),
+        Index(
+            "ix_workflow_transitions_article_id_created_at", "article_id", "created_at"
+        ),
         MYSQL_TABLE_ARGS,
     )
 
@@ -481,10 +527,12 @@ class WorkflowTransition(PKMixin, Base):
         BigInteger, ForeignKey("articles.id", ondelete="CASCADE"), nullable=False
     )
     from_state: Mapped[WorkflowState | None] = mapped_column(
-        Enum(WorkflowState, native_enum=False, length=20, validate_strings=True), nullable=True
+        Enum(WorkflowState, native_enum=False, length=20, validate_strings=True),
+        nullable=True,
     )
     to_state: Mapped[WorkflowState] = mapped_column(
-        Enum(WorkflowState, native_enum=False, length=20, validate_strings=True), nullable=False
+        Enum(WorkflowState, native_enum=False, length=20, validate_strings=True),
+        nullable=False,
     )
     actor_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True

@@ -13,6 +13,16 @@ So model modules are registered here, once, rather than at each call site.
 from app.db.base import Base
 from app.models.ai import AiArticleDraft, AiSource, AiSuggestion
 from app.models.audio import AudioAsset
+from app.models.epaper import (
+    EpaperAsset,
+    EpaperEdition,
+    EpaperPage,
+    EpaperPageArticle,
+    EpaperPageShare,
+    EpaperPageTemplate,
+    EpaperUserEdition,
+    EpaperUserEditionPreference,
+)
 from app.models.audit import AuditLog
 from app.models.content import (
     Article,
@@ -37,6 +47,7 @@ from app.models.engagement import (
     Report,
 )
 from app.models.notify import Notification, NotificationCampaign, PushDevice
+from app.models.poll import Poll, PollOption, PollVote, TrendingTopic
 from app.models.geo import District, Locality, Mandal, State
 from app.models.ingestion import ContentSource, IngestedItem
 from app.models.media import ArticleMedia, Media
@@ -61,6 +72,14 @@ __all__ = [
     "AppSetting",
     "Article",
     "AudioAsset",
+    "EpaperAsset",
+    "EpaperEdition",
+    "EpaperPage",
+    "EpaperPageArticle",
+    "EpaperPageShare",
+    "EpaperPageTemplate",
+    "EpaperUserEdition",
+    "EpaperUserEditionPreference",
     "ContentSource",
     "IngestedItem",
     "Reaction",
@@ -90,8 +109,12 @@ __all__ = [
     "NotificationCampaign",
     "Permission",
     "Pin",
+    "Poll",
+    "PollOption",
+    "PollVote",
     "PushDevice",
     "TrendingScore",
+    "TrendingTopic",
     "SearchQuery",
     "State",
     "Role",

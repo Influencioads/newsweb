@@ -37,6 +37,7 @@ from app.schemas.public import (
     CategoryFeedOut,
     CategoryOut,
     DistrictOut,
+    EpaperTeaserOut,
     HomeOut,
     HomeSectionOut,
     LocalFeedOut,
@@ -109,7 +110,9 @@ def _card(article: Article) -> ArticleCardOut:
         title_te=article.title_te,
         title_en=article.title_en,
         summary_te=article.summary_te,
-        category=CategoryOut.model_validate(article.category) if article.category else None,
+        category=CategoryOut.model_validate(article.category)
+        if article.category
+        else None,
         district=None,
         hero=None,
         byline_te=article.byline_te,
@@ -121,7 +124,9 @@ def _card(article: Article) -> ArticleCardOut:
     )
 
 
-def _cards(articles: list[Article], db: Session, districts: dict[int, Any]) -> list[ArticleCardOut]:
+def _cards(
+    articles: list[Article], db: Session, districts: dict[int, Any]
+) -> list[ArticleCardOut]:
     """Project articles to cards, resolving districts and hero media in bulk."""
     from app.models.media import Media
 
@@ -183,7 +188,9 @@ def get_config(response: Response, db: Session = Depends(get_db)) -> SiteConfigO
             NavCategoryOut.model_validate(c) for c in article_repo.nav_categories(db)
         ],
         states=[StateOut.model_validate(s) for s in article_repo.active_states(db)],
-        districts=[DistrictOut.model_validate(d) for d in article_repo.active_districts(db)],
+        districts=[
+            DistrictOut.model_validate(d) for d in article_repo.active_districts(db)
+        ],
     )
 
 
@@ -218,7 +225,9 @@ def get_home(
         return HomeOut.model_validate(cached)
 
     districts = _district_map(db)
-    edition_district = article_repo.get_district_by_slug(db, edition) if edition else None
+    edition_district = (
+        article_repo.get_district_by_slug(db, edition) if edition else None
+    )
     district_id = edition_district.id if edition_district else None
 
     # §9: active homepage pins occupy the top slots ahead of the latest pull.
@@ -234,7 +243,10 @@ def get_home(
     #   [9:17]   briefs — sized so the left column runs to roughly the same
     #            depth as the taller centre column and right rail
     top = article_repo.latest(
-        db, limit=17, district_id=district_id, exclude_ids={a.id for a in pinned} or None
+        db,
+        limit=17,
+        district_id=district_id,
+        exclude_ids={a.id for a in pinned} or None,
     )
     if not top and not pinned and district_id is not None:
         # A young district edition can be empty; fall back to the national feed
@@ -271,7 +283,11 @@ def get_home(
             )
             for s in configured
             if s.kind == HomeSectionKind.TRENDING
-            or (s.kind == HomeSectionKind.CATEGORY and s.category is not None and s.category.is_active)
+            or (
+                s.kind == HomeSectionKind.CATEGORY
+                and s.category is not None
+                and s.category.is_active
+            )
         ]
     else:
         plans = [
@@ -311,8 +327,11 @@ def get_home(
     mandal_block: HomeSectionOut | None = None
     if mandal and edition_district is not None:
         mandal_row = next(
-            (m for m in article_repo.mandals_for_district(db, edition_district.id)
-             if m.slug == mandal),
+            (
+                m
+                for m in article_repo.mandals_for_district(db, edition_district.id)
+                if m.slug == mandal
+            ),
             None,
         )
         if mandal_row is not None:
@@ -325,8 +344,27 @@ def get_home(
                     articles=_cards(items, db, districts),
                 )
 
+    from sqlalchemy import select
+    from app.models.epaper import EpaperEdition
+    from app.services import settings_service
+
+    published_epaper = None
+    if settings_service.get_bool(db, "epaper.enabled"):
+        published_epaper = db.scalar(
+            select(EpaperEdition)
+            .where(
+                EpaperEdition.edition_type == "DAILY",
+                EpaperEdition.status == "PUBLISHED",
+                EpaperEdition.edition_date <= utcnow().date(),
+            )
+            .order_by(EpaperEdition.edition_date.desc())
+            .limit(1)
+        )
+
     payload = HomeOut(
-        edition=DistrictOut.model_validate(edition_district) if edition_district else None,
+        edition=DistrictOut.model_validate(edition_district)
+        if edition_district
+        else None,
         mandal_block=mandal_block,
         lead=_cards([lead], db, districts)[0] if lead else None,
         secondary=_cards(secondary, db, districts),
@@ -335,9 +373,19 @@ def get_home(
         latest=_cards(latest, db, districts),
         breaking=_breaking_items(db),
         sections=sections,
+        epaper=EpaperTeaserOut(
+            edition_slug=published_epaper.edition_date.isoformat(),
+            pub_date=published_epaper.edition_date.isoformat(),
+            thumb_url=None,
+            page_count=len(published_epaper.pages),
+        )
+        if published_epaper
+        else None,
         generated_at=utcnow(),
     )
-    cache_set(cache_key, payload.model_dump(mode="json"), settings.PUBLIC_CACHE_TTL_SECONDS)
+    cache_set(
+        cache_key, payload.model_dump(mode="json"), settings.PUBLIC_CACHE_TTL_SECONDS
+    )
     return payload
 
 
@@ -372,7 +420,9 @@ def _breaking_items(db: Session) -> list[BreakingItemOut]:
         "(§10.1) — never server-rendered per request."
     ),
 )
-def get_breaking(response: Response, db: Session = Depends(get_db)) -> list[BreakingItemOut]:
+def get_breaking(
+    response: Response, db: Session = Depends(get_db)
+) -> list[BreakingItemOut]:
     _cache_headers(response, ttl=settings.BREAKING_CACHE_TTL_SECONDS)
     cached = cache_get("breaking")
     if cached:
@@ -395,13 +445,17 @@ def get_breaking(response: Response, db: Session = Depends(get_db)) -> list[Brea
 )
 def list_articles(
     response: Response,
-    q: str | None = Query(default=None, min_length=2, max_length=120, description="Headline search"),
+    q: str | None = Query(
+        default=None, min_length=2, max_length=120, description="Headline search"
+    ),
     category: str | None = Query(default=None, description="Category slug"),
     district: str | None = Query(default=None, description="District slug"),
     mandal: str | None = Query(default=None, description="Mandal slug"),
     author: str | None = Query(default=None, description="Author slug"),
     tag: str | None = Query(default=None, description="Tag slug"),
-    cursor: str | None = Query(default=None, description="Opaque cursor from `next_cursor`"),
+    cursor: str | None = Query(
+        default=None, description="Opaque cursor from `next_cursor`"
+    ),
     limit: int = Query(default=20, ge=1, le=50),
     db: Session = Depends(get_db),
 ) -> CategoryFeedOut:
@@ -421,7 +475,9 @@ def list_articles(
             message_en="No such district.", message_te="ఆ జిల్లా కనిపించలేదు."
         )
     if mandal and mandal_row is None:
-        raise NotFoundError(message_en="No such mandal.", message_te="ఆ మండలం కనిపించలేదు.")
+        raise NotFoundError(
+            message_en="No such mandal.", message_te="ఆ మండలం కనిపించలేదు."
+        )
     if author and author_row is None:
         raise NotFoundError(message_en="No such author.", message_te="ఆ రచయిత కనిపించలేదు.")
     if tag and tag_row is None:
@@ -487,6 +543,9 @@ def get_article(
 
     districts = _district_map(db)
     card = _cards([article], db, districts)[0]
+    from app.services import poll_service
+
+    attached_polls = poll_service.active_polls(db, article_id=article.id)
 
     author = None
     if article.author_id:
@@ -521,6 +580,7 @@ def get_article(
             if m is not None
         ],
         related=_cards(article_repo.related(db, article), db, districts),
+        poll=poll_service.serialize(attached_polls[0]) if attached_polls else None,
     )
 
 
@@ -555,9 +615,13 @@ def get_trending(
     category_row = article_repo.get_category_by_slug(db, category) if category else None
     district_row = article_repo.get_district_by_slug(db, district) if district else None
     if category and category_row is None:
-        raise NotFoundError(message_en="No such section.", message_te="ఆ విభాగం కనిపించలేదు.")
+        raise NotFoundError(
+            message_en="No such section.", message_te="ఆ విభాగం కనిపించలేదు."
+        )
     if district and district_row is None:
-        raise NotFoundError(message_en="No such district.", message_te="ఆ జిల్లా కనిపించలేదు.")
+        raise NotFoundError(
+            message_en="No such district.", message_te="ఆ జిల్లా కనిపించలేదు."
+        )
 
     trending_service.ensure_fresh(db)
     if district_row is not None:
@@ -585,7 +649,9 @@ def get_trending(
         articles=_cards(articles[:limit], db, _district_map(db)),
         next_cursor=str(offset + limit) if has_more else None,
     )
-    cache_set(cache_key, payload.model_dump(mode="json"), settings.PUBLIC_CACHE_TTL_SECONDS)
+    cache_set(
+        cache_key, payload.model_dump(mode="json"), settings.PUBLIC_CACHE_TTL_SECONDS
+    )
     return payload
 
 
@@ -612,7 +678,9 @@ def get_short_news(
     _cache_headers(response)
     category_row = article_repo.get_category_by_slug(db, category) if category else None
     if category and category_row is None:
-        raise NotFoundError(message_en="No such section.", message_te="ఆ విభాగం కనిపించలేదు.")
+        raise NotFoundError(
+            message_en="No such section.", message_te="ఆ విభాగం కనిపించలేదు."
+        )
 
     rows = article_repo.short_news(
         db,
@@ -745,7 +813,9 @@ def get_locations(response: Response, db: Session = Depends(get_db)) -> Location
             LocationStateOut(
                 **StateOut.model_validate(state).model_dump(),
                 districts=[
-                    DistrictOut.model_validate(d) for d in districts if d.state == state.code
+                    DistrictOut.model_validate(d)
+                    for d in districts
+                    if d.state == state.code
                 ],
             )
         )
@@ -780,9 +850,12 @@ def get_district_mandals(
     _cache_headers(response, ttl=3600)
     district = article_repo.get_district_by_slug(db, district_slug)
     if district is None:
-        raise NotFoundError(message_en="No such district.", message_te="ఆ జిల్లా కనిపించలేదు.")
+        raise NotFoundError(
+            message_en="No such district.", message_te="ఆ జిల్లా కనిపించలేదు."
+        )
     return [
-        MandalOut.model_validate(m) for m in article_repo.mandals_for_district(db, district.id)
+        MandalOut.model_validate(m)
+        for m in article_repo.mandals_for_district(db, district.id)
     ]
 
 
@@ -799,7 +872,9 @@ def local_feed(
     response: Response,
     district: str = Query(description="District slug (required anchor of the feed)"),
     mandal: str | None = Query(default=None, description="Mandal slug"),
-    locality: str | None = Query(default=None, description="Locality slug within the mandal"),
+    locality: str | None = Query(
+        default=None, description="Locality slug within the mandal"
+    ),
     offset: int = Query(default=0, ge=0, le=1000),
     limit: int = Query(default=20, ge=1, le=50),
     db: Session = Depends(get_db),
@@ -808,16 +883,24 @@ def local_feed(
 
     district_row = article_repo.get_district_by_slug(db, district)
     if district_row is None:
-        raise NotFoundError(message_en="No such district.", message_te="ఆ జిల్లా కనిపించలేదు.")
+        raise NotFoundError(
+            message_en="No such district.", message_te="ఆ జిల్లా కనిపించలేదు."
+        )
 
     mandal_row = None
     if mandal:
         mandal_row = next(
-            (m for m in article_repo.mandals_for_district(db, district_row.id) if m.slug == mandal),
+            (
+                m
+                for m in article_repo.mandals_for_district(db, district_row.id)
+                if m.slug == mandal
+            ),
             None,
         )
         if mandal_row is None:
-            raise NotFoundError(message_en="No such mandal.", message_te="ఆ మండలం కనిపించలేదు.")
+            raise NotFoundError(
+                message_en="No such mandal.", message_te="ఆ మండలం కనిపించలేదు."
+            )
 
     locality_row = None
     if locality and mandal_row is not None:

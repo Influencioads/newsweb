@@ -125,6 +125,11 @@ export function hasSession(): boolean {
   return Boolean(refreshToken);
 }
 
+/** Used by native download APIs that cannot pass through Axios interceptors. */
+export function getAccessToken(): string | null {
+  return accessToken;
+}
+
 // ------------------------------------------------------------------ client --
 export const api = axios.create({
   baseURL: API_BASE,

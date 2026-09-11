@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Bell, MapPin, Menu, Moon, Radio, Search, Sun, UserRound, X, Zap } from 'lucide-react';
 
+import { RouteFallback, SkipLink } from '@/components/app';
 import { LanguageToggle } from '@/components/layout/LanguageToggle';
 import * as notificationsApi from '@/features/engagement/notificationsApi';
 import * as publicApi from '@/features/public/api';
@@ -436,6 +437,7 @@ export default function PublicLayout() {
 
   return (
     <div className="min-h-screen bg-canvas">
+      <SkipLink />
       <header className="bg-white">
         <TopStrip />
         <Masthead />
@@ -443,7 +445,14 @@ export default function PublicLayout() {
         <BreakingTicker />
       </header>
 
-      <Outlet />
+      {/* #main is the skip-link / ScrollToTop focus target. A div, not <main>:
+          every page renders its own <main> landmark. The Suspense here keeps
+          the header painted while a page chunk loads. */}
+      <div id="main" tabIndex={-1} className="outline-none">
+        <Suspense fallback={<RouteFallback />}>
+          <Outlet />
+        </Suspense>
+      </div>
 
       <PolicyFooter />
     </div>

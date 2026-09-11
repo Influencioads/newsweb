@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import App from './App';
+import { Toaster } from './components/ui/Toast';
 import './assets/index.css';
 import { ApiError } from './api/client';
 
@@ -34,6 +35,7 @@ ReactDOM.createRoot(rootEl).render(
           eventual upgrade is a no-op. */}
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <App />
+        <Toaster />
       </BrowserRouter>
     </QueryClientProvider>
   </React.StrictMode>,

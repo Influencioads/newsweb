@@ -32,7 +32,7 @@ export type Theme = 'system' | 'light' | 'dark';
 export type ResolvedTheme = 'light' | 'dark';
 
 /** Brand red in light, the paper tone in dark — what the browser chrome tints to. */
-const THEME_COLOR: Record<ResolvedTheme, string> = { light: '#A61C24', dark: '#201B16' };
+const THEME_COLOR: Record<ResolvedTheme, string> = { light: '#A61C24', dark: '#201B16' }; // audit-allow-hex
 
 export interface ReaderPrefsState {
   fontStep: FontStep;

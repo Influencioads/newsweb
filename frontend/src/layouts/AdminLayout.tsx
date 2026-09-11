@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { LogOut, Menu, Search, X } from 'lucide-react';
 
+import { RouteFallback, SkipLink } from '@/components/app';
 import { useAuth } from '@/stores/auth';
 import type { PermissionKey } from '@/types/auth';
 import { LanguageToggle } from '@/components/layout/LanguageToggle';
@@ -79,6 +80,7 @@ export default function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-canvas-cms">
+      <SkipLink />
       <header className="bg-ink text-white">
         <div className="flex items-center justify-between gap-3 px-4 py-2.5 md:px-[18px]">
           <div className="flex items-center gap-2.5">
@@ -163,7 +165,12 @@ export default function AdminLayout() {
         ) : null}
       </header>
 
-      <Outlet />
+      {/* Skip-link / focus target (pages render their own <main>); Suspense keeps the topbar up while a chunk loads. */}
+      <div id="main" tabIndex={-1} className="outline-none">
+        <Suspense fallback={<RouteFallback />}>
+          <Outlet />
+        </Suspense>
+      </div>
     </div>
   );
 }

@@ -87,8 +87,16 @@
  * hues brighten for contrast; the "deep" panels stay dark in both themes.
  * ------------------------------------------------------------------------- */
 .dark {
-  --tn-brand: 217 87 94;          --tn-brand-dark: 231 122 128;
+  /* brand: one token serves both `text-brand` on surface (4.2:1) and
+     `bg-brand text-on-brand` (3.8:1). No single value clears 4.5:1 for both on
+     this palette — fills are large/bold-text AA; a fill-vs-text split is a
+     contract revision. brand-dark stays DARKER than brand so hover deepens
+     (white on it = 5.4:1) exactly as it does in light. */
+  --tn-brand: 217 87 94;          --tn-brand-dark: 190 60 68;
   --tn-brand-tint: 64 31 32;
+  /* breaking brightens like brand: error text on surface = 4.9:1, on
+     breaking-tint = 4.2:1 (white on a `bg-breaking` fill drops to ~3.3:1). */
+  --tn-breaking: 232 96 106;
   --tn-breaking-tint: 64 37 37;   --tn-breaking-border: 110 52 55;
   --tn-ink: 237 231 221;          --tn-ink-soft: 201 192 179;
   /* muted-inverse is only used on the constant-dark panels (footer, CMS
@@ -141,20 +149,8 @@
     line-height: 1.65;
   }
 
-  /* --------------------------------------------------------------------- *
-   * Telugu text rules (§4.1). Violating any of these clips vattulu/matras.
-   * --------------------------------------------------------------------- */
-  .te,
-  .telugu {
-    font-family: 'Noto Sans Telugu', Inter, sans-serif;
-    line-height: 1.7;
-  }
-
-  .th,
-  .telugu-headline {
-    font-family: 'Anek Telugu', 'Noto Sans Telugu', sans-serif;
-    line-height: 1.5;
-  }
+  /* Telugu text rules (§4.1) — `.te` / `.th` live in @layer utilities below so
+     their line-height outranks the `text-*` tuples. */
 
   /* A single-line Telugu headline must never be clipped: no fixed heights and
      no overflow:hidden. Where an ellipsis is genuinely required, use
@@ -273,6 +269,24 @@
 }
 
 @layer utilities {
+  /* --------------------------------------------------------------------- *
+   * Telugu text rules (§4.1). Violating any of these clips vattulu/matras.
+   * Declared as utilities (not base) so they are emitted AFTER the core
+   * `text-ui` / `text-meta` / `leading-*` utilities: `cn(s.body, 'text-ui')`
+   * on Telugu chrome keeps line-height 1.7 under any size.
+   * --------------------------------------------------------------------- */
+  .te,
+  .telugu {
+    font-family: 'Noto Sans Telugu', Inter, sans-serif;
+    line-height: 1.7;
+  }
+
+  .th,
+  .telugu-headline {
+    font-family: 'Anek Telugu', 'Noto Sans Telugu', sans-serif;
+    line-height: 1.5;
+  }
+
   /* Reveal-on-scroll (utils/motion.ts useReveal). Elements start hidden and
      rise 12px when they first enter the viewport; stagger via --reveal-delay. */
   .reveal {

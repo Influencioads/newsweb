@@ -1,13 +1,25 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Clock3, PenLine, XCircle } from 'lucide-react';
+import { CheckCircle2, Inbox, PenLine, ShieldCheck, Trash2 } from 'lucide-react';
 
-import { ApiError } from '@/api/client';
+import { StatusPill } from '@/components/ui/Badge';
+import { Button, ButtonLink } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { useConfirm } from '@/components/ui/Dialog';
+import { Checkbox, Field, Input, Select, Textarea } from '@/components/ui/Field';
+import { LocationPicker } from '@/components/location/LocationPicker';
+import { Icon } from '@/components/ui/Icon';
+import { PageContainer, PageHeader, SectionHeader } from '@/components/ui/Layout';
+import { EmptyState, QueryState, SkeletonCard } from '@/components/ui/State';
+import { useToast } from '@/components/ui/Toast';
+import { WORKFLOW_STATUS, type StatusRegistry } from '@/features/cms/status';
 import * as creatorApi from '@/features/creator/api';
 import * as publicApi from '@/features/public/api';
-import { useI18n } from '@/i18n';
+import { useI18n, useScript } from '@/i18n';
 import { useAuth } from '@/stores/auth';
+import { cn } from '@/utils/cn';
+import { useDocumentTitle } from '@/utils/motion';
 import { relativeTime } from '@/utils/time';
 
 /**
@@ -16,20 +28,39 @@ import { relativeTime } from '@/utils/time';
  * the §17 moderation history — pending, approved (with a link once the
  * newsroom publishes), or rejected with the moderator's note.
  */
+
+const MIN_TITLE = 10;
+const MAX_TITLE = 200;
+const MIN_BODY = 100;
+const MAX_BODY = 20000;
+
+/** A reader submission waiting on a moderator reads as "in review", not "pending". */
+const SUBMISSION_STATUS: StatusRegistry = {
+  pending: WORKFLOW_STATUS.in_review,
+  approved: WORKFLOW_STATUS.approved,
+  rejected: WORKFLOW_STATUS.rejected,
+};
+
 export default function SubmitPage() {
-  const { language, pick } = useI18n();
-  const te = language === 'te';
-  const teCls = te ? 'te' : 'font-sans';
+  const { language, pick, t } = useI18n();
+  const s = useScript();
+  const L = (te: string, en: string) => (language === 'te' ? te : en);
+  const bodyCls = cn(s.body, s.te ? 'text-te-body-xs' : 'text-ui');
+  useDocumentTitle(t('page.submit'));
+
   const navigate = useNavigate();
-  const status = useAuth((s) => s.status);
+  const status = useAuth((auth) => auth.status);
   const queryClient = useQueryClient();
+  const toast = useToast();
+  const { confirm, dialog } = useConfirm();
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [categorySlug, setCategorySlug] = useState('');
+  const [stateCode, setStateCode] = useState<string | null>(null);
   const [districtSlug, setDistrictSlug] = useState('');
   const [accepted, setAccepted] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [tried, setTried] = useState(false);
 
   useEffect(() => {
     if (status === 'anonymous') navigate('/login', { replace: true, state: { from: '/submit' } });
@@ -59,191 +90,280 @@ export default function SubmitPage() {
       setTitle('');
       setBody('');
       setAccepted(false);
-      setError(null);
+      setTried(false);
+      toast.success(L('అందింది! సమీక్ష తర్వాత తెలియజేస్తాం.', 'Received. We will update you after review.'));
       void queryClient.invalidateQueries({ queryKey: ['reader', 'submissions'] });
     },
-    onError: (e) => setError(e instanceof ApiError ? (te ? e.messageTe : e.messageEn) : String(e)),
+    onError: (e) => toast.error(e),
   });
 
   if (status !== 'authenticated') return null;
 
-  const canSubmit = title.trim().length >= 10 && body.trim().length >= 100 && accepted;
-  const inputCls =
-    'w-full rounded-control border border-rule-input bg-white px-3 py-2.5 text-[15px] text-ink';
+  // Validity is independent of `tried`; `tried` only decides whether the reader
+  // is shown the message yet (nobody wants a red form before they have typed).
+  const shortTitle = title.trim().length < MIN_TITLE;
+  const shortBody = body.trim().length < MIN_BODY;
+  const canSubmit = !shortTitle && !shortBody && accepted;
+  const titleError =
+    tried && shortTitle
+      ? L(`శీర్షిక కనీసం ${MIN_TITLE} అక్షరాలు ఉండాలి.`, `The headline needs at least ${MIN_TITLE} characters.`)
+      : null;
+  const bodyError =
+    tried && shortBody
+      ? L(`కథనం కనీసం ${MIN_BODY} అక్షరాలు ఉండాలి.`, `The story needs at least ${MIN_BODY} characters.`)
+      : null;
+  const acceptError =
+    tried && !accepted ? L('మార్గదర్శకాలను అంగీకరించాలి.', 'Please accept the guidelines.') : null;
 
-  const STATUS_UI: Record<creatorApi.SubmissionStatus, { icon: React.ReactNode; cls: string; te: string; en: string }> = {
-    pending: { icon: <Clock3 className="h-3.5 w-3.5" aria-hidden />, cls: 'bg-exclusive-tint text-exclusive-text', te: 'సమీక్షలో', en: 'In review' },
-    approved: { icon: <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />, cls: 'bg-success-tint text-success', te: 'ఆమోదించబడింది', en: 'Approved' },
-    rejected: { icon: <XCircle className="h-3.5 w-3.5" aria-hidden />, cls: 'bg-breaking-tint text-breaking', te: 'తిరస్కరించబడింది', en: 'Rejected' },
+  /** Typing again puts the form back in edit mode and retires the success card. */
+  const edit = () => {
+    if (submit.isSuccess) submit.reset();
   };
 
+  const clearDraft = async () => {
+    const ok = await confirm({
+      title: L('డ్రాఫ్ట్ తొలగించాలా?', 'Clear this draft?'),
+      body: L('మీరు రాసినది పోతుంది. తిరిగి తేలేము.', 'What you have written will be lost. This cannot be undone.'),
+      confirmLabel: L('తొలగించండి', 'Clear it'),
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setTitle('');
+    setBody('');
+    setCategorySlug('');
+    setDistrictSlug('');
+    setAccepted(false);
+    setTried(false);
+    submit.reset();
+  };
+
+  const categories = (config.data?.categories ?? []).filter((c) => c.show_in_nav);
+
   return (
-    <div className="mx-auto max-w-[760px] px-4 py-7 sm:py-10">
-      <div className="mb-6 border-b-2 border-ink pb-4">
-        <p className="flex items-center gap-1.5 font-sans text-[11px] font-bold uppercase tracking-[0.16em] text-brand">
-          <PenLine className="h-3.5 w-3.5" aria-hidden />
-          {te ? 'పాఠక రచయిత' : 'READER CONTRIBUTOR'}
-        </p>
-        <h1 className={`${te ? 'th' : 'font-sans'} mt-1 text-[27px] font-extrabold text-ink sm:text-[32px]`}>
-          {te ? 'మీ కథనం పంపండి' : 'Submit your story'}
-        </h1>
-        <p className={`${teCls} mt-1 text-[13px] leading-telugu text-muted`}>
-          {te
-            ? 'మీ ప్రాంత విశేషాలు, విజయగాథలు రాయండి. మోడరేషన్, సంపాదకీయ సమీక్ష తర్వాత మీ పేరుతో ప్రచురిస్తాం.'
-            : 'Write what is happening around you. After moderation and editorial review it publishes with your name.'}
-        </p>
-        <p className={`${teCls} mt-2 text-[12.5px] leading-telugu text-muted`}>
-          {te
-            ? 'క్రమం తప్పకుండా రాస్తారా? '
-            : 'Filing regularly? '}
-          <Link to="/contributor" className="font-semibold text-brand underline">
-            {te ? 'విలేకరిగా ధృవీకరించుకోండి' : 'Get verified as a contributor'}
-          </Link>
-          {te
-            ? ' — ఎక్కువ కథనాలు పంపవచ్చు, ఫోటోలు జోడించవచ్చు, మీ పేరుపై ధృవీకరణ గుర్తు.'
-            : ' — send more stories, attach photographs, and carry a verified byline.'}
-        </p>
-      </div>
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (canSubmit) submit.mutate();
-        }}
-        className="rounded-card border border-rule bg-paper p-5 sm:p-6"
-      >
-        <label className={`${teCls} mb-1 block text-[12.5px] font-semibold text-ink`}>
-          {te ? 'శీర్షిక' : 'Headline'} <span className="text-breaking">*</span>
-        </label>
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          maxLength={200}
-          placeholder={te ? 'ఉదా: మా ఊరి యువత కట్టిన గ్రంథాలయం' : 'e.g. The library our village youth built'}
-          className={`te ${inputCls}`}
-        />
-        <p className="mt-0.5 text-right font-sans text-[10px] text-muted-light">{title.length}/200</p>
-
-        <label className={`${teCls} mb-1 mt-3 block text-[12.5px] font-semibold text-ink`}>
-          {te ? 'కథనం (కనీసం 100 అక్షరాలు)' : 'Story (at least 100 characters)'}{' '}
-          <span className="text-breaking">*</span>
-        </label>
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          rows={10}
-          maxLength={20000}
-          placeholder={te ? 'పూర్తి వివరాలతో రాయండి. పేరాల మధ్య ఖాళీ లైన్ వదలండి…' : 'Write in full. Leave a blank line between paragraphs…'}
-          className={`te ${inputCls} leading-telugu`}
-        />
-        <p className="mt-0.5 text-right font-sans text-[10px] text-muted-light">{body.length}/20000</p>
-
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <label className="block">
-            <span className={`${teCls} mb-1 block text-[12px] font-semibold text-muted`}>
-              {te ? 'విభాగం' : 'Section'}
-            </span>
-            <select value={categorySlug} onChange={(e) => setCategorySlug(e.target.value)} className={`${teCls} ${inputCls}`}>
-              <option value="">{te ? '— ఎంచుకోండి —' : '— choose —'}</option>
-              {config.data?.categories.filter((c) => c.show_in_nav).map((c) => (
-                <option key={c.slug} value={c.slug}>{pick(c.name_te, c.name_en)}</option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className={`${teCls} mb-1 block text-[12px] font-semibold text-muted`}>
-              {te ? 'జిల్లా' : 'District'}
-            </span>
-            <select value={districtSlug} onChange={(e) => setDistrictSlug(e.target.value)} className={`${teCls} ${inputCls}`}>
-              <option value="">{te ? '— ఎంచుకోండి —' : '— choose —'}</option>
-              {config.data?.districts.map((d) => (
-                <option key={d.slug} value={d.slug}>{pick(d.name_te, d.name_en)}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <label className={`${teCls} mt-4 flex cursor-pointer items-start gap-2 text-[13px] leading-telugu text-ink`}>
-          <input
-            type="checkbox"
-            checked={accepted}
-            onChange={(e) => setAccepted(e.target.checked)}
-            className="mt-1 h-4 w-4 accent-brand"
-          />
-          <span>
-            {te
-              ? 'ఇది నా సొంత రచన; వాస్తవాలు నిర్ధారించుకున్నాను. '
-              : 'This is my own writing and I have verified the facts. '}
-            <Link to="/editorial-policy" className="text-info hover:underline">
-              {te ? 'కంటెంట్ మార్గదర్శకాలను' : 'The content guidelines'}
-            </Link>
-            {te ? ' అంగీకరిస్తున్నాను.' : ' are accepted.'}
-          </span>
-        </label>
-
-        <button
-          type="submit"
-          disabled={!canSubmit || submit.isPending}
-          className={`${teCls} mt-4 w-full rounded-control bg-brand py-3 text-[15px] font-bold text-white hover:bg-brand-dark disabled:opacity-50`}
-        >
-          {submit.isPending
-            ? te ? 'పంపుతోంది…' : 'Submitting…'
-            : te ? 'మోడరేషన్‌కు పంపండి' : 'Send for moderation'}
-        </button>
-        {submit.isSuccess ? (
-          <p className={`${teCls} mt-2 text-center text-[12.5px] font-semibold text-success`}>
-            {te ? '✓ అందింది! సమీక్ష తర్వాత తెలియజేస్తాం.' : '✓ Received! We will update you after review.'}
-          </p>
-        ) : null}
-        {error ? (
-          <p role="alert" className={`${teCls} mt-2 rounded bg-breaking-tint px-3 py-2 text-[13px] text-breaking`}>
-            {error}
-          </p>
-        ) : null}
-      </form>
-
-      {/* ------------------------------------------- my submissions -------- */}
-      <section className="mt-8">
-        <h2 className={`${te ? 'th' : 'font-sans'} mb-3 border-b-2 border-ink pb-1.5 text-[18px] font-extrabold text-brand`}>
-          {te ? 'నా సమర్పణలు' : 'My submissions'}
-        </h2>
-        {mine.data?.length === 0 ? (
-          <p className={`${teCls} rounded border border-rule bg-paper px-4 py-5 text-center text-[13.5px] text-muted`}>
-            {te ? 'ఇంకా సమర్పణలు లేవు.' : 'Nothing submitted yet.'}
-          </p>
-        ) : (
-          <div className="divide-y divide-rule">
-            {mine.data?.map((s) => {
-              const ui = STATUS_UI[s.status];
-              return (
-                <div key={s.id} className="flex items-start gap-3 py-3">
-                  <div className="min-w-0 flex-1">
-                    {s.article_url ? (
-                      <Link to={s.article_url} lang="te" className="te block text-[14.5px] font-semibold text-ink hover:text-brand">
-                        {s.title_te}
-                      </Link>
-                    ) : (
-                      <p lang="te" className="te text-[14.5px] font-semibold text-ink">{s.title_te}</p>
-                    )}
-                    {s.review_note ? (
-                      <p lang="te" className="te mt-0.5 text-[12.5px] text-muted">
-                        {te ? 'గమనిక: ' : 'Note: '}{s.review_note}
-                      </p>
-                    ) : null}
-                    <p className="mt-0.5 font-sans text-[10.5px] text-muted-light">
-                      {relativeTime(s.created_at, language)}
-                    </p>
-                  </div>
-                  <span className={`flex shrink-0 items-center gap-1 rounded-chip px-2.5 py-1 text-[11px] font-bold ${ui.cls} ${teCls}`}>
-                    {ui.icon}
-                    {te ? ui.te : ui.en}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+    <PageContainer width="form" className="space-y-7 py-7 md:space-y-10 md:py-10">
+      <PageHeader
+        icon={PenLine}
+        eyebrow={L('పాఠక రచయిత', 'Reader contributor')}
+        title={L('మీ కథనం పంపండి', 'Submit your story')}
+        subtitle={L(
+          'మీ ప్రాంత విశేషాలు, విజయగాథలు రాయండి. మోడరేషన్, సంపాదకీయ సమీక్ష తర్వాత మీ పేరుతో ప్రచురిస్తాం.',
+          'Write what is happening around you. After moderation and editorial review it publishes with your name.',
         )}
+        spacing="none"
+      />
+
+      {submit.isSuccess ? (
+        <Card tone="paper" padding="lg" className="border-success">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-pill bg-success-tint text-success">
+              <Icon icon={CheckCircle2} size="md" />
+            </span>
+            <div className="min-w-0">
+              <h2 className={cn(s.head, 'text-headline-xs font-bold text-ink')}>
+                {L('మీ కథనం అందింది', 'Your story reached us')}
+              </h2>
+              <p className={cn(bodyCls, 'mt-1 text-muted')}>
+                {L(
+                  'మోడరేటర్ సమీక్ష తర్వాత తెలియజేస్తాం. స్థితిని కింద చూడవచ్చు.',
+                  'A moderator reads it next and you will hear from us. Track it in the list below.',
+                )}
+              </p>
+            </div>
+          </div>
+        </Card>
+      ) : null}
+
+      <Card as="section" padding="lg">
+        <form
+          className="space-y-5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setTried(true);
+            if (canSubmit && !submit.isPending) submit.mutate();
+          }}
+        >
+          <Field
+            label={L('శీర్షిక', 'Headline')}
+            required
+            error={titleError}
+            hint={`${title.length}/${MAX_TITLE}`}
+          >
+            <Input
+              script="te"
+              value={title}
+              maxLength={MAX_TITLE}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                edit();
+              }}
+              placeholder={L('ఉదా: మా ఊరి యువత కట్టిన గ్రంథాలయం', 'e.g. The library our village youth built')}
+            />
+          </Field>
+
+          <Field
+            label={L(`కథనం (కనీసం ${MIN_BODY} అక్షరాలు)`, `Story (at least ${MIN_BODY} characters)`)}
+            required
+            error={bodyError}
+          >
+            <Textarea
+              script="te"
+              value={body}
+              rows={10}
+              counter={MAX_BODY}
+              onChange={(e) => {
+                setBody(e.target.value);
+                edit();
+              }}
+              placeholder={L(
+                'పూర్తి వివరాలతో రాయండి. పేరాల మధ్య ఖాళీ లైన్ వదలండి…',
+                'Write in full. Leave a blank line between paragraphs…',
+              )}
+            />
+          </Field>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label={L('విభాగం', 'Section')} optionalLabel>
+              <Select value={categorySlug} onChange={(e) => setCategorySlug(e.target.value)}>
+                <option value="">{L('— ఎంచుకోండి —', '— choose —')}</option>
+                {categories.map((c) => (
+                  <option key={c.slug} value={c.slug}>
+                    {pick(c.name_te, c.name_en)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <LocationPicker
+              levels="district"
+              className="sm:col-span-2"
+              value={{ state: stateCode, district: districtSlug }}
+              onChange={(next) => {
+                setStateCode(next.state ?? null);
+                setDistrictSlug(next.district ?? '');
+              }}
+            />
+          </div>
+
+          {/* A fieldset, not a Field: Checkbox carries its own label, so a
+              Field's htmlFor would point at nothing. */}
+          <fieldset className="pt-1">
+            <legend className={cn(s.body, 'mb-1.5 text-ui-sm font-semibold text-ink')}>
+              {L('ధ్రువీకరణ', 'Your declaration')}
+            </legend>
+            <Checkbox
+              checked={accepted}
+              onChange={(v) => {
+                setAccepted(v);
+                edit();
+              }}
+              label={L(
+                'ఇది నా సొంత రచన; వాస్తవాలు నిర్ధారించుకున్నాను. కంటెంట్ మార్గదర్శకాలను అంగీకరిస్తున్నాను.',
+                'This is my own writing, I have verified the facts, and I accept the content guidelines.',
+              )}
+            />
+            {acceptError ? (
+              <p role="alert" className={cn(s.body, 'mt-1.5 text-meta text-breaking')}>
+                {acceptError}
+              </p>
+            ) : null}
+          </fieldset>
+          <ButtonLink to="/editorial-policy" variant="link" size="sm">
+            {L('కంటెంట్ మార్గదర్శకాలు చదవండి', 'Read the content guidelines')}
+          </ButtonLink>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="submit" pending={submit.isPending} disabled={submit.isPending}>
+              {L('మోడరేషన్‌కు పంపండి', 'Send for moderation')}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              icon={Trash2}
+              onClick={() => void clearDraft()}
+              disabled={submit.isPending || (!title && !body)}
+            >
+              {L('డ్రాఫ్ట్ తొలగించండి', 'Clear draft')}
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      <Card tone="warm" padding="md">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-pill bg-brand-tint text-brand">
+              <Icon icon={ShieldCheck} size="md" />
+            </span>
+            <p className={cn(bodyCls, 'min-w-0 text-ink-soft')}>
+              {L(
+                'క్రమం తప్పకుండా రాస్తారా? విలేకరిగా ధృవీకరించుకుంటే ఎక్కువ కథనాలు పంపవచ్చు, ఫోటోలు జోడించవచ్చు, మీ పేరుపై ధృవీకరణ గుర్తు వస్తుంది.',
+                'Filing regularly? Verified contributors send more stories, attach photographs and carry a verified byline.',
+              )}
+            </p>
+          </div>
+          <ButtonLink to="/contributor" variant="secondary" size="sm">
+            {L('ధృవీకరించుకోండి', 'Get verified')}
+          </ButtonLink>
+        </div>
+      </Card>
+
+      <section>
+        <SectionHeader title={L('నా సమర్పణలు', 'My submissions')} />
+        <QueryState
+          query={mine}
+          skeleton={
+            <div className="flex flex-col gap-4">
+              <SkeletonCard variant="row" />
+              <SkeletonCard variant="row" />
+            </div>
+          }
+          empty={
+            <EmptyState
+              icon={Inbox}
+              compact
+              title={L('ఇంకా సమర్పణలు లేవు', 'Nothing submitted yet')}
+              body={L('మీ మొదటి కథనం పైన రాయండి.', 'Write your first story in the form above.')}
+            />
+          }
+        >
+          {(rows) => (
+            <ul className="flex flex-col gap-3">
+              {rows.map((row) => (
+                <li key={row.id}>
+                  <Card padding="md">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        {row.article_url ? (
+                          <Link
+                            to={row.article_url}
+                            lang="te"
+                            className="te flex min-h-tap items-center text-te-body-sm font-semibold text-ink underline-offset-4 hover:text-brand hover:underline"
+                          >
+                            {row.title_te}
+                          </Link>
+                        ) : (
+                          <p lang="te" className="te text-te-body-sm font-semibold text-ink">
+                            {row.title_te}
+                          </p>
+                        )}
+                        {row.review_note ? (
+                          <p lang="te" className="te mt-1 text-te-body-xs text-muted">
+                            {L('గమనిక: ', 'Note: ')}
+                            {row.review_note}
+                          </p>
+                        ) : null}
+                        <p className="mt-1 font-sans text-meta text-muted">{relativeTime(row.created_at, language)}</p>
+                      </div>
+                      <StatusPill status={row.status} registry={SUBMISSION_STATUS} className="shrink-0" />
+                    </div>
+                  </Card>
+                </li>
+              ))}
+            </ul>
+          )}
+        </QueryState>
       </section>
-    </div>
+
+      {dialog}
+    </PageContainer>
   );
 }

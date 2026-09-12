@@ -1,11 +1,20 @@
-import { FormEvent, useState } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { CheckCircle2, LinkIcon, MailCheck } from 'lucide-react';
 
-import { ApiError } from '@/api/client';
+import { Button, ButtonLink, linkClass } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Field, Input } from '@/components/ui/Field';
+import { Icon } from '@/components/ui/Icon';
+import { PageContainer, PageHeader } from '@/components/ui/Layout';
+import { EmptyState, ErrorState } from '@/components/ui/State';
+import { useToast } from '@/components/ui/Toast';
 import * as authApi from '@/features/auth/api';
-import { useI18n } from '@/i18n';
+import { useI18n, useScript } from '@/i18n';
 import { useAuth } from '@/stores/auth';
+import { cn } from '@/utils/cn';
+import { useDocumentTitle } from '@/utils/motion';
 
 /**
  * §4 — reader signup, forgotten password, reset, and email verification.
@@ -14,33 +23,61 @@ import { useAuth } from '@/stores/auth';
  * a reader may hold either credential, or both. The OTP path is unchanged and
  * still the fastest way in, so the signup page links to it rather than hiding
  * it behind this longer form.
+ *
+ * All four share `Shell` — the same auth card as /login: form-width container,
+ * one `lg` Card, 48px controls, errors above the form, full-width action.
  */
 
-const input =
-  'w-full rounded-control border border-rule-input bg-white px-3 py-2.5 text-[15px] text-ink ' +
-  'focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 dark:bg-surface';
+/** Inline bilingual copy for the strings these pages do not have keys for. */
+function useL() {
+  const { language } = useI18n();
+  return (te: string, en: string) => (language === 'te' ? te : en);
+}
 
-function Shell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+interface ShellProps {
+  /** `page.*` string for the browser tab. */
+  docTitle: string;
+  title: string;
+  subtitle: string;
+  children: ReactNode;
+  /** Trailing link row under the card. */
+  footer?: ReactNode;
+}
+
+function Shell({ docTitle, title, subtitle, children, footer }: ShellProps) {
+  useDocumentTitle(docTitle);
+  const s = useScript();
   return (
-    <div className="mx-auto max-w-md px-4 py-10">
-      <h1 className="th text-[26px] font-extrabold leading-tight text-ink">{title}</h1>
-      <p className="te mt-1.5 text-[13px] leading-telugu text-muted">{subtitle}</p>
-      <div className="mt-6">{children}</div>
-    </div>
+    <PageContainer width="form" className="py-8 md:py-12">
+      <Card padding="lg" radius="2xl">
+        <p lang="te" className="th text-headline-lg font-extrabold text-brand">
+          టాప్ తెలుగు
+        </p>
+        <PageHeader title={title} subtitle={subtitle} />
+        {children}
+      </Card>
+      {footer ? (
+        <p className={cn(s.body, s.te ? 'text-te-body-xs' : 'text-ui', 'mt-7 text-center text-muted')}>{footer}</p>
+      ) : null}
+    </PageContainer>
   );
 }
 
-function Problem({ error }: { error: unknown }) {
-  const { language } = useI18n();
-  if (!error) return null;
-  const api = error as ApiError;
-  const message = api?.messageTe
-    ? (language === 'te' ? api.messageTe : api.messageEn)
-    : language === 'te' ? 'ఏదో తప్పు జరిగింది.' : 'Something went wrong.';
+/** Success panel — the form's replacement once the one-shot action has landed. */
+function Done({ children }: { children: ReactNode }) {
+  const s = useScript();
   return (
-    <p role="alert" className="te mb-3 rounded-control border border-breaking-border bg-breaking-tint p-3 text-[13px] text-breaking">
-      {message}
-    </p>
+    <div
+      role="status"
+      className={cn(
+        s.body,
+        'flex items-start gap-2 rounded-xl border border-success bg-success-tint p-4 text-success',
+        s.te ? 'text-te-body-xs' : 'text-ui',
+      )}
+    >
+      <Icon icon={CheckCircle2} className="mt-0.5" />
+      <span>{children}</span>
+    </div>
   );
 }
 
@@ -48,10 +85,10 @@ function Problem({ error }: { error: unknown }) {
 // Register
 // --------------------------------------------------------------------------- //
 export function RegisterPage() {
-  const { language } = useI18n();
-  const en = language === 'en';
+  const { t } = useI18n();
+  const L = useL();
   const nav = useNavigate();
-  const setMe = useAuth((s) => s.setMe);
+  const setMe = useAuth((st) => st.setMe);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -62,10 +99,12 @@ export function RegisterPage() {
   const mismatch = confirm.length > 0 && password !== confirm;
 
   const register = useMutation({
-    mutationFn: () => authApi.registerReader({
-      name, email, password, confirm_password: confirm, phone: phone || undefined,
-    }),
-    onSuccess: (data) => { setMe(data.me); nav("/profile"); },
+    mutationFn: () =>
+      authApi.registerReader({ name, email, password, confirm_password: confirm, phone: phone || undefined }),
+    onSuccess: (data) => {
+      setMe(data.me);
+      nav('/profile');
+    },
   });
 
   function submit(event: FormEvent) {
@@ -76,60 +115,84 @@ export function RegisterPage() {
 
   return (
     <Shell
-      title={en ? 'Create your account' : 'ఖాతా సృష్టించండి'}
-      subtitle={en
-        ? 'Save stories, follow your district, and submit news of your own.'
-        : 'కథనాలు సేవ్ చేసుకోండి, మీ జిల్లాను ఫాలో అవ్వండి, మీ వార్తలు పంపండి.'}
+      docTitle={t('page.register')}
+      title={L('ఖాతా సృష్టించండి', 'Create your account')}
+      subtitle={L(
+        'కథనాలు సేవ్ చేసుకోండి, మీ జిల్లాను ఫాలో అవ్వండి, మీ వార్తలు పంపండి.',
+        'Save stories, follow your district, and submit news of your own.',
+      )}
+      footer={
+        <>
+          {L('ఇప్పటికే ఖాతా ఉందా?', 'Already have an account?')}{' '}
+          <Link to="/login" className={linkClass}>
+            {L('లాగిన్', 'Sign in')}
+          </Link>
+        </>
+      }
     >
-      <Problem error={register.error} />
-      <form onSubmit={submit} className="space-y-3.5">
-        <label className="block">
-          <span className="te mb-1 block text-[12.5px] font-bold text-ink">{en ? 'Name' : 'పేరు'}</span>
-          <input required minLength={2} value={name} onChange={(e) => setName(e.target.value)}
-            className={`te ${input}`} autoComplete="name" />
-        </label>
-        <label className="block">
-          <span className="te mb-1 block text-[12.5px] font-bold text-ink">{en ? 'Email' : 'ఇమెయిల్'}</span>
-          <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-            className={input} autoComplete="email" />
-        </label>
-        <label className="block">
-          <span className="te mb-1 block text-[12.5px] font-bold text-ink">
-            {en ? 'Phone' : 'ఫోన్'} <span className="font-normal text-muted">({en ? 'optional' : 'ఐచ్ఛికం'})</span>
-          </span>
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel"
-            placeholder="98480 12345" className={input} autoComplete="tel" />
-          <span className="te mt-1 block text-[11.5px] text-muted">
-            {en ? 'Lets you sign in with an OTP as well.' : 'OTP ద్వారా కూడా లాగిన్ అవ్వొచ్చు.'}
-          </span>
-        </label>
-        <label className="block">
-          <span className="te mb-1 block text-[12.5px] font-bold text-ink">{en ? 'Password' : 'పాస్‌వర్డ్'}</span>
-          <input required type="password" minLength={8} value={password}
-            onChange={(e) => setPassword(e.target.value)} className={input} autoComplete="new-password" />
-        </label>
-        <label className="block">
-          <span className="te mb-1 block text-[12.5px] font-bold text-ink">
-            {en ? 'Confirm password' : 'పాస్‌వర్డ్ మళ్లీ'}
-          </span>
-          <input required type="password" minLength={8} value={confirm}
-            onChange={(e) => setConfirm(e.target.value)} className={input} autoComplete="new-password" />
-          {mismatch ? (
-            <span className="te mt-1 block text-[12px] text-breaking">
-              {en ? 'Passwords do not match.' : 'పాస్‌వర్డ్‌లు సరిపోలలేదు.'}
-            </span>
-          ) : null}
-        </label>
-        <button disabled={register.isPending || mismatch}
-          className="te min-h-tap w-full rounded-control bg-brand px-5 font-bold text-white disabled:opacity-60">
-          {register.isPending ? (en ? 'Creating…' : 'సృష్టిస్తోంది…') : (en ? 'Create account' : 'ఖాతా సృష్టించండి')}
-        </button>
+      {register.error ? <ErrorState compact error={register.error} className="mb-2" /> : null}
+      <form onSubmit={submit} className="space-y-5">
+        <Field label={L('పేరు', 'Name')} required>
+          <Input size="lg" required minLength={2} autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <Field label={L('ఇమెయిల్', 'Email')} required>
+          <Input
+            size="lg"
+            required
+            type="email"
+            script="en"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </Field>
+        <Field
+          label={L('ఫోన్', 'Phone')}
+          optionalLabel
+          hint={L('OTP ద్వారా కూడా లాగిన్ అవ్వొచ్చు.', 'Lets you sign in with an OTP as well.')}
+        >
+          <Input
+            size="lg"
+            inputMode="tel"
+            script="en"
+            autoComplete="tel"
+            placeholder="98480 12345"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+        </Field>
+        <Field label={L('పాస్‌వర్డ్', 'Password')} required>
+          <Input
+            size="lg"
+            required
+            type="password"
+            minLength={8}
+            script="en"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </Field>
+        <Field
+          label={L('పాస్‌వర్డ్ మళ్లీ', 'Confirm password')}
+          required
+          error={mismatch ? L('పాస్‌వర్డ్‌లు సరిపోలలేదు.', 'Passwords do not match.') : null}
+        >
+          <Input
+            size="lg"
+            required
+            type="password"
+            minLength={8}
+            script="en"
+            autoComplete="new-password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+          />
+        </Field>
+        <Button type="submit" size="lg" full pending={register.isPending} disabled={mismatch}>
+          {L('ఖాతా సృష్టించండి', 'Create account')}
+        </Button>
       </form>
-
-      <p className="te mt-5 text-center text-[13px] text-muted">
-        {en ? 'Already have an account?' : 'ఇప్పటికే ఖాతా ఉందా?'}{' '}
-        <Link to="/login" className="font-bold text-brand underline">{en ? 'Sign in' : 'లాగిన్'}</Link>
-      </p>
     </Shell>
   );
 }
@@ -138,40 +201,59 @@ export function RegisterPage() {
 // Forgot password
 // --------------------------------------------------------------------------- //
 export function ForgotPasswordPage() {
-  const { language } = useI18n();
-  const en = language === 'en';
+  const { t } = useI18n();
+  const L = useL();
   const [email, setEmail] = useState('');
   const request = useMutation({ mutationFn: () => authApi.requestPasswordReset(email) });
 
   return (
     <Shell
-      title={en ? 'Reset your password' : 'పాస్‌వర్డ్ రీసెట్'}
-      subtitle={en
-        ? 'We will email you a link. It works once and expires in 15 minutes.'
-        : 'మీ ఇమెయిల్‌కు లింక్ పంపుతాం. అది ఒకసారే పనిచేస్తుంది, 15 నిమిషాల్లో గడువు ముగుస్తుంది.'}
+      docTitle={t('page.forgotPassword')}
+      title={L('పాస్‌వర్డ్ రీసెట్', 'Reset your password')}
+      subtitle={L(
+        'మీ ఇమెయిల్‌కు లింక్ పంపుతాం. అది ఒకసారే పనిచేస్తుంది, 15 నిమిషాల్లో గడువు ముగుస్తుంది.',
+        'We will email you a link. It works once and expires in 15 minutes.',
+      )}
+      footer={
+        <Link to="/login" className={linkClass}>
+          {L('లాగిన్‌కు తిరిగి', 'Back to sign in')}
+        </Link>
+      }
     >
       {request.isSuccess ? (
-        <p className="te rounded-control border border-success/40 bg-success/10 p-3 text-[13px] text-success">
-          {en
-            ? 'If that address is registered, a reset link is on its way.'
-            : 'ఆ చిరునామా నమోదై ఉంటే, రీసెట్ లింక్ పంపబడింది.'}
-        </p>
+        <Done>
+          {L(
+            'ఆ చిరునామా నమోదై ఉంటే, రీసెట్ లింక్ పంపబడింది.',
+            'If that address is registered, a reset link is on its way.',
+          )}
+        </Done>
       ) : (
-        <form onSubmit={(e) => { e.preventDefault(); request.mutate(); }} className="space-y-3.5">
-          <label className="block">
-            <span className="te mb-1 block text-[12.5px] font-bold text-ink">{en ? 'Email' : 'ఇమెయిల్'}</span>
-            <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-              className={input} autoComplete="email" />
-          </label>
-          <button disabled={request.isPending}
-            className="te min-h-tap w-full rounded-control bg-brand px-5 font-bold text-white disabled:opacity-60">
-            {request.isPending ? '…' : (en ? 'Send reset link' : 'లింక్ పంపండి')}
-          </button>
-        </form>
+        <>
+          {request.error ? <ErrorState compact error={request.error} className="mb-2" /> : null}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              request.mutate();
+            }}
+            className="space-y-5"
+          >
+            <Field label={L('ఇమెయిల్', 'Email')} required>
+              <Input
+                size="lg"
+                required
+                type="email"
+                script="en"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </Field>
+            <Button type="submit" size="lg" full icon={LinkIcon} pending={request.isPending}>
+              {L('లింక్ పంపండి', 'Send reset link')}
+            </Button>
+          </form>
+        </>
       )}
-      <p className="te mt-5 text-center text-[13px] text-muted">
-        <Link to="/login" className="font-bold text-brand underline">{en ? 'Back to sign in' : 'లాగిన్‌కు తిరిగి'}</Link>
-      </p>
     </Shell>
   );
 }
@@ -180,8 +262,9 @@ export function ForgotPasswordPage() {
 // Reset password (from the emailed link)
 // --------------------------------------------------------------------------- //
 export function ResetPasswordPage() {
-  const { language } = useI18n();
-  const en = language === 'en';
+  const { t } = useI18n();
+  const L = useL();
+  const toast = useToast();
   const [params] = useSearchParams();
   const nav = useNavigate();
   const token = params.get('token') ?? '';
@@ -191,46 +274,82 @@ export function ResetPasswordPage() {
 
   const reset = useMutation({
     mutationFn: () => authApi.confirmPasswordReset(token, password),
-    onSuccess: () => nav('/login'),
+    onSuccess: () => {
+      toast.success(L('పాస్‌వర్డ్ మార్చాం. ఇప్పుడు లాగిన్ అవ్వండి.', 'Password changed. Sign in with it now.'));
+      nav('/login');
+    },
+    onError: (error) => toast.error(error),
   });
 
   if (!token) {
     return (
-      <Shell title={en ? 'Link not valid' : 'లింక్ చెల్లదు'}
-        subtitle={en ? 'Request a new reset link.' : 'కొత్త రీసెట్ లింక్ అడగండి.'}>
-        <Link to="/forgot-password" className="te font-bold text-brand underline">
-          {en ? 'Request a link' : 'లింక్ అడగండి'}
-        </Link>
+      <Shell
+        docTitle={t('page.resetPassword')}
+        title={L('లింక్ చెల్లదు', 'Link not valid')}
+        subtitle={L('కొత్త రీసెట్ లింక్ అడగండి.', 'Request a new reset link.')}
+      >
+        <EmptyState
+          compact
+          icon={LinkIcon}
+          title={L('ఈ లింక్ గడువు ముగిసింది', 'This link has expired')}
+          body={L(
+            'రీసెట్ లింక్ ఒకసారే పనిచేస్తుంది. కొత్తది అడగండి.',
+            'A reset link works only once. Ask for a fresh one.',
+          )}
+          action={<ButtonLink to="/forgot-password">{L('లింక్ అడగండి', 'Request a link')}</ButtonLink>}
+        />
       </Shell>
     );
   }
 
   return (
-    <Shell title={en ? 'Choose a new password' : 'కొత్త పాస్‌వర్డ్'}
-      subtitle={en
-        ? 'Setting a new password signs you out of every other device.'
-        : 'కొత్త పాస్‌వర్డ్ పెడితే మిగతా అన్ని పరికరాల నుంచి లాగ్ అవుట్ అవుతారు.'}>
-      <Problem error={reset.error} />
-      <form onSubmit={(e) => { e.preventDefault(); if (!mismatch) reset.mutate(); }} className="space-y-3.5">
-        <label className="block">
-          <span className="te mb-1 block text-[12.5px] font-bold text-ink">{en ? 'New password' : 'కొత్త పాస్‌వర్డ్'}</span>
-          <input required type="password" minLength={10} value={password}
-            onChange={(e) => setPassword(e.target.value)} className={input} autoComplete="new-password" />
-        </label>
-        <label className="block">
-          <span className="te mb-1 block text-[12.5px] font-bold text-ink">{en ? 'Confirm' : 'మళ్లీ టైప్ చేయండి'}</span>
-          <input required type="password" minLength={10} value={confirm}
-            onChange={(e) => setConfirm(e.target.value)} className={input} autoComplete="new-password" />
-          {mismatch ? (
-            <span className="te mt-1 block text-[12px] text-breaking">
-              {en ? 'Passwords do not match.' : 'పాస్‌వర్డ్‌లు సరిపోలలేదు.'}
-            </span>
-          ) : null}
-        </label>
-        <button disabled={reset.isPending || mismatch}
-          className="te min-h-tap w-full rounded-control bg-brand px-5 font-bold text-white disabled:opacity-60">
-          {reset.isPending ? '…' : (en ? 'Set password' : 'పాస్‌వర్డ్ మార్చండి')}
-        </button>
+    <Shell
+      docTitle={t('page.resetPassword')}
+      title={L('కొత్త పాస్‌వర్డ్', 'Choose a new password')}
+      subtitle={L(
+        'కొత్త పాస్‌వర్డ్ పెడితే మిగతా అన్ని పరికరాల నుంచి లాగ్ అవుట్ అవుతారు.',
+        'Setting a new password signs you out of every other device.',
+      )}
+    >
+      {reset.error ? <ErrorState compact error={reset.error} className="mb-2" /> : null}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!mismatch) reset.mutate();
+        }}
+        className="space-y-5"
+      >
+        <Field label={L('కొత్త పాస్‌వర్డ్', 'New password')} required>
+          <Input
+            size="lg"
+            required
+            type="password"
+            minLength={10}
+            script="en"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </Field>
+        <Field
+          label={L('మళ్లీ టైప్ చేయండి', 'Confirm')}
+          required
+          error={mismatch ? L('పాస్‌వర్డ్‌లు సరిపోలలేదు.', 'Passwords do not match.') : null}
+        >
+          <Input
+            size="lg"
+            required
+            type="password"
+            minLength={10}
+            script="en"
+            autoComplete="new-password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+          />
+        </Field>
+        <Button type="submit" size="lg" full pending={reset.isPending} disabled={mismatch}>
+          {L('పాస్‌వర్డ్ మార్చండి', 'Set password')}
+        </Button>
       </form>
     </Shell>
   );
@@ -240,8 +359,8 @@ export function ResetPasswordPage() {
 // Email verification (from the emailed link)
 // --------------------------------------------------------------------------- //
 export function VerifyEmailPage() {
-  const { language } = useI18n();
-  const en = language === 'en';
+  const { t } = useI18n();
+  const L = useL();
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
   const [done, setDone] = useState(false);
@@ -255,26 +374,35 @@ export function VerifyEmailPage() {
   // mount: link scanners in mail clients would otherwise burn the token before
   // the reader ever sees the page.
   return (
-    <Shell title={en ? 'Verify your email' : 'ఇమెయిల్ ధృవీకరణ'}
-      subtitle={en ? 'One tap confirms this address is yours.' : 'ఒక క్లిక్‌తో ఈ చిరునామా మీదని నిర్ధారించండి.'}>
+    <Shell
+      docTitle={t('page.verifyEmail')}
+      title={L('ఇమెయిల్ ధృవీకరణ', 'Verify your email')}
+      subtitle={L('ఒక క్లిక్‌తో ఈ చిరునామా మీదని నిర్ధారించండి.', 'One tap confirms this address is yours.')}
+    >
       {!token ? (
-        <p className="te text-[13px] text-breaking">{en ? 'This link is not valid.' : 'ఈ లింక్ చెల్లదు.'}</p>
+        <EmptyState
+          compact
+          icon={LinkIcon}
+          title={L('ఈ లింక్ చెల్లదు', 'This link is not valid')}
+          body={L(
+            'మీ ప్రొఫైల్ నుంచి కొత్త ధృవీకరణ లింక్ పంపుకోవచ్చు.',
+            'You can send yourself a fresh verification link from your profile.',
+          )}
+          action={<ButtonLink to="/profile">{t('page.profile')}</ButtonLink>}
+        />
       ) : done ? (
-        <div className="space-y-3">
-          <p className="te rounded-control border border-success/40 bg-success/10 p-3 text-[13px] text-success">
-            {en ? 'Email verified. Thank you.' : 'ఇమెయిల్ ధృవీకరించబడింది. ధన్యవాదాలు.'}
-          </p>
-          <Link to="/profile" className="te font-bold text-brand underline">
-            {en ? 'Go to your profile' : 'మీ ప్రొఫైల్‌కు వెళ్లండి'}
-          </Link>
+        <div className="space-y-5">
+          <Done>{L('ఇమెయిల్ ధృవీకరించబడింది. ధన్యవాదాలు.', 'Email verified. Thank you.')}</Done>
+          <ButtonLink to="/profile" size="lg" full>
+            {L('మీ ప్రొఫైల్‌కు వెళ్లండి', 'Go to your profile')}
+          </ButtonLink>
         </div>
       ) : (
         <>
-          <Problem error={verify.error} />
-          <button type="button" disabled={verify.isPending} onClick={() => verify.mutate()}
-            className="te min-h-tap w-full rounded-control bg-brand px-5 font-bold text-white disabled:opacity-60">
-            {verify.isPending ? '…' : (en ? 'Verify my email' : 'నా ఇమెయిల్ ధృవీకరించండి')}
-          </button>
+          {verify.error ? <ErrorState compact error={verify.error} className="mb-2" /> : null}
+          <Button size="lg" full icon={MailCheck} pending={verify.isPending} onClick={() => verify.mutate()}>
+            {L('నా ఇమెయిల్ ధృవీకరించండి', 'Verify my email')}
+          </Button>
         </>
       )}
     </Shell>

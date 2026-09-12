@@ -69,6 +69,9 @@ export function track(event: BeaconEvent, immediate = false): void {
 }
 
 export function trackShare(shortId: string): void {
+  // A caller with nothing to report (an e-paper page that holds no article)
+  // must not post an empty short_id at the article counters.
+  if (!shortId) return;
   track({ short_id: shortId, type: 'share' }, true);
 }
 

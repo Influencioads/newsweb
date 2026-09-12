@@ -17,6 +17,11 @@ import { T } from '@/ui/Text';
  *   * a generated file exists → real playback with seek and speed
  *   * voice on, no file       → the device voice (expo-speech), unchanged
  *   * voice off (§20)         → nothing renders
+ *
+ * A caller that already holds the file (the e-paper playlist ships an
+ * `AudioTrack.url`) passes `url` and the lookup is skipped entirely. The
+ * device-voice fallback only renders for a caller that supplies a real
+ * `onToggleDevice` — an empty handler would be a button that does nothing.
  */
 
 interface AudioState {
@@ -59,20 +64,24 @@ const useStyles = makeStyles((color) => ({
 
 export function ArticleAudio({
   shortId,
-  deviceSpeaking,
+  deviceSpeaking = false,
   onToggleDevice,
   listenLabel,
   stopLabel,
   endpoint,
+  url,
 }: {
   shortId: string;
-  deviceSpeaking: boolean;
-  onToggleDevice: () => void;
+  deviceSpeaking?: boolean;
+  /** Omit when there is no device-voice fallback to offer. */
+  onToggleDevice?: () => void;
   listenLabel: string;
   stopLabel: string;
   /** Defaults to this article's audio route; the bulletin passes its own,
    *  which returns the same payload shape. */
   endpoint?: string;
+  /** A file the caller already holds — skips the lookup entirely. */
+  url?: string;
 }) {
   const styles = useStyles();
   const { t, isTelugu } = useI18n();
@@ -81,31 +90,32 @@ export function ArticleAudio({
   const audio = useQuery({
     queryKey: ['audio', source],
     queryFn: async () => (await api.get<AudioState>(source)).data,
+    enabled: !url,
     retry: false,
     staleTime: 5 * 60_000,
   });
 
   // The hook has to run unconditionally, so it is created with a null source
-  // and only given one when the server says a file exists.
-  const player = useAudioPlayer(audio.data?.url ?? null);
+  // and only given one when a file is known to exist.
+  const player = useAudioPlayer(url ?? audio.data?.url ?? null);
   const status = useAudioPlayerStatus(player);
 
-  if (audio.data && !audio.data.voice_enabled) return null;
+  if (!url && audio.data && !audio.data.voice_enabled) return null;
 
-  const hasFile = Boolean(audio.data?.available && audio.data.url);
+  const hasFile = Boolean(url) || Boolean(audio.data?.available && audio.data.url);
 
   if (!hasFile) {
-    return (
+    return onToggleDevice ? (
       <Button
         variant={deviceSpeaking ? 'primary' : 'secondary'}
         icon={deviceSpeaking ? 'pause' : 'volume2'}
         label={deviceSpeaking ? stopLabel : listenLabel}
         onPress={onToggleDevice}
       />
-    );
+    ) : null;
   }
 
-  const total = status.duration || audio.data!.duration_sec;
+  const total = status.duration || audio.data?.duration_sec || 0;
   const elapsed = status.currentTime ?? 0;
   const percent = total ? Math.min(100, (elapsed / total) * 100) : 0;
   const back = L(`${SKIP} సెకన్లు వెనక్కి`, `Back ${SKIP} seconds`, isTelugu);

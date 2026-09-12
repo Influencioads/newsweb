@@ -1,21 +1,49 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bookmark, History, Rss, X } from 'lucide-react';
+import { useEffect, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Bookmark, BookmarkX, History, Home, Rss, X, type LucideIcon } from 'lucide-react';
 
 import { RowCard } from '@/components/article/ArticleCard';
+import { Button, ButtonLink, IconButton } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
+import { useConfirm } from '@/components/ui/Dialog';
+import { PageContainer, PageHeader, SectionHeader } from '@/components/ui/Layout';
+import { EmptyState, QueryState, Skeleton } from '@/components/ui/State';
+import { Tabs } from '@/components/ui/Tabs';
+import { useToast } from '@/components/ui/Toast';
 import * as engagementApi from '@/features/engagement/api';
-import { useI18n } from '@/i18n';
+import { useI18n, useScript } from '@/i18n';
 import { useAuth } from '@/stores/auth';
-import type { ArticleCard as ArticleCardType } from '@/types/public';
+import { cn } from '@/utils/cn';
+import { useDocumentTitle, useReveal } from '@/utils/motion';
 import { relativeTime } from '@/utils/time';
 
 /**
  * The reader's library (§2, §11, §12): saved articles, reading history with
  * progress, and the Following feed with follow management.
+ *
+ * The three pages are one surface — a shared header plus a Tabs strip that
+ * navigates between them — so switching lists never feels like leaving.
+ * Every list is an offset infinite query; removing a bookmark or dropping a
+ * follow goes through ConfirmDialog and reports with a toast.
  */
 
-function useRequireLogin(from: string) {
+type LibraryTab = 'bookmarks' | 'history' | 'following';
+
+const TAB_PATH: Record<LibraryTab, string> = {
+  bookmarks: '/bookmarks',
+  history: '/history',
+  following: '/following',
+};
+
+/** Page copy with no strings.ts key yet (see neededStrings). */
+function useL(): (te: string, en: string) => string {
+  const { language } = useI18n();
+  return (te, en) => (language === 'te' ? te : en);
+}
+
+/** Library pages are reader-private: anonymous visitors bounce to sign-in. */
+function useRequireLogin(from: string): boolean {
   const status = useAuth((s) => s.status);
   const navigate = useNavigate();
   useEffect(() => {
@@ -24,159 +52,248 @@ function useRequireLogin(from: string) {
   return status === 'authenticated';
 }
 
-function PageShell({
-  eyebrow,
-  title,
-  icon,
-  children,
-}: {
-  eyebrow: string;
-  title: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
+/** Offset-paged infinite query — the shape all three library endpoints share. */
+function useOffsetFeed<T extends { next_offset: number | null }>(
+  key: LibraryTab,
+  fetchPage: (offset: number) => Promise<T>,
+  enabled: boolean,
+) {
+  return useInfiniteQuery({
+    queryKey: ['engagement', key],
+    queryFn: ({ pageParam }) => fetchPage(pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (last: T) => last.next_offset ?? undefined,
+    enabled,
+  });
+}
+
+interface LoadMoreQuery {
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  fetchNextPage: () => unknown;
+}
+
+function LoadMore({ query }: { query: LoadMoreQuery }) {
+  const { t } = useI18n();
+  if (!query.hasNextPage) return null;
   return (
-    <div className="mx-auto min-h-[55vh] max-w-[900px] px-4 py-7 sm:py-10">
-      <div className="mb-6 border-b-2 border-ink pb-4">
-        <p className="flex items-center gap-1.5 font-sans text-[11px] font-bold uppercase tracking-[0.16em] text-brand">
-          {icon}
-          {eyebrow}
-        </p>
-        <h1 className="th mt-1 text-[27px] font-extrabold text-ink sm:text-[32px]">{title}</h1>
-      </div>
-      {children}
+    <div className="mt-6">
+      <Button
+        variant="secondary"
+        full
+        pending={query.isFetchingNextPage}
+        onClick={() => void query.fetchNextPage()}
+      >
+        {t('ui.loadMore')}
+      </Button>
     </div>
   );
 }
 
-function EmptyBox({ children }: { children: React.ReactNode }) {
+/** Shared chrome: one header, one tab strip, one rhythm. */
+function LibraryShell({
+  tab,
+  icon,
+  title,
+  children,
+}: {
+  tab: LibraryTab;
+  icon: LucideIcon;
+  title: string;
+  children: ReactNode;
+}) {
+  const { t } = useI18n();
+  const L = useL();
+  const navigate = useNavigate();
+  useDocumentTitle(title);
+
   return (
-    <p className="te rounded border border-rule bg-paper px-4 py-6 text-center text-[14.5px] text-muted">
-      {children}
-    </p>
+    <PageContainer width="page" className="py-7 md:py-10">
+      <PageHeader eyebrow={L('నా లైబ్రరీ', 'My library')} title={title} icon={icon} spacing="tight" />
+      <Tabs
+        ariaLabel={L('నా లైబ్రరీ', 'My library')}
+        items={[
+          { key: 'bookmarks', label: t('page.bookmarks'), icon: Bookmark },
+          { key: 'history', label: t('page.history'), icon: History },
+          { key: 'following', label: t('page.following'), icon: Rss },
+        ]}
+        value={tab}
+        onChange={(key) => {
+          if (key !== tab) navigate(TAB_PATH[key as LibraryTab]);
+        }}
+        scrollable
+      />
+      <div className="mt-7 space-y-7 md:space-y-10">{children}</div>
+    </PageContainer>
+  );
+}
+
+/** Empty list with a way out — a dead end is never the last word. */
+function LibraryEmpty({ icon, title, body }: { icon: LucideIcon; title: string; body: string }) {
+  const { t } = useI18n();
+  return (
+    <EmptyState
+      icon={icon}
+      title={title}
+      body={body}
+      action={
+        <ButtonLink to="/" icon={Home}>
+          {t('state.goHome')}
+        </ButtonLink>
+      }
+    />
   );
 }
 
 // --------------------------------------------------------------------------- #
 export function BookmarksPage() {
-  const { language } = useI18n();
-  const te = language === 'te';
+  const { t, pick } = useI18n();
+  const L = useL();
   const ready = useRequireLogin('/bookmarks');
-  const [extra, setExtra] = useState<ArticleCardType[]>([]);
-  const [nextOffset, setNextOffset] = useState<number | null>(null);
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const { confirm, dialog } = useConfirm();
+  const reveal = useReveal<HTMLLIElement>();
 
-  const query = useQuery({
-    queryKey: ['engagement', 'bookmarks'],
-    queryFn: async () => {
-      const data = await engagementApi.fetchBookmarks();
-      setExtra([]);
-      setNextOffset(data.next_offset);
-      return data;
+  const feed = useOffsetFeed('bookmarks', engagementApi.fetchBookmarks, ready);
+
+  const remove = useMutation({
+    mutationFn: (shortId: string) => engagementApi.setBookmark(shortId, false),
+    onSuccess: () => {
+      toast.success(L('సేవ్ చేసినవాటి నుంచి తీసివేశాం', 'Removed from your saved stories'));
+      void queryClient.invalidateQueries({ queryKey: ['engagement', 'bookmarks'] });
     },
-    enabled: ready,
+    onError: (error) => toast.error(error),
   });
 
-  const articles = [...(query.data?.articles ?? []), ...extra];
+  const askRemove = (shortId: string, headline: string) => {
+    void (async () => {
+      const ok = await confirm({
+        title: L('సేవ్ నుంచి తీసివేయాలా?', 'Remove from saved?'),
+        body: headline,
+        confirmLabel: t('ui.remove'),
+        tone: 'danger',
+      });
+      if (ok) remove.mutate(shortId);
+    })();
+  };
 
   if (!ready) return null;
   return (
-    <PageShell
-      eyebrow={te ? 'నా లైబ్రరీ' : 'MY LIBRARY'}
-      title={te ? 'సేవ్ చేసిన వార్తలు' : 'Saved articles'}
-      icon={<Bookmark className="h-3.5 w-3.5" aria-hidden />}
-    >
-      {query.isLoading ? (
-        <p className="te text-muted">{te ? 'లోడ్ అవుతోంది…' : 'Loading…'}</p>
-      ) : articles.length === 0 ? (
-        <EmptyBox>
-          {te
-            ? 'ఇంకా ఏమీ సేవ్ చేయలేదు. కథనంలో “సేవ్” నొక్కితే ఇక్కడ కనిపిస్తుంది.'
-            : 'Nothing saved yet. Tap “Save” on an article and it shows up here.'}
-        </EmptyBox>
-      ) : (
-        <>
-          <div className="flex flex-col gap-4">
-            {articles.map((article) => (
-              <RowCard key={article.short_id} article={article} />
-            ))}
-          </div>
-          {nextOffset != null ? (
-            <button
-              type="button"
-              onClick={async () => {
-                const page = await engagementApi.fetchBookmarks(nextOffset);
-                setExtra((cur) => [...cur, ...page.articles]);
-                setNextOffset(page.next_offset);
-              }}
-              className="te mt-6 w-full border border-rule bg-paper py-3 text-[13.5px] font-bold text-ink hover:border-brand hover:text-brand"
-            >
-              {te ? 'మరిన్ని' : 'Load more'}
-            </button>
-          ) : null}
-        </>
-      )}
-    </PageShell>
+    <LibraryShell tab="bookmarks" icon={Bookmark} title={t('page.bookmarks')}>
+      <QueryState
+        query={feed}
+        isEmpty={(data) => !data.pages.some((page) => page.articles.length)}
+        empty={
+          <LibraryEmpty
+            icon={Bookmark}
+            title={L('ఇంకా ఏమీ సేవ్ చేయలేదు', 'Nothing saved yet')}
+            body={L(
+              'కథనంలో “సేవ్” నొక్కితే అది ఇక్కడ చేరుతుంది.',
+              'Tap “Save” on a story and it shows up here.',
+            )}
+          />
+        }
+      >
+        {(data) => (
+          <>
+            <ul className="flex flex-col gap-4">
+              {data.pages
+                .flatMap((page) => page.articles)
+                .map((article) => (
+                  <li key={article.short_id} ref={reveal} className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <RowCard article={article} />
+                    </div>
+                    <IconButton
+                      icon={BookmarkX}
+                      label={L('సేవ్ నుంచి తీసివేయండి', 'Remove from saved')}
+                      disabled={remove.isPending}
+                      onClick={() => askRemove(article.short_id, pick(article.title_te, article.title_en))}
+                    />
+                  </li>
+                ))}
+            </ul>
+            <LoadMore query={feed} />
+          </>
+        )}
+      </QueryState>
+      {dialog}
+    </LibraryShell>
   );
 }
 
 // --------------------------------------------------------------------------- #
 export function HistoryPage() {
-  const { language } = useI18n();
-  const te = language === 'te';
+  const { t, language } = useI18n();
+  const L = useL();
+  const s = useScript();
   const ready = useRequireLogin('/history');
+  const reveal = useReveal<HTMLLIElement>();
 
-  const query = useQuery({
-    queryKey: ['engagement', 'history'],
-    queryFn: () => engagementApi.fetchHistory(),
-    enabled: ready,
-  });
+  const feed = useOffsetFeed('history', engagementApi.fetchHistory, ready);
 
   if (!ready) return null;
   return (
-    <PageShell
-      eyebrow={te ? 'నా లైబ్రరీ' : 'MY LIBRARY'}
-      title={te ? 'చదివిన వార్తలు' : 'Reading history'}
-      icon={<History className="h-3.5 w-3.5" aria-hidden />}
-    >
-      {query.isLoading ? (
-        <p className="te text-muted">{te ? 'లోడ్ అవుతోంది…' : 'Loading…'}</p>
-      ) : !query.data?.items.length ? (
-        <EmptyBox>
-          {te ? 'చదివిన కథనాలు ఇక్కడ కనిపిస్తాయి.' : 'Articles you read will appear here.'}
-        </EmptyBox>
-      ) : (
-        <div className="flex flex-col gap-4">
-          {query.data.items.map(({ article, max_scroll_pct, last_read_at }) => (
-            <div key={article.short_id}>
-              <RowCard article={article} />
-              <div className="mt-1 flex items-center gap-2 px-1">
-                <div className="h-1 flex-1 overflow-hidden rounded bg-rule">
-                  <div
-                    className="h-full bg-brand"
-                    style={{ width: `${Math.max(max_scroll_pct, 2)}%` }}
-                    aria-hidden
-                  />
-                </div>
-                <span className="whitespace-nowrap font-sans text-[10.5px] text-muted-light">
-                  {max_scroll_pct}% · {relativeTime(last_read_at, language)}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </PageShell>
+    <LibraryShell tab="history" icon={History} title={t('page.history')}>
+      <QueryState
+        query={feed}
+        isEmpty={(data) => !data.pages.some((page) => page.items.length)}
+        empty={
+          <LibraryEmpty
+            icon={History}
+            title={L('ఇంకా చదివిన కథనాలు లేవు', 'No reading history yet')}
+            body={L(
+              'మీరు చదివిన కథనాలు, ఎంత వరకు చదివారో ఇక్కడ కనిపిస్తాయి.',
+              'Stories you read — and how far you got — appear here.',
+            )}
+          />
+        }
+      >
+        {(data) => (
+          <>
+            <ul className="flex flex-col gap-4">
+              {data.pages
+                .flatMap((page) => page.items)
+                .map(({ article, max_scroll_pct, last_read_at }) => (
+                  <li key={article.short_id} ref={reveal}>
+                    <RowCard article={article} />
+                    <div className="mt-1.5 flex items-center gap-2 px-1">
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-pill bg-rule-soft">
+                        <div
+                          aria-hidden
+                          className="h-full rounded-pill bg-brand"
+                          style={{ width: `${Math.max(max_scroll_pct, 2)}%` }}
+                        />
+                      </div>
+                      <span
+                        lang={language}
+                        className={cn(s.body, 'whitespace-nowrap text-meta text-muted')}
+                      >
+                        {max_scroll_pct}% · {relativeTime(last_read_at, language)}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+            </ul>
+            <LoadMore query={feed} />
+          </>
+        )}
+      </QueryState>
+    </LibraryShell>
   );
 }
 
 // --------------------------------------------------------------------------- #
 export function FollowingPage() {
-  const { language, pick } = useI18n();
-  const te = language === 'te';
+  const { t, pick } = useI18n();
+  const L = useL();
+  const s = useScript();
   const ready = useRequireLogin('/following');
   const queryClient = useQueryClient();
-  const [extra, setExtra] = useState<ArticleCardType[]>([]);
-  const [nextOffset, setNextOffset] = useState<number | null>(null);
+  const toast = useToast();
+  const { confirm, dialog } = useConfirm();
+  const reveal = useReveal<HTMLLIElement>();
 
   const follows = useQuery({
     queryKey: ['engagement', 'my-follows'],
@@ -184,98 +301,107 @@ export function FollowingPage() {
     enabled: ready,
   });
 
-  const feed = useQuery({
-    queryKey: ['engagement', 'following-feed'],
-    queryFn: async () => {
-      const data = await engagementApi.fetchFollowingFeed();
-      setExtra([]);
-      setNextOffset(data.next_offset);
-      return data;
-    },
-    enabled: ready,
-  });
+  const feed = useOffsetFeed('following', engagementApi.fetchFollowingFeed, ready);
 
   const unfollow = useMutation({
     mutationFn: (f: engagementApi.FollowItem) =>
       engagementApi.setFollow(f.target_type, f.slug, false),
     onSuccess: () => {
+      toast.success(L('అన్‌ఫాలో చేశారు', 'Unfollowed'));
       void queryClient.invalidateQueries({ queryKey: ['engagement', 'my-follows'] });
-      void queryClient.invalidateQueries({ queryKey: ['engagement', 'following-feed'] });
+      void queryClient.invalidateQueries({ queryKey: ['engagement', 'following'] });
     },
+    onError: (error) => toast.error(error),
   });
 
-  const articles = [...(feed.data?.articles ?? []), ...extra];
+  const askUnfollow = (f: engagementApi.FollowItem) => {
+    void (async () => {
+      const ok = await confirm({
+        title: L('అన్‌ఫాలో చేయాలా?', 'Unfollow?'),
+        body: pick(f.name_te, f.name_en),
+        confirmLabel: L('అన్‌ఫాలో', 'Unfollow'),
+        tone: 'danger',
+      });
+      if (ok) unfollow.mutate(f);
+    })();
+  };
 
   if (!ready) return null;
   return (
-    <PageShell
-      eyebrow={te ? 'నా ఫీడ్' : 'MY FEED'}
-      title={te ? 'ఫాలోయింగ్' : 'Following'}
-      icon={<Rss className="h-3.5 w-3.5" aria-hidden />}
-    >
-      {follows.data?.length ? (
-        <div className="mb-6 flex flex-wrap gap-2">
-          {follows.data.map((f) => (
-            <span
-              key={`${f.target_type}:${f.slug}`}
-              className="te flex items-center gap-1.5 rounded-chip border border-brand bg-brand-tint px-3 py-1 text-[12px] font-semibold text-brand"
-            >
-              {pick(f.name_te, f.name_en)}
-              <button
-                type="button"
-                onClick={() => unfollow.mutate(f)}
-                aria-label={te ? 'అన్‌ఫాలో' : 'Unfollow'}
-                className="hover:text-brand-dark"
-              >
-                <X className="h-3 w-3" aria-hidden />
-              </button>
-            </span>
-          ))}
-        </div>
-      ) : null}
+    <LibraryShell tab="following" icon={Rss} title={t('page.following')}>
+      <QueryState
+        query={follows}
+        compact
+        skeleton={<Skeleton variant="text" lines={1} />}
+        isEmpty={(items) => items.length === 0}
+        empty={<></>}
+      >
+        {(items) => (
+          <section>
+            <SectionHeader
+              level={3}
+              title={L('మీరు ఫాలో అవుతున్నవి', 'You follow')}
+              action={
+                <span className={cn(s.body, 'text-meta text-muted')}>
+                  {L('తీసివేయడానికి నొక్కండి', 'Tap to unfollow')}
+                </span>
+              }
+            />
+            <ul className="flex flex-wrap gap-2">
+              {items.map((f) => {
+                const label = s.text(f.name_te, f.name_en);
+                return (
+                  <li key={`${f.target_type}:${f.slug}`}>
+                    <Chip
+                      selected
+                      icon={X}
+                      disabled={unfollow.isPending}
+                      onClick={() => askUnfollow(f)}
+                      lang={label.lang}
+                      textClass={label.telugu ? 'text-te-body-xs' : 'text-ui-sm'}
+                      // The X is decorative; the chip has to say what it does.
+                      ariaLabel={L(`${label.text} — అన్‌ఫాలో`, `Unfollow ${label.text}`)}
+                    >
+                      {label.text}
+                    </Chip>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+      </QueryState>
 
-      {feed.isLoading ? (
-        <p className="te text-muted">{te ? 'లోడ్ అవుతోంది…' : 'Loading…'}</p>
-      ) : articles.length === 0 ? (
-        <EmptyBox>
-          {te ? (
-            <>
-              విభాగాలు, ప్రాంతాలు లేదా రచయితలను ఫాలో అయితే వారి వార్తలు ఇక్కడ కనిపిస్తాయి.{' '}
-              <Link to="/" className="font-semibold text-info hover:underline">
-                హోమ్‌కు వెళ్లండి
-              </Link>
-            </>
-          ) : (
-            <>
-              Follow sections, places or authors and their stories appear here.{' '}
-              <Link to="/" className="font-semibold text-info hover:underline">
-                Go home
-              </Link>
-            </>
-          )}
-        </EmptyBox>
-      ) : (
-        <>
-          <div className="flex flex-col gap-4">
-            {articles.map((article) => (
-              <RowCard key={article.short_id} article={article} />
-            ))}
-          </div>
-          {nextOffset != null ? (
-            <button
-              type="button"
-              onClick={async () => {
-                const page = await engagementApi.fetchFollowingFeed(nextOffset);
-                setExtra((cur) => [...cur, ...page.articles]);
-                setNextOffset(page.next_offset);
-              }}
-              className="te mt-6 w-full border border-rule bg-paper py-3 text-[13.5px] font-bold text-ink hover:border-brand hover:text-brand"
-            >
-              {te ? 'మరిన్ని' : 'Load more'}
-            </button>
-          ) : null}
-        </>
-      )}
-    </PageShell>
+      <QueryState
+        query={feed}
+        isEmpty={(data) => !data.pages.some((page) => page.articles.length)}
+        empty={
+          <LibraryEmpty
+            icon={Rss}
+            title={L('మీ ఫీడ్ ఇంకా ఖాళీగా ఉంది', 'Your feed is empty')}
+            body={L(
+              'విభాగాలు, ప్రాంతాలు లేదా రచయితలను ఫాలో అయితే వారి వార్తలు ఇక్కడ కనిపిస్తాయి.',
+              'Follow sections, places or authors and their stories appear here.',
+            )}
+          />
+        }
+      >
+        {(data) => (
+          <>
+            <ul className="flex flex-col gap-4">
+              {data.pages
+                .flatMap((page) => page.articles)
+                .map((article) => (
+                  <li key={article.short_id} ref={reveal}>
+                    <RowCard article={article} />
+                  </li>
+                ))}
+            </ul>
+            <LoadMore query={feed} />
+          </>
+        )}
+      </QueryState>
+      {dialog}
+    </LibraryShell>
   );
 }

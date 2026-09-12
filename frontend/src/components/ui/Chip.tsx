@@ -52,6 +52,11 @@ export interface ChipProps {
    * against the base class.
    */
   textClass?: string;
+  /**
+   * Accessible name when the visible label alone does not say what the chip
+   * does (an unfollow chip reads only the entity name plus "pressed").
+   */
+  ariaLabel?: string;
   disabled?: boolean;
 }
 
@@ -71,6 +76,7 @@ export function Chip({
   className,
   lang,
   textClass,
+  ariaLabel,
   disabled,
 }: ChipProps) {
   const s = useScript();
@@ -112,6 +118,7 @@ export function Chip({
       <Link
         to={to}
         lang={lang}
+        aria-label={ariaLabel}
         onClick={onClick}
         aria-current={selected ? 'page' : undefined}
         aria-disabled={disabled || undefined}
@@ -130,7 +137,15 @@ export function Chip({
     );
   }
   return (
-    <button type="button" lang={lang} onClick={onClick} aria-pressed={selected} disabled={disabled} className={cls}>
+    <button
+      type="button"
+      lang={lang}
+      aria-label={ariaLabel}
+      onClick={onClick}
+      aria-pressed={selected}
+      disabled={disabled}
+      className={cls}
+    >
       {content}
     </button>
   );

@@ -1,7 +1,10 @@
 import type { ReactNode } from 'react';
+import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react';
 
+import { Card } from '@/components/ui/Card';
+import { Chip, ChipRail } from '@/components/ui/Chip';
 import { PageContainer, PageHeader } from '@/components/ui/Layout';
-import { useReaderPrefs, FONT_STEPS } from '@/stores/readerPrefs';
+import { useReaderPrefs, FONT_STEPS, type Theme } from '@/stores/readerPrefs';
 import { useDocumentTitle } from '@/utils/motion';
 
 /**
@@ -36,13 +39,13 @@ const FACES: Array<[string, string]> = [
 
 function Section({ title, spec, children }: { title: string; spec: string; children: ReactNode }) {
   return (
-    <section className="rounded-xl border border-rule bg-surface p-5 shadow-card">
+    <Card as="section" padding="lg">
       <header className="mb-3">
         <h2 className="text-ui-sm font-semibold text-ink">{title}</h2>
         <p className="mt-0.5 text-meta text-muted">{spec}</p>
       </header>
       {children}
-    </section>
+    </Card>
   );
 }
 
@@ -50,17 +53,62 @@ function Label({ children }: { children: ReactNode }) {
   return <p className="mb-1 text-eyebrow uppercase text-muted">{children}</p>;
 }
 
+const THEMES: Array<[Theme, string, LucideIcon]> = [
+  ['system', 'System', Monitor],
+  ['light', 'Light', Sun],
+  ['dark', 'Dark', Moon],
+];
+
+/**
+ * Font step x theme, switched in place: every size below has to be checked at
+ * all four steps in both themes, and leaving the page to do it loses the scroll
+ * position on the one screen where the comparison matters.
+ */
+function Controls() {
+  const { fontStep, setFontStep, theme, resolvedTheme, setTheme } = useReaderPrefs();
+  return (
+    <div className="glass sticky top-0 z-10 -mx-4 mb-8 border-b border-rule px-4 py-3 md:-mx-6 md:px-6">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div className="flex items-center gap-2">
+          <span className="text-eyebrow uppercase text-muted">Font step</span>
+          <ChipRail ariaLabel="Reader font step" fadeEdges={false}>
+            {FONT_STEPS.map((step) => (
+              <Chip key={step} selected={fontStep === step} onClick={() => setFontStep(step)} lang="en">
+                {step}
+              </Chip>
+            ))}
+          </ChipRail>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-eyebrow uppercase text-muted">Theme</span>
+          <ChipRail ariaLabel="Theme" fadeEdges={false}>
+            {THEMES.map(([value, label, icon]) => (
+              <Chip key={value} icon={icon} selected={theme === value} onClick={() => setTheme(value)} lang="en">
+                {label}
+              </Chip>
+            ))}
+          </ChipRail>
+        </div>
+        <p className="text-meta text-muted">
+          current: {fontStep} · {theme} ({resolvedTheme})
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function TeluguRenderTest() {
   useDocumentTitle('Telugu render test');
-  const { fontStep, setFontStep } = useReaderPrefs();
 
   return (
     <PageContainer as="main" id="main" tabIndex={-1} width="page" className="py-8 outline-none">
-      <PageHeader titleLang="te" title="తెలుగు రెండరింగ్ పరీక్ష" className="mb-4" />
+      <PageHeader titleLang="te" title="తెలుగు రెండరింగ్ పరీక్ష" spacing="tight" />
       <p lang="en" className="mb-8 text-meta text-muted">
         Telugu render test · Build Instructions §4.1 + §15.4 QA checklist. If any glyph clips,
         boxes, or reorders, the build is not shippable.
       </p>
+
+      <Controls />
 
       <div className="flex flex-col gap-4">
         <Section
@@ -123,36 +171,18 @@ export default function TeluguRenderTest() {
             </div>
             <div>
               <Label>Mixed script — Latin fallback must match x-height</Label>
-              <p className="te text-te-body-xs">₹1,250 కోట్లు · 26 Aug 2026 · #Breaking · CM చంద్రబాబు · IPL</p>
+              <p lang="te" className="te text-te-body-xs">
+                ₹1,250 కోట్లు · 26 Aug 2026 · #Breaking · CM చంద్రబాబు · IPL
+              </p>
             </div>
           </div>
         </Section>
 
         <Section
           title="Reader font-size switcher"
-          spec="§4.1 — required feature; persists in localStorage across sessions"
+          spec="§4.1 — required feature; persists in localStorage across sessions. Switch it in the bar above."
         >
-          <div className="flex flex-wrap items-center gap-2">
-            {FONT_STEPS.map((step) => (
-              <button
-                key={step}
-                type="button"
-                onClick={() => setFontStep(step)}
-                aria-pressed={fontStep === step}
-                className={[
-                  'min-h-tap min-w-tap rounded-xl border px-4 text-ui font-semibold',
-                  'transition-[colors,transform,box-shadow,opacity] duration-base ease-standard active:scale-[.98]',
-                  fontStep === step
-                    ? 'border-brand bg-brand-tint text-brand'
-                    : 'border-rule text-ink-soft hover:border-brand',
-                ].join(' ')}
-              >
-                {step}
-              </button>
-            ))}
-            <span className="ml-2 text-meta text-muted">current: {fontStep}</span>
-          </div>
-          <p lang="te" className="reader-body te mt-4">
+          <p lang="te" className="reader-body te">
             ఈ వాక్యం పైన ఎంచుకున్న అక్షర పరిమాణానికి అనుగుణంగా మారుతుంది. ఎంపిక అన్ని కథనాలకూ
             వర్తిస్తుంది.
           </p>
@@ -163,7 +193,9 @@ export default function TeluguRenderTest() {
             {FACES.map(([family, cls]) => (
               <div key={family} className="rounded-xl border border-rule p-3">
                 <dt className="text-eyebrow uppercase text-muted">{family}</dt>
-                <dd className={`${cls} text-headline-md`}>తెలుగు Abc 123</dd>
+                <dd lang="te" className={`${cls} text-headline-md`}>
+                  తెలుగు Abc 123
+                </dd>
               </div>
             ))}
           </dl>

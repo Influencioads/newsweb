@@ -1,16 +1,26 @@
-import { FormEvent, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Search } from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { Search, SearchX, X } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 
 import { RowCard } from '@/components/article/ArticleCard';
+import { Button, IconButton } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
+import { Field, Input, Select } from '@/components/ui/Field';
+import { PageContainer, PageHeader, SectionHeader } from '@/components/ui/Layout';
+import { EmptyState, QueryState, SkeletonCard } from '@/components/ui/State';
 import * as publicApi from '@/features/public/api';
 import { useI18n } from '@/i18n';
-import type { ArticleCard as ArticleCardType } from '@/types/public';
+import { useDocumentTitle, useReveal } from '@/utils/motion';
 
 /**
  * Reader search (updated doc §10): full-text with category/district filters,
- * popular-search chips, and offset paging against `/public/search`.
+ * popular/recent suggestion chips, and offset paging against `/public/search`.
+ *
+ * The query lives in the URL (`?q=&category=&district=`) so a result page is
+ * shareable and the back button works; the input holds the draft until submit.
+ * Paging is an infinite query pulled by an IntersectionObserver on the "more
+ * results" button, which stays the accessible path to the same call.
  */
 export default function SearchPage() {
   const [params, setParams] = useSearchParams();
@@ -18,11 +28,13 @@ export default function SearchPage() {
   const category = params.get('category') ?? '';
   const district = params.get('district') ?? '';
   const [value, setValue] = useState(query);
-  const [extra, setExtra] = useState<ArticleCardType[]>([]);
-  const [nextOffset, setNextOffset] = useState<number | null>(null);
-  const { language, pick } = useI18n();
-  const te = language === 'te';
-  const teCls = te ? 'te' : 'font-sans';
+  const { t, pick, language } = useI18n();
+  // Page-specific copy with no strings.ts key yet (see neededStrings).
+  const L = (te: string, en: string) => (language === 'te' ? te : en);
+  const reveal = useReveal<HTMLLIElement>();
+  const sentinel = useRef<HTMLDivElement | null>(null);
+
+  useDocumentTitle(query || t('page.search'));
 
   const config = useQuery({
     queryKey: ['public', 'config'],
@@ -36,22 +48,36 @@ export default function SearchPage() {
     staleTime: 300_000,
   });
 
-  const result = useQuery({
+  const result = useInfiniteQuery({
     queryKey: ['public', 'search', query, category, district],
-    queryFn: async () => {
-      const data = await publicApi.fetchSearch({
+    queryFn: ({ pageParam }) =>
+      publicApi.fetchSearch({
         q: query,
         category: category || undefined,
         district: district || undefined,
+        offset: pageParam,
         limit: 20,
-      });
-      setExtra([]);
-      setNextOffset(data.next_offset);
-      return data;
-    },
+      }),
+    initialPageParam: 0,
+    getNextPageParam: (last) => last.next_offset ?? undefined,
     enabled: query.length >= 2,
   });
 
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = result;
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || !hasNextPage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting) && !isFetchingNextPage) void fetchNextPage();
+      },
+      { rootMargin: '200px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  /** A search term shorter than two characters is dropped, not searched. */
   function apply(next: { q?: string; category?: string; district?: string }) {
     const merged = {
       q: next.q ?? query,
@@ -70,124 +96,171 @@ export default function SearchPage() {
     apply({ q: value.trim() });
   }
 
-  async function loadMore() {
-    if (nextOffset == null) return;
-    const page = await publicApi.fetchSearch({
-      q: query,
-      category: category || undefined,
-      district: district || undefined,
-      offset: nextOffset,
-      limit: 20,
-    });
-    setExtra((current) => [...current, ...page.articles]);
-    setNextOffset(page.next_offset);
+  function runSuggestion(term: string) {
+    setValue(term);
+    apply({ q: term });
   }
 
-  const articles = [...(result.data?.articles ?? []), ...extra];
   const suggestions = meta.data?.recent.length ? meta.data.recent : meta.data?.popular ?? [];
+  const suggestionTitle = meta.data?.recent.length
+    ? L('మీ ఇటీవలి శోధనలు', 'Your recent searches')
+    : L('ప్రజాదరణ పొందిన శోధనలు', 'Popular searches');
 
   return (
-    <div className="mx-auto min-h-[55vh] max-w-[900px] px-4 py-7 sm:py-10">
-      <div className="mb-7 border-b-2 border-ink pb-4">
-        <p className="font-sans text-[11px] font-bold uppercase tracking-[0.16em] text-brand">
-          {te ? 'వార్తల అన్వేషణ' : 'NEWS SEARCH'}
-        </p>
-        <h1 className={`${te ? 'th' : 'font-sans'} mt-1 text-[27px] font-extrabold text-ink sm:text-[34px]`}>
-          {te ? 'మీకు కావాల్సిన వార్తను వెతకండి' : 'Find the story you need'}
-        </h1>
-      </div>
+    <PageContainer width="page" className="py-7 md:py-10">
+      <PageHeader
+        eyebrow={L('వార్తల అన్వేషణ', 'News search')}
+        icon={Search}
+        title={L('మీకు కావాల్సిన వార్తను వెతకండి', 'Find the story you need')}
+        subtitle={L(
+          'శీర్షిక, అంశం లేదా పేరుతో వెతకండి — విభాగం, జిల్లా వారీగా వడపోయవచ్చు.',
+          'Search by headline, topic or name — then narrow it by section and district.',
+        )}
+      />
 
-      <form onSubmit={submit} role="search" className="flex overflow-hidden rounded-control border-2 border-ink bg-white focus-within:border-brand">
-        <Search className="ml-3 mt-3.5 h-5 w-5 shrink-0 text-muted" aria-hidden />
-        <label htmlFor="news-search" className="sr-only">{te ? 'వార్తలు వెతకండి' : 'Search news'}</label>
-        <input
-          id="news-search"
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          placeholder={te ? 'శీర్షిక, అంశం లేదా పేరు…' : 'Headline, topic or name…'}
-          className={`${teCls} min-w-0 flex-1 bg-transparent px-3 py-3 text-[16px] text-ink outline-none`}
-        />
-        <button className={`${teCls} bg-brand px-5 font-bold text-white hover:bg-brand-dark`} type="submit">
-          {te ? 'వెతకండి' : 'Search'}
-        </button>
-      </form>
-
-      {/* -------------------------------- filters --------------------------- */}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <select
-          value={category}
-          onChange={(e) => apply({ category: e.target.value })}
-          aria-label={te ? 'విభాగం' : 'Category'}
-          className={`${teCls} rounded-control border border-rule-input bg-white px-2 py-2 text-[13px] text-ink`}
-        >
-          <option value="">{te ? 'అన్ని విభాగాలు' : 'All sections'}</option>
-          {config.data?.categories.filter((c) => c.show_in_nav).map((c) => (
-            <option key={c.slug} value={c.slug}>{pick(c.name_te, c.name_en)}</option>
-          ))}
-        </select>
-        <select
-          value={district}
-          onChange={(e) => apply({ district: e.target.value })}
-          aria-label={te ? 'జిల్లా' : 'District'}
-          className={`${teCls} rounded-control border border-rule-input bg-white px-2 py-2 text-[13px] text-ink`}
-        >
-          <option value="">{te ? 'అన్ని జిల్లాలు' : 'All districts'}</option>
-          {config.data?.districts.map((d) => (
-            <option key={d.slug} value={d.slug}>{pick(d.name_te, d.name_en)}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* -------------------------------- popular/recent --------------------- */}
-      {!query && suggestions.length ? (
-        <div className="mt-6">
-          <p className={`${teCls} mb-2 text-[12px] font-bold uppercase tracking-[0.1em] text-muted-light`}>
-            {meta.data?.recent.length
-              ? te ? 'మీ ఇటీవలి శోధనలు' : 'Your recent searches'
-              : te ? 'ప్రజాదరణ పొందిన శోధనలు' : 'Popular searches'}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {suggestions.slice(0, 10).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => { setValue(s); apply({ q: s }); }}
-                className={`${teCls} rounded-chip border border-rule bg-paper px-3 py-1.5 text-[13px] text-ink hover:border-brand hover:text-brand`}
-              >
-                {s}
-              </button>
-            ))}
+      <div className="space-y-7 md:space-y-10">
+        <form onSubmit={submit} role="search" className="space-y-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="min-w-0 flex-1">
+              <label htmlFor="news-search" className="sr-only">
+                {L('వార్తలు వెతకండి', 'Search news')}
+              </label>
+              <Input
+                id="news-search"
+                type="search"
+                enterKeyHint="search"
+                autoComplete="off"
+                size="lg"
+                leading={Search}
+                value={value}
+                onChange={(event) => setValue(event.target.value)}
+                placeholder={L('శీర్షిక, అంశం లేదా పేరు…', 'Headline, topic or name…')}
+                trailing={
+                  value ? (
+                    <IconButton
+                      icon={X}
+                      label={t('ui.clear')}
+                      onClick={() => {
+                        setValue('');
+                        apply({ q: '' });
+                      }}
+                    />
+                  ) : undefined
+                }
+              />
+            </div>
+            <Button type="submit" size="lg" icon={Search}>
+              {t('ui.search')}
+            </Button>
           </div>
-        </div>
-      ) : null}
 
-      {query.length >= 2 ? (
-        <section className="mt-8" aria-live="polite">
-          {result.isLoading ? <p className={`${teCls} text-muted`}>{te ? 'వెతుకుతోంది…' : 'Searching…'}</p> : null}
-          {result.isError ? <p className={`${teCls} text-brand`}>{te ? 'శోధన విఫలమైంది. మళ్లీ ప్రయత్నించండి.' : 'Search failed. Please try again.'}</p> : null}
-          {result.data ? (
-            <>
-              <h2 className={`${te ? 'th' : 'font-sans'} mb-4 text-[18px] font-bold text-ink`}>
-                {result.data.total
-                  ? te ? `“${query}” కోసం ${result.data.total} ఫలితాలు` : `${result.data.total} results for “${query}”`
-                  : te ? `“${query}” కోసం వార్తలు దొరకలేదు` : `No stories found for “${query}”`}
-              </h2>
-              <div className="flex flex-col gap-4">
-                {articles.map((article) => <RowCard key={article.short_id} article={article} />)}
-              </div>
-              {nextOffset != null ? (
-                <button
-                  type="button"
-                  onClick={loadMore}
-                  className={`${teCls} mt-6 w-full border border-rule bg-paper py-3 text-[13.5px] font-bold text-ink hover:border-brand hover:text-brand`}
-                >
-                  {te ? 'మరిన్ని ఫలితాలు' : 'More results'}
-                </button>
-              ) : null}
-            </>
-          ) : null}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label={L('విభాగం', 'Section')}>
+              <Select value={category} onChange={(e) => apply({ category: e.target.value })}>
+                <option value="">{L('అన్ని విభాగాలు', 'All sections')}</option>
+                {config.data?.categories
+                  .filter((c) => c.show_in_nav)
+                  .map((c) => (
+                    <option key={c.slug} value={c.slug}>
+                      {pick(c.name_te, c.name_en)}
+                    </option>
+                  ))}
+              </Select>
+            </Field>
+            <Field label={t('page.district')}>
+              <Select value={district} onChange={(e) => apply({ district: e.target.value })}>
+                <option value="">{L('అన్ని జిల్లాలు', 'All districts')}</option>
+                {config.data?.districts.map((d) => (
+                  <option key={d.slug} value={d.slug}>
+                    {pick(d.name_te, d.name_en)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+        </form>
+
+        {!query && suggestions.length ? (
+          <section>
+            <SectionHeader level={3} title={suggestionTitle} />
+            <div className="flex flex-wrap gap-2">
+              {suggestions.slice(0, 10).map((term) => (
+                <Chip key={term} icon={Search} onClick={() => runSuggestion(term)}>
+                  {term}
+                </Chip>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        <section>
+          {query.length < 2 ? (
+            <EmptyState
+              icon={Search}
+              title={L('వెతకడం మొదలుపెట్టండి', 'Start your search')}
+              body={L(
+                'కనీసం రెండు అక్షరాలు టైప్ చేసి ఎంటర్ నొక్కండి.',
+                'Type at least two characters, then press enter.',
+              )}
+            />
+          ) : (
+            <QueryState
+              query={result}
+              isEmpty={(data) => !data.pages.some((page) => page.articles.length)}
+              empty={
+                <EmptyState
+                  icon={SearchX}
+                  title={t('state.noResults')}
+                  body={L(
+                    'వేరే పదాలతో ప్రయత్నించండి, లేదా విభాగం/జిల్లా వడపోతను తీసేయండి.',
+                    'Try different words, or clear the section and district filters.',
+                  )}
+                />
+              }
+            >
+              {(data) => {
+                const articles = data.pages.flatMap((page) => page.articles);
+                const total = data.pages[0]?.total ?? articles.length;
+                return (
+                  <>
+                    <SectionHeader level={2} tone="ink" title={L(`${total} ఫలితాలు`, `${total} results`)} />
+                    {/* The count is what changes; the list itself is not a live region. */}
+                    <p aria-live="polite" className="sr-only">
+                      {L(`${total} ఫలితాలు`, `${total} results`)}
+                    </p>
+                    <ul className="flex flex-col gap-4">
+                      {articles.map((article) => (
+                        <li key={article.short_id} ref={reveal}>
+                          <RowCard article={article} />
+                        </li>
+                      ))}
+                    </ul>
+
+                    {isFetchingNextPage ? (
+                      <div className="mt-4">
+                        <SkeletonCard variant="row" />
+                      </div>
+                    ) : null}
+
+                    {hasNextPage ? (
+                      <div ref={sentinel} className="mt-6">
+                        <Button
+                          variant="secondary"
+                          full
+                          pending={isFetchingNextPage}
+                          onClick={() => void fetchNextPage()}
+                        >
+                          {t('ui.loadMore')}
+                        </Button>
+                      </div>
+                    ) : null}
+                  </>
+                );
+              }}
+            </QueryState>
+          )}
         </section>
-      ) : null}
-    </div>
+      </div>
+    </PageContainer>
   );
 }

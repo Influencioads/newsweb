@@ -1,8 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 
+import { StatusPill } from '@/components/ui/Badge';
 import { ButtonLink, Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 import { PageContainer, PageHeader } from '@/components/ui/Layout';
+import { ErrorState } from '@/components/ui/State';
 import { useDocumentTitle } from '@/utils/motion';
 
 interface HealthResponse {
@@ -11,6 +14,13 @@ interface HealthResponse {
   env: string;
   version: string;
   dependencies: { mysql: boolean; redis: boolean };
+}
+
+/** Registry key for a dependency probe: up, down, or still being checked. */
+function probeStatus(ok: boolean | undefined, isLoading: boolean): string {
+  if (ok === true) return 'ok';
+  if (ok === false) return 'error';
+  return isLoading ? 'pending' : 'none';
 }
 
 /**
@@ -47,41 +57,34 @@ export default function SystemStatus() {
       <PageHeader
         titleLang="en"
         title="System status"
-        subtitle="Phase 1 · live readiness probe. Values come from the API, none are hardcoded."
+        subtitle={
+          // The page is English-only; the subtitle says so itself rather than
+          // inheriting the reader's interface language from PageHeader.
+          <span lang="en" className="font-sans">
+            Phase 1 · live readiness probe. Values come from the API, none are hardcoded.
+          </span>
+        }
       />
 
       {isError && (
-        <div role="alert" className="mb-4 rounded-xl border border-breaking-border bg-breaking-tint p-4">
-          <p className="text-ui-sm font-semibold text-breaking">API unreachable</p>
-          <p className="mt-1 text-meta text-ink-soft">
-            {error instanceof Error ? error.message : 'Unknown error'} — is the backend running on
-            port 8000?
+        <div className="mb-6">
+          <ErrorState error={error} onRetry={() => void refetch()} title="API unreachable" compact />
+          <p className="mt-2 text-center font-mono text-meta text-muted">
+            {error instanceof Error ? error.message : 'Unknown error'} — is the backend running on port 8000?
           </p>
         </div>
       )}
 
       <ul className="flex flex-col gap-2">
         {rows.map(([label, ok, detail]) => (
-          <li
-            key={label}
-            className="flex items-center justify-between gap-4 rounded-xl border border-rule bg-surface p-4 shadow-card"
-          >
-            <div className="min-w-0">
-              <p className="text-ui-sm font-medium text-ink">{label}</p>
-              <p className="truncate font-mono text-meta text-muted">{detail}</p>
-            </div>
-            <span
-              className={[
-                'shrink-0 rounded-pill px-3 py-1 text-meta font-bold',
-                ok === true
-                  ? 'bg-success-tint text-success'
-                  : ok === false
-                    ? 'bg-breaking-tint text-breaking'
-                    : 'bg-rule-soft text-muted',
-              ].join(' ')}
-            >
-              {isLoading && ok === undefined ? 'checking…' : ok === true ? 'up' : ok === false ? 'down' : '—'}
-            </span>
+          <li key={label}>
+            <Card className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-ui-sm font-medium text-ink">{label}</p>
+                <p className="truncate font-mono text-meta text-muted">{detail}</p>
+              </div>
+              <StatusPill status={probeStatus(ok, isLoading)} size="sm" className="shrink-0" />
+            </Card>
           </li>
         ))}
       </ul>

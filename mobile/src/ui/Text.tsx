@@ -25,8 +25,8 @@ import { usePrefs } from '@/stores/prefs';
  */
 export type TWeight = 'regular' | 'medium' | 'semibold' | 'bold' | 'heavy';
 export type TLang = 'te' | 'en' | 'auto';
-/** Palette keys text may be painted with (`white` is the deprecated surface alias). */
-export type PaletteKey = Exclude<keyof Palette, 'white'>;
+/** Palette keys text may be painted with. */
+export type PaletteKey = keyof Palette;
 
 export interface TProps extends TextProps {
   /** Type-scale step. `eyebrow` is Latin-only (Inter, uppercase, tracked). */

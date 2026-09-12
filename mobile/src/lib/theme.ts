@@ -55,8 +55,6 @@ export const lightColor = {
   /** Foreground on a brand-filled surface. Light on the deep red here; dark on
    *  the lightened red the dark palette uses, where white would not contrast. */
   onBrand: '#FFFFFF',
-  /** @deprecated alias of `surface` — kept until W12 removes the last reader. */
-  white: '#FFFFFF',
 } as const;
 
 /** Font family names as registered with expo-font in app/_layout.tsx. */
@@ -188,7 +186,6 @@ export const darkColor: Palette = {
   overlay: '#000000',
   onOverlay: '#FFFFFF',
   onBrand: '#FFFFFF',
-  white: '#26201A',
 };
 
 export type Palette = { -readonly [K in keyof typeof lightColor]: string };

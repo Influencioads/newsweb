@@ -16,6 +16,11 @@ export interface CardProps extends HTMLAttributes<HTMLElement> {
   /** Element to render; defaults to `div`. */
   as?: ElementType;
   padding?: 'none' | 'sm' | 'md' | 'lg';
+  /**
+   * Corner radius. `cn` is plain clsx, so a `rounded-2xl` className cannot beat
+   * the base `rounded-xl` — ask for the larger radius here instead.
+   */
+  radius?: 'xl' | '2xl';
   /** Hover lift, press feedback and a focus-within ring for cards that wrap a link. */
   interactive?: boolean;
   tone?: 'surface' | 'paper' | 'warm' | 'ink';
@@ -37,14 +42,15 @@ const TONE: Record<NonNullable<CardProps['tone']>, string> = {
 };
 
 export const Card = forwardRef<HTMLElement, CardProps>(function Card(
-  { as: Tag = 'div', padding = 'md', interactive = false, tone = 'surface', className, ...rest },
+  { as: Tag = 'div', padding = 'md', radius = 'xl', interactive = false, tone = 'surface', className, ...rest },
   ref,
 ) {
   return (
     <Tag
       ref={ref}
       className={cn(
-        'rounded-xl border shadow-card',
+        radius === '2xl' ? 'rounded-2xl' : 'rounded-xl',
+        'border shadow-card',
         TONE[tone],
         PADDING[padding],
         interactive &&

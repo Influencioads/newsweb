@@ -1,63 +1,226 @@
-import { useQuery } from '@tanstack/react-query';
-import { Link, useParams } from 'react-router-dom';
-import { Camera, MapPin, PlayCircle, Sparkles, UserRound } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { useParams } from 'react-router-dom';
+import { Hash, MapPin, UserRound, type LucideIcon } from 'lucide-react';
 
 import { RowCard } from '@/components/article/ArticleCard';
-import { NewsImage } from '@/components/media/NewsImage';
+import { Button, ButtonLink } from '@/components/ui/Button';
+import { PageContainer, PageHeader } from '@/components/ui/Layout';
+import { EmptyState, QueryState, SkeletonCard } from '@/components/ui/State';
 import * as publicApi from '@/features/public/api';
-import { useI18n } from '@/i18n';
-import type { ArticleCard } from '@/types/public';
+import { useI18n, useScript } from '@/i18n';
+import { useDocumentTitle, useReveal } from '@/utils/motion';
 
-function titleCase(value: string) {
-  return value.split('-').map((part) => part ? (part[0]?.toUpperCase() ?? '') + part.slice(1) : '').join(' ');
+/**
+ * Discovery surfaces (§5, §9).
+ *
+ * The district, mandal, author and tag archives are the same page with a
+ * different filter, so they share one `FeedPage` shell rather than four
+ * near-identical copies. Paging is a cursor-based infinite query with an
+ * IntersectionObserver on the "load more" button; the button stays the
+ * accessible path to the same call, exactly as the trending feed does.
+ *
+ * The photo gallery and Web Stories shelves are the sibling `DiscoveryShelves`
+ * (see the re-export at the foot of this file).
+ */
+
+// ---------------------------------------------------------------------------
+// Filtered archives
+// ---------------------------------------------------------------------------
+
+type FeedKind = 'district' | 'mandal' | 'author' | 'tag';
+
+/** "guntur-west" → "Guntur West" — the fallback name before the feed answers. */
+function titleCase(value: string): string {
+  return value
+    .split('-')
+    .map((part) => (part ? (part[0]?.toUpperCase() ?? '') + part.slice(1) : ''))
+    .join(' ');
 }
 
-function FeedShell({ title, subtitle, icon, articles, loading }: { title: string; subtitle: string; icon: React.ReactNode; articles: ArticleCard[]; loading: boolean }) {
-  const { language } = useI18n();
-  const te = language === 'te';
-  return <div className="mx-auto min-h-[60vh] max-w-[1040px] px-4 py-7">
-    <header className="mb-6 border-b-2 border-ink pb-4">
-      <div className="mb-2 flex items-center gap-2 text-brand">{icon}<span className="font-sans text-[10px] font-extrabold uppercase tracking-[.16em]">Top Telugu News</span></div>
-      <h1 className={`${te ? 'th' : 'font-sans'} text-[30px] font-extrabold text-ink sm:text-[38px]`}>{title}</h1>
-      <p className={`${te ? 'te' : 'font-sans'} mt-2 text-[13px] text-muted`}>{subtitle}</p>
-    </header>
-    {loading ? <div className="space-y-4">{[1,2,3].map(i=><div key={i} className="h-24 animate-pulse rounded bg-placeholder" />)}</div>
-      : articles.length ? <div className="grid gap-x-8 md:grid-cols-2">{articles.map(a=><RowCard key={a.short_id} article={a}/>)}</div>
-      : <div className="rounded border border-dashed border-rule bg-paper px-6 py-14 text-center"><p className={`${te ? 'te' : 'font-sans'} text-muted`}>{te ? 'ఈ విభాగంలో కథనాలు ఇంకా ప్రచురించలేదు.' : 'No published stories are available here yet.'}</p><Link to="/" className="mt-3 inline-block font-semibold text-brand hover:underline">{te ? 'హోమ్‌కు వెళ్లండి' : 'Return home'}</Link></div>}
-  </div>;
+interface FeedPageProps {
+  kind: FeedKind;
+  slug: string;
+  icon: LucideIcon;
+  eyebrow: string;
+  subtitle: string;
+}
+
+function FeedPage({ kind, slug, icon, eyebrow, subtitle }: FeedPageProps) {
+  const { t } = useI18n();
+  const s = useScript();
+  const reveal = useReveal<HTMLLIElement>();
+  const sentinel = useRef<HTMLDivElement | null>(null);
+
+  const feed = useInfiniteQuery({
+    queryKey: ['public', 'feed', kind, slug],
+    queryFn: ({ pageParam }) =>
+      publicApi.fetchFeed({ [kind]: slug, cursor: pageParam || undefined, limit: 20 }),
+    initialPageParam: '',
+    getNextPageParam: (last) => last.next_cursor ?? undefined,
+    enabled: Boolean(slug),
+  });
+
+  // Only the district feed echoes its subject back; the rest name themselves
+  // from the slug. Either way the heading carries the script of what it shows.
+  const district = kind === 'district' ? feed.data?.pages[0]?.district : null;
+  const heading = district ? s.text(district.name_te, district.name_en) : null;
+  const title = heading?.text || titleCase(slug);
+  useDocumentTitle(title);
+
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = feed;
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || !hasNextPage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting) && !isFetchingNextPage) void fetchNextPage();
+      },
+      { rootMargin: '200px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  return (
+    <PageContainer width="page" className="py-7 md:py-10">
+      <PageHeader
+        eyebrow={eyebrow}
+        icon={icon}
+        title={title}
+        // The `titleCase(slug)` fallback is always Latin, so the lang follows
+        // the text actually rendered rather than the interface.
+        titleLang={heading?.lang ?? 'en'}
+        subtitle={subtitle}
+        back={{ to: '/', label: t('page.home') }}
+      />
+
+      <div className="space-y-7 md:space-y-10">
+        <QueryState
+          query={feed}
+          skeleton={
+            <div className="grid gap-x-8 gap-y-5 md:grid-cols-2">
+              {[0, 1, 2, 3].map((i) => (
+                <SkeletonCard key={i} variant="row" />
+              ))}
+            </div>
+          }
+          isEmpty={(data) => !data.pages.some((page) => page.articles.length)}
+          empty={
+            <EmptyState
+              icon={icon}
+              title={t('state.empty')}
+              action={
+                <ButtonLink to="/" variant="secondary">
+                  {t('page.home')}
+                </ButtonLink>
+              }
+            />
+          }
+        >
+          {(data) => (
+            <>
+              <ul className="grid gap-x-8 gap-y-5 md:grid-cols-2">
+                {data.pages
+                  .flatMap((page) => page.articles)
+                  .map((article) => (
+                    <li key={article.short_id} ref={reveal}>
+                      <RowCard article={article} />
+                    </li>
+                  ))}
+              </ul>
+
+              {isFetchingNextPage ? (
+                <div className="mt-4">
+                  <SkeletonCard variant="row" />
+                </div>
+              ) : null}
+
+              {hasNextPage ? (
+                <div ref={sentinel} className="mt-6">
+                  <Button
+                    variant="secondary"
+                    full
+                    pending={isFetchingNextPage}
+                    onClick={() => void fetchNextPage()}
+                  >
+                    {t('ui.loadMore')}
+                  </Button>
+                </div>
+              ) : null}
+            </>
+          )}
+        </QueryState>
+      </div>
+    </PageContainer>
+  );
 }
 
 export function DistrictPage() {
-  const { slug='' }=useParams(); const {language}=useI18n(); const te=language==='te';
-  const q=useQuery({queryKey:['public','district',slug],queryFn:()=>publicApi.fetchFeed({district:slug,limit:30})});
-  const name=q.data?.district ? (te?q.data.district.name_te:q.data.district.name_en) : titleCase(slug);
-  return <FeedShell title={name} subtitle={te?'జిల్లా నుంచి తాజా స్థానిక వార్తలు':'Latest verified local news from the district'} icon={<MapPin className="h-5 w-5"/>} articles={q.data?.articles??[]} loading={q.isLoading}/>;
+  const { slug = '' } = useParams();
+  const { t, language } = useI18n();
+  // Page-specific copy with no strings.ts key yet (see neededStrings).
+  const L = (te: string, en: string) => (language === 'te' ? te : en);
+  return (
+    <FeedPage
+      kind="district"
+      slug={slug}
+      icon={MapPin}
+      eyebrow={t('page.district')}
+      subtitle={L('జిల్లా నుంచి తాజా స్థానిక వార్తలు', 'Latest verified local news from the district')}
+    />
+  );
 }
 
-function SearchFeedPage({kind}:{kind:'mandal'|'author'|'tag'}) {
-  const {slug=''}=useParams(); const {language}=useI18n(); const te=language==='te'; const name=titleCase(slug);
-  const q=useQuery({queryKey:['public',kind,slug],queryFn:()=>publicApi.fetchFeed({[kind]:slug,limit:30})});
-  const labels={mandal:te?'మండల వార్తలు':'Mandal news',author:te?'రచయిత':'Author',tag:te?'అంశం':'Topic'};
-  return <FeedShell title={name} subtitle={labels[kind]} icon={kind==='author'?<UserRound className="h-5 w-5"/>:<MapPin className="h-5 w-5"/>} articles={q.data?.articles??[]} loading={q.isLoading}/>;
-}
-export const MandalPage=()=> <SearchFeedPage kind="mandal"/>;
-export const AuthorPage=()=> <SearchFeedPage kind="author"/>;
-export const TagPage=()=> <SearchFeedPage kind="tag"/>;
-
-export function PhotoGalleryPage() {
-  const {data,isLoading}=useQuery({queryKey:['public','home'],queryFn:()=>publicApi.fetchHome()});
-  const {language,pick}=useI18n(); const te=language==='te';
-  const items=data ? [data.lead,...data.secondary,...data.mid_column,...data.latest,...data.sections.flatMap(s=>s.articles)].filter((a):a is ArticleCard=>Boolean(a?.hero)).filter((a,i,all)=>all.findIndex(x=>x.short_id===a.short_id)===i) : [];
-  return <div className="mx-auto min-h-[60vh] max-w-[1200px] px-4 py-7"><header className="mb-6 border-b-2 border-ink pb-4"><Camera className="mb-2 h-6 w-6 text-brand"/><h1 className={`${te?'th':'font-sans'} text-[32px] font-extrabold`}>{te?'ఫోటో గ్యాలరీ':'Photo gallery'}</h1></header>{isLoading?<div className="h-64 animate-pulse bg-placeholder"/>:<div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{items.map(a=><Link key={a.short_id} to={a.url} className="group"><NewsImage media={a.hero} ratio="4/3" sizes="(max-width:640px) 100vw, 33vw" className="w-full rounded-card"/><h2 className={`${te?'th':'font-sans'} mt-2 text-[17px] font-bold group-hover:text-brand`}>{pick(a.title_te,a.title_en)}</h2></Link>)}</div>}</div>;
+export function MandalPage() {
+  const { slug = '' } = useParams();
+  const { t, language } = useI18n();
+  const L = (te: string, en: string) => (language === 'te' ? te : en);
+  return (
+    <FeedPage
+      kind="mandal"
+      slug={slug}
+      icon={MapPin}
+      eyebrow={t('page.mandal')}
+      subtitle={L('మండలం నుంచి తాజా వార్తలు', 'The latest reporting from this mandal')}
+    />
+  );
 }
 
-export function WebStoriesPage() {
-  const {data,isLoading}=useQuery({queryKey:['public','home'],queryFn:()=>publicApi.fetchHome()});
-  const {language,pick}=useI18n(); const te=language==='te'; const items=data?[data.lead,...data.secondary,...data.mid_column,...data.latest].filter((a):a is ArticleCard=>Boolean(a)).filter((a,i,all)=>all.findIndex(x=>x.short_id===a.short_id)===i).slice(0,10):[];
-  return <div className="mx-auto min-h-[60vh] max-w-[1200px] px-4 py-7"><header className="mb-6 border-b-2 border-ink pb-4"><Sparkles className="mb-2 h-6 w-6 text-brand"/><h1 className={`${te?'th':'font-sans'} text-[32px] font-extrabold`}>{te?'వెబ్ స్టోరీస్':'Web Stories'}</h1></header>{isLoading?<div className="h-72 animate-pulse bg-placeholder"/>:<div className="flex snap-x gap-4 overflow-x-auto pb-4">{items.map(a=><Link key={a.short_id} to={a.url} className="group relative aspect-[9/16] w-[230px] shrink-0 snap-start overflow-hidden rounded-card bg-ink shadow-card"><NewsImage media={a.hero} ratio="9/16" sizes="230px" className="h-full w-full opacity-70"/><div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-4 pt-14"><h2 className={`${te?'th':'font-sans'} text-[18px] font-bold text-white`}>{pick(a.title_te,a.title_en)}</h2></div></Link>)}</div>}</div>;
+export function AuthorPage() {
+  const { slug = '' } = useParams();
+  const { t, language } = useI18n();
+  const L = (te: string, en: string) => (language === 'te' ? te : en);
+  return (
+    <FeedPage
+      kind="author"
+      slug={slug}
+      icon={UserRound}
+      eyebrow={t('page.author')}
+      subtitle={L('ఈ విలేకరి రాసిన కథనాలు', 'Stories filed by this journalist')}
+    />
+  );
 }
 
-export function VideoHubPage() {
-  const {language}=useI18n(); const te=language==='te';
-  return <FeedShell title={te?'వీడియోలు':'Video hub'} subtitle={te?'యూట్యూబ్, బన్నీ స్ట్రీమ్, జాటా మరియు స్వంత వీడియోలు':'YouTube, Bunny Stream, Zata and newsroom-hosted video'} icon={<PlayCircle className="h-5 w-5"/>} articles={[]} loading={false}/>;
+export function TagPage() {
+  const { slug = '' } = useParams();
+  const { t, language } = useI18n();
+  const L = (te: string, en: string) => (language === 'te' ? te : en);
+  return (
+    <FeedPage
+      kind="tag"
+      slug={slug}
+      icon={Hash}
+      eyebrow={t('page.tag')}
+      subtitle={L('ఈ అంశంపై ప్రచురించిన కథనాలు', 'Everything published under this tag')}
+    />
+  );
 }
+// ---------------------------------------------------------------------------
+// Home-payload shelves
+// ---------------------------------------------------------------------------
+
+// The photo gallery and Web Stories live in a sibling file (this one would
+// otherwise run past the 500-line ceiling) and are re-exported here, so the
+// route table keeps importing every discovery page from one module.
+export { PhotoGalleryPage, WebStoriesPage } from './DiscoveryShelves';

@@ -62,17 +62,40 @@ export interface PageHeaderProps {
   icon?: LucideIcon;
   actions?: ReactNode;
   back?: { to: string; label: string };
-  /** Script of the title/eyebrow/subtitle; defaults to the interface language. */
+  /**
+   * Script of the **title**; defaults to the interface language. The eyebrow and
+   * subtitle stay in the interface language — they are chrome the caller writes,
+   * not the DB name the title carries.
+   */
   titleLang?: 'te' | 'en';
+  /** Rhythm below the block: default 40px, `tight` 24px, `none` for a container that owns the gap. */
+  spacing?: 'default' | 'tight' | 'none';
   className?: string;
 }
 
-export function PageHeader({ eyebrow, title, subtitle, icon, actions, back, titleLang, className }: PageHeaderProps) {
+const HEADER_SPACING: Record<NonNullable<PageHeaderProps['spacing']>, string> = {
+  default: 'mb-8 md:mb-10',
+  tight: 'mb-5 md:mb-6',
+  none: '',
+};
+
+export function PageHeader({
+  eyebrow,
+  title,
+  subtitle,
+  icon,
+  actions,
+  back,
+  titleLang,
+  spacing = 'default',
+  className,
+}: PageHeaderProps) {
   const s = useScript();
   const lang = titleLang ?? s.language;
   const telugu = lang === 'te';
+  const chromeTe = s.language === 'te';
   return (
-    <header className={cn('mb-8 md:mb-10', className)}>
+    <header className={cn(HEADER_SPACING[spacing], className)}>
       {back ? (
         <Link
           to={back.to}
@@ -95,8 +118,11 @@ export function PageHeader({ eyebrow, title, subtitle, icon, actions, back, titl
           <div className="min-w-0">
             {eyebrow ? (
               <p
-                lang={lang}
-                className={cn('mb-1 font-semibold text-brand', telugu ? 'te text-meta' : 'font-sans text-eyebrow uppercase')}
+                lang={s.language}
+                className={cn(
+                  'mb-1 font-semibold text-brand',
+                  chromeTe ? 'te text-meta' : 'font-sans text-eyebrow uppercase',
+                )}
               >
                 {eyebrow}
               </p>
@@ -105,7 +131,7 @@ export function PageHeader({ eyebrow, title, subtitle, icon, actions, back, titl
               {title}
             </h1>
             {subtitle ? (
-              <p lang={lang} className={cn('mt-1 text-muted', telugu ? 'te text-te-body-sm' : 'font-sans text-ui')}>
+              <p lang={s.language} className={cn('mt-1 text-muted', chromeTe ? 'te text-te-body-sm' : 'font-sans text-ui')}>
                 {subtitle}
               </p>
             ) : null}

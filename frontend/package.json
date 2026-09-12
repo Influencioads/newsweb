@@ -11,7 +11,8 @@
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "audit:ui": "node scripts/audit-ui.mjs"
+    "audit:ui": "node scripts/audit-ui.mjs",
+    "audit:ui:strict": "node scripts/audit-ui.mjs --strict --no-legacy"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

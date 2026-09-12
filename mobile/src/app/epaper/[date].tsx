@@ -1,21 +1,43 @@
-import { useQuery } from "@tanstack/react-query";
-import { useLocalSearchParams } from "expo-router";
-import { ActivityIndicator, Text, View } from "react-native";
-import * as api from "@/api/epaper";
-import { EpaperReader } from "@/components/EpaperReader";
-export default function Screen() {
+import { useQuery } from '@tanstack/react-query';
+import { Stack, useLocalSearchParams } from 'expo-router';
+
+import * as api from '@/api/epaper';
+import { EpaperReader } from '@/components/EpaperReader';
+import { ErrorState, LoadingState } from '@/components/Feedback';
+import { useI18n } from '@/lib/i18n';
+import { Screen } from '@/ui/Screen';
+import { ScreenHeader } from '@/ui/ScreenHeader';
+
+/** The published edition for one date. The reader draws its own toolbar. */
+export default function EpaperDateScreen() {
   const { date } = useLocalSearchParams<{ date: string }>();
-  const q = useQuery({
-    queryKey: ["epaper", date],
+  const { t } = useI18n();
+
+  const edition = useQuery({
+    queryKey: ['epaper', date],
     queryFn: () => api.fetchEdition(date!),
     enabled: Boolean(date),
   });
-  if (q.isLoading) return <ActivityIndicator style={{ margin: 40 }} />;
-  if (!q.data)
-    return (
-      <View style={{ padding: 30 }}>
-        <Text>Published E-Paper not found.</Text>
-      </View>
-    );
-  return <EpaperReader edition={q.data} />;
+
+  return (
+    <Screen edges={['top', 'bottom']}>
+      <Stack.Screen options={{ headerShown: false }} />
+      {edition.data ? (
+        <EpaperReader edition={edition.data} />
+      ) : (
+        <>
+          <ScreenHeader title={t('epaper.title')} />
+          {edition.isLoading ? (
+            <LoadingState variant="article" />
+          ) : (
+            <ErrorState
+              error={edition.error}
+              kind={edition.isError ? undefined : 'notFound'}
+              onRetry={() => void edition.refetch()}
+            />
+          )}
+        </>
+      )}
+    </Screen>
+  );
 }

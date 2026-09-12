@@ -1,17 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Stack, router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { View } from 'react-native';
 
-import { api, ApiError } from '@/api/client';
-import { EmptyState } from '@/components/Feedback';
+import { api } from '@/api/client';
+import { EmptyState, ErrorState, LoadingState } from '@/components/Feedback';
+import { SwitchRow } from '@/components/profile/SettingsRows';
 import { timeAgo, useI18n } from '@/lib/i18n';
-import { font } from '@/lib/theme';
-import { makeStyles, useColors } from '@/lib/useTheme';
+import { space } from '@/lib/theme';
+import { makeStyles } from '@/lib/useTheme';
 import { useAuth } from '@/stores/auth';
+import { Badge, type BadgeTone } from '@/ui/Badge';
+import { ConfirmSheet } from '@/ui/BottomSheet';
+import { Button } from '@/ui/Button';
+import { Card } from '@/ui/Card';
+import { Field, Input } from '@/ui/Input';
+import { Screen } from '@/ui/Screen';
+import { T } from '@/ui/Text';
+import { useToast } from '@/ui/Toast';
 
 /** Creator submissions (§17): write → accept guidelines → moderation. */
-
 type SubmissionStatus = 'pending' | 'approved' | 'rejected';
 interface Submission {
   id: number;
@@ -21,16 +29,31 @@ interface Submission {
   created_at: string;
 }
 
+// ponytail: no i18n keys yet for these — see neededStrings.
+const L = (te: string, en: string, telugu: boolean) => (telugu ? te : en);
+
+const TITLE_MIN = 10;
+const BODY_MIN = 100;
+const BODY_MAX = 20000;
+
+const STATUS_TONE: Record<SubmissionStatus, BadgeTone> = {
+  pending: 'exclusive',
+  approved: 'success',
+  rejected: 'breaking',
+};
+
 export default function SubmitScreen() {
   const styles = useStyles();
-  const color = useColors();
   const { t, language, isTelugu } = useI18n();
+  const toast = useToast();
   const authed = useAuth((s) => s.status === 'authenticated');
   const queryClient = useQueryClient();
+
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [accepted, setAccepted] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [touched, setTouched] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const mine = useQuery({
     queryKey: ['my-submissions'],
@@ -51,213 +74,198 @@ export default function SubmitScreen() {
       setTitle('');
       setBody('');
       setAccepted(false);
-      setError(null);
+      setTouched(false);
+      toast.success(t('submit.received'));
       void queryClient.invalidateQueries({ queryKey: ['my-submissions'] });
     },
-    onError: (e) =>
-      setError(e instanceof ApiError ? (isTelugu ? e.messageTe : e.messageEn) : String(e)),
+    onError: (e) => toast.error(e),
   });
 
-  const canSubmit = title.trim().length >= 10 && body.trim().length >= 100 && accepted;
+  const titleOk = title.trim().length >= TITLE_MIN;
+  const bodyOk = body.trim().length >= BODY_MIN;
+  const canSubmit = titleOk && bodyOk && accepted && !submit.isPending;
+  const hasDraft = title.length > 0 || body.length > 0;
+
   const STATUS_LABEL: Record<SubmissionStatus, string> = {
     pending: t('submit.pending'),
     approved: t('submit.approved'),
     rejected: t('submit.rejected'),
   };
-  const STATUS_COLOR: Record<SubmissionStatus, string> = {
-    pending: color.exclusive,
-    approved: color.success,
-    rejected: color.breaking,
-  };
+
+  if (!authed) {
+    return (
+      <Screen edges={['bottom']}>
+        <Stack.Screen options={{ title: t('submit.title') }} />
+        <EmptyState icon="logIn" title={t('ui.signInToContinue')} body={t('comments.signIn')} />
+      </Screen>
+    );
+  }
 
   return (
-    <>
+    <Screen edges={['bottom']} scroll keyboard contentContainerStyle={styles.body}>
       <Stack.Screen options={{ title: t('submit.title') }} />
-      {!authed ? (
-        <EmptyState message={t('comments.signIn')} />
-      ) : (
-        <ScrollView contentContainerStyle={styles.scroll}>
-          <Text style={styles.hint}>{t('submit.hint')}</Text>
 
-          {/* The route into citizen journalism proper: verified contributors
-              may send more, attach photographs, and carry a verified byline. */}
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/contributor')}
-            style={styles.contributorLink}
-          >
-            <Text style={styles.contributorLinkText}>
-              క్రమం తప్పకుండా రాస్తారా? విలేకరిగా ధృవీకరించుకోండి →
-            </Text>
-          </Pressable>
+      <T variant="bodySmall" color="muted" scaled>
+        {t('submit.hint')}
+      </T>
 
-          <Text style={styles.label}>{t('submit.headline')} *</Text>
-          <TextInput
-            value={title}
-            onChangeText={setTitle}
-            maxLength={200}
-            placeholder="ఉదా: మా ఊరి యువత కట్టిన గ్రంథాలయం"
-            placeholderTextColor={color.mutedLight}
-            style={styles.input}
-          />
+      {/* The route into citizen journalism proper: verified contributors
+          may send more, attach photographs, and carry a verified byline. */}
+      <Button
+        variant="ghost"
+        iconRight="arrowRight"
+        label={L('విలేకరిగా ధృవీకరించుకోండి', 'Get verified as a contributor', isTelugu)}
+        onPress={() => router.push('/contributor')}
+        style={styles.link}
+      />
 
-          <Text style={styles.label}>{t('submit.body')} *</Text>
-          <TextInput
-            value={body}
-            onChangeText={setBody}
-            multiline
-            textAlignVertical="top"
-            maxLength={20000}
-            placeholder="పూర్తి వివరాలతో రాయండి…"
-            placeholderTextColor={color.mutedLight}
-            style={[styles.input, styles.bodyInput]}
-          />
-          <Text style={styles.counter}>{body.length}/20000</Text>
-
-          <View style={styles.guidelineRow}>
-            <Switch
-              value={accepted}
-              onValueChange={setAccepted}
-              trackColor={{ true: color.brand, false: color.ruleStrong }}
-              thumbColor={color.white}
-            />
-            <Text style={styles.guidelineText}>{t('submit.guidelines')}</Text>
-          </View>
-
-          <Pressable
-            onPress={() => submit.mutate()}
-            disabled={!canSubmit || submit.isPending}
-            accessibilityRole="button"
-            style={[styles.button, (!canSubmit || submit.isPending) && styles.disabled]}
-          >
-            <Text style={styles.buttonText}>
-              {submit.isPending ? t('submit.sending') : t('submit.send')}
-            </Text>
-          </Pressable>
-          {submit.isSuccess ? <Text style={styles.success}>{t('submit.received')}</Text> : null}
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-
-          <Text style={styles.mineTitle}>{t('submit.mine')}</Text>
-          {mine.data?.length ? (
-            mine.data.map((s) => (
-              <View key={s.id} style={styles.mineRow}>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={styles.mineHeadline}>{s.title_te}</Text>
-                  {s.review_note ? (
-                    <Text style={styles.mineNote}>గమనిక: {s.review_note}</Text>
-                  ) : null}
-                  <Text style={styles.mineTime}>{timeAgo(s.created_at, language)}</Text>
-                </View>
-                <Text style={[styles.mineStatus, { color: STATUS_COLOR[s.status] }]}>
-                  {STATUS_LABEL[s.status]}
-                </Text>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.mineEmpty}>—</Text>
+      <Field
+        label={t('submit.headline')}
+        required
+        error={
+          touched && !titleOk
+            ? L(
+                `కనీసం ${TITLE_MIN} అక్షరాల శీర్షిక రాయండి.`,
+                `Write a headline of at least ${TITLE_MIN} characters.`,
+                isTelugu,
+              )
+            : undefined
+        }
+      >
+        <Input
+          value={title}
+          onChangeText={setTitle}
+          onBlur={() => setTouched(true)}
+          maxLength={200}
+          placeholder={L(
+            'ఉదా: మా ఊరి యువత కట్టిన గ్రంథాలయం',
+            'e.g. The library our village youth built',
+            isTelugu,
           )}
-          <View style={{ height: 30 }} />
-        </ScrollView>
-      )}
-    </>
+        />
+      </Field>
+
+      <Field
+        label={t('submit.body')}
+        required
+        error={
+          touched && !bodyOk
+            ? L(
+                `కనీసం ${BODY_MIN} అక్షరాలు రాయండి.`,
+                `Write at least ${BODY_MIN} characters.`,
+                isTelugu,
+              )
+            : undefined
+        }
+        style={styles.field}
+      >
+        <Input
+          value={body}
+          onChangeText={setBody}
+          onBlur={() => setTouched(true)}
+          multiline
+          counter={BODY_MAX}
+          placeholder={L('పూర్తి వివరాలతో రాయండి…', 'Write the full story…', isTelugu)}
+        />
+      </Field>
+
+      <Card padding="none" style={styles.guidelines}>
+        <SwitchRow
+          label={t('submit.guidelines')}
+          value={accepted}
+          onChange={setAccepted}
+          icon="shield"
+        />
+      </Card>
+
+      <View style={styles.actions}>
+        <Button
+          label={submit.isPending ? t('submit.sending') : t('submit.send')}
+          icon="send"
+          pending={submit.isPending}
+          disabled={!canSubmit}
+          onPress={() => submit.mutate()}
+          style={styles.grow}
+        />
+        {hasDraft ? (
+          <Button
+            label={t('ui.clear')}
+            variant="secondary"
+            icon="trash2"
+            onPress={() => setConfirmClear(true)}
+          />
+        ) : null}
+      </View>
+
+      <T variant="headlineMd" weight="bold" style={styles.mineTitle} accessibilityRole="header">
+        {t('submit.mine')}
+      </T>
+
+      {mine.isLoading ? <LoadingState variant="list" rows={3} /> : null}
+      {mine.isError ? (
+        <ErrorState error={mine.error} fill={false} onRetry={() => void mine.refetch()} />
+      ) : null}
+      {mine.data && mine.data.length === 0 ? (
+        <EmptyState
+          icon="fileText"
+          body={L(
+            'ఇంకా సమర్పణలు లేవు. పైన మీ మొదటి కథనం రాయండి.',
+            'No submissions yet — write your first story above.',
+            isTelugu,
+          )}
+        />
+      ) : null}
+
+      {(mine.data ?? []).map((s) => (
+        <Card key={s.id} style={styles.row}>
+          <View style={styles.rowText}>
+            <T variant="body" weight="semibold" lang="te" scaled numberOfLines={3}>
+              {s.title_te}
+            </T>
+            {s.review_note ? (
+              <T variant="bodySmall" color="muted" lang="te" scaled>
+                {`${L('గమనిక', 'Note', isTelugu)}: ${s.review_note}`}
+              </T>
+            ) : null}
+            <T variant="meta" color="mutedLight">
+              {timeAgo(s.created_at, language)}
+            </T>
+          </View>
+          <Badge tone={STATUS_TONE[s.status]} size="xs" label={STATUS_LABEL[s.status]} />
+        </Card>
+      ))}
+
+      <ConfirmSheet
+        open={confirmClear}
+        onClose={() => setConfirmClear(false)}
+        title={L('రాసినది తొలగించాలా?', 'Clear this draft?', isTelugu)}
+        body={L(
+          'మీరు రాసిన శీర్షిక, కథనం పోతాయి. దీన్ని వెనక్కి తీసుకోలేరు.',
+          'Your headline and story will be lost. This cannot be undone.',
+          isTelugu,
+        )}
+        confirmLabel={t('ui.delete')}
+        tone="danger"
+        onConfirm={() => {
+          setTitle('');
+          setBody('');
+          setTouched(false);
+          setConfirmClear(false);
+          toast.info(t('state.deleted'));
+        }}
+      />
+    </Screen>
   );
 }
 
-const useStyles = makeStyles((color) => ({
-  contributorLink: { minHeight: 44, justifyContent: 'center', marginBottom: 12 },
-  contributorLinkText: {
-    fontFamily: font.teluguSemiBold,
-    fontSize: 13,
-    lineHeight: 22,
-    color: color.brand,
-  },
-  scroll: { padding: 16 },
-  hint: { fontFamily: font.telugu, fontSize: 13, lineHeight: 22, color: color.muted, marginBottom: 12 },
-  label: {
-    fontFamily: font.teluguSemiBold,
-    fontSize: 12.5,
-    lineHeight: 19,
-    color: color.ink,
-    marginBottom: 4,
-    marginTop: 10,
-  },
-  input: {
-    borderWidth: 1.5,
-    borderColor: color.ruleStrong,
-    borderRadius: 8,
-    backgroundColor: color.white,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontFamily: font.telugu,
-    fontSize: 15.5,
-    lineHeight: 24,
-    color: color.ink,
-  },
-  bodyInput: { minHeight: 220 },
-  counter: {
-    fontFamily: font.telugu,
-    fontSize: 10,
-    color: color.mutedLight,
-    textAlign: 'right',
-    marginTop: 2,
-  },
-  guidelineRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
-  guidelineText: {
-    flex: 1,
-    fontFamily: font.telugu,
-    fontSize: 12.5,
-    lineHeight: 21,
-    color: color.ink,
-  },
-  button: {
-    marginTop: 16,
-    backgroundColor: color.brand,
-    borderRadius: 8,
-    paddingVertical: 13,
-    alignItems: 'center',
-  },
-  disabled: { opacity: 0.5 },
-  buttonText: { fontFamily: font.teluguBold, fontSize: 15, lineHeight: 23, color: color.white },
-  success: {
-    fontFamily: font.teluguSemiBold,
-    fontSize: 12.5,
-    lineHeight: 20,
-    color: color.success,
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  error: {
-    fontFamily: font.telugu,
-    fontSize: 13,
-    lineHeight: 21,
-    color: color.breaking,
-    backgroundColor: '#FDECEC',
-    padding: 8,
-    borderRadius: 6,
-    marginTop: 8,
-  },
-  mineTitle: {
-    fontFamily: font.teluguBold,
-    fontSize: 16,
-    lineHeight: 25,
-    color: color.brand,
-    marginTop: 24,
-    marginBottom: 6,
-    borderBottomWidth: 2,
-    borderBottomColor: color.ink,
-    paddingBottom: 4,
-  },
-  mineRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: color.rule,
-  },
-  mineHeadline: { fontFamily: font.teluguSemiBold, fontSize: 14, lineHeight: 23, color: color.ink },
-  mineNote: { fontFamily: font.telugu, fontSize: 12, lineHeight: 19, color: color.muted, marginTop: 2 },
-  mineTime: { fontFamily: font.telugu, fontSize: 10.5, lineHeight: 16, color: color.mutedLight, marginTop: 2 },
-  mineStatus: { fontFamily: font.teluguBold, fontSize: 11.5, lineHeight: 18 },
-  mineEmpty: { fontFamily: font.telugu, fontSize: 13, color: color.mutedLight },
+const useStyles = makeStyles(() => ({
+  body: { padding: space.lg, paddingBottom: space.xxl, gap: space.sm },
+  link: { alignSelf: 'flex-start', paddingHorizontal: 0 },
+  field: { marginTop: space.sm },
+  guidelines: { marginTop: space.sm },
+  actions: { flexDirection: 'row', gap: space.sm, marginTop: space.md },
+  grow: { flex: 1 },
+  mineTitle: { marginTop: space.xl },
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: space.md, marginTop: space.sm },
+  rowText: { flex: 1, minWidth: 0, gap: space.xs },
 }));

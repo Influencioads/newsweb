@@ -9,9 +9,15 @@
     },
     {
       "name": "web",
-      "runtimeExecutable": "C:/Users/PREDAT~1/AppData/Local/Temp/claude/C--Users-PREDATOR-12TH-GEN-Desktop-Coding-newsweb-newsweb-main/df078d28-a5d7-4966-96aa-995155803542/scratchpad/web.cmd",
-      "runtimeArgs": [],
-      "port": 5174
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "frontend", "--", "--port", "5175", "--strictPort", "false"],
+      "port": 5175
+    },
+    {
+      "name": "app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "mobile", "run", "web", "--", "--port", "8081"],
+      "port": 8081
     }
   ]
 }

@@ -31,6 +31,11 @@ export interface ShareTarget {
   /** The story's canonical path, e.g. /politics/slug-ab12cd. */
   url: string;
   title: string;
+  /**
+   * Report the share to the article counters. `false` for a surface that counts
+   * itself (an e-paper page, a video) and whose `shortId` is not an article.
+   */
+  track?: boolean;
 }
 
 export interface ShareSheetProps extends ShareTarget {
@@ -50,19 +55,22 @@ export interface ShareButtonProps extends ShareTarget {
 }
 
 /** The share paths for one story. `downloading` is the card fetch's pending state. */
-export function useShareActions(shortId: string, url: string, title: string) {
+export function useShareActions(shortId: string, url: string, title: string, track = true) {
   const { t } = useI18n();
   const toast = useToast();
   const [downloading, setDownloading] = useState(false);
 
   const absolute = `${window.location.origin}${url}`;
+  const report = () => {
+    if (track) trackShare(shortId);
+  };
 
   // `navigator.share` is typed as always present, so testing it directly is a
   // compile error; the capability genuinely varies at runtime.
   const canNative = typeof navigator !== 'undefined' && 'share' in navigator;
 
   function whatsapp() {
-    trackShare(shortId);
+    report();
     const text = encodeURIComponent(`${title}\n${absolute}`);
     window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
   }
@@ -71,7 +79,7 @@ export function useShareActions(shortId: string, url: string, title: string) {
   async function copy(): Promise<boolean> {
     try {
       await navigator.clipboard.writeText(absolute);
-      trackShare(shortId);
+      report();
       toast.success(t('ui.copied'));
       return true;
     } catch (error) {
@@ -93,7 +101,7 @@ export function useShareActions(shortId: string, url: string, title: string) {
       anchor.download = `${shortId}.png`;
       anchor.click();
       URL.revokeObjectURL(objectUrl);
-      trackShare(shortId);
+      report();
       toast.success(t('ui.done'));
       return true;
     } catch (error) {
@@ -108,7 +116,7 @@ export function useShareActions(shortId: string, url: string, title: string) {
     if (!navigator.share) return;
     try {
       await navigator.share({ title, url: absolute });
-      trackShare(shortId);
+      report();
     } catch {
       // A cancelled share sheet throws. That is not a failure.
     }
@@ -117,9 +125,9 @@ export function useShareActions(shortId: string, url: string, title: string) {
   return { whatsapp, copy, download, downloading, native, canNative };
 }
 
-export function ShareSheet({ open, onClose, shortId, url, title, cardAvailable }: ShareSheetProps) {
+export function ShareSheet({ open, onClose, shortId, url, title, track, cardAvailable }: ShareSheetProps) {
   const { t } = useI18n();
-  const { whatsapp, copy, download, downloading, native, canNative } = useShareActions(shortId, url, title);
+  const { whatsapp, copy, download, downloading, native, canNative } = useShareActions(shortId, url, title, track);
 
   // Every row dismisses the sheet once its path has run (focus returns to the
   // opener) — except a path that reports failure, which stays open for a retry.
@@ -151,7 +159,7 @@ export function ShareSheet({ open, onClose, shortId, url, title, cardAvailable }
   );
 }
 
-export function ShareButton({ shortId, url, title, cardAvailable, variant = 'icon', label, className }: ShareButtonProps) {
+export function ShareButton({ shortId, url, title, track, cardAvailable, variant = 'icon', label, className }: ShareButtonProps) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const text = label ?? t('ui.share');
@@ -170,6 +178,7 @@ export function ShareButton({ shortId, url, title, cardAvailable, variant = 'ico
         shortId={shortId}
         url={url}
         title={title}
+        track={track}
         cardAvailable={cardAvailable}
       />
     </>

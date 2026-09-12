@@ -45,22 +45,10 @@
   --tn-on-brand: 255 255 255;
   --tn-on-ink: 255 255 255;
 
-  /* Legacy hex aliases for the few raw-CSS consumers below. */
+  /* Colour aliases for the raw-CSS consumers below (:focus-visible, .ph).
+     Only the three that are actually referenced survive. */
   --brand: rgb(var(--tn-brand));
-  --brand-dark: rgb(var(--tn-brand-dark));
-  --breaking: rgb(var(--tn-breaking));
-  --ink: rgb(var(--tn-ink));
-  --ink-soft: rgb(var(--tn-ink-soft));
-  --muted: rgb(var(--tn-muted));
   --muted-light: rgb(var(--tn-muted-light));
-  --paper: rgb(var(--tn-paper));
-  --canvas: rgb(var(--tn-canvas));
-  --cms-canvas: rgb(var(--tn-canvas-cms));
-  --rule: rgb(var(--tn-rule));
-  --ai: rgb(var(--tn-ai));
-  --exclusive: rgb(var(--tn-exclusive));
-  --success: rgb(var(--tn-success));
-  --info: rgb(var(--tn-info));
   --placeholder: rgb(var(--tn-placeholder));
 
   /* Reader font-size switcher (§4.1 A- / A / A+ / A++).
@@ -126,13 +114,10 @@
   color-scheme: dark;
 }
 
-/* Cards written as `bg-white` follow the surface token in dark mode; text-white
- * (buttons, tickers) intentionally stays white. The `bg-ink` panels — footer,
- * CMS topbar, code blocks, story cards — are dark by design in BOTH themes,
- * so they pin to the constant deep tone while text-ink flips.
- * TODO(W6): delete the two bg-white rules once audit-ui --strict reports 0. */
-.dark .bg-white { background-color: rgb(var(--tn-surface)); }
-.dark .bg-white\/95 { background-color: rgb(var(--tn-surface) / 0.95); }
+/* The `bg-ink` panels — footer, CMS topbar, code blocks, story cards — are dark
+ * by design in BOTH themes, so they pin to the constant deep tone while
+ * text-ink flips. (The `.dark .bg-white` compatibility shim is gone: every
+ * surface now uses `bg-surface`, and text-white on fills stays white.) */
 .dark .bg-ink { background-color: rgb(var(--tn-ink-deep)); }
 
 @layer base {

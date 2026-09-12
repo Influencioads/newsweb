@@ -1,39 +1,61 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type KeyboardEvent } from 'react';
 
-interface OtpInputProps {
-  value: string;
-  onChange: (value: string) => void;
-  length?: number;
-  /** Kept for callers; both sizes now sit on the 44px tap floor and the named type scale. */
-  size?: 'lg' | 'sm';
-  disabled?: boolean;
-  autoFocus?: boolean;
-  label: string;
-  id: string;
-}
+import { cn } from '@/utils/cn';
 
 /**
  * Segmented code input (mockup 1k).
  *
  * Real inputs, not styled divs: field staff use password managers and SMS
  * autofill, and `autoComplete="one-time-code"` is what makes the iOS/Android
- * keyboard offer the code. Paste of a full code fills every box.
+ * keyboard offer the code. Pasting or autofilling the whole code arrives as a
+ * multi-character change on one box and fills every box from the start.
+ *
+ * Each box is 44×48 (the tap floor on the narrow axis), carries its own
+ * `aria-label` ("OTP code 3" — a spoken "3/6" is unreliable, so the total sits
+ * on the group instead) and sits in a labelled `role="group"`.
+ * `onComplete` fires once the last digit lands, so a caller can submit without
+ * the reader reaching for a button.
+ *
+ *     <OtpInput id="otp-0" label={t('…')} value={otp} onChange={setOtp}
+ *               onComplete={() => verify.mutate()} autoFocus />
  */
+export interface OtpInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  length?: number;
+  disabled?: boolean;
+  autoFocus?: boolean;
+  /** Accessible name of the group ("<label> (6)"); each box is named "<label> N". */
+  label: string;
+  /** Id of the first box, so an enclosing Field can point its <label> at it. */
+  id: string;
+  /** Called with the full code the moment every box is filled. */
+  onComplete?: (value: string) => void;
+}
+
 export function OtpInput({
   value,
   onChange,
   length = 6,
-  size = 'lg',
   disabled = false,
   autoFocus = false,
   label,
   id,
+  onComplete,
 }: OtpInputProps) {
   const refs = useRef<Array<HTMLInputElement | null>>([]);
+  // Latest callback without re-arming the completion effect on every render.
+  const complete = useRef(onComplete);
+  complete.current = onComplete;
 
   useEffect(() => {
     if (autoFocus) refs.current[0]?.focus();
   }, [autoFocus]);
+
+  // Fires on the transition into "full", so a backspace-then-retype submits again.
+  useEffect(() => {
+    if (value.length === length) complete.current?.(value);
+  }, [value, length]);
 
   const digits = Array.from({ length }, (_, i) => value[i] ?? '');
 
@@ -59,7 +81,7 @@ export function OtpInput({
     if (index < length - 1) refs.current[index + 1]?.focus();
   }
 
-  function handleKeyDown(index: number, e: React.KeyboardEvent<HTMLInputElement>) {
+  function handleKeyDown(index: number, e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Backspace' && !digits[index] && index > 0) {
       e.preventDefault();
       setDigit(index - 1, '');
@@ -73,15 +95,14 @@ export function OtpInput({
     }
   }
 
-  // Both variants meet the 44px floor; `sm` only narrows the box.
-  const box = size === 'lg' ? 'h-tap w-11 text-headline-sm' : 'h-tap w-10 text-ui';
-
   return (
     <div role="group" aria-labelledby={`${id}-label`}>
       <span id={`${id}-label`} className="sr-only">
-        {label}
+        {label} ({length})
       </span>
-      <div className="flex gap-1.5">
+      {/* 6 × 44px + gaps outgrows a padded card below ~360px, so the row
+          scrolls rather than shrinking the boxes under the tap floor. */}
+      <div className="no-scrollbar flex gap-1.5 overflow-x-auto py-1">
         {digits.map((digit, i) => (
           <input
             key={i}
@@ -99,12 +120,12 @@ export function OtpInput({
             onChange={(e) => handleChange(i, e.target.value)}
             onKeyDown={(e) => handleKeyDown(i, e)}
             onFocus={(e) => e.target.select()}
-            className={[
-              box,
-              'rounded-xl bg-field text-center font-sans font-bold text-ink outline-none transition-[colors,transform,box-shadow,opacity] duration-base ease-standard',
+            className={cn(
+              'h-tap-lg w-tap shrink-0 rounded-xl bg-field text-center font-sans text-headline-sm font-bold text-ink',
+              'outline-none transition-[colors,transform,box-shadow,opacity] duration-base ease-standard',
               digit ? 'border-2 border-brand' : 'border border-rule-input',
-              'focus:border-2 focus:border-brand disabled:opacity-50',
-            ].join(' ')}
+              'focus:border-2 focus:border-brand disabled:opacity-60',
+            )}
           />
         ))}
       </div>

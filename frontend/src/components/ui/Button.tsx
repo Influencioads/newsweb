@@ -63,6 +63,12 @@ const SIZE: Record<ButtonSize, string> = {
   lg: 'min-h-tap-lg min-w-tap px-5 text-ui',
 };
 
+/**
+ * The `variant="link"` look for an anchor that has to sit *inside* prose, where
+ * a Button's 44px floor would break the line box. The one copy of the string.
+ */
+export const linkClass = 'font-semibold text-brand underline-offset-4 hover:underline';
+
 function buttonClass(
   { variant = 'primary', size = 'md', full, pending }: ButtonVisualProps,
   disabled: boolean | undefined,
@@ -198,6 +204,8 @@ export interface IconButtonVisualProps {
   iconSize?: 'sm' | 'md' | 'lg';
   /** Pill shape instead of the rounded-xl square (play buttons inside pills). */
   round?: boolean;
+  /** aria-busy + disabled, and the icon itself spins (never the control). */
+  pending?: boolean;
 }
 
 export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>, IconButtonVisualProps {}
@@ -231,11 +239,16 @@ function iconButtonName(label: string, badge: IconButtonVisualProps['badge']): s
   return text === null ? label : `${label} (${text})`;
 }
 
-function IconButtonContent({ icon, iconSize = 'md', badge }: Pick<IconButtonVisualProps, 'icon' | 'iconSize' | 'badge'>) {
+function IconButtonContent({
+  icon,
+  iconSize = 'md',
+  badge,
+  pending,
+}: Pick<IconButtonVisualProps, 'icon' | 'iconSize' | 'badge' | 'pending'>) {
   const text = badgeText(badge);
   return (
     <>
-      <Icon icon={icon} size={iconSize} />
+      <Icon icon={pending ? Loader2 : icon} size={iconSize} className={cn(pending && 'animate-spin')} />
       {text !== null && (
         <span
           aria-hidden
@@ -249,21 +262,22 @@ function IconButtonContent({ icon, iconSize = 'md', badge }: Pick<IconButtonVisu
 }
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
-  { icon, label, size, pressed, variant, badge, iconSize, round, className, disabled, type = 'button', ...rest },
+  { icon, label, size, pressed, variant, badge, iconSize, round, pending, className, disabled, type = 'button', ...rest },
   ref,
 ) {
   return (
     <button
       ref={ref}
       type={type}
-      disabled={disabled}
+      disabled={disabled || pending}
       aria-label={iconButtonName(label, badge)}
       title={label}
       aria-pressed={pressed}
-      className={iconButtonClass({ icon, label, size, pressed, variant, round }, disabled, className)}
+      aria-busy={pending || undefined}
+      className={iconButtonClass({ icon, label, size, pressed, variant, round }, disabled || pending, className)}
       {...rest}
     >
-      <IconButtonContent icon={icon} iconSize={iconSize} badge={badge} />
+      <IconButtonContent icon={icon} iconSize={iconSize} badge={badge} pending={pending} />
     </button>
   );
 });

@@ -1,104 +1,235 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, MapPin, Megaphone, Tag, Zap } from 'lucide-react';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Bell, BellOff, CheckCheck, MapPin, Megaphone, Tag, Zap, type LucideIcon } from 'lucide-react';
 
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Icon } from '@/components/ui/Icon';
+import { PageContainer, PageHeader, SectionHeader } from '@/components/ui/Layout';
+import { EmptyState, QueryState } from '@/components/ui/State';
+import { useToast } from '@/components/ui/Toast';
 import * as notificationsApi from '@/features/engagement/notificationsApi';
-import { useI18n } from '@/i18n';
+import { useI18n, useScript, type StringKey } from '@/i18n';
 import { useAuth } from '@/stores/auth';
+import { cn } from '@/utils/cn';
+import { useDocumentTitle, useReveal } from '@/utils/motion';
 import { relativeTime } from '@/utils/time';
 
-const KIND_ICON: Record<notificationsApi.NotificationKind, React.ReactNode> = {
-  breaking: <Zap className="h-4 w-4 text-breaking" aria-hidden />,
-  local: <MapPin className="h-4 w-4 text-brand" aria-hidden />,
-  topic: <Tag className="h-4 w-4 text-info" aria-hidden />,
-  system: <Megaphone className="h-4 w-4 text-exclusive" aria-hidden />,
+/**
+ * The reader's inbox (§13): alerts grouped by day, newest first.
+ *
+ * Opening the page still clears the masthead badge once per visit — the rows
+ * keep the `read_at` they arrived with, so the unread dots stay readable — and
+ * "mark all as read" is the explicit control that clears the dots too.
+ */
+
+interface KindStyle {
+  icon: LucideIcon;
+  tone: string;
+}
+
+const KIND: Record<notificationsApi.NotificationKind, KindStyle> = {
+  breaking: { icon: Zap, tone: 'bg-breaking-tint text-breaking' },
+  local: { icon: MapPin, tone: 'bg-brand-tint text-brand' },
+  topic: { icon: Tag, tone: 'bg-info-tint text-info' },
+  system: { icon: Megaphone, tone: 'bg-exclusive-tint text-exclusive-text' },
 };
 
-/** The reader's inbox (§13). Opening the page marks everything read. */
+const GROUPS = ['today', 'yesterday', 'earlier'] as const;
+type DayGroup = (typeof GROUPS)[number];
+
+const GROUP_LABEL: Record<DayGroup, StringKey> = {
+  today: 'ui.today',
+  yesterday: 'ui.yesterday',
+  earlier: 'ui.earlier',
+};
+
+const DAY_MS = 86_400_000;
+
+/** Which day bucket a timestamp falls into, in the reader's own timezone. */
+function dayGroup(iso: string, now: Date): DayGroup {
+  const at = new Date(iso).getTime();
+  if (Number.isNaN(at)) return 'earlier';
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  if (at >= midnight) return 'today';
+  if (at >= midnight - DAY_MS) return 'yesterday';
+  return 'earlier';
+}
+
+function NotificationRow({
+  item,
+  reveal,
+}: {
+  item: notificationsApi.NotificationItem;
+  reveal: (el: HTMLElement | null) => void;
+}) {
+  const { t, language } = useI18n();
+  const s = useScript();
+  const kind = KIND[item.kind];
+  const unread = item.read_at === null;
+
+  const body = (
+    <div className="flex min-h-tap w-full items-start gap-3">
+      <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-pill', kind.tone)}>
+        <Icon icon={kind.icon} size="sm" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p lang="te" className="te text-te-body-sm font-semibold text-ink">
+          {item.title_te}
+        </p>
+        {item.body_te ? (
+          <p lang="te" className="te mt-0.5 text-te-body-xs text-ink-soft">
+            {item.body_te}
+          </p>
+        ) : null}
+        <p lang={language} className={cn(s.body, 'mt-1 text-meta text-muted')}>
+          {relativeTime(item.created_at, language)}
+        </p>
+      </div>
+      {unread ? (
+        <>
+          <span aria-hidden className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-pill bg-brand" />
+          <span className="sr-only">{t('ui.unread')}</span>
+        </>
+      ) : null}
+    </div>
+  );
+
+  return (
+    <Card
+      as="li"
+      ref={reveal}
+      padding="sm"
+      interactive={item.article_url !== null}
+      className={cn(!unread && 'opacity-80')}
+    >
+      {item.article_url ? (
+        <Link to={item.article_url} className="flex rounded-xl">
+          {body}
+        </Link>
+      ) : (
+        body
+      )}
+    </Card>
+  );
+}
+
+/** The reader's inbox (§13). */
 export default function NotificationsPage() {
-  const { language } = useI18n();
-  const te = language === 'te';
-  const teCls = te ? 'te' : 'font-sans';
+  const { t, language } = useI18n();
+  const L = (te: string, en: string) => (language === 'te' ? te : en);
   const status = useAuth((s) => s.status);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const toast = useToast();
+  const reveal = useReveal<HTMLElement>();
+  useDocumentTitle(t('page.notifications'));
 
   useEffect(() => {
-    if (status === 'anonymous') navigate('/login', { replace: true, state: { from: '/notifications' } });
+    if (status === 'anonymous') {
+      navigate('/login', { replace: true, state: { from: '/notifications' } });
+    }
   }, [status, navigate]);
 
-  const inbox = useQuery({
+  const inbox = useInfiniteQuery({
     queryKey: ['notifications', 'inbox'],
-    queryFn: () => notificationsApi.fetchInbox(),
+    queryFn: ({ pageParam }) => notificationsApi.fetchInbox(pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (last) => last.next_offset ?? undefined,
     enabled: status === 'authenticated',
   });
 
-  // Opening the inbox clears the badge — the §13 flow readers expect.
+  const serverUnread = inbox.data?.pages[0]?.unread ?? 0;
+
+  // Opening the inbox clears the badge — the §13 flow readers expect. Once per
+  // visit, and the inbox itself is NOT refetched, so the dots survive the call.
+  const cleared = useRef(false);
   useEffect(() => {
-    if (inbox.data && inbox.data.unread > 0) {
-      void notificationsApi.markRead().then(() => {
-        void queryClient.invalidateQueries({ queryKey: ['notifications', 'unread'] });
-      });
-    }
-  }, [inbox.data, queryClient]);
+    if (cleared.current || serverUnread === 0) return;
+    cleared.current = true;
+    void notificationsApi.markRead().then(() => {
+      void queryClient.invalidateQueries({ queryKey: ['notifications', 'unread'] });
+    });
+  }, [serverUnread, queryClient]);
+
+  const markAll = useMutation({
+    mutationFn: () => notificationsApi.markRead(),
+    onSuccess: () => {
+      toast.success(L('అన్నీ చదివినట్లు గుర్తించాం', 'All notifications marked as read'));
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+    onError: (error) => toast.error(error),
+  });
+
+  const items = inbox.data?.pages.flatMap((page) => page.items) ?? [];
+  const hasUnread = items.some((n) => n.read_at === null);
+  const now = new Date();
 
   if (status !== 'authenticated') return null;
-
   return (
-    <div className="mx-auto min-h-[55vh] max-w-[760px] px-4 py-7 sm:py-10">
-      <div className="mb-6 border-b-2 border-ink pb-4">
-        <p className="flex items-center gap-1.5 font-sans text-[11px] font-bold uppercase tracking-[0.16em] text-brand">
-          <Bell className="h-3.5 w-3.5" aria-hidden />
-          {te ? 'హెచ్చరికలు' : 'ALERTS'}
-        </p>
-        <h1 className={`${te ? 'th' : 'font-sans'} mt-1 text-[27px] font-extrabold text-ink sm:text-[32px]`}>
-          {te ? 'నోటిఫికేషన్లు' : 'Notifications'}
-        </h1>
-      </div>
+    <PageContainer width="wrap" className="py-7 md:py-10">
+      <PageHeader
+        eyebrow={t('ui.notifications')}
+        title={t('page.notifications')}
+        icon={Bell}
+        actions={
+          <Button
+            variant="secondary"
+            icon={CheckCheck}
+            disabled={!hasUnread}
+            pending={markAll.isPending}
+            onClick={() => markAll.mutate()}
+          >
+            {t('ui.markAllRead')}
+          </Button>
+        }
+      />
 
-      {inbox.isLoading ? (
-        <p className={`${teCls} text-muted`}>{te ? 'లోడ్ అవుతోంది…' : 'Loading…'}</p>
-      ) : !inbox.data?.items.length ? (
-        <p className={`${teCls} rounded border border-rule bg-paper px-4 py-6 text-center text-[14.5px] text-muted`}>
-          {te
-            ? 'ఇంకా నోటిఫికేషన్లు లేవు. ప్రాంతాలు, విభాగాలను ఫాలో అయితే ముఖ్య వార్తలు ఇక్కడ చేరతాయి.'
-            : 'No notifications yet. Follow places and sections to get important stories here.'}
-        </p>
-      ) : (
-        <div className="divide-y divide-rule">
-          {inbox.data.items.map((n) => {
-            const inner = (
-              <div className={`flex items-start gap-3 py-3 ${n.read_at ? 'opacity-70' : ''}`}>
-                <span className="mt-1 shrink-0">{KIND_ICON[n.kind]}</span>
-                <div className="min-w-0 flex-1">
-                  <p lang="te" className="te text-[14.5px] font-semibold leading-telugu text-ink">
-                    {n.title_te}
-                  </p>
-                  {n.body_te ? (
-                    <p lang="te" className="te mt-0.5 text-[13px] leading-telugu text-muted">
-                      {n.body_te}
-                    </p>
-                  ) : null}
-                  <p className="mt-1 font-sans text-[10.5px] text-muted-light">
-                    {relativeTime(n.created_at, language)}
-                  </p>
-                </div>
-                {!n.read_at ? (
-                  <span aria-hidden className="mt-2 h-2 w-2 shrink-0 rounded-full bg-brand" />
-                ) : null}
-              </div>
-            );
-            return n.article_url ? (
-              <Link key={n.id} to={n.article_url} className="block hover:bg-paper">
-                {inner}
-              </Link>
-            ) : (
-              <div key={n.id}>{inner}</div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+      <QueryState
+        query={inbox}
+        isEmpty={(data) => !data.pages.some((page) => page.items.length)}
+        empty={
+          <EmptyState
+            icon={BellOff}
+            title={L('ఇంకా నోటిఫికేషన్లు లేవు', 'No notifications yet')}
+            body={L(
+              'ప్రాంతాలు, విభాగాలను ఫాలో అయితే ముఖ్య వార్తలు ఇక్కడ చేరతాయి.',
+              'Follow places and sections to get important stories here.',
+            )}
+          />
+        }
+      >
+        {() => (
+          <div className="space-y-7 md:space-y-10">
+            {GROUPS.map((group) => {
+              const rows = items.filter((n) => dayGroup(n.created_at, now) === group);
+              if (rows.length === 0) return null;
+              return (
+                <section key={group}>
+                  <SectionHeader level={3} tone="ink" title={t(GROUP_LABEL[group])} />
+                  <ul className="flex flex-col gap-3">
+                    {rows.map((n) => (
+                      <NotificationRow key={n.id} item={n} reveal={reveal} />
+                    ))}
+                  </ul>
+                </section>
+              );
+            })}
+
+            {inbox.hasNextPage ? (
+              <Button
+                variant="secondary"
+                full
+                pending={inbox.isFetchingNextPage}
+                onClick={() => void inbox.fetchNextPage()}
+              >
+                {t('ui.loadMore')}
+              </Button>
+            ) : null}
+          </div>
+        )}
+      </QueryState>
+    </PageContainer>
   );
 }

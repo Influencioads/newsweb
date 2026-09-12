@@ -35,6 +35,8 @@ export const lightColor = {
   aiTint: '#F4F0FB',
   exclusive: '#B48A2A',
   exclusiveTint: '#FBF3DC',
+  /** Text / glyph on exclusiveTint — the gold fill itself is too light for AA there (web --tn-exclusive-text). */
+  exclusiveText: '#7C5D1C',
   success: '#2F703A',
   successTint: '#E8F2E9',
   info: '#2F5E8C',
@@ -82,7 +84,7 @@ export const font = {
  *
  * Mirrors the web scale: display 34 → 30 here, headline-xl/lg → headlineLg,
  * headline-md → headlineMd, headline-sm/xs → headlineSm, ui/ui-sm → ui,
- * meta 12.5, eyebrow 11 (Inter, Latin only — never on Telugu text).
+ * meta 12.5, eyebrow 11 (Manrope, Latin only — never on Telugu text).
  */
 export const type = {
   /** Masthead wordmark. */
@@ -117,7 +119,7 @@ export const BODY_FLOOR = 17;
 
 /**
  * A type style scaled by the reader's A-/A/A+/A++ choice, keeping the
- * line-height ratio (>= 1.65 for body, 1.5 for Anek headlines) and the 17sp
+ * line-height ratio (>= 1.65 for body, 1.5 for Noto Serif Telugu headlines) and the 17sp
  * body floor.
  */
 export function readerType(
@@ -177,6 +179,7 @@ export const darkColor: Palette = {
   aiTint: '#2D273E',
   exclusive: '#D4B061',
   exclusiveTint: '#362E1E',
+  exclusiveText: '#E2C480',
   success: '#79BE84',
   successTint: '#1E3022',
   info: '#7FA9DA',

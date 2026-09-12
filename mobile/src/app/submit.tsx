@@ -227,7 +227,7 @@ export default function SubmitScreen() {
                 {`${L('గమనిక', 'Note', isTelugu)}: ${s.review_note}`}
               </T>
             ) : null}
-            <T variant="meta" color="mutedLight">
+            <T variant="meta" color="muted">
               {timeAgo(s.created_at, language)}
             </T>
           </View>

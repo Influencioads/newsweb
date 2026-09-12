@@ -50,7 +50,7 @@ const useStyles = makeStyles((color) => ({
     borderRadius: radius.md,
     backgroundColor: color.inkDeep,
     borderWidth: 1,
-    borderColor: alpha(color.onOverlay, 0.16),
+    borderColor: alpha(color.onOverlay, 0.28),
     ...shadow('raised', color),
   },
   message: { flex: 1, paddingVertical: space.sm },

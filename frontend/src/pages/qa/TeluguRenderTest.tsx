@@ -30,7 +30,7 @@ const TEST_LINES = [
 const LONG_HEADLINE =
   'అమరావతి రాజధాని నిర్మాణానికి కేంద్ర ప్రభుత్వం తొలి విడతగా ఒక వెయ్యి రెండు వందల యాభై కోట్ల రూపాయల నిధులు విడుదల చేసినట్లు అధికారులు వెల్లడించారు';
 
-/** The three faces, compared at one size so the difference read is the face. */
+/** The four faces, compared at one size so the difference read is the face. */
 const FACES: Array<[string, string]> = [
   ['Noto Serif Telugu', 'th font-bold'],
   ['Noto Sans Telugu', 'te'],
@@ -131,7 +131,7 @@ export default function TeluguRenderTest() {
         >
           <div className="flex flex-col gap-4">
             <div>
-              <Label>Article header · Noto Serif Telugu 700 · headline-xl</Label>
+              <Label>Article header · Noto Serif Telugu 800 · headline-xl</Label>
               <h3 lang="te" className="th text-headline-xl font-extrabold">
                 {LONG_HEADLINE}
               </h3>
@@ -190,7 +190,7 @@ export default function TeluguRenderTest() {
         </Section>
 
         <Section title="Font loading" spec="§4.1 — self-hosted WOFF2, no Google Fonts CDN">
-          <dl className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {FACES.map(([family, cls]) => (
               <div key={family} className="rounded-xl border border-rule p-3">
                 <dt className="text-eyebrow uppercase text-muted">{family}</dt>

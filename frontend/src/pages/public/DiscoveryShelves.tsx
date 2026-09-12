@@ -279,7 +279,7 @@ export function WebStoriesPage() {
                       />
                       <span
                         aria-hidden
-                        className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-ink via-ink/70 to-transparent"
+                        className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-ink-deep via-ink-deep/70 to-transparent"
                       />
                       <span
                         lang={headline.lang}

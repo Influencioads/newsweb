@@ -114,7 +114,8 @@ export function Switch({ checked, onChange, label, hint, disabled, name, classNa
       >
         <span
           className={cn(
-            'absolute left-0.5 top-0.5 h-5 w-5 rounded-pill bg-on-brand shadow-card transition-transform duration-base ease-standard',
+            // Surface, not on-brand: when off the knob sits on the rule-strong track, where on-brand is ink in dark mode.
+            'absolute left-0.5 top-0.5 h-5 w-5 rounded-pill bg-surface shadow-card ring-1 ring-ink/30 transition-transform duration-base ease-standard',
             checked && 'translate-x-5',
           )}
         />

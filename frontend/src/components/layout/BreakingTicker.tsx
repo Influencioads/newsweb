@@ -11,7 +11,7 @@ import { useI18n, useScript } from '@/i18n';
 import { cn } from '@/utils/cn';
 
 /**
- * BreakingTicker — the red band under the nav (not sticky). Polls the cached
+ * BreakingTicker — the amber breaking band under the nav (not sticky). Polls the cached
  * breaking endpoint every 25 s (§10.1) and renders nothing when it is empty.
  *
  * The track holds two visual copies so the loop is seamless; the second is
@@ -83,7 +83,7 @@ export function BreakingTicker() {
             'flex min-h-9 shrink-0 items-center gap-1.5 rounded-pill bg-brand-deep px-3 text-ui-sm font-bold text-on-ink',
           )}
         >
-          <Icon icon={Zap} size="sm" />
+          <Icon icon={Zap} size="sm" className="text-exclusive" />
           {t('home.breaking')}
         </span>
 

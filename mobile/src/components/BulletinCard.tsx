@@ -74,7 +74,7 @@ const useStyles = makeStyles((color) => ({
     width: DOT,
     height: DOT,
     borderRadius: radius.pill,
-    backgroundColor: color.brand,
+    backgroundColor: color.onOverlay,
     // Centre the disc on the first line of a bodySmall row.
     marginTop: (type.bodySmall.lineHeight - DOT) / 2,
   },
@@ -107,7 +107,7 @@ export function BulletinCard({ bulletin, player }: { bulletin: BulletinSummary; 
           name={playing ? 'pause' : 'play'}
           label={playing ? t('ui.pause') : t('ui.listen')}
           size={48}
-          variant="primary"
+          variant="inverse"
           onPress={() => (playing ? player.pause() : player.play())}
         />
         <T variant="meta" weight="medium" color="onOverlay" lang="en" style={styles.soft}>

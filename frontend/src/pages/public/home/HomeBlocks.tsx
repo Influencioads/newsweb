@@ -75,7 +75,7 @@ export function TopTopics({ topics }: { topics: TrendingTopic[] }) {
                 <Link to={`/topic/${topic.slug}`} className="block">
                   {/* Decoration: the grid says nothing by order, so the rank
                       must not be read out as part of the link's name. */}
-                  <span aria-hidden className="font-sans text-display font-black tabular-nums text-brand">
+                  <span aria-hidden className="font-serif text-display font-bold leading-none tabular-nums text-brand">
                     {index + 1}
                   </span>
                   <h3 lang={title.lang} className={cn(title.head, 'mt-1 text-headline-sm font-extrabold text-ink')}>

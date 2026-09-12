@@ -25,7 +25,7 @@ export function EpaperPromo({ epaper }: { epaper: EpaperTeaser }) {
   const s = useScript();
   const toast = useToast();
   const date = epaper.pub_date;
-  const ghost = 'border border-on-brand/30';
+  const ghost = 'border border-on-ink/30';
 
   /** Native share where it exists, clipboard everywhere else. */
   async function share(): Promise<void> {

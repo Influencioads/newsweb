@@ -37,7 +37,7 @@ export interface Shortcut {
   to: string;
   key: StringKey;
   icon: LucideIcon;
-  /** Marks the live destination (red Radio icon in the rail). */
+  /** Marks the live destination (amber Radio icon in the rail). */
   live?: boolean;
 }
 

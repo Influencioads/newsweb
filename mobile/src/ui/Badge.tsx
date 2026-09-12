@@ -9,8 +9,9 @@ import { T, type PaletteKey } from '@/ui/Text';
  * Badge — a small tinted pill label: BREAKING, EXCLUSIVE, AI, a district tag,
  * a moderation status. Not a control; it just names a tone.
  *
- * Every tone maps to a `<tone>Tint` background with the tone colour as text,
- * so it reads in both themes. `xs` uses the meta step, `sm` the ui step —
+ * Every tone maps to a `<tone>Tint` background with the tone colour as text
+ * (exclusive uses exclusiveText — the gold fill is too light for AA on its
+ * tint), so it reads in both themes. `xs` uses the meta step, `sm` the ui step —
  * both through <T>, so Telugu labels keep their line-height.
  */
 export type BadgeTone =
@@ -35,7 +36,7 @@ export interface BadgeProps {
 const TONE: Record<BadgeTone, { bg: PaletteKey; fg: PaletteKey }> = {
   brand: { bg: 'brandTint', fg: 'brand' },
   breaking: { bg: 'breakingTint', fg: 'breaking' },
-  exclusive: { bg: 'exclusiveTint', fg: 'exclusive' },
+  exclusive: { bg: 'exclusiveTint', fg: 'exclusiveText' },
   ai: { bg: 'aiTint', fg: 'ai' },
   success: { bg: 'successTint', fg: 'success' },
   info: { bg: 'infoTint', fg: 'info' },

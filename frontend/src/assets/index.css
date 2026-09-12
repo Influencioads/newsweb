@@ -158,6 +158,12 @@
     outline-offset: 2px;
     border-radius: 6px;
   }
+  /* On the constant-dark `bg-ink` panels (footer, admin sidebar, toasts, ink
+     cards) the light-mode brand ring is 2.3:1 against ink, so the ring goes
+     white there — the colour Button's `inverse` variant already uses. */
+  .bg-ink :focus-visible {
+    outline-color: rgb(var(--tn-on-ink));
+  }
 
   /* Reserve space for media so CLS stays < 0.1 (§10.3). Every image and ad slot
      in this app declares an aspect-ratio or explicit height; this is the
@@ -273,12 +279,6 @@
   .telugu-headline {
     font-family: 'Noto Serif Telugu', 'Noto Sans Telugu', serif;
     line-height: 1.5;
-  }
-
-  /* Fraunces carries an optical-size axis; let the browser pick it per size so
-     the wordmark tagline and English headlines get the display cut. */
-  .font-serif {
-    font-optical-sizing: auto;
   }
 
   /* Reveal-on-scroll (utils/motion.ts useReveal). Elements start hidden and

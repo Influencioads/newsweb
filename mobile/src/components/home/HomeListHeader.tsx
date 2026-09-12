@@ -76,6 +76,7 @@ export function HomeListHeader({ breaking, epaper, topics }: HomeListHeaderProps
             <Button
               label={t('epaper.read')}
               icon="bookOpen"
+              variant="inverse"
               onPress={() => router.push({ pathname: '/epaper/[date]', params: { date: epaper.pub_date } })}
             />
             <IconButton

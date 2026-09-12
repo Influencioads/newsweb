@@ -134,7 +134,7 @@ export function Field({ label, hint, error, required, htmlFor, children, classNa
 // The global :focus-visible outline (index.css) stays on: it sits 2px outside
 // the subtle 20% ring, so keyboard focus is unmistakable while mouse focus is quiet.
 const INPUT_BASE =
-  'w-full min-h-tap rounded-xl border border-rule-input bg-field px-3 text-ink placeholder:text-muted-light ' +
+  'w-full min-h-tap rounded-xl border border-rule-input bg-field px-3 text-ink placeholder:text-muted ' +
   'transition-colors duration-base focus:border-brand focus:ring-2 focus:ring-brand/20 ' +
   'disabled:cursor-not-allowed disabled:opacity-60';
 

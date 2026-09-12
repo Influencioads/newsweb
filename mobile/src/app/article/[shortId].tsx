@@ -247,7 +247,7 @@ export default function ArticleScreen() {
               {/* §7 corrections — the note travels with the story, never silently. */}
               {data.correction_note_te ? (
                 <View style={styles.correction}>
-                  <Icon name="info" size={20} color={color.exclusive} />
+                  <Icon name="info" size={20} color={color.exclusiveText} />
                   <T variant="bodySmall" scaled style={styles.correctionText}>
                     {data.correction_note_te}
                   </T>
@@ -340,7 +340,7 @@ const useStyles = makeStyles((color) => ({
     flexDirection: 'row',
     gap: space.sm,
     borderLeftWidth: 3,
-    borderLeftColor: color.exclusive,
+    borderLeftColor: color.exclusiveText,
     backgroundColor: color.exclusiveTint,
     borderRadius: radius.sm,
     padding: space.md,

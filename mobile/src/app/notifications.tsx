@@ -58,12 +58,13 @@ function NotificationRow({ item }: { item: NotificationItem }) {
   const color = useColors();
   const { language, isTelugu } = useI18n();
   const look = KIND[item.kind];
+  const read = item.read_at != null;
   // The inbox stores a full article URL; its trailing segment is the short id.
   const shortId = item.article_url?.split('-').pop();
   // Unread belongs in the label: the dot is decorative, and `selected` would
   // announce a selection state the row does not have.
   const label = [
-    item.read_at == null ? L('చదవనిది', 'Unread', isTelugu) : null,
+    read ? null : L('చదవనిది', 'Unread', isTelugu),
     item.title_te,
     item.body_te,
     timeAgo(item.created_at, language),
@@ -72,12 +73,12 @@ function NotificationRow({ item }: { item: NotificationItem }) {
     .join(', ');
 
   const body = (
-    <View style={[styles.row, item.read_at != null && styles.read]}>
-      <View style={[styles.bubble, { backgroundColor: color[look.bg] }]}>
+    <View style={styles.row}>
+      <View style={[styles.bubble, read && styles.read, { backgroundColor: color[look.bg] }]}>
         <Icon name={look.icon} size={20} color={color[look.fg]} />
       </View>
       <View style={styles.text}>
-        <T variant="body" weight="semibold" scaled>
+        <T variant="body" weight="semibold" color={read ? 'inkSoft' : 'ink'} scaled>
           {item.title_te}
         </T>
         {item.body_te ? (
@@ -89,9 +90,7 @@ function NotificationRow({ item }: { item: NotificationItem }) {
           {timeAgo(item.created_at, language)}
         </T>
       </View>
-      {item.read_at == null ? (
-        <View style={styles.dot} aria-hidden />
-      ) : null}
+      {read ? null : <View style={styles.dot} aria-hidden />}
     </View>
   );
 
@@ -230,6 +229,7 @@ const useStyles = makeStyles((color) => ({
     paddingVertical: space.md,
     backgroundColor: color.paper,
   },
+  // Read rows dim the glyph bubble only; text stays on AA tokens (title → inkSoft).
   read: { opacity: 0.7 },
   bubble: {
     width: 36,

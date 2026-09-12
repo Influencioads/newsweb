@@ -97,7 +97,7 @@ function Player({ video, title, playing, onPlay }: { video: VideoDetail; title: 
             aria-label={`${t('ui.play')}: ${title}`}
             className="group absolute inset-0 flex items-center justify-center rounded-2xl transition-[colors,transform,box-shadow,opacity] duration-base ease-standard hover:bg-overlay/20 active:scale-[.98]"
           >
-            <span className="flex h-tap-lg w-tap-lg items-center justify-center rounded-pill bg-overlay/60 text-on-ink shadow-raised transition-[colors,transform,box-shadow,opacity] duration-base ease-standard group-hover:bg-brand">
+            <span className="flex h-tap-lg w-tap-lg items-center justify-center rounded-pill bg-overlay/60 text-on-ink shadow-raised transition-[colors,transform,box-shadow,opacity] duration-base ease-standard group-hover:bg-brand group-hover:text-on-brand">
               <Icon icon={Play} size="lg" />
             </span>
           </button>

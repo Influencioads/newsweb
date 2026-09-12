@@ -24,7 +24,7 @@ import { hasTelugu, T, textStyle, type TLang } from '@/ui/Text';
  * field fill, a hairline that turns rule → brand on focus (breaking when
  * `invalid`), optional leading icon / trailing node, and a `n/max` counter.
  * Both faces come from the `body` step (17/29): Noto Sans Telugu when the
- * text, placeholder or app language is Telugu, Inter otherwise — so the box
+ * text, placeholder or app language is Telugu, Manrope otherwise — so the box
  * never jumps when the first Telugu character lands.
  */
 export interface FieldProps {
@@ -32,7 +32,7 @@ export interface FieldProps {
   hint?: string;
   /** Replaces the hint while set; announced to assistive tech. */
   error?: string;
-  /** Appends a breaking-red asterisk to the label. */
+  /** Appends a breaking (amber) asterisk to the label. */
   required?: boolean;
   children: ReactNode;
   style?: StyleProp<ViewStyle>;

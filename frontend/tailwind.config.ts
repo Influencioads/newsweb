@@ -100,7 +100,10 @@ export default {
         highlight: 'rgb(var(--tn-highlight) / <alpha-value>)',
         /** Scrim behind dialogs / sheets. Use with an alpha: `bg-overlay/60`. */
         overlay: 'rgb(var(--tn-overlay) / <alpha-value>)',
-        /** Foreground on a brand-filled control (white in both themes). */
+        /**
+         * Foreground on a brand / breaking fill: white on the deep light-mode fills,
+         * ink on the light dark-mode fills. Constant-dark panels use `on-ink` instead.
+         */
         'on-brand': 'rgb(var(--tn-on-brand) / <alpha-value>)',
         /** Foreground on a constant-dark panel (footer, ink cards, image scrims). */
         'on-ink': 'rgb(var(--tn-on-ink) / <alpha-value>)',
@@ -112,9 +115,10 @@ export default {
         // Body Telugu stays a sans: the most legible face at 19px on the
         // mid-range Android we target.
         telugu: ['"Noto Sans Telugu"', 'Manrope', 'sans-serif'],
-        // Latin chrome, numerals, and the CMS.
+        // Latin chrome, numerals and the CMS. Inside a `te` run Latin and numerals
+        // come from Noto Sans Telugu's own Latin subset (x-heights match), not Manrope.
         sans: ['Manrope', '"Noto Sans Telugu"', 'system-ui', 'sans-serif'],
-        // Latin display: English headlines, the wordmark tagline, pull quotes.
+        // Latin display: English headlines, pull quotes.
         serif: ['Fraunces', '"Noto Serif Telugu"', 'Georgia', 'serif'],
         mono: ['ui-monospace', 'Menlo', 'monospace'],
       },
@@ -122,12 +126,12 @@ export default {
         // ------------------------------------------------------------------
         // Named type scale. Telugu readers skew older — sizes are generous.
         // Every Telugu size ships an explicit line-height >= 1.65 (body) or
-        // 1.5 (Anek headlines, which sit tighter by design of the face).
+        // 1.5 (Noto Serif Telugu headlines, which sit tighter by design of the face).
         // Minimum chrome size is 12.5px (`text-meta`).
         // ------------------------------------------------------------------
         /**
          * Masthead wordmark. 1.5, not the 1.35 a Latin display face would take:
-         * the wordmark is Telugu (Anek), and §4.1 puts the floor for a Telugu
+         * the wordmark is Telugu (Noto Serif Telugu), and §4.1 puts the floor for a Telugu
          * headline at 1.5. A responsive variant such as `md:text-display`
          * outranks the `.th` rule (same layer, emitted later), so the token
          * itself has to satisfy the floor.
@@ -149,13 +153,17 @@ export default {
         /** Timestamps, bylines, captions. The floor. */
         meta: ['12.5px', { lineHeight: '1.5' }],
         /** Uppercase Latin-only kicker. Never apply to Telugu text. */
-        eyebrow: ['11px', { lineHeight: '1.4', letterSpacing: '0.08em' }],
+        eyebrow: ['11px', { lineHeight: '1.4', letterSpacing: '0.12em' }],
       },
       lineHeight: {
         // §4.1: never below 1.65 for Telugu. Named so a reviewer can spot a violation.
         telugu: '1.7',
         'telugu-tight': '1.65',
         'telugu-headline': '1.5',
+      },
+      letterSpacing: {
+        /** The masthead tagline under the Telugu wordmark. */
+        wordmark: '0.24em',
       },
       spacing: {
         tap: '44px', // §1a: hit targets >= 44px

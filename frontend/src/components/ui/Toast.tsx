@@ -26,10 +26,12 @@ export type { ToastKind, ToastOptions } from '@/stores/toast';
  * timer pauses while hovered or focused.
  */
 
+// The toast is a constant-dark panel, so the status colours (deep in light
+// mode) would sit under 3:1 on it; the glyph carries the kind, the colour stays on-ink.
 const KIND_ICON: Record<ToastKind, { icon: LucideIcon; cls: string }> = {
-  success: { icon: CheckCircle2, cls: 'text-success' },
-  error: { icon: AlertCircle, cls: 'text-breaking' },
-  info: { icon: Info, cls: 'text-info' },
+  success: { icon: CheckCircle2, cls: 'text-on-ink' },
+  error: { icon: AlertCircle, cls: 'text-on-ink' },
+  info: { icon: Info, cls: 'text-on-ink' },
 };
 
 const ROOT_ID = 'overlay-root';
@@ -85,14 +87,11 @@ function ToastCard({ toast }: { toast: ToastItem }) {
       <p lang={te ? 'te' : 'en'} className={cn('min-w-0 flex-1 break-words', te ? 'te text-te-body-xs' : 'font-sans text-ui')}>
         {toast.message}
       </p>
-      {/* The action / dismiss recolour below relies on `on-ink` being declared
-          after `brand` / `ink` / `rule` in tailwind.config.ts colours (cn() is
-          clsx, not tailwind-merge). Reordering the theme would turn the X ink-on-ink. */}
       {toast.action && (
         <Button
-          variant="link"
+          variant="inverse"
           size="sm"
-          className="shrink-0 text-on-ink"
+          className="shrink-0"
           onClick={() => {
             toast.action?.onClick();
             dismiss(toast.id);
@@ -104,8 +103,8 @@ function ToastCard({ toast }: { toast: ToastItem }) {
       <IconButton
         icon={X}
         label={t('ui.dismiss')}
-        variant="ghost"
-        className="shrink-0 text-on-ink hover:bg-on-ink/10"
+        variant="inverse"
+        className="shrink-0"
         onClick={() => dismiss(toast.id)}
       />
     </div>

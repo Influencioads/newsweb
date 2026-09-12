@@ -24,11 +24,12 @@ const RULES = {
   white: '`.white` palette alias — use surface',
   pressable: `raw Pressable/Touchable* import outside ${PRESSABLE} — use <PressableScale>`,
   glyph: 'emoji / Unicode glyph literal — use <Icon>',
-  'te-lineheight': 'Telugu style with lineHeight < 1.65x fontSize (Anek 1.5x) or no lineHeight',
+  'te-lineheight': 'Telugu style with lineHeight < 1.65x fontSize (Noto Serif headline 1.5x) or no lineHeight',
   'te-uppercase': 'textTransform uppercase on a Telugu face',
   'te-body-floor': 'font.telugu below the 17 body floor',
   'static-color': `static \`color\` import from ${THEME} in a rendering file — use useColors()/makeStyles`,
   motion: `ad-hoc withSpring/withTiming config outside ${MOTION} — use m.spring / m.timing / SPRING.*`,
+  'old-face': 'Anek Telugu / Inter reference (code or comment) — the faces are Noto Serif Telugu, Noto Sans Telugu, Fraunces, Manrope',
 };
 const INFO = new Set(['te-body-floor']);
 
@@ -39,7 +40,8 @@ const IMPORT_RX = /import\s*\{([^}]*)\}\s*from\s*['"](?:react-native|react-nativ
 const THEME_IMPORT_RX = /import\s*\{([^}]*)\}\s*from\s*['"]@\/lib\/theme['"]/g;
 const MOTION_RX = /\bwith(?:Spring|Timing)\(\s*[^,()]+,\s*\{/g;
 const NOTO_MIN = 1.65;
-const ANEK_MIN = 1.5;
+const SERIF_MIN = 1.5;
+const OLD_FACE_RX = /\bAnek\w*|\bInter(?:_\w+)?\b/g;
 
 /** The `type` scale from theme.ts so `type.body.fontSize` / `...type.meta` resolve. */
 const TYPE = {};
@@ -130,6 +132,7 @@ function scan(file, src, hit) {
     for (const m of line.match(/[\w.]*\.white\b/g) ?? []) hit('white', name, n, m);
     for (const g of line.match(GLYPH_RX) ?? [])
       hit('glyph', name, n, `${g} U+${g.codePointAt(0).toString(16).toUpperCase()}`);
+    for (const m of raw[i].match(OLD_FACE_RX) ?? []) hit('old-face', name, n, m);
   });
   if (name !== PRESSABLE)
     for (const m of code.matchAll(IMPORT_RX)) {
@@ -146,12 +149,12 @@ function scan(file, src, hit) {
   for (const { start, own } of objectLiterals(code)) {
     const fam = /\bfontFamily\s*:\s*([^,\n}]+)/.exec(own)?.[1]?.trim();
     if (!fam) continue;
-    const face = /font\.telugu|NotoSansTelugu/.test(fam) ? 'noto' : /font\.headline|AnekTelugu/.test(fam) ? 'anek' : null;
+    const face = /font\.telugu|NotoSansTelugu/.test(fam) ? 'noto' : /font\.headline|NotoSerifTelugu/.test(fam) ? 'serif' : null;
     if (!face) continue;
     const n = lineOf(code, start);
     const fs = num(own, 'fontSize');
     const lh = num(own, 'lineHeight');
-    const min = face === 'noto' ? NOTO_MIN : ANEK_MIN;
+    const min = face === 'noto' ? NOTO_MIN : SERIF_MIN;
     if (typeof fs === 'number' && typeof lh === 'number' && lh / fs < min - 1e-9)
       hit('te-lineheight', name, n, `${lh}/${fs} = ${(lh / fs).toFixed(2)} < ${min} (${fam})`);
     else if (typeof fs === 'number' && lh === null) hit('te-lineheight', name, n, `no lineHeight for fontSize ${fs} (${fam})`);
@@ -174,7 +177,8 @@ const d = <Text>\u2192 ok</Text>;
 const s = makeStyles((color) => ({
   bad: { fontFamily: font.telugu, fontSize: 14, lineHeight: 21 },
   ok: { fontFamily: font.teluguBold, ...type.body },
-  anek: { fontFamily: font.headline, fontSize: 20, lineHeight: 30, textTransform: 'uppercase' },
+  serif: { fontFamily: font.headline, fontSize: 20, lineHeight: 30, textTransform: 'uppercase' },
+  stale: { fontFamily: 'AnekTelugu_700Bold', fontSize: 20, lineHeight: 30 }, // Inter_400Regular in a comment still counts
   none: { fontFamily: font.telugu, fontSize: 18 },
   unknown: { fontFamily: font.telugu, ...readerType(type.body, 1) },
   latin: { fontFamily: font.latin, fontSize: 11, lineHeight: 13, textTransform: 'uppercase' },
@@ -195,6 +199,7 @@ const s = makeStyles((color) => ({
     'te-body-floor': 1,
     'static-color': 1,
     motion: 1,
+    'old-face': 2,
   };
   const diff = Object.keys(RULES).filter((k) => (got[k] ?? 0) !== (want[k] ?? 0));
   console.log(diff.length ? `self-test FAILED: ${JSON.stringify({ got, want })}` : 'self-test ok');

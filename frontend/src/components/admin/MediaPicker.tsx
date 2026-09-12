@@ -172,7 +172,7 @@ export function MediaPicker({ heroId, hero, gallery, onHeroChange, onGalleryChan
             {gallery.map((g, index) => (
               <li key={g.id} className="relative">
                 <img src={g.url} alt={g.alt_te ?? ''} loading="lazy" className="aspect-[4/3] w-full rounded-xl border border-rule object-cover" />
-                <span aria-hidden className="absolute bottom-1 left-1 rounded-pill bg-ink/70 px-2 font-sans text-meta font-bold text-on-ink">
+                <span aria-hidden className="absolute bottom-1 left-1 rounded-pill bg-overlay/70 px-2 font-sans text-meta font-bold text-on-ink">
                   {index + 1}
                 </span>
                 <IconButton

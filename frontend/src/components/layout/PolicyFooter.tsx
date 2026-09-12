@@ -81,7 +81,7 @@ export function PolicyFooter() {
         </nav>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-on-ink/10 py-6">
-          <span lang="te" className="th text-headline-xs font-bold text-on-ink">
+          <span lang="te" className="th text-headline-xs font-bold text-exclusive">
             టాప్ తెలుగు న్యూస్
           </span>
           <p lang="en" className="font-sans text-meta text-muted-inverse">

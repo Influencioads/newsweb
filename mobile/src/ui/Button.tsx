@@ -18,8 +18,12 @@ import { T, type PaletteKey, type TLang } from '@/ui/Text';
  *
  * `IconButton` is a round 44/48 glyph-only control with an optional count
  * badge; `active` paints it brand-on-brandTint (bookmarked, liked, …).
+ *
+ * `inverse` (both controls) is the fill for constant-dark panels (Card
+ * tone="ink", BulletinCard): onOverlay disc with an inkDeep label, since the
+ * brand fill sinks into inkDeep in light mode.
  */
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'inverse';
 
 export interface ButtonProps {
   label: string;
@@ -45,6 +49,7 @@ const FG: Record<ButtonVariant, PaletteKey> = {
   secondary: 'ink',
   ghost: 'ink',
   danger: 'onBrand',
+  inverse: 'inkDeep',
 };
 
 const useStyles = makeStyles((color) => ({
@@ -60,11 +65,13 @@ const useStyles = makeStyles((color) => ({
   secondary: { backgroundColor: color.surface, borderWidth: 1, borderColor: color.rule },
   ghost: {},
   danger: { backgroundColor: color.breaking },
+  inverse: { backgroundColor: color.onOverlay },
   full: { alignSelf: 'stretch' },
   // IconButton
   icon: { alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill },
   iconSecondary: { backgroundColor: color.surface, borderWidth: 1, borderColor: color.rule },
   iconPrimary: { backgroundColor: color.brand },
+  iconInverse: { backgroundColor: color.onOverlay },
   active: { backgroundColor: color.brandTint },
   badge: {
     position: 'absolute',
@@ -130,7 +137,7 @@ export interface IconButtonProps {
   active?: boolean;
   /** Count bubble; hidden when null/0/''. */
   badge?: number | string | null;
-  variant?: 'ghost' | 'secondary' | 'primary';
+  variant?: 'ghost' | 'secondary' | 'primary' | 'inverse';
   /** Glyph colour override (a palette value). */
   color?: string;
   disabled?: boolean;
@@ -153,7 +160,7 @@ export function IconButton({
 }: IconButtonProps) {
   const styles = useStyles();
   const color = useColors();
-  const fg = tint ?? (active ? color.brand : variant === 'primary' ? color.onBrand : color.ink);
+  const fg = tint ?? (active ? color.brand : variant === 'primary' ? color.onBrand : variant === 'inverse' ? color.inkDeep : color.ink);
   const showBadge = badge != null && badge !== 0 && badge !== '';
 
   return (
@@ -169,6 +176,7 @@ export function IconButton({
         { width: size, height: size },
         variant === 'secondary' && styles.iconSecondary,
         variant === 'primary' && styles.iconPrimary,
+        variant === 'inverse' && styles.iconInverse,
         active && variant !== 'primary' && styles.active,
         style,
       ]}

@@ -42,7 +42,7 @@ interface Ctx {
   bulletTop: number;
 }
 
-/** Heading level → type step (Anek stays at its 1.5x line-height at every step). */
+/** Heading level → type step (the Noto Serif headline face stays at its 1.5x line-height at every step). */
 const HEADING: Record<number, TypeVariant> = { 2: 'headlineLg', 3: 'headlineMd', 4: 'headlineSm' };
 
 /** The node's own text, for script detection — `<T>` cannot sniff element children. */

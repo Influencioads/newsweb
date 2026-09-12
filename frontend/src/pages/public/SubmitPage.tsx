@@ -100,7 +100,7 @@ export default function SubmitPage() {
   if (status !== 'authenticated') return null;
 
   // Validity is independent of `tried`; `tried` only decides whether the reader
-  // is shown the message yet (nobody wants a red form before they have typed).
+  // is shown the message yet (nobody wants an error state before they have typed).
   const shortTitle = title.trim().length < MIN_TITLE;
   const shortBody = body.trim().length < MIN_BODY;
   const canSubmit = !shortTitle && !shortBody && accepted;

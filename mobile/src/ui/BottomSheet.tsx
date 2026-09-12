@@ -189,7 +189,7 @@ export interface ConfirmSheetProps {
   confirmLabel?: string;
   /** Defaults to t('ui.cancel'). */
   cancelLabel?: string;
-  /** `danger` paints the confirm button breaking-red. */
+  /** `danger` paints the confirm button breaking (amber). */
   tone?: 'primary' | 'danger';
   onConfirm: () => void;
   pending?: boolean;

@@ -44,7 +44,7 @@ export interface BadgeProps {
 const TONE: Record<BadgeTone, string> = {
   brand: 'bg-brand-tint text-brand',
   breaking: 'bg-breaking text-on-brand',
-  exclusive: 'bg-exclusive-tint text-exclusive-text',
+  exclusive: 'bg-exclusive-tint text-exclusive-text border border-exclusive-border',
   ai: 'bg-ai-tint text-ai-text border border-ai-border',
   success: 'bg-success-tint text-success',
   info: 'bg-info-tint text-info',

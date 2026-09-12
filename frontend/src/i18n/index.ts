@@ -93,7 +93,7 @@ export function useI18n() {
 /** Font class + lang attribute for a piece of text in a known script. */
 export interface ScriptAttrs {
   lang: Language;
-  /** `te` (Noto Sans Telugu, lh 1.7) or `font-sans` (Inter). */
+  /** `te` (Noto Sans Telugu, lh 1.7) or `font-sans` (Manrope). */
   cls: 'te' | 'font-sans';
   /** `th` (Noto Serif Telugu, lh 1.5) or `font-serif` (Fraunces) — for headlines. */
   head: 'th' | 'font-serif';

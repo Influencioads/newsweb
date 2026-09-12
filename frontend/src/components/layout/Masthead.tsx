@@ -72,7 +72,7 @@ export function Masthead() {
           <span lang="te" className="th block text-headline-lg font-extrabold text-brand md:text-display">
             టాప్ తెలుగు న్యూస్
           </span>
-          <span lang="en" className="block font-sans text-eyebrow font-semibold uppercase text-muted-light">
+          <span lang="en" className="block font-sans text-eyebrow font-semibold uppercase tracking-wordmark text-exclusive-text">
             Top Telugu News
           </span>
         </Link>

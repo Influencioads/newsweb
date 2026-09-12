@@ -95,7 +95,7 @@ for (const file of walk(SRC)) {
  * rule in the same layer, so it wins on source order and a token that ships a
  * line-height below the Telugu floor silently breaks §4.1 wherever it is used
  * with a responsive prefix. The scale itself therefore has to satisfy the
- * floor: 1.5 for the Anek headline tokens, 1.65 for the Noto body tokens.
+ * floor: 1.5 for the Noto Serif Telugu headline tokens, 1.65 for the Noto body tokens.
  * (ui / ui-sm / meta / eyebrow are Latin tokens; `.te` supplies 1.7 there.)
  * ------------------------------------------------------------------------- */
 const SCALE_FLOOR = [

@@ -36,7 +36,7 @@ const useStyles = makeStyles((color) => ({
   },
   surface: { backgroundColor: color.surface },
   paper: { backgroundColor: color.paper },
-  ink: { backgroundColor: color.inkDeep, borderColor: alpha(color.onOverlay, 0.16) },
+  ink: { backgroundColor: color.inkDeep, borderColor: alpha(color.onOverlay, 0.28) },
   elevated: shadow('card', color),
   raised: shadow('raised', color),
 }));

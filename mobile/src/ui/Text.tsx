@@ -17,8 +17,8 @@ import { usePrefs } from '@/stores/prefs';
 /**
  * T — every piece of text in the app.
  *
- * Picks the face (Anek for Telugu headlines, Noto Sans Telugu for Telugu
- * copy, Inter for Latin), the §4.1-safe size/line-height from the type scale,
+ * Picks the face (Noto Serif Telugu for Telugu headlines, Noto Sans Telugu
+ * for Telugu copy, Fraunces for Latin headlines, Manrope for Latin chrome), the §4.1-safe size/line-height from the type scale,
  * the reader's A-/A/A+/A++ step when `scaled`, and caps the OS font slider at
  * MAX_FONT_MULTIPLIER so layouts hold. Telugu is detected from string
  * children unless `lang` says otherwise.
@@ -29,7 +29,7 @@ export type TLang = 'te' | 'en' | 'auto';
 export type PaletteKey = keyof Palette;
 
 export interface TProps extends TextProps {
-  /** Type-scale step. `eyebrow` is Latin-only (Inter, uppercase, tracked). */
+  /** Type-scale step. `eyebrow` is Latin-only (Manrope, uppercase, tracked). */
   variant?: TypeVariant;
   weight?: TWeight;
   /** Palette key, resolved against the active theme. */
@@ -49,7 +49,7 @@ export interface TextStyleTokens {
 }
 
 const TELUGU = /[\u0C00-\u0C7F]/;
-/** §4.1: Noto Sans Telugu needs >= 1.65x line-height or vattulu clip. Anek headlines sit at 1.5. */
+/** §4.1: Noto Sans Telugu needs >= 1.65x line-height or vattulu clip. Noto Serif Telugu headlines sit at 1.5 (its hhea box is 1.352em, win 1.462em). */
 const TELUGU_LINE_RATIO = 1.65;
 
 /** True when the string contains any Telugu-block character. */
@@ -72,7 +72,7 @@ function face(variant: TypeVariant, weight: TWeight, telugu: boolean): string {
   }
   // Latin headlines take the serif display face; chrome stays on Manrope.
   if (isHeadline(variant)) {
-    return weight === 'heavy' || weight === 'bold' ? font.latinDisplayHeavy : font.latinDisplay;
+    return weight === 'heavy' ? font.latinDisplayHeavy : font.latinDisplay;
   }
   switch (weight) {
     case 'medium':
@@ -134,7 +134,7 @@ export function T({
   const palette = useColors();
   const fontStep = usePrefs((s) => s.fontStep);
   const hasTe = detect('auto', children);
-  // Eyebrow is Inter uppercase; a Telugu string that lands here (whatever
+  // Eyebrow is Manrope uppercase; a Telugu string that lands here (whatever
   // `lang` claims) gets Noto meta instead — never uppercase on Telugu.
   const telugu = lang === 'auto' ? hasTe : lang === 'te' || (variant === 'eyebrow' && hasTe);
   const eyebrow = variant === 'eyebrow' && !telugu;

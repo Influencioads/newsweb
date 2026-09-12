@@ -57,7 +57,7 @@ export interface NavRowProps {
   /** Current value, shown muted before the chevron. */
   value?: string;
   onPress: () => void;
-  /** Paints the label breaking-red (sign out, delete). */
+  /** Paints the label breaking (amber) — sign out, delete. */
   danger?: boolean;
   /** Trailing glyph; `externalLink` for a row that leaves the app. */
   chevron?: IconName;
@@ -116,7 +116,7 @@ export function SwitchRow({ label, value, onChange, icon }: SwitchRowProps) {
         value={value}
         onValueChange={onChange}
         trackColor={{ true: color.brand, false: color.ruleStrong }}
-        thumbColor={color.surface}
+        thumbColor={value ? color.onBrand : color.onOverlay}
         ios_backgroundColor={color.ruleStrong}
         aria-hidden
       />

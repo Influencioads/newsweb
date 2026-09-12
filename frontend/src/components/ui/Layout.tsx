@@ -145,7 +145,7 @@ export function PageHeader({
 
 /**
  * SectionHeader — the one heading for a block of content on a page: title with
- * a brand rule (or an ink underline) and an optional "see all" link. Sits
+ * a gold hairline (or an ink underline) and an optional "see all" link. Sits
  * `mb-4` above its section; the caller separates sections (mt-7 md:mt-10).
  *
  *     <SectionHeader title={pick(sec.title_te, sec.title_en)} to={`/section/${sec.key}`} />
@@ -157,7 +157,7 @@ export interface SectionHeaderProps {
   to?: string;
   toLabel?: string;
   level?: 2 | 3;
-  /** brand: brand-coloured title with a short bar; ink: ink title over an ink underline. */
+  /** brand: brand-coloured title over a short gold rule; ink: ink title over an ink underline. */
   tone?: 'brand' | 'ink';
   className?: string;
   titleLang?: 'te' | 'en';
@@ -213,7 +213,7 @@ export function SectionHeader({
         >
           {title}
         </Heading>
-        {tone === 'brand' ? <span aria-hidden className="mt-1 block h-1 w-10 rounded-pill bg-brand" /> : null}
+        {tone === 'brand' ? <span aria-hidden className="mt-1.5 block h-0.5 w-12 bg-exclusive" /> : null}
       </div>
       {trailing}
     </div>

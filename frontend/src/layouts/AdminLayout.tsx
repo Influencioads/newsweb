@@ -52,7 +52,7 @@ const ITEM =
 const TONE = {
   ink: {
     idle: 'text-muted-inverse hover:bg-ink-panel hover:text-on-ink',
-    active: 'bg-brand-tint/20 text-on-ink',
+    active: 'bg-on-ink/10 text-on-ink',
     label: 'text-muted-inverse',
   },
   surface: {
@@ -105,7 +105,7 @@ function NavGroups({ groups, tone, collapsed = false }: NavGroupsProps) {
                     {({ isActive }) => (
                       <>
                         {isActive ? (
-                          <span aria-hidden className="absolute inset-y-2 left-0 w-1 rounded-pill bg-brand" />
+                          <span aria-hidden className="absolute inset-y-2 left-0 w-1 rounded-pill bg-exclusive" />
                         ) : null}
                         <Icon icon={item.icon} size="md" />
                         <span className={cn('min-w-0 flex-1', collapsed && 'sr-only')}>{label}</span>

@@ -9,13 +9,17 @@ import { cn } from '@/utils/cn';
 /**
  * Button family — every clickable control that carries a label.
  *
- * - `Button`          native <button>; variants primary/secondary/ghost/danger/link.
+ * - `Button`          native <button>; variants primary/secondary/ghost/danger/
+ *                     link/inverse/on-fill.
  * - `ButtonLink`      same look, renders a router <Link> (or <a> when `external`).
  * - `IconButton`      44/48px square, icon only, `label` is mandatory (aria-label),
  *                     optional `badge` bubble, `pressed` (aria-pressed) state and
- *                     `round` (pill) shape; `variant="inverse"` is the ghost look
- *                     on a brand / breaking fill (white foreground).
+ *                     `round` (pill) shape.
  * - `IconButtonLink`  IconButton as a router <Link>.
+ *
+ * `variant="inverse"` is the ghost look on a constant-dark panel (on-ink: white
+ * in both themes). `variant="on-fill"` is the ghost look on a brand / breaking
+ * fill (on-brand: white in light mode, ink in dark mode, where the fills are light).
  *
  * All sizes meet the 44px tap floor (lg = 48). `pending` sets aria-busy +
  * disabled and swaps the icon for a spinner (or adds one when there is no
@@ -52,8 +56,6 @@ const VARIANT: Record<ButtonVariant, string> = {
   ghost: 'text-ink hover:bg-rule-soft',
   danger: 'bg-breaking text-on-brand hover:bg-breaking/90',
   link: 'text-brand underline-offset-4 hover:underline',
-  /** Ghost on a brand / breaking fill (the ticker's pause button). The global
-      brand focus ring is invisible on that fill, so the ring goes white here. */
   // On constant-dark panels (admin sidebar, ink cards): on-ink stays white in
   // both themes, whereas on-brand becomes ink in dark mode.
   inverse: 'text-on-ink hover:bg-on-ink/10 focus-visible:outline-on-ink',

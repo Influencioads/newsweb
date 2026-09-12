@@ -215,9 +215,10 @@ export default {
           '40%': { transform: 'scale(1.2)' },
           '100%': { transform: 'scale(1)' },
         },
+        // The ticker track holds two copies, so one seamless lap is -50%.
         marquee: {
           from: { transform: 'translate3d(0,0,0)' },
-          to: { transform: 'translate3d(-100%,0,0)' },
+          to: { transform: 'translate3d(-50%,0,0)' },
         },
       },
       animation: {

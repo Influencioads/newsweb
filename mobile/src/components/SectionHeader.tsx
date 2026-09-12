@@ -1,21 +1,54 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import { useI18n } from '@/lib/i18n';
-import { color, font, HIT_SLOP } from '@/lib/theme';
-import { makeStyles } from '@/lib/useTheme';
+import { radius, space, TAP } from '@/lib/theme';
+import { makeStyles, useColors } from '@/lib/useTheme';
+import { Icon } from '@/ui/Icon';
+import { PressableScale } from '@/ui/PressableScale';
+import { T } from '@/ui/Text';
 
-/** Section rule: bold title on the left, optional "see all →" on the right —
- * the same block header the web home uses. */
-export function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => void }) {
+/**
+ * Section header: brand headline with a short brand rule under it, optional
+ * subtitle, optional "see all" row on the right — the block header the web
+ * home uses.
+ */
+export interface SectionHeaderProps {
+  title: string;
+  subtitle?: string;
+  onSeeAll?: () => void;
+}
+
+export function SectionHeader({ title, subtitle, onSeeAll }: SectionHeaderProps) {
   const styles = useStyles();
+  const color = useColors();
   const { t } = useI18n();
   return (
     <View style={styles.row}>
-      <Text style={styles.title}>{title}</Text>
+      <View style={styles.text}>
+        <T variant="headlineMd" weight="bold" color="brand" accessibilityRole="header">
+          {title}
+        </T>
+        <View style={styles.rule} accessibilityElementsHidden importantForAccessibility="no" />
+        {subtitle ? (
+          <T variant="meta" color="muted">
+            {subtitle}
+          </T>
+        ) : null}
+      </View>
       {onSeeAll ? (
-        <Pressable onPress={onSeeAll} hitSlop={HIT_SLOP} accessibilityRole="button">
-          <Text style={styles.seeAll}>{t('home.seeAll')} →</Text>
-        </Pressable>
+        <PressableScale
+          onPress={onSeeAll}
+          haptic="select"
+          minHeight={TAP}
+          accessibilityRole="button"
+          accessibilityLabel={`${t('home.seeAll')}: ${title}`}
+          style={styles.seeAll}
+        >
+          <T variant="ui" weight="semibold" color="info" numberOfLines={1}>
+            {t('home.seeAll')}
+          </T>
+          <Icon name="chevronRight" size={16} color={color.info} />
+        </PressableScale>
       ) : null}
     </View>
   );
@@ -24,26 +57,14 @@ export function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: (
 const useStyles = makeStyles((color) => ({
   row: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingTop: 18,
-    paddingBottom: 8,
-    borderBottomWidth: 2,
-    borderBottomColor: color.ink,
-    backgroundColor: color.canvas,
+    gap: space.md,
+    paddingHorizontal: space.lg,
+    paddingTop: space.xl,
+    paddingBottom: space.sm,
   },
-  title: {
-    fontFamily: font.headline,
-    fontSize: 19,
-    lineHeight: 30,
-    color: color.brand,
-  },
-  seeAll: {
-    fontFamily: font.telugu,
-    fontSize: 12,
-    lineHeight: 18,
-    color: color.info,
-    fontWeight: '600',
-  },
+  text: { flex: 1, minWidth: 0, gap: space.xs },
+  rule: { width: 40, height: 3, borderRadius: radius.pill, backgroundColor: color.brand },
+  seeAll: { flexDirection: 'row', alignItems: 'center', gap: space.xs, paddingLeft: space.sm },
 }));

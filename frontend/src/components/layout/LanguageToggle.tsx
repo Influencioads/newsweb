@@ -1,42 +1,41 @@
+import { Chip } from '@/components/ui/Chip';
 import { LANGUAGES, LANGUAGE_LABELS, useI18n } from '@/i18n';
+import { cn } from '@/utils/cn';
 
 /**
- * Telugu / English switcher.
+ * Telugu / English switcher — two 44px pressed-pill Chips in one group.
  *
- * Rendered as two labelled buttons rather than a dropdown: with only two
- * options a select costs an extra tap, and a reader who cannot currently read
- * the interface should be able to see both labels at once and pick the one they
- * recognise. Each label is written in its own script for exactly that reason —
- * "English" stays "English" and "తెలుగు" stays "తెలుగు" whichever mode is active.
+ * Two labelled buttons rather than a dropdown: with only two options a select
+ * costs an extra tap, and a reader who cannot currently read the interface
+ * should see both labels at once and pick the one they recognise. Each label is
+ * written in its own script for exactly that reason — "English" stays "English"
+ * and "తెలుగు" stays "తెలుగు" whichever mode is active.
+ *
+ * The group names itself (`reader.language`) unless a visible caption is
+ * passed through `aria-labelledby`, as ReaderSettings does.
+ *
+ *     <LanguageToggle />                          // masthead, NavDrawer, admin
+ *     <LanguageToggle aria-labelledby={capId} />  // under a visible caption
  */
-export function LanguageToggle({ compact = false }: { compact?: boolean }) {
+export interface LanguageToggleProps {
+  className?: string;
+  'aria-labelledby'?: string;
+}
+
+export function LanguageToggle({ className, 'aria-labelledby': labelledBy }: LanguageToggleProps) {
   const { language, setLanguage, t } = useI18n();
 
   return (
     <div
       role="group"
-      aria-label={t('reader.language')}
-      className="flex items-center gap-0.5 rounded-[6px] border border-rule p-0.5"
+      aria-label={labelledBy ? undefined : t('reader.language')}
+      aria-labelledby={labelledBy}
+      className={cn('inline-flex items-center gap-1', className)}
     >
       {LANGUAGES.map((lang) => (
-        <button
-          key={lang}
-          type="button"
-          onClick={() => setLanguage(lang)}
-          aria-pressed={language === lang}
-          lang={lang}
-          className={[
-            'rounded-[4px] px-2 font-semibold transition-colors',
-            compact ? 'min-h-[26px] text-[10.5px]' : 'min-h-[28px] text-[11.5px]',
-            // Telugu needs its own face and a taller line-box even in a chip.
-            lang === 'te' ? 'te leading-[1.5]' : 'font-sans',
-            language === lang
-              ? 'bg-brand text-white'
-              : 'text-muted hover:text-ink',
-          ].join(' ')}
-        >
+        <Chip key={lang} as="button" lang={lang} selected={language === lang} onClick={() => setLanguage(lang)}>
           {LANGUAGE_LABELS[lang]}
-        </button>
+        </Chip>
       ))}
     </div>
   );

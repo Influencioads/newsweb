@@ -1,10 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+import { Field, Select } from '@/components/ui/Field';
 import * as cmsApi from '@/features/cms/api';
+import { useI18n } from '@/i18n';
 import type { CmsDistrictOption, CmsOption } from '@/types/cms';
-
-import { Field, inputClass } from './FormControls';
 
 /**
  * §2 location cascade: State → District → Mandal → City/Village.
@@ -22,14 +22,23 @@ export interface LocationValue {
   localityId: number | null;
 }
 
-export function LocationSelector({
-  value, onChange, states, districts,
-}: {
+export interface LocationSelectorProps {
   value: LocationValue;
   onChange: (v: LocationValue) => void;
   states: CmsOption[];
   districts: CmsDistrictOption[];
-}) {
+  /** Server-side `mandal_id` message from a failed save. */
+  mandalError?: ReactNode;
+}
+
+/** The API keys districts by state code; the states list carries slugs. */
+const stateCode = (slug: string) => (slug === 'andhra-pradesh' ? 'AP' : slug === 'telangana' ? 'TS' : slug);
+
+export function LocationSelector({ value, onChange, states, districts, mandalError }: LocationSelectorProps) {
+  const { language } = useI18n();
+  const L = (te: string, en: string) => (language === 'te' ? te : en);
+  const pickLabel = L('ఎంచుకోండి', 'Choose');
+
   const mandals = useQuery({
     queryKey: ['cms', 'mandals', value.districtId],
     queryFn: () => cmsApi.fetchEditorMandals(value.districtId!),
@@ -50,79 +59,63 @@ export function LocationSelector({
     }
   }, [value, districts, onChange]);
 
-  const visibleDistricts = value.state
-    ? districts.filter((d) => d.state === value.state)
-    : districts;
+  const visibleDistricts = value.state ? districts.filter((d) => d.state === value.state) : districts;
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <Field label="రాష్ట్రం · State">
-        <select
-          className={inputClass}
-          value={value.state}
-          onChange={(e) => onChange({ state: e.target.value, districtId: null, mandalId: null, localityId: null })}
-        >
-          <option value="">జాతీయం · National</option>
+    <div className="space-y-4">
+      <Field label={L('రాష్ట్రం', 'State')}>
+        <Select value={value.state} onChange={(e) => onChange({ state: e.target.value, districtId: null, mandalId: null, localityId: null })}>
+          <option value="">{L('జాతీయం', 'National')}</option>
           {states.map((s) => (
-            <option key={s.id} value={s.slug === 'andhra-pradesh' ? 'AP' : s.slug === 'telangana' ? 'TS' : s.slug}>
+            <option key={s.id} value={stateCode(s.slug)}>
               {s.name_te} — {s.name_en}
             </option>
           ))}
-        </select>
+        </Select>
       </Field>
 
-      <Field label="జిల్లా · District">
-        <select
-          className={inputClass}
+      <Field label={L('జిల్లా', 'District')}>
+        <Select
           value={value.districtId ?? ''}
-          onChange={(e) =>
-            onChange({
-              ...value,
-              districtId: e.target.value ? Number(e.target.value) : null,
-              mandalId: null,
-              localityId: null,
-            })
-          }
+          onChange={(e) => onChange({ ...value, districtId: e.target.value ? Number(e.target.value) : null, mandalId: null, localityId: null })}
         >
-          <option value="">ఎంచుకోండి</option>
+          <option value="">{pickLabel}</option>
           {visibleDistricts.map((d) => (
-            <option key={d.id} value={d.id}>{d.name_te} — {d.name_en}</option>
+            <option key={d.id} value={d.id}>
+              {d.name_te} — {d.name_en}
+            </option>
           ))}
-        </select>
+        </Select>
       </Field>
 
-      <Field label="మండలం · Mandal" hint={value.districtId ? undefined : 'ముందు జిల్లా ఎంచుకోండి'}>
-        <select
-          className={inputClass}
+      <Field label={L('మండలం', 'Mandal')} hint={value.districtId ? undefined : L('ముందు జిల్లా ఎంచుకోండి', 'Choose a district first')} error={mandalError}>
+        <Select
           disabled={value.districtId == null || mandals.isLoading}
           value={value.mandalId ?? ''}
-          onChange={(e) =>
-            onChange({
-              ...value,
-              mandalId: e.target.value ? Number(e.target.value) : null,
-              localityId: null,
-            })
-          }
+          onChange={(e) => onChange({ ...value, mandalId: e.target.value ? Number(e.target.value) : null, localityId: null })}
         >
-          <option value="">ఎంచుకోండి</option>
+          <option value="">{pickLabel}</option>
           {(mandals.data ?? []).map((m) => (
-            <option key={m.id} value={m.id}>{m.name_te} — {m.name_en}</option>
+            <option key={m.id} value={m.id}>
+              {m.name_te} — {m.name_en}
+            </option>
           ))}
-        </select>
+        </Select>
       </Field>
 
-      <Field label="ఊరు / పట్టణం · Village or town" hint={value.mandalId ? undefined : 'ముందు మండలం ఎంచుకోండి'}>
-        <select
-          className={inputClass}
+      <Field label={L('ఊరు / పట్టణం', 'Village or town')} hint={value.mandalId ? undefined : L('ముందు మండలం ఎంచుకోండి', 'Choose a mandal first')}>
+        <Select
           disabled={value.mandalId == null || localities.isLoading}
           value={value.localityId ?? ''}
           onChange={(e) => onChange({ ...value, localityId: e.target.value ? Number(e.target.value) : null })}
         >
-          <option value="">ఎంచుకోండి</option>
+          <option value="">{pickLabel}</option>
           {(localities.data ?? []).map((l) => (
-            <option key={l.id} value={l.id}>{l.name_te} — {l.name_en}</option>
+            <option key={l.id} value={l.id}>
+              {l.name_te} — {l.name_en}
+            </option>
           ))}
-        </select>
+        </Select>
       </Field>
     </div>
   );

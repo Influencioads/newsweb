@@ -17,9 +17,10 @@ import { prefersReducedMotion } from '@/utils/motion';
  *              honoured for `as="span"` — interactive chips never go below the
  *              tap floor. Pass `lang` for DB content (category names) so the
  *              font follows the text's script instead of the UI language.
- * - `ChipRail` overflow-x strip with snap, fading edges and edge-aware
- *              prev/next arrows (hover-capable pointers only, hidden at the
- *              ends). Arrow labels come from `ui.scrollLeft` / `ui.scrollRight`.
+ * - `ChipRail` overflow-x strip with snap, edge-aware fading edges (an edge the
+ *              strip rests on stays sharp) and edge-aware prev/next arrows
+ *              (hover-capable pointers only, hidden at the ends). Arrow labels
+ *              come from `ui.scrollLeft` / `ui.scrollRight`.
  *
  *     <ChipRail ariaLabel={t('ui.sections')}>
  *       <Chip selected={!active} onClick={() => setActive('')}>{t('ui.showAll')}</Chip>
@@ -222,7 +223,10 @@ export function ChipRail({ ariaLabel, snap = true, fadeEdges = true, children, c
         className={cn(
           'no-scrollbar scroll-touch overflow-x-auto',
           snap && 'snap-x',
+          // .fade-l / .fade-r (index.css) fade only the side that has more to show.
           fadeEdges && overflowing && 'fade-edges',
+          fadeEdges && !edges.start && 'fade-l',
+          fadeEdges && !edges.end && 'fade-r',
         )}
       >
         {/* w-max so the inner box is as wide as its chips; its resize = content change. */}

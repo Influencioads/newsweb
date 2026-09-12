@@ -48,7 +48,7 @@ export default function SectionPage() {
   const description = DESCRIPTIONS[slug]?.[language];
 
   return (
-    <main className="mx-auto min-h-[60vh] max-w-[1200px] px-4 pb-10 pt-5 sm:pt-7">
+    <div className="mx-auto min-h-[60vh] max-w-[1200px] px-4 pb-10 pt-5 sm:pt-7">
       <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-1 font-sans text-[11px] text-muted">
         <Link to="/" className="hover:text-brand">{te ? 'హోమ్' : 'Home'}</Link>
         <ChevronRight className="h-3 w-3" />
@@ -127,6 +127,6 @@ export default function SectionPage() {
           </Link>
         </div>
       )}
-    </main>
+    </div>
   );
 }

@@ -99,7 +99,7 @@ export default function LoginPage() {
   const teCls = te ? 'te' : 'font-sans';
 
   return (
-    <main className="mx-auto flex min-h-[60vh] max-w-[440px] flex-col justify-center px-4 py-10">
+    <div className="mx-auto flex min-h-[60vh] max-w-[440px] flex-col justify-center px-4 py-10">
       <div className="border border-rule bg-paper p-6 shadow-card sm:p-8">
         <p className="font-sans text-[11px] font-bold uppercase tracking-[0.16em] text-brand">
           {te ? 'పాఠకుల ఖాతా' : 'READER ACCOUNT'}
@@ -216,6 +216,6 @@ export default function LoginPage() {
           {te ? 'ఇక్కడ' : 'here'}
         </Link>
       </p>
-    </main>
+    </div>
   );
 }

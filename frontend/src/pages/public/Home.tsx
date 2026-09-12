@@ -232,7 +232,7 @@ export default function Home() {
   }
 
   return (
-    <main className="mx-auto max-w-[1200px] px-4 pb-8 pt-4">
+    <div className="mx-auto max-w-[1200px] px-4 pb-8 pt-4">
       {/* Renders nothing when no bulletin is on air, including when an admin
           has flipped the kill switch — so it never leaves an empty slot. */}
       <BulletinCard />
@@ -493,7 +493,7 @@ export default function Home() {
           </section>
         );
       })}
-    </main>
+    </div>
   );
 }
 

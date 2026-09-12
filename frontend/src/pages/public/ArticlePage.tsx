@@ -16,7 +16,7 @@ import { FollowButton } from '@/features/engagement/components/FollowButton';
 import * as publicApi from '@/features/public/api';
 import { AudioPlayer } from '@/components/article/AudioPlayer';
 import { ArticleVideo } from '@/components/article/ArticleVideo';
-import { ShareSheet } from '@/components/article/ShareSheet';
+import { ShareButton } from '@/components/article/ShareSheet';
 import { extractPlainText, useTts } from '@/features/reader/tts';
 import { useI18n } from '@/i18n';
 import { FONT_STEPS, useReaderPrefs } from '@/stores/readerPrefs';
@@ -129,7 +129,8 @@ function ReaderToolbar({ article }: { article: ArticleDetail }) {
       {/* §4.6 — WhatsApp is the #1 distribution channel. The Latin slug keeps
           the shared link readable, and the link preview now carries a rendered
           Telugu headline card (see app/api/v1/crawler.py). */}
-      <ShareSheet
+      <ShareButton
+        variant="button"
         shortId={article.short_id}
         url={article.url}
         title={language === 'en' && article.title_en ? article.title_en : article.title_te}
@@ -205,7 +206,7 @@ export default function ArticlePage() {
   const showTeluguOnlyNotice = language === 'en' && Boolean(data.title_en);
 
   return (
-    <main className="bg-white">
+    <div className="bg-white">
       {/* Breadcrumb strip — mockup 1c shows the canonical URL here. */}
       <div className="border-b border-rule bg-paper-sub">
         <div className="mx-auto max-w-[880px] px-4 py-1.5">
@@ -455,7 +456,7 @@ export default function ArticlePage() {
         {/* §15 — videos from this story's section */}
         <VideoStrip category={data.category?.slug} limit={4} className="mt-7" />
       </article>
-    </main>
+    </div>
   );
 }
 

@@ -1,9 +1,18 @@
-import { useRef, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMemo, useRef } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Mic, RefreshCw, Trash2 } from 'lucide-react';
 
+import { ApiError } from '@/api/client';
+import { AudioPlayer } from '@/components/article/AudioPlayer';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { useConfirm } from '@/components/ui/Dialog';
+import { useToast } from '@/components/ui/Toast';
 import * as cmsApi from '@/features/cms/api';
-import type { ApiError } from '@/api/client';
+import { useTts } from '@/features/reader/tts';
+import { useI18n, useScript } from '@/i18n';
 import type { CmsAudioRef } from '@/types/cms';
+import { cn } from '@/utils/cn';
 
 /**
  * §19 — attach your own audio instead of a synthesised reading.
@@ -14,7 +23,9 @@ import type { CmsAudioRef } from '@/types/cms';
  *
  * The duration is read from the file in the browser before upload, so the
  * player shows a real length immediately rather than waiting on server-side
- * probing.
+ * probing. Playback uses the reader's AudioPlayer against the public audio
+ * route once the story is live; that route refuses unpublished stories, so a
+ * draft previews through a plain `<audio>` element instead.
  */
 
 const ACCEPT = 'audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/ogg,audio/webm';
@@ -24,7 +35,10 @@ function readDuration(file: File): Promise<number> {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
     const probe = new Audio();
-    const done = (value: number) => { URL.revokeObjectURL(url); resolve(value); };
+    const done = (value: number) => {
+      URL.revokeObjectURL(url);
+      resolve(value);
+    };
     probe.preload = 'metadata';
     probe.onloadedmetadata = () => done(Number.isFinite(probe.duration) ? probe.duration : 0);
     // A container the browser cannot decode is still a valid upload; the
@@ -41,46 +55,84 @@ function format(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export function AudioAttachment({
-  articleId, audio, onChange,
-}: {
+export interface AudioAttachmentProps {
   /** Null for an article that has not been saved yet. */
   articleId: number | null;
+  shortId: string | null;
+  /** The public audio route only serves live stories. */
+  published: boolean;
   audio: CmsAudioRef | null;
   onChange: (audio: CmsAudioRef | null) => void;
-}) {
+}
+
+export function AudioAttachment({ articleId, shortId, published, audio, onChange }: AudioAttachmentProps) {
+  const { t, language } = useI18n();
+  const s = useScript();
+  const toast = useToast();
+  const qc = useQueryClient();
+  const { confirm, dialog } = useConfirm();
   const fileInput = useRef<HTMLInputElement>(null);
-  const [tooLarge, setTooLarge] = useState(false);
+  const L = (te: string, en: string) => (language === 'te' ? te : en);
+  const bodyCls = cn(s.body, s.te ? 'text-te-body-xs' : 'text-ui');
+
+  // AudioPlayer needs the device-voice hook; an editor's file always exists
+  // when the player renders, so the fallback never speaks. Memoised because
+  // the player stops the voice whenever the object identity changes.
+  const { state, toggle, stop } = useTts('');
+  const deviceTts = useMemo(
+    () => ({ state, toggle, stop: () => ('speechSynthesis' in window ? stop() : undefined) }),
+    [state, toggle, stop],
+  );
+  const endpoint = published && shortId ? `/public/articles/${shortId}/audio` : null;
+  const refreshPlayer = () => {
+    if (endpoint) void qc.invalidateQueries({ queryKey: ['audio', endpoint] });
+  };
 
   const upload = useMutation({
     mutationFn: async (file: File) => {
       const duration = await readDuration(file);
       return cmsApi.uploadArticleAudio(articleId!, file, duration);
     },
-    onSuccess: (result) => onChange({
-      id: result.id, url: result.url, mime: result.mime,
-      duration_sec: result.duration_sec, provider: result.provider, status: result.status,
-    }),
+    onSuccess: (result) => {
+      onChange({
+        id: result.id,
+        url: result.url,
+        mime: result.mime,
+        duration_sec: result.duration_sec,
+        provider: result.provider,
+        status: result.status,
+      });
+      refreshPlayer();
+      toast.success(L('ఆడియో జోడించారు', 'Audio attached'));
+    },
+    onError: (e) =>
+      toast.error(
+        e instanceof ApiError && e.status === 415 ? L('ఆ ఫైల్ రకం అనుమతించబడదు — MP3, M4A, WAV లేదా OGG వాడండి.', 'That file type is not allowed — use MP3, M4A, WAV or OGG.') : e,
+      ),
   });
 
   const remove = useMutation({
     mutationFn: () => cmsApi.deleteArticleAudio(articleId!),
-    onSuccess: () => onChange(null),
+    onSuccess: () => {
+      onChange(null);
+      refreshPlayer();
+      toast.success(t('state.deleted'));
+    },
+    onError: (e) => toast.error(e),
   });
 
   if (articleId == null) {
     return (
-      <p className="te rounded-control border border-rule bg-canvas p-3 text-[12.5px] text-muted">
-        ఆడియో జోడించడానికి ముందు కథనాన్ని ఒకసారి సేవ్ చేయండి.
-      </p>
+      <Card padding="sm" tone="paper">
+        <p className={cn(bodyCls, 'text-muted')}>{L('ఆడియో జోడించడానికి ముందు కథనాన్ని ఒకసారి సేవ్ చేయండి.', 'Save the story once before attaching audio.')}</p>
+      </Card>
     );
   }
 
   const uploaded = audio?.provider === 'upload';
-  const error = upload.error as ApiError | undefined;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <input
         ref={fileInput}
         type="file"
@@ -90,68 +142,59 @@ export function AudioAttachment({
           const file = e.target.files?.[0];
           e.target.value = '';
           if (!file) return;
-          if (file.size > MAX_BYTES) { setTooLarge(true); return; }
-          setTooLarge(false);
+          if (file.size > MAX_BYTES) {
+            toast.error(L('ఫైల్ 50MB కంటే పెద్దది.', 'The file is larger than 50MB.'));
+            return;
+          }
           upload.mutate(file);
         }}
       />
 
       {uploaded ? (
-        <div className="flex flex-wrap items-center gap-3 rounded-control border border-rule bg-canvas p-3">
-          {audio!.url ? (
-            <audio src={audio!.url} controls preload="metadata" className="h-9 min-w-[220px] flex-1" />
+        <Card padding="sm" tone="paper" className="space-y-3">
+          {endpoint && shortId ? (
+            <AudioPlayer shortId={shortId} readingLabel="" deviceTts={deviceTts} endpoint={endpoint} />
+          ) : audio!.url ? (
+            <audio src={audio!.url} controls preload="metadata" className="min-h-tap w-full" />
           ) : null}
-          <span className="font-sans text-[11.5px] text-muted">{format(audio!.duration_sec)}</span>
-          <button
-            type="button"
-            disabled={remove.isPending}
-            onClick={() => remove.mutate()}
-            className="te min-h-[32px] rounded-control border border-rule px-3 text-[12px] font-semibold text-breaking disabled:opacity-50"
-          >
-            {remove.isPending ? '…' : 'తీసివేయండి'}
-          </button>
-          <button
-            type="button"
-            disabled={upload.isPending}
-            onClick={() => fileInput.current?.click()}
-            className="te min-h-[32px] rounded-control border border-brand px-3 text-[12px] font-bold text-brand disabled:opacity-50"
-          >
-            మార్చండి
-          </button>
-        </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-sans text-meta tabular-nums text-muted">{format(audio!.duration_sec)}</span>
+            <Button variant="secondary" size="sm" icon={RefreshCw} pending={upload.isPending} onClick={() => fileInput.current?.click()}>
+              {L('మార్చండి', 'Replace')}
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              icon={Trash2}
+              pending={remove.isPending}
+              onClick={async () => {
+                if (await confirm({ title: t('state.confirmDelete'), confirmLabel: t('ui.remove'), tone: 'danger' })) remove.mutate();
+              }}
+            >
+              {t('ui.remove')}
+            </Button>
+          </div>
+        </Card>
       ) : (
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            disabled={upload.isPending}
-            onClick={() => fileInput.current?.click()}
-            className="te min-h-[34px] rounded-control border border-brand px-3.5 text-[12.5px] font-bold text-brand disabled:opacity-50"
-          >
-            {upload.isPending ? 'అప్‌లోడ్ అవుతోంది…' : '🎙 ఆడియో ఫైల్ జోడించండి'}
-          </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="secondary" size="sm" icon={Mic} pending={upload.isPending} onClick={() => fileInput.current?.click()}>
+            {upload.isPending ? t('ui.uploading') : L('ఆడియో ఫైల్ జోడించండి', 'Attach an audio file')}
+          </Button>
           {audio && !uploaded ? (
-            <span className="te text-[11.5px] text-muted">
-              ప్రస్తుతం {audio.provider} ద్వారా తయారైన ఆడియో వాడుతోంది.
+            <span className={cn(s.body, 'text-meta text-muted')}>
+              {L(`ప్రస్తుతం ${audio.provider} ద్వారా తయారైన ఆడియో వాడుతోంది.`, `Currently using audio generated by ${audio.provider}.`)}
             </span>
           ) : null}
         </div>
       )}
 
-      <p className="te text-[11.5px] leading-telugu text-muted">
-        MP3, M4A, WAV, OGG — 50MB లోపు. జోడించిన ఫైల్‌కు ప్రాధాన్యం ఉంటుంది; సైట్ వాయిస్
-        ఆఫ్‌లో ఉన్నా ఇది వినిపిస్తుంది.
+      <p className={cn(s.body, 'text-meta text-muted')}>
+        {L(
+          'MP3, M4A, WAV, OGG — 50MB లోపు. జోడించిన ఫైల్‌కు ప్రాధాన్యం ఉంటుంది; సైట్ వాయిస్ ఆఫ్‌లో ఉన్నా ఇది వినిపిస్తుంది.',
+          'MP3, M4A, WAV or OGG, under 50MB. An attached file takes priority and plays even when site voice is off.',
+        )}
       </p>
-
-      {tooLarge ? (
-        <p className="te text-[12px] text-breaking">ఫైల్ 50MB కంటే పెద్దది.</p>
-      ) : null}
-      {error ? (
-        <p className="te text-[12px] text-breaking">
-          {error.status === 415
-            ? 'ఆ ఫైల్ రకం అనుమతించబడదు — MP3, M4A, WAV లేదా OGG వాడండి.'
-            : (error.messageTe ?? 'అప్‌లోడ్ విఫలమైంది.')}
-        </p>
-      ) : null}
+      {dialog}
     </div>
   );
 }

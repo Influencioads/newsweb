@@ -1,14 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Pause, Volume2 } from 'lucide-react';
+import { Pause, Play } from 'lucide-react';
 
 import { api } from '@/api/client';
-import { useI18n } from '@/i18n';
+import { IconButton } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
+import { useI18n, useScript } from '@/i18n';
 import { type TtsState } from '@/features/reader/tts';
 import type { AudioState } from '@/types/cms';
+import { cn } from '@/utils/cn';
 
 /**
- * §19–21 listen control.
+ * §19–21 listen control — one brand-tinted pill in every state.
  *
  * Three states, and the component picks between them rather than the caller:
  *
@@ -19,9 +22,13 @@ import type { AudioState } from '@/types/cms';
  *   * voice is off site-wide or for this article (§20) → nothing renders
  *
  * The server decides which case applies; this only renders it.
+ *
+ *     <AudioPlayer shortId={a.short_id} readingLabel={readingTime(…)} deviceTts={tts} />
  */
 
 const SPEEDS = [0.75, 1, 1.25, 1.5] as const;
+
+const PILL = 'flex min-h-tap flex-wrap items-center gap-2 rounded-pill border border-brand/20 bg-brand-tint px-2 py-1';
 
 function format(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
@@ -30,9 +37,7 @@ function format(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export function AudioPlayer({
-  shortId, readingLabel, deviceTts, endpoint,
-}: {
+export interface AudioPlayerProps {
   shortId: string;
   readingLabel: string;
   /** The existing Web Speech hook, used when there is no server file. */
@@ -44,10 +49,14 @@ export function AudioPlayer({
    * `voice_enabled` short-circuit — works unchanged.
    */
   endpoint?: string;
-}) {
-  const { language } = useI18n();
-  const te = language === 'te';
-  const script = te ? 'te' : 'font-sans';
+}
+
+export function AudioPlayer({ shortId, readingLabel, deviceTts, endpoint }: AudioPlayerProps) {
+  const { t, language } = useI18n();
+  const s = useScript();
+  // Page-specific copy with no strings.ts key yet (see neededStrings).
+  const L = (te: string, en: string) => (language === 'te' ? te : en);
+  const labelId = useId();
   const source = endpoint ?? `/public/articles/${shortId}/audio`;
 
   const audioState = useQuery({
@@ -72,8 +81,12 @@ export function AudioPlayer({
   }, [speed]);
 
   // Leaving the article must stop both players; the device voice in
-  // particular keeps talking across a route change otherwise.
-  useEffect(() => () => deviceTts.stop(), [deviceTts]);
+  // particular keeps talking across a route change otherwise. Depend on the
+  // stable callback, not the object — useTts returns a fresh literal every
+  // render, and running this cleanup on each render would cancel the voice
+  // the moment it started.
+  const stopDevice = deviceTts.stop;
+  useEffect(() => () => stopDevice(), [stopDevice]);
 
   const data = audioState.data;
 
@@ -83,38 +96,44 @@ export function AudioPlayer({
   const hasFile = Boolean(data?.available && data.url);
 
   if (!hasFile) {
-    const unavailable = deviceTts.state === 'unavailable';
+    const { state } = deviceTts;
+    const unavailable = state === 'unavailable';
+    const speaking = state === 'speaking';
+    // The "no voice" reason is the visible label itself: a disabled button
+    // never shows a tooltip, and the span is already the button's description.
+    const label = unavailable
+      ? L('ఈ పరికరంలో తెలుగు వాయిస్ లేదు', 'No Telugu voice on this device')
+      : speaking
+        ? t('ui.pause')
+        : state === 'paused'
+          ? L('కొనసాగించండి', 'Resume')
+          : `${t('reader.listen')} ${readingLabel}`;
+    // The IconButton dims itself when disabled; only the text dims here.
     return (
-      <button
-        type="button"
-        onClick={deviceTts.toggle}
-        disabled={unavailable}
-        aria-pressed={deviceTts.state === 'speaking'}
-        title={unavailable
-          ? (te ? 'ఈ పరికరంలో తెలుగు వాయిస్ లేదు' : 'No Telugu voice on this device')
-          : (te ? 'వినండి' : 'Listen')}
-        className={[
-          script,
-          'flex min-h-tap items-center gap-1.5 rounded-control border px-3 text-[11.5px] font-semibold leading-[1.4] disabled:opacity-50',
-          deviceTts.state === 'speaking' || deviceTts.state === 'paused'
-            ? 'border-brand bg-brand-tint text-brand'
-            : 'border-rule text-brand',
-        ].join(' ')}
-      >
-        {deviceTts.state === 'speaking'
-          ? <Pause className="h-3.5 w-3.5" aria-hidden />
-          : <Volume2 className="h-3.5 w-3.5" aria-hidden />}
-        {deviceTts.state === 'speaking'
-          ? (te ? 'ఆపండి' : 'Pause')
-          : deviceTts.state === 'paused'
-            ? (te ? 'కొనసాగించండి' : 'Resume')
-            : `${te ? 'వినండి' : 'Listen'} ${readingLabel}`}
-      </button>
+      <div className={PILL}>
+        <IconButton
+          icon={speaking ? Pause : Play}
+          label={speaking ? t('ui.pause') : t('reader.listen')}
+          variant="primary"
+          round
+          disabled={unavailable}
+          aria-describedby={labelId}
+          onClick={deviceTts.toggle}
+        />
+        <span
+          id={labelId}
+          className={cn(s.body, 'pr-2 text-ui-sm font-semibold text-brand', unavailable && 'opacity-60')}
+        >
+          {label}
+        </span>
+      </div>
     );
   }
 
+  const duration = total || data!.duration_sec;
+
   return (
-    <div className="flex min-h-tap flex-wrap items-center gap-2 rounded-control border border-brand bg-brand-tint px-2.5 py-1.5">
+    <div className={PILL}>
       <audio
         ref={ref}
         src={data!.url!}
@@ -125,51 +144,52 @@ export function AudioPlayer({
         onPause={() => setPlaying(false)}
         onEnded={() => { setPlaying(false); setElapsed(0); }}
       />
-      <button
-        type="button"
-        aria-label={playing ? (te ? 'ఆపండి' : 'Pause') : (te ? 'వినండి' : 'Listen')}
+      <IconButton
+        icon={playing ? Pause : Play}
+        label={playing ? t('ui.pause') : t('reader.listen')}
+        variant="primary"
+        round
         onClick={() => {
           const el = ref.current;
           if (!el) return;
           if (playing) el.pause();
           else void el.play();
         }}
-        className="flex h-7 w-7 items-center justify-center rounded-full bg-brand text-white"
-      >
-        {playing ? <Pause className="h-3.5 w-3.5" aria-hidden /> : <Volume2 className="h-3.5 w-3.5" aria-hidden />}
-      </button>
+      />
 
+      {/* The floor sits on the control itself: a range input takes pointer
+          events across its whole box while the browser keeps the track thin. */}
       <input
         type="range"
         min={0}
-        max={total || data!.duration_sec || 1}
+        max={duration || 1}
         step={1}
         value={elapsed}
-        aria-label={te ? 'ఆడియో స్థానం' : 'Audio position'}
+        aria-label={L('ఆడియో స్థానం', 'Audio position')}
+        aria-valuetext={`${format(elapsed)} / ${format(duration)}`}
         onChange={(e) => {
           const el = ref.current;
           if (el) { el.currentTime = Number(e.target.value); setElapsed(Number(e.target.value)); }
         }}
-        className="h-1 w-28 accent-brand sm:w-40"
+        className="min-h-tap min-w-28 flex-1 cursor-pointer accent-brand"
       />
 
-      <span className="font-sans text-[11px] tabular-nums text-brand">
-        {format(elapsed)} / {format(total || data!.duration_sec)}
+      <span className="font-sans text-meta tabular-nums text-brand">
+        {format(elapsed)} / {format(duration)}
       </span>
 
-      <div className="flex items-center gap-0.5" role="group" aria-label={te ? 'వేగం' : 'Speed'}>
-        {SPEEDS.map((s) => (
-          <button
-            key={s}
-            type="button"
-            aria-pressed={speed === s}
-            onClick={() => setSpeed(s)}
-            className={`rounded px-1.5 font-sans text-[10.5px] font-bold ${
-              speed === s ? 'bg-brand text-white' : 'text-brand hover:bg-white'
-            }`}
+      <div role="group" aria-label={t('ui.speed')} className="flex items-center gap-1">
+        {SPEEDS.map((rate) => (
+          <Chip
+            key={rate}
+            as="button"
+            lang="en"
+            selected={speed === rate}
+            onClick={() => setSpeed(rate)}
+            className="tabular-nums"
           >
-            {s}×
-          </button>
+            {rate}×
+          </Chip>
         ))}
       </div>
     </div>

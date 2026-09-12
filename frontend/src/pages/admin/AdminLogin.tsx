@@ -1,14 +1,22 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useState, type ReactNode } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 import { ApiError } from '@/api/client';
+import { LanguageToggle } from '@/components/layout/LanguageToggle';
+import { Button, IconButton } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Field, Input } from '@/components/ui/Field';
+import { PageContainer } from '@/components/ui/Layout';
+import { ErrorState } from '@/components/ui/State';
+import { Tabs } from '@/components/ui/Tabs';
 import * as authApi from '@/features/auth/api';
 import { OtpInput } from '@/features/auth/components/OtpInput';
+import { useI18n, useScript } from '@/i18n';
 import { useAuth } from '@/stores/auth';
-import { LanguageToggle } from '@/components/layout/LanguageToggle';
-import { useI18n } from '@/i18n';
+import { cn } from '@/utils/cn';
+import { useDocumentTitle } from '@/utils/motion';
 
 /**
  * Newsroom CMS sign-in — mockup `1k`.
@@ -17,65 +25,17 @@ import { useI18n } from '@/i18n';
  *   * field staff (reporters, stringers) — phone + OTP, because "many work from
  *     feature-phone-era habits and passwords get shared"
  *   * desk staff, editors, admins — email + password + mandatory TOTP
+ *
+ * Both panels stay mounted (a Tabs switch hides the other with `hidden`) so a
+ * half-entered OTP countdown survives a peek at the other tab. This page sits
+ * outside AdminLayout, so it owns its own `<main id="main">`.
  */
 
 type Panel = 'otp' | 'password';
 
-function Card({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="w-full max-w-[330px] rounded-card border border-black/[0.09] bg-white p-[22px] shadow-card">
-      {children}
-    </div>
-  );
-}
-
-function CardHeading({ subtitle }: { subtitle: string }) {
-  const { language } = useI18n();
-  return (
-    <>
-      <h1 className={`${language === 'te' ? 'th' : 'font-sans'} text-[17px] font-extrabold text-brand`}>
-        {language === 'te' ? 'టాప్ తెలుగు · న్యూస్‌రూమ్' : 'Top Telugu · Newsroom'}
-      </h1>
-      <p className={`${language === 'te' ? 'te' : 'font-sans'} mb-4 mt-0.5 text-[12px] text-muted`}>{subtitle}</p>
-    </>
-  );
-}
-
-function FieldLabel({ htmlFor, children, telugu = true }: {
-  htmlFor: string;
-  children: React.ReactNode;
-  telugu?: boolean;
-}) {
-  return (
-    <label
-      htmlFor={htmlFor}
-      className={[
-        'mb-1.5 block font-semibold text-ink',
-        telugu ? 'te text-[11.5px]' : 'text-[11px]',
-      ].join(' ')}
-    >
-      {children}
-    </label>
-  );
-}
-
-function ErrorBanner({ error }: { error: unknown }) {
-  const { language } = useI18n();
-  if (!error) return null;
-  const isApi = error instanceof ApiError;
-  return (
-    <div
-      role="alert"
-      className="mt-3 rounded-control border border-breaking-border bg-breaking-tint px-3 py-2"
-    >
-      <p className={`${language === 'te' ? 'te leading-telugu' : 'font-sans'} text-[12px] text-[#8E2A31]`}>
-        {isApi ? (language === 'en' ? error.messageEn : error.messageTe) : (language === 'en' ? 'Something went wrong. Please try again.' : 'ఏదో పొరపాటు జరిగింది. మళ్లీ ప్రయత్నించండి.')}
-      </p>
-      {isApi && language === 'te' && error.messageEn ? (
-        <p className="mt-0.5 font-sans text-[10.5px] text-muted-light">{error.messageEn}</p>
-      ) : null}
-    </div>
-  );
+function PanelIntro({ children }: { children: ReactNode }) {
+  const s = useScript();
+  return <p className={cn(s.body, 'text-muted', s.te ? 'text-te-body-xs' : 'text-ui')}>{children}</p>;
 }
 
 // --------------------------------------------------------------------------- //
@@ -83,6 +43,7 @@ function ErrorBanner({ error }: { error: unknown }) {
 // --------------------------------------------------------------------------- //
 function OtpPanel({ onSignedIn }: { onSignedIn: () => void }) {
   const { language } = useI18n();
+  const s = useScript();
   const en = language === 'en';
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
@@ -118,78 +79,76 @@ function OtpPanel({ onSignedIn }: { onSignedIn: () => void }) {
 
   const phoneDigits = phone.replace(/\D/g, '');
   const canRequest = phoneDigits.length >= 10 && !request.isPending;
+  const error = request.error ?? verify.error;
 
   return (
-    <Card>
-      <CardHeading subtitle={en ? 'Reporter / stringer sign in' : 'రిపోర్టర్ / స్ట్రింగర్ లాగిన్'} />
+    <form
+      className="space-y-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!sent) request.mutate();
+        else if (otp.length === 6) verify.mutate();
+      }}
+    >
+      <PanelIntro>{en ? 'Reporter / stringer sign in' : 'రిపోర్టర్ / స్ట్రింగర్ లాగిన్'}</PanelIntro>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!sent) request.mutate();
-          else if (otp.length === 6) verify.mutate();
-        }}
-      >
-        <FieldLabel htmlFor="phone" telugu={!en}>{en ? 'Phone number' : 'ఫోన్ నంబర్'}</FieldLabel>
-        <div className="flex items-center gap-2 rounded-control border border-rule-input px-3 py-2.5 focus-within:border-brand">
-          <span className="font-sans text-[14px] text-muted-light">+91</span>
-          <input
+      <Field label={en ? 'Phone number' : 'ఫోన్ నంబర్'} htmlFor="phone">
+        <div className="flex items-center gap-2">
+          <span className="font-sans text-ui text-muted">+91</span>
+          <Input
             id="phone"
             type="tel"
             inputMode="numeric"
             autoComplete="tel-national"
+            script="en"
             value={phone}
             disabled={sent}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="98480 12345"
-            className="w-full bg-transparent font-sans text-[14px] font-medium text-ink outline-none placeholder:text-muted-light/70 disabled:opacity-60"
           />
         </div>
+      </Field>
 
-        {sent ? (
-          <>
-            <div className="mt-3.5">
-              <FieldLabel htmlFor="otp-0" telugu={!en}>{en ? 'OTP — 6 digits received by SMS' : 'OTP — SMSలో వచ్చిన 6 అంకెలు'}</FieldLabel>
-              <OtpInput id="otp-0" label="OTP" value={otp} onChange={setOtp} autoFocus />
-            </div>
+      {sent ? (
+        <>
+          <Field label={en ? 'OTP — 6 digits received by SMS' : 'OTP — SMSలో వచ్చిన 6 అంకెలు'} htmlFor="otp-0">
+            <OtpInput id="otp-0" label="OTP" value={otp} onChange={setOtp} autoFocus />
+          </Field>
 
-            <p className={`${en ? 'font-sans' : 'te'} mt-2 text-[11px] text-muted-light`}>
-              {secondsLeft > 0 ? (
-                <>{en ? 'Resend' : 'మళ్లీ పంపండి'} — 00:{String(secondsLeft).padStart(2, '0')}</>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => request.mutate()}
-                  className="font-semibold text-brand underline"
-                >
-                  {en ? 'Resend' : 'మళ్లీ పంపండి'}
-                </button>
-              )}{' '}
-              · <span className="text-breaking">{en ? '5 attempts / 15 min' : '5 ప్రయత్నాలు / 15 నిమి.'}</span>
+          <p className={cn(s.body, 'flex flex-wrap items-center gap-x-2 text-meta text-muted')}>
+            {secondsLeft > 0 ? (
+              <span>
+                {en ? 'Resend' : 'మళ్లీ పంపండి'} — 00:{String(secondsLeft).padStart(2, '0')}
+              </span>
+            ) : (
+              <Button variant="link" size="sm" pending={request.isPending} onClick={() => request.mutate()}>
+                {en ? 'Resend' : 'మళ్లీ పంపండి'}
+              </Button>
+            )}
+            <span aria-hidden>·</span>
+            <span className="text-breaking">{en ? '5 attempts / 15 min' : '5 ప్రయత్నాలు / 15 నిమి.'}</span>
+          </p>
+
+          {devOtp ? (
+            <p className="rounded-xl border border-exclusive-border bg-exclusive-tint px-3 py-2 font-mono text-meta text-exclusive-text">
+              dev only · OTP {devOtp}
             </p>
+          ) : null}
+        </>
+      ) : null}
 
-            {devOtp ? (
-              <p className="mt-2 rounded border border-exclusive-border bg-exclusive-tint px-2 py-1 font-mono text-[10.5px] text-exclusive-text">
-                dev only · OTP {devOtp}
-              </p>
-            ) : null}
-          </>
-        ) : null}
+      {error ? <ErrorState compact error={error} /> : null}
 
-        <ErrorBanner error={request.error ?? verify.error} />
-
-        <button
-          type="submit"
-          disabled={sent ? otp.length !== 6 || verify.isPending : !canRequest}
-          className="te mt-3.5 flex min-h-tap w-full items-center justify-center gap-2 rounded-control bg-brand px-4 font-bold leading-telugu text-white transition-opacity hover:bg-brand-dark disabled:opacity-50"
-        >
-          {(request.isPending || verify.isPending) && (
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-          )}
-          {sent ? (en ? 'Sign in' : 'లాగిన్') : (en ? 'Send OTP' : 'OTP పంపండి')}
-        </button>
-      </form>
-    </Card>
+      <Button
+        type="submit"
+        size="lg"
+        full
+        pending={request.isPending || verify.isPending}
+        disabled={sent ? otp.length !== 6 || verify.isPending : !canRequest}
+      >
+        {sent ? (en ? 'Sign in' : 'లాగిన్') : en ? 'Send OTP' : 'OTP పంపండి'}
+      </Button>
+    </form>
   );
 }
 
@@ -198,6 +157,7 @@ function OtpPanel({ onSignedIn }: { onSignedIn: () => void }) {
 // --------------------------------------------------------------------------- //
 function PasswordPanel({ onSignedIn }: { onSignedIn: () => void }) {
   const { language } = useI18n();
+  const s = useScript();
   const en = language === 'en';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -227,135 +187,128 @@ function PasswordPanel({ onSignedIn }: { onSignedIn: () => void }) {
   });
 
   return (
-    <Card>
-      <CardHeading subtitle={en ? 'Desk / editor / admin sign in' : 'డెస్క్ / ఎడిటర్ / అడ్మిన్ లాగిన్'} />
+    <form
+      className="space-y-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        login.mutate();
+      }}
+    >
+      <PanelIntro>{en ? 'Desk / editor / admin sign in' : 'డెస్క్ / ఎడిటర్ / అడ్మిన్ లాగిన్'}</PanelIntro>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          login.mutate();
-        }}
-      >
-        <FieldLabel htmlFor="email" telugu={false}>
-          Email
-        </FieldLabel>
-        <input
+      <Field label={en ? 'Email' : 'ఇమెయిల్'} htmlFor="email">
+        <Input
           id="email"
           type="email"
           autoComplete="username"
+          script="en"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="lakshmi@topten.news"
-          className="w-full rounded-control border border-rule-input px-3 py-2.5 font-sans text-[13px] font-medium text-ink outline-none placeholder:text-muted-light/70 focus:border-brand"
         />
+      </Field>
 
-        <div className="mt-3">
-          <FieldLabel htmlFor="password" telugu={false}>
-            Password
-          </FieldLabel>
-          <div className="flex items-center gap-2 rounded-control border border-rule-input px-3 py-2.5 focus-within:border-brand">
-            <input
-              id="password"
-              type={showPassword ? 'text' : 'password'}
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-transparent font-sans text-[13px] font-medium text-ink outline-none"
-            />
-            <button
-              type="button"
+      <Field label={en ? 'Password' : 'పాస్‌వర్డ్'} htmlFor="password">
+        <Input
+          id="password"
+          type={showPassword ? 'text' : 'password'}
+          autoComplete="current-password"
+          script="en"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          trailing={
+            <IconButton
+              icon={showPassword ? EyeOff : Eye}
+              label={showPassword ? (en ? 'Hide password' : 'పాస్‌వర్డ్ దాచండి') : en ? 'Show password' : 'పాస్‌వర్డ్ చూపించండి'}
               onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
-              className="shrink-0 font-sans text-[11px] text-muted-light hover:text-ink"
-            >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
+            />
+          }
+        />
+      </Field>
+
+      {needsTotp ? (
+        <div className="rounded-xl border border-rule bg-paper-sub p-4">
+          <Field
+            label={en ? 'Step 2 · TOTP code' : 'దశ 2 · TOTP కోడ్'}
+            hint={en ? 'mandatory 2FA for desk staff' : 'డెస్క్ సిబ్బందికి 2FA తప్పనిసరి'}
+            htmlFor="totp-0"
+          >
+            <OtpInput id="totp-0" label={en ? 'TOTP code' : 'TOTP కోడ్'} value={totp} onChange={setTotp} autoFocus />
+          </Field>
         </div>
+      ) : null}
 
-        {needsTotp ? (
-          <div className="mt-3.5 rounded-control border border-rule bg-paper-sub p-3">
-            <p className="mb-1.5 font-sans text-[10px] font-bold uppercase tracking-[0.06em] text-ink-soft">
-              Step 2 · TOTP code{' '}
-              <span className="font-normal normal-case text-muted-light">
-                — mandatory 2FA for desk staff
-              </span>
-            </p>
-            <OtpInput id="totp-0" label="TOTP code" value={totp} onChange={setTotp} size="sm" autoFocus />
-          </div>
-        ) : null}
+      {login.error ? <ErrorState compact error={login.error} /> : null}
 
-        <ErrorBanner error={login.error} />
+      <Button
+        type="submit"
+        size="lg"
+        full
+        iconRight={ArrowRight}
+        pending={login.isPending}
+        disabled={!email || !password || (needsTotp && totp.length !== 6)}
+      >
+        {en ? 'Sign in' : 'సైన్ ఇన్'}
+      </Button>
 
-        <button
-          type="submit"
-          disabled={login.isPending || !email || !password || (needsTotp && totp.length !== 6)}
-          className="te mt-3.5 flex min-h-tap w-full items-center justify-center gap-2 rounded-control bg-ink px-4 font-bold leading-telugu text-white transition-opacity hover:bg-ink-panel disabled:opacity-50"
-        >
-          {login.isPending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-          {en ? 'Sign in →' : 'సైన్ ఇన్ →'}
-        </button>
-
-        <p className="mt-2 font-sans text-[10px] text-muted-light">
-          admin / super_admin: + optional IP allowlist
-        </p>
-      </form>
-    </Card>
+      <p className={cn(s.body, 'text-meta text-muted')}>
+        {en ? 'admin / super_admin: + optional IP allowlist' : 'admin / super_admin: + ఐచ్ఛిక IP అనుమతి జాబితా'}
+      </p>
+    </form>
   );
 }
 
 // --------------------------------------------------------------------------- //
 export default function AdminLogin() {
-  const { language } = useI18n();
+  const { language, t } = useI18n();
+  const s = useScript();
   const en = language === 'en';
   const navigate = useNavigate();
   const location = useLocation();
   const [panel, setPanel] = useState<Panel>('password');
+  useDocumentTitle(t('admin.page.login'));
 
-  const redirectTo =
-    (location.state as { from?: string } | null)?.from ?? '/admin/dashboard';
+  const redirectTo = (location.state as { from?: string } | null)?.from ?? '/admin/dashboard';
 
   function handleSignedIn() {
     navigate(redirectTo, { replace: true });
   }
 
   return (
-    <main className="relative flex min-h-screen flex-col items-center justify-center bg-canvas px-4 py-10">
-      <div className="absolute right-4 top-4"><LanguageToggle /></div>
-      {/* Below md the two cards would stack into a confusing double form, so the
-          panel is chosen with a toggle and only one is shown. */}
-      <div className="mb-4 flex gap-1 rounded-control border border-rule bg-white p-1 md:hidden">
-        {(
-          [
-            ['password', en ? 'Desk / editor' : 'డెస్క్ / ఎడిటర్'],
-            ['otp', en ? 'Reporter / stringer' : 'రిపోర్టర్ / స్ట్రింగర్'],
-          ] as const
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setPanel(key)}
-            aria-pressed={panel === key}
-            className={[
-              'te min-h-[40px] rounded-[6px] px-3 text-[12px] font-semibold transition-colors',
-              panel === key ? 'bg-ink text-white' : 'text-muted',
-            ].join(' ')}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+    <div className="flex min-h-dvh flex-col bg-canvas-cms">
+      <header className="flex items-center justify-end px-4 py-3 md:px-6">
+        <LanguageToggle />
+      </header>
+      <PageContainer as="main" id="main" tabIndex={-1} width="form" className="flex flex-1 flex-col justify-center pb-10 outline-none">
+        <Card padding="lg">
+          <div className="mb-6">
+            <p lang="te" className="th text-headline-lg font-extrabold text-brand">
+              టాప్ తెలుగు
+            </p>
+            <h1 className={cn(s.head, 'text-headline-sm font-bold text-ink')}>{t('admin.page.login')}</h1>
+          </div>
 
-      <div className="flex w-full flex-col items-center gap-4 md:flex-row md:items-start md:justify-center">
-        <div className={panel === 'otp' ? 'contents' : 'hidden md:contents'}>
-          <OtpPanel onSignedIn={handleSignedIn} />
-        </div>
-        <div className={panel === 'password' ? 'contents' : 'hidden md:contents'}>
-          <PasswordPanel onSignedIn={handleSignedIn} />
-        </div>
-      </div>
-    </main>
+          <Tabs
+            ariaLabel={t('nav.signIn')}
+            className="mb-5"
+            items={[
+              { key: 'password', label: en ? 'Desk / editor' : 'డెస్క్ / ఎడిటర్' },
+              { key: 'otp', label: en ? 'Reporter / stringer' : 'రిపోర్టర్ / స్ట్రింగర్' },
+            ]}
+            value={panel}
+            onChange={(key) => setPanel(key === 'otp' ? 'otp' : 'password')}
+          />
+
+          <div role="tabpanel" hidden={panel !== 'password'}>
+            <PasswordPanel onSignedIn={handleSignedIn} />
+          </div>
+          <div role="tabpanel" hidden={panel !== 'otp'}>
+            <OtpPanel onSignedIn={handleSignedIn} />
+          </div>
+        </Card>
+      </PageContainer>
+    </div>
   );
 }

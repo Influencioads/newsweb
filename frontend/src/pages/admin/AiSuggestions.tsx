@@ -1,11 +1,24 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { ExternalLink, FileText, PenLine, Send, Sparkles, Trash2, X } from 'lucide-react';
 
+import { ApiError } from '@/api/client';
+import { AdminPage } from '@/components/admin/AdminPage';
+import { Badge, StatusPill } from '@/components/ui/Badge';
+import { Button, ButtonLink } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { PromptDialog, useConfirm } from '@/components/ui/Dialog';
+import { EmptyState, QueryState, SkeletonCard } from '@/components/ui/State';
+import { Tabs } from '@/components/ui/Tabs';
+import { useToast } from '@/components/ui/Toast';
 import * as cmsApi from '@/features/cms/api';
-import { useI18n } from '@/i18n';
-import type { ApiError } from '@/api/client';
+import { useI18n, useScript } from '@/i18n';
 import type { AiDraft, AiSuggestion } from '@/types/cms';
+import { cn } from '@/utils/cn';
+import { useReveal } from '@/utils/motion';
+
+import { useL } from './useL';
 
 /**
  * §16 "Today's AI suggestions" and §15 drafts.
@@ -14,142 +27,201 @@ import type { AiDraft, AiSuggestion } from '@/types/cms';
  * worth covering? So each card leads with the topic and the reason, shows the
  * sources §17 requires for verification, and offers exactly two actions.
  *
- * Converting a draft does not publish it — the banner says so, and the button
+ * Converting a draft does not publish it — the subtitle says so, and the button
  * label says "send for review" rather than anything stronger, because that is
- * literally what the endpoint does.
+ * literally what the endpoint does. There is no publish control on this screen.
  */
 
-function ScoreDot({ score }: { score: number }) {
-  const tone = score >= 0.66 ? 'bg-breaking' : score >= 0.4 ? 'bg-partial' : 'bg-muted';
+type Tab = 'suggestions' | 'drafts';
+
+function ScoreBadge({ score }: { score: number }) {
+  const L = useL();
+  const tone = score >= 0.66 ? 'breaking' : score >= 0.4 ? 'partial' : 'muted';
   return (
-    <span className="inline-flex items-center gap-1" title={`score ${score}`}>
-      <span className={`h-2 w-2 rounded-full ${tone}`} aria-hidden />
-      <span className="font-sans text-[11px] font-bold text-muted">{Math.round(score * 100)}</span>
-    </span>
+    <Badge tone={tone} size="xs" lang="en" className="shrink-0 tabular-nums">
+      <span className="sr-only">{L('స్కోరు', 'score')} </span>
+      {Math.round(score * 100)}
+    </Badge>
   );
 }
 
-function SuggestionCard({
-  suggestion, onDraft, onReject, busy,
-}: { suggestion: AiSuggestion; onDraft: (notes: string) => void; onReject: () => void; busy: boolean }) {
-  const { language } = useI18n();
-  const en = language === 'en';
-  const [notes, setNotes] = useState('');
-  const [open, setOpen] = useState(false);
+// ---------------------------------------------------------------------------
+// Suggestion
+// ---------------------------------------------------------------------------
+
+interface SuggestionCardProps {
+  suggestion: AiSuggestion;
+  busy: boolean;
+  pending: boolean;
+  onDraft: () => void;
+  onReject: () => void;
+}
+
+function SuggestionCard({ suggestion, busy, pending, onDraft, onReject }: SuggestionCardProps) {
+  const L = useL();
+  const s = useScript();
 
   return (
-    <article className="rounded-card border border-ai-border bg-white p-4 shadow-card dark:bg-surface">
+    <Card as="article" padding="md">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="te text-[15.5px] font-bold leading-telugu text-ink">{suggestion.topic_te}</h3>
-          {suggestion.topic_en ? <p className="font-sans text-[12px] text-muted">{suggestion.topic_en}</p> : null}
+          <h3 lang="te" className="th text-headline-xs font-bold text-ink">
+            {suggestion.topic_te}
+          </h3>
+          {suggestion.topic_en ? (
+            <p lang="en" className="font-sans text-ui-sm text-muted">
+              {suggestion.topic_en}
+            </p>
+          ) : null}
         </div>
-        <ScoreDot score={suggestion.score} />
+        <ScoreBadge score={suggestion.score} />
       </div>
 
       {suggestion.rationale_te ? (
-        <p className="te mt-2 text-[13px] leading-telugu text-ink-soft">{suggestion.rationale_te}</p>
+        <p lang="te" className="te mt-2 text-te-body-xs text-ink-soft">
+          {suggestion.rationale_te}
+        </p>
       ) : null}
 
       {suggestion.sources.length ? (
-        <div className="mt-3 rounded border border-rule bg-canvas p-2.5">
-          <p className="font-sans text-[10px] font-bold uppercase tracking-wide text-muted">
-            {en ? 'Sources — verify before writing' : 'మూలాలు — రాయకముందు ధృవీకరించండి'}
+        <div className="mt-3 rounded-xl border border-rule bg-canvas p-3">
+          <p className={cn(s.body, 'text-meta font-semibold text-muted')}>
+            {L('మూలాలు — రాయకముందు ధృవీకరించండి', 'Sources — verify before writing')}
           </p>
-          <ul className="mt-1 space-y-1">
-            {suggestion.sources.map((s) => (
-              <li key={s.url} className="font-sans text-[12px]">
-                <a href={s.url} target="_blank" rel="noreferrer noopener" className="text-ai underline">{s.publisher}</a>
-                <span className="ml-1.5 rounded bg-white px-1 py-0.5 text-[10px] uppercase text-muted">{s.licence}</span>
-                {s.title ? <span className="ml-1 text-ink-soft">{s.title}</span> : null}
+          <ul className="mt-1 flex flex-col">
+            {suggestion.sources.map((src) => (
+              <li key={src.url} className="flex min-h-tap flex-wrap items-center gap-x-2 gap-y-1">
+                <ButtonLink to={src.url} external variant="link" size="sm" iconRight={ExternalLink}>
+                  {src.publisher}
+                </ButtonLink>
+                <Badge size="xs" lang="en">
+                  {src.licence}
+                </Badge>
+                {src.title ? <span className="font-sans text-ui-sm text-ink-soft">{src.title}</span> : null}
               </li>
             ))}
           </ul>
         </div>
       ) : (
-        <p className="te mt-2 text-[11.5px] text-muted">
-          {en ? 'Derived from our own coverage — no external source.' : 'మన సొంత కవరేజ్ నుంచి — బాహ్య మూలం లేదు.'}
+        <p className={cn(s.body, 'mt-2 text-meta text-muted')}>
+          {L('మన సొంత కవరేజ్ నుంచి — బాహ్య మూలం లేదు.', 'Derived from our own coverage — no external source.')}
         </p>
       )}
 
-      <footer className="mt-3 flex flex-wrap items-center gap-2 border-t border-rule pt-3">
-        <span className="font-sans text-[10.5px] uppercase tracking-wide text-muted">{suggestion.engine}</span>
-        {open ? (
-          <>
-            <input value={notes} onChange={(e) => setNotes(e.target.value)}
-              placeholder={en ? 'Angle or notes for the writer' : 'రచయితకు గమనికలు'}
-              className="te min-w-[200px] flex-1 rounded-control border border-rule-input px-2.5 py-1.5 text-[12.5px]" />
-            <button type="button" disabled={busy} onClick={() => onDraft(notes)}
-              className="te min-h-[32px] rounded-control bg-ai px-3 text-[12px] font-bold text-white disabled:opacity-50">
-              {busy ? '…' : (en ? 'Write draft' : 'డ్రాఫ్ట్ రాయండి')}
-            </button>
-          </>
-        ) : (
-          <button type="button" onClick={() => setOpen(true)}
-            className="te ml-auto min-h-[32px] rounded-control border border-ai px-3 text-[12px] font-bold text-ai">
-            {en ? 'Accept & draft' : 'ఆమోదించి డ్రాఫ్ట్'}
-          </button>
-        )}
-        <button type="button" disabled={busy} onClick={onReject}
-          className="te min-h-[32px] rounded-control border border-rule px-3 text-[12px] font-semibold text-muted">
-          {en ? 'Reject' : 'తిరస్కరించండి'}
-        </button>
-      </footer>
-    </article>
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-rule pt-3">
+        <Badge tone="ai" size="xs" lang="en">
+          {suggestion.engine}
+        </Badge>
+        <StatusPill status={suggestion.status} />
+        <div className="ml-auto flex flex-wrap gap-2">
+          <Button size="sm" icon={PenLine} pending={pending} disabled={busy} onClick={onDraft}>
+            {L('ఆమోదించి డ్రాఫ్ట్', 'Accept & draft')}
+          </Button>
+          <Button size="sm" variant="secondary" icon={X} disabled={busy} onClick={onReject}>
+            {L('తిరస్కరించండి', 'Reject')}
+          </Button>
+        </div>
+      </div>
+    </Card>
   );
 }
 
-function DraftCard({ draft, onConvert, onDiscard, busy }: {
-  draft: AiDraft; onConvert: () => void; onDiscard: () => void; busy: boolean;
-}) {
-  const { language } = useI18n();
-  const en = language === 'en';
+// ---------------------------------------------------------------------------
+// Draft
+// ---------------------------------------------------------------------------
+
+interface DraftCardProps {
+  draft: AiDraft;
+  busy: boolean;
+  pending: boolean;
+  onConvert: () => void;
+  onDiscard: () => void;
+}
+
+function DraftCard({ draft, busy, pending, onConvert, onDiscard }: DraftCardProps) {
+  const { t } = useI18n();
+  const L = useL();
+  const s = useScript();
+
   return (
-    <article className="rounded-card border border-rule bg-white p-4 shadow-card dark:bg-surface">
+    <Card as="article" padding="md">
       <div className="flex items-start justify-between gap-3">
-        <h3 className="te text-[15px] font-bold leading-telugu text-ink">{draft.title_te}</h3>
-        <span className="shrink-0 rounded-chip bg-ai-tint px-2 py-0.5 font-sans text-[10px] font-bold uppercase text-ai">
-          {draft.engine}
-        </span>
+        <h3 lang="te" className="th min-w-0 text-headline-xs font-bold text-ink">
+          {draft.title_te}
+        </h3>
+        <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+          <Badge tone="ai" size="xs" lang="en">
+            {draft.engine}
+          </Badge>
+          <StatusPill status={draft.status} />
+        </div>
       </div>
-      {draft.summary_te ? <p className="te mt-1.5 text-[13px] leading-telugu text-ink-soft">{draft.summary_te}</p> : null}
-      {draft.body_plain ? (
-        <p className="te mt-2 max-h-32 overflow-y-auto rounded border border-rule bg-canvas p-2.5 text-[12.5px] leading-telugu text-ink-soft">
-          {draft.body_plain}
+
+      {draft.summary_te ? (
+        <p lang="te" className="te mt-2 text-te-body-xs text-ink-soft">
+          {draft.summary_te}
         </p>
       ) : null}
-      <footer className="mt-3 flex flex-wrap items-center gap-2 border-t border-rule pt-3">
-        <span className="font-sans text-[11px] text-muted">
-          {draft.word_count} {en ? 'words' : 'పదాలు'}
+
+      {draft.body_plain ? (
+        <details className="mt-2 rounded-xl border border-rule bg-canvas px-3">
+          <summary className={cn(s.body, 'min-h-tap cursor-pointer py-3 text-ui-sm font-semibold text-ink')}>
+            {L('పూర్తి పాఠం', 'Full text')}
+          </summary>
+          <p lang="te" className="te whitespace-pre-line pb-3 text-te-body-xs text-ink-soft">
+            {draft.body_plain}
+          </p>
+        </details>
+      ) : null}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-rule pt-3">
+        <span className={cn(s.body, 'text-meta text-muted tabular-nums')}>
+          {draft.word_count} {t('admin.wordCount')}
           {draft.confidence != null ? ` · ${Math.round(draft.confidence * 100)}%` : ''}
         </span>
         {draft.status === 'converted' ? (
-          <span className="te ml-auto text-[12px] font-bold text-success">
-            {en ? 'Sent for review' : 'సమీక్షకు పంపబడింది'}
-          </span>
+          <Badge tone="success" className="ml-auto">
+            {L('సమీక్షకు పంపబడింది', 'Sent for review')}
+          </Badge>
         ) : (
-          <>
-            <button type="button" disabled={busy} onClick={onConvert}
-              className="te ml-auto min-h-[32px] rounded-control bg-brand px-3 text-[12px] font-bold text-white disabled:opacity-50">
-              {en ? 'Send for review' : 'సమీక్షకు పంపండి'}
-            </button>
-            <button type="button" disabled={busy} onClick={onDiscard}
-              className="te min-h-[32px] rounded-control border border-rule px-3 text-[12px] font-semibold text-muted">
-              {en ? 'Discard' : 'తొలగించండి'}
-            </button>
-          </>
+          <div className="ml-auto flex flex-wrap gap-2">
+            <Button size="sm" icon={Send} pending={pending} disabled={busy} onClick={onConvert}>
+              {L('సమీక్షకు పంపండి', 'Send for review')}
+            </Button>
+            <Button size="sm" variant="secondary" icon={Trash2} disabled={busy} onClick={onDiscard}>
+              {L('తొలగించండి', 'Discard')}
+            </Button>
+          </div>
         )}
-      </footer>
-    </article>
+      </div>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
+function ListSkeleton() {
+  return (
+    <div className="flex flex-col gap-3">
+      <SkeletonCard variant="compact" />
+      <SkeletonCard variant="compact" />
+      <SkeletonCard variant="compact" />
+    </div>
   );
 }
 
 export default function AiSuggestionsPage() {
-  const { language } = useI18n();
-  const en = language === 'en';
+  const { t } = useI18n();
+  const L = useL();
   const nav = useNavigate();
+  const toast = useToast();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<'suggestions' | 'drafts'>('suggestions');
+  const { confirm, dialog } = useConfirm();
+  const reveal = useReveal<HTMLLIElement>();
+  const [tab, setTab] = useState<Tab>('suggestions');
+  const [draftFor, setDraftFor] = useState<AiSuggestion | null>(null);
 
   const suggestions = useQuery({
     queryKey: ['cms', 'ai', 'suggestions'],
@@ -163,91 +235,204 @@ export default function AiSuggestionsPage() {
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ['cms', 'ai'] });
   };
+  const onError = (err: unknown) => toast.error(err);
 
-  const generate = useMutation({ mutationFn: () => cmsApi.generateAiSuggestions(), onSuccess: refresh });
+  const generate = useMutation({
+    mutationFn: () => cmsApi.generateAiSuggestions(),
+    onSuccess: () => {
+      toast.success(t('state.updated'));
+      refresh();
+    },
+    onError: (err) =>
+      toast.error(
+        err instanceof ApiError && err.status === 409
+          ? L(
+              'AI ఆఫ్‌లో ఉంది లేదా నేటి పరిమితి ముగిసింది. రెండూ సెట్టింగ్‌లలో ఉన్నాయి.',
+              'AI is switched off, or today’s limit is reached. Both are in Settings.',
+            )
+          : err,
+      ),
+  });
   const draft = useMutation({
     mutationFn: ({ id, notes }: { id: number; notes: string }) => cmsApi.draftFromSuggestion(id, notes),
-    onSuccess: () => { refresh(); setTab('drafts'); },
+    onSuccess: () => {
+      toast.success(t('state.success'));
+      refresh();
+      setTab('drafts');
+    },
+    onError,
   });
-  const reject = useMutation({ mutationFn: (id: number) => cmsApi.rejectAiSuggestion(id), onSuccess: refresh });
+  const reject = useMutation({
+    mutationFn: (id: number) => cmsApi.rejectAiSuggestion(id),
+    onSuccess: () => {
+      toast.success(t('state.updated'));
+      refresh();
+    },
+    onError,
+  });
   const convert = useMutation({
     mutationFn: (id: number) => cmsApi.convertAiDraft(id),
-    onSuccess: (result) => { refresh(); nav(`/admin/articles/${result.article_id}/edit`); },
+    onSuccess: (result) => {
+      toast.success(t('state.success'));
+      refresh();
+      nav(`/admin/articles/${result.article_id}/edit`);
+    },
+    onError,
   });
-  const discard = useMutation({ mutationFn: (id: number) => cmsApi.discardAiDraft(id), onSuccess: refresh });
+  const discard = useMutation({
+    mutationFn: (id: number) => cmsApi.discardAiDraft(id),
+    onSuccess: () => {
+      toast.success(t('state.deleted'));
+      refresh();
+    },
+    onError,
+  });
 
-  const generateError = generate.error as ApiError | undefined;
+  const askReject = async (sg: AiSuggestion) => {
+    const ok = await confirm({
+      title: L('ఈ సూచనను తిరస్కరించాలా?', 'Reject this suggestion?'),
+      body: (
+        <span lang="te" className="te">
+          {sg.topic_te}
+        </span>
+      ),
+      tone: 'danger',
+      confirmLabel: L('తిరస్కరించండి', 'Reject'),
+    });
+    if (ok) reject.mutate(sg.id);
+  };
+  const askConvert = async (d: AiDraft) => {
+    const ok = await confirm({
+      title: L('సమీక్షకు పంపాలా?', 'Send for review?'),
+      body: L(
+        'డ్రాఫ్ట్ కథనంగా మారి ఎడిటర్ సమీక్షకు వెళ్తుంది. ఇది ప్రచురణ కాదు.',
+        'The draft becomes an article and goes to editor review. This does not publish it.',
+      ),
+      confirmLabel: L('సమీక్షకు పంపండి', 'Send for review'),
+    });
+    if (ok) convert.mutate(d.id);
+  };
+  const askDiscard = async (d: AiDraft) => {
+    const ok = await confirm({
+      title: L('ఈ డ్రాఫ్ట్‌ను తొలగించాలా?', 'Discard this draft?'),
+      body: t('state.confirmDelete'),
+      tone: 'danger',
+      confirmLabel: L('తొలగించండి', 'Discard'),
+    });
+    if (ok) discard.mutate(d.id);
+  };
+  const submitDraft = async (values: Record<string, string>) => {
+    if (!draftFor) return;
+    try {
+      await draft.mutateAsync({ id: draftFor.id, notes: values.notes ?? '' });
+      setDraftFor(null);
+    } catch {
+      // onError already toasted; the dialog stays open so the notes are not lost.
+    }
+  };
+
+  const suggestionsLabel = L('సూచనలు', 'Suggestions');
+  const draftsLabel = L('డ్రాఫ్ట్‌లు', 'Drafts');
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-6">
-      <header className="mb-4">
-        <h1 className="th text-[25px] font-extrabold text-ink">
-          {en ? "Today's AI suggestions" : 'నేటి AI సూచనలు'}
-        </h1>
-        <p className="te mt-1 text-[12px] text-muted">
-          {en
-            ? 'Ideas and drafts. Nothing here reaches readers without an editor approving it and a second editor publishing it.'
-            : 'ఆలోచనలు, డ్రాఫ్ట్‌లు. ఎడిటర్ ఆమోదం, మరో ఎడిటర్ ప్రచురణ లేకుండా ఇవి పాఠకులకు చేరవు.'}
-        </p>
-      </header>
-
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        {(['suggestions', 'drafts'] as const).map((key) => (
-          <button key={key} type="button" onClick={() => setTab(key)}
-            aria-pressed={tab === key}
-            className={`te min-h-[34px] rounded-chip border px-3.5 text-[12.5px] font-semibold ${
-              tab === key ? 'border-brand bg-brand text-white' : 'border-rule bg-white text-ink dark:bg-surface'
-            }`}>
-            {key === 'suggestions'
-              ? `${en ? 'Suggestions' : 'సూచనలు'} (${suggestions.data?.total ?? 0})`
-              : `${en ? 'Drafts' : 'డ్రాఫ్ట్‌లు'} (${drafts.data?.total ?? 0})`}
-          </button>
-        ))}
-        <button type="button" disabled={generate.isPending} onClick={() => generate.mutate()}
-          className="te ml-auto min-h-[34px] rounded-control border border-ai px-3.5 text-[12.5px] font-bold text-ai disabled:opacity-50">
-          {generate.isPending ? (en ? 'Working…' : 'పని జరుగుతోంది…') : (en ? 'Generate suggestions' : 'సూచనలు తయారు చేయండి')}
-        </button>
-      </div>
-
-      {generateError ? (
-        <p role="alert" className="te mb-4 rounded-control border border-breaking-border bg-breaking-tint p-3 text-[13px] text-breaking">
-          {generateError.status === 409
-            ? (en
-              ? 'AI is switched off, or today’s limit is reached. Both are in Settings.'
-              : 'AI ఆఫ్‌లో ఉంది లేదా నేటి పరిమితి ముగిసింది. రెండూ సెట్టింగ్‌లలో ఉన్నాయి.')
-            : (en ? generateError.messageEn : generateError.messageTe)}
-        </p>
-      ) : null}
+    <AdminPage
+      width="page"
+      title={t('admin.page.ai')}
+      subtitle={L(
+        'ఆలోచనలు, డ్రాఫ్ట్‌లు. ఎడిటర్ ఆమోదం, మరో ఎడిటర్ ప్రచురణ లేకుండా ఇవి పాఠకులకు చేరవు.',
+        'Ideas and drafts. Nothing here reaches readers without an editor approving it and a second editor publishing it.',
+      )}
+      actions={
+        <Button variant="secondary" icon={Sparkles} pending={generate.isPending} onClick={() => generate.mutate()}>
+          {generate.isPending ? L('పని జరుగుతోంది…', 'Working…') : L('సూచనలు తయారు చేయండి', 'Generate suggestions')}
+        </Button>
+      }
+    >
+      <Tabs
+        ariaLabel={t('ui.sections')}
+        value={tab}
+        onChange={(key) => setTab(key as Tab)}
+        items={[
+          { key: 'suggestions', label: suggestionsLabel, icon: Sparkles, count: suggestions.data?.total ?? 0 },
+          { key: 'drafts', label: draftsLabel, icon: FileText, count: drafts.data?.total ?? 0 },
+        ]}
+      />
 
       {tab === 'suggestions' ? (
-        <div className="space-y-3">
-          {suggestions.data?.items.map((s) => (
-            <SuggestionCard key={s.id} suggestion={s}
-              busy={draft.isPending || reject.isPending}
-              onDraft={(notes) => draft.mutate({ id: s.id, notes })}
-              onReject={() => reject.mutate(s.id)} />
-          ))}
-          {suggestions.data && suggestions.data.items.length === 0 ? (
-            <p className="te rounded-card border border-rule bg-white p-6 text-center text-[13px] text-muted dark:bg-surface">
-              {en ? 'No open suggestions. Generate a new batch above.' : 'పెండింగ్ సూచనలు లేవు. పైన కొత్తవి తయారు చేయండి.'}
-            </p>
-          ) : null}
+        <div role="tabpanel" aria-label={suggestionsLabel}>
+          <QueryState
+            query={suggestions}
+            skeleton={<ListSkeleton />}
+            isEmpty={(d) => d.items.length === 0}
+            empty={
+              <EmptyState
+                icon={Sparkles}
+                title={L('పెండింగ్ సూచనలు లేవు.', 'No open suggestions.')}
+                body={L('పైన కొత్తవి తయారు చేయండి.', 'Generate a new batch above.')}
+              />
+            }
+          >
+            {(data) => (
+              <ul className="flex flex-col gap-3">
+                {data.items.map((sg) => (
+                  <li key={sg.id} ref={reveal}>
+                    <SuggestionCard
+                      suggestion={sg}
+                      busy={draft.isPending || reject.isPending}
+                      pending={draft.isPending && draft.variables.id === sg.id}
+                      onDraft={() => setDraftFor(sg)}
+                      onReject={() => void askReject(sg)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </QueryState>
         </div>
       ) : (
-        <div className="space-y-3">
-          {drafts.data?.items.map((d) => (
-            <DraftCard key={d.id} draft={d}
-              busy={convert.isPending || discard.isPending}
-              onConvert={() => convert.mutate(d.id)}
-              onDiscard={() => discard.mutate(d.id)} />
-          ))}
-          {drafts.data && drafts.data.items.length === 0 ? (
-            <p className="te rounded-card border border-rule bg-white p-6 text-center text-[13px] text-muted dark:bg-surface">
-              {en ? 'No drafts waiting.' : 'డ్రాఫ్ట్‌లు లేవు.'}
-            </p>
-          ) : null}
+        <div role="tabpanel" aria-label={draftsLabel}>
+          <QueryState
+            query={drafts}
+            skeleton={<ListSkeleton />}
+            isEmpty={(d) => d.items.length === 0}
+            empty={<EmptyState icon={FileText} title={L('డ్రాఫ్ట్‌లు లేవు.', 'No drafts waiting.')} />}
+          >
+            {(data) => (
+              <ul className="flex flex-col gap-3">
+                {data.items.map((d) => (
+                  <li key={d.id} ref={reveal}>
+                    <DraftCard
+                      draft={d}
+                      busy={convert.isPending || discard.isPending}
+                      pending={convert.isPending && convert.variables === d.id}
+                      onConvert={() => void askConvert(d)}
+                      onDiscard={() => void askDiscard(d)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </QueryState>
         </div>
       )}
-    </main>
+
+      <PromptDialog
+        open={draftFor !== null}
+        onClose={() => setDraftFor(null)}
+        title={L('ఆమోదించి డ్రాఫ్ట్', 'Accept & draft')}
+        description={
+          draftFor ? (
+            <span lang="te" className="te">
+              {draftFor.topic_te}
+            </span>
+          ) : undefined
+        }
+        fields={[{ name: 'notes', label: L('రచయితకు గమనికలు', 'Angle or notes for the writer'), type: 'textarea' }]}
+        submitLabel={L('డ్రాఫ్ట్ రాయండి', 'Write draft')}
+        pending={draft.isPending}
+        onSubmit={submitDraft}
+      />
+      {dialog}
+    </AdminPage>
   );
 }

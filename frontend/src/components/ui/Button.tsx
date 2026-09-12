@@ -12,7 +12,9 @@ import { cn } from '@/utils/cn';
  * - `Button`          native <button>; variants primary/secondary/ghost/danger/link.
  * - `ButtonLink`      same look, renders a router <Link> (or <a> when `external`).
  * - `IconButton`      44/48px square, icon only, `label` is mandatory (aria-label),
- *                     optional `badge` bubble and `pressed` (aria-pressed) state.
+ *                     optional `badge` bubble, `pressed` (aria-pressed) state and
+ *                     `round` (pill) shape; `variant="inverse"` is the ghost look
+ *                     on a brand / breaking fill (white foreground).
  * - `IconButtonLink`  IconButton as a router <Link>.
  *
  * All sizes meet the 44px tap floor (lg = 48). `pending` sets aria-busy +
@@ -23,7 +25,7 @@ import { cn } from '@/utils/cn';
  *     <ButtonLink to="/search" variant="secondary" iconRight={ChevronRight}>…</ButtonLink>
  *     <IconButton icon={Bell} label={t('ui.notifications')} badge={unread} />
  */
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link';
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link' | 'inverse';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 export interface ButtonVisualProps {
@@ -39,8 +41,9 @@ export interface ButtonVisualProps {
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>, ButtonVisualProps {}
 
+// Radius is added per family (IconButton can be a pill), not here.
 const BASE =
-  'relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl font-semibold select-none ' +
+  'relative inline-flex items-center justify-center gap-2 whitespace-nowrap font-semibold select-none ' +
   'transition-[colors,transform,box-shadow] duration-base ease-standard active:scale-[.98]';
 
 const VARIANT: Record<ButtonVariant, string> = {
@@ -49,6 +52,9 @@ const VARIANT: Record<ButtonVariant, string> = {
   ghost: 'text-ink hover:bg-rule-soft',
   danger: 'bg-breaking text-on-brand hover:bg-breaking/90',
   link: 'text-brand underline-offset-4 hover:underline',
+  /** Ghost on a brand / breaking fill (the ticker's pause button). The global
+      brand focus ring is invisible on that fill, so the ring goes white here. */
+  inverse: 'text-on-brand hover:bg-on-brand/10 focus-visible:outline-on-brand',
 };
 
 const SIZE: Record<ButtonSize, string> = {
@@ -65,6 +71,7 @@ function buttonClass(
 ): string {
   return cn(
     BASE,
+    'rounded-xl',
     VARIANT[variant],
     SIZE[size],
     variant === 'link' && 'px-1',
@@ -189,17 +196,20 @@ export interface IconButtonVisualProps {
   /** Count bubble, top-right. Hidden for null / 0 / ''. Numbers over 99 show "99+". */
   badge?: number | string | null;
   iconSize?: 'sm' | 'md' | 'lg';
+  /** Pill shape instead of the rounded-xl square (play buttons inside pills). */
+  round?: boolean;
 }
 
 export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>, IconButtonVisualProps {}
 
 function iconButtonClass(
-  { size = 44, pressed, variant = 'ghost' }: IconButtonVisualProps,
+  { size = 44, pressed, variant = 'ghost', round }: IconButtonVisualProps,
   disabled: boolean | undefined,
   className: string | undefined,
 ): string {
   return cn(
     BASE,
+    round ? 'rounded-pill' : 'rounded-xl',
     'shrink-0 p-0',
     size === 48 ? 'h-tap-lg w-tap-lg' : 'h-tap w-tap',
     VARIANT[variant],
@@ -239,7 +249,7 @@ function IconButtonContent({ icon, iconSize = 'md', badge }: Pick<IconButtonVisu
 }
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
-  { icon, label, size, pressed, variant, badge, iconSize, className, disabled, type = 'button', ...rest },
+  { icon, label, size, pressed, variant, badge, iconSize, round, className, disabled, type = 'button', ...rest },
   ref,
 ) {
   return (
@@ -250,7 +260,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       aria-label={iconButtonName(label, badge)}
       title={label}
       aria-pressed={pressed}
-      className={iconButtonClass({ icon, label, size, pressed, variant }, disabled, className)}
+      className={iconButtonClass({ icon, label, size, pressed, variant, round }, disabled, className)}
       {...rest}
     >
       <IconButtonContent icon={icon} iconSize={iconSize} badge={badge} />
@@ -273,6 +283,7 @@ export function IconButtonLink({
   variant,
   badge,
   iconSize,
+  round,
   className,
   to,
   external,
@@ -282,7 +293,7 @@ export function IconButtonLink({
     'aria-label': iconButtonName(label, badge),
     title: label,
     'aria-current': pressed ? ('page' as const) : undefined,
-    className: iconButtonClass({ icon, label, size, pressed, variant }, undefined, className),
+    className: iconButtonClass({ icon, label, size, pressed, variant, round }, undefined, className),
     ...rest,
   };
   const content = <IconButtonContent icon={icon} iconSize={iconSize} badge={badge} />;

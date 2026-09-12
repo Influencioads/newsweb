@@ -92,24 +92,24 @@ export default function VideoDetailPage() {
 
   if (video.isLoading) {
     return (
-      <main className="mx-auto max-w-4xl px-4 py-10">
+      <div className="mx-auto max-w-4xl px-4 py-10">
         <p className={`${teCls} text-center text-[13px] text-muted`} role="status">
           {te ? 'లోడ్ అవుతోంది…' : 'Loading…'}
         </p>
-      </main>
+      </div>
     );
   }
 
   if (video.isError || !video.data) {
     return (
-      <main className="mx-auto max-w-4xl px-4 py-10">
+      <div className="mx-auto max-w-4xl px-4 py-10">
         <p role="alert" className={`${teCls} rounded-card border border-breaking-border bg-breaking-tint p-5 text-[13px] text-breaking`}>
           {te ? 'ఈ వీడియో అందుబాటులో లేదు.' : 'This video is not available.'}
         </p>
         <Link to="/videos" className={`${teCls} mt-3 inline-block font-bold text-brand underline`}>
           {te ? 'అన్ని వీడియోలు' : 'All videos'}
         </Link>
-      </main>
+      </div>
     );
   }
 
@@ -117,7 +117,7 @@ export default function VideoDetailPage() {
   const threads = comments.data?.comments ?? [];
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-4">
+    <div className="mx-auto max-w-4xl px-4 py-4">
       <button
         type="button"
         onClick={() => nav(-1)}
@@ -313,6 +313,6 @@ export default function VideoDetailPage() {
           </div>
         </section>
       ) : null}
-    </main>
+    </div>
   );
 }

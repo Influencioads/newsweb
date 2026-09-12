@@ -1,53 +1,124 @@
-import { useQuery } from "@tanstack/react-query";
-import { router } from "expo-router";
-import {
-  Linking,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Share,
-  Text,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useQuery } from '@tanstack/react-query';
+import { useAudioPlayer, type AudioPlayer } from 'expo-audio';
+import { router, type Href } from 'expo-router';
+import { useState } from 'react';
+import { RefreshControl, View, type ListRenderItem } from 'react-native';
+import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 
-import * as engagementApi from "@/api/engagement";
-import * as notificationsApi from "@/api/notifications";
-import * as publicApi from "@/api/public";
-import * as epaperApi from "@/api/epaper";
-import { API_BASE } from "@/api/client";
-import { CompactCard, LeadCard, RowCard } from "@/components/ArticleCard";
-import { EmptyState, ErrorState, LoadingState } from "@/components/Feedback";
-import { SectionHeader } from "@/components/SectionHeader";
-import { VideoStrip } from "@/components/VideoStrip";
-import { PollCard } from "@/components/PollCard";
-import { BulletinCard } from "@/components/BulletinCard";
-import { useI18n } from "@/lib/i18n";
-import { font } from "@/lib/theme";
-import { makeStyles, useColors } from "@/lib/useTheme";
-import { useAuth } from "@/stores/auth";
-import { usePrefs } from "@/stores/prefs";
+import { absoluteMediaUrl } from '@/api/client';
+import * as engagementApi from '@/api/engagement';
+import * as epaperApi from '@/api/epaper';
+import type { Poll } from '@/api/epaper';
+import * as notificationsApi from '@/api/notifications';
+import * as publicApi from '@/api/public';
+import type { ArticleCard, HomePayload } from '@/api/types';
+import { CompactCard, LeadCard, RowCard } from '@/components/ArticleCard';
+import { BulletinCard, useBulletin, type BulletinSummary } from '@/components/BulletinCard';
+import { EmptyState, ErrorState } from '@/components/Feedback';
+import { HomeListHeader } from '@/components/home/HomeListHeader';
+import { PollCard } from '@/components/PollCard';
+import { SectionHeader } from '@/components/SectionHeader';
+import { VideoStrip } from '@/components/VideoStrip';
+import { useI18n } from '@/lib/i18n';
+import { space } from '@/lib/theme';
+import { makeStyles, useColors } from '@/lib/useTheme';
+import { useAuth } from '@/stores/auth';
+import { usePrefs } from '@/stores/prefs';
+import { IconButton } from '@/ui/Button';
+import { Screen } from '@/ui/Screen';
+import { ScreenHeader } from '@/ui/ScreenHeader';
+import { SkeletonFeed } from '@/ui/Skeleton';
 
 /**
- * Home feed: breaking strip, lead story, secondary rows, latest rail, then the
- * admin-configured section blocks — one `/public/home` request (§23).
+ * Home feed: breaking strip, e-paper promo, top topics, lead story, secondary
+ * rows, for-you rail, bulletin, big question, latest rail, mandal block, video
+ * strip, then the admin-configured section blocks — one `/public/home`
+ * request (§23), flattened into a single FlatList so the masthead collapses
+ * against one scroll offset.
  */
+type Row =
+  | { key: string; type: 'lead' | 'row' | 'compact'; article: ArticleCard }
+  | { key: string; type: 'section'; title: string; href?: Href }
+  | { key: string; type: 'poll'; poll: Poll }
+  | { key: string; type: 'bulletin'; bulletin: BulletinSummary; player: AudioPlayer }
+  | { key: string; type: 'video' | 'empty' };
+
+const STAGGER_MAX = 6;
+
+function flatten(
+  home: HomePayload,
+  forYou: ArticleCard[],
+  bulletin: { bulletin: BulletinSummary; player: AudioPlayer } | undefined,
+  poll: Poll | undefined,
+  pick: (te: string | null, en: string | null) => string,
+  forYouTitle: string,
+  latestTitle: string,
+): Row[] {
+  const rows: Row[] = [];
+  const article = (type: 'lead' | 'row' | 'compact', prefix: string, a: ArticleCard) =>
+    rows.push({ key: `${prefix}-${a.short_id}`, type, article: a });
+
+  if (home.lead) article('lead', 'lead', home.lead);
+  home.secondary.forEach((a) => article('row', 'sec', a));
+  home.mid_column.forEach((a) => article('row', 'mid', a));
+
+  // §3.2 personalised rail — only once there is enough to call it one.
+  if (forYou.length >= 3) {
+    rows.push({ key: 'fy-h', type: 'section', title: forYouTitle });
+    forYou.forEach((a) => article('row', 'fy', a));
+  }
+
+  // No row at all when no bulletin is on air (between slots, or switched off).
+  if (bulletin) rows.push({ key: 'bulletin', type: 'bulletin', ...bulletin });
+  if (poll) rows.push({ key: `poll-${poll.id}`, type: 'poll', poll });
+
+  if (home.latest.length) {
+    rows.push({ key: 'latest-h', type: 'section', title: latestTitle });
+    home.latest.slice(0, 6).forEach((a) => article('compact', 'latest', a));
+  }
+
+  // §3 what's happening in your mandal.
+  const mandal = home.mandal_block;
+  if (mandal?.articles.length) {
+    rows.push({ key: 'mandal-h', type: 'section', title: pick(mandal.title_te, mandal.title_en), href: '/local' });
+    article('lead', 'mandal', mandal.articles[0]);
+    mandal.articles.slice(1, 5).forEach((a) => article('row', 'mandal', a));
+  }
+
+  rows.push({ key: 'video', type: 'video' });
+
+  for (const section of home.sections) {
+    rows.push({
+      key: `s-${section.key}-h`,
+      type: 'section',
+      title: pick(section.title_te, section.title_en),
+      href: section.key === 'trending' ? '/trending' : { pathname: '/section/[slug]', params: { slug: section.key } },
+    });
+    if (section.articles[0]) article('lead', `s-${section.key}`, section.articles[0]);
+    section.articles.slice(1, 5).forEach((a) => article('row', `s-${section.key}`, a));
+  }
+
+  if (!home.lead && !home.sections.length) rows.push({ key: 'empty', type: 'empty' });
+  return rows;
+}
+
+const keyOf = (row: Row) => row.key;
+
 export default function HomeScreen() {
   const styles = useStyles();
   const color = useColors();
   const { t, pick } = useI18n();
   const edition = usePrefs((s) => s.edition);
   const mandal = usePrefs((s) => s.mandal);
-  const authed = useAuth((s) => s.status === "authenticated");
+  const authed = useAuth((s) => s.status === 'authenticated');
 
   const home = useQuery({
-    queryKey: ["home", edition, mandal],
+    queryKey: ['home', edition, mandal],
     queryFn: () => publicApi.fetchHome(edition, mandal),
   });
 
   const unread = useQuery({
-    queryKey: ["inbox-unread"],
+    queryKey: ['inbox-unread'],
     queryFn: () => notificationsApi.fetchInbox(0),
     enabled: authed,
     refetchInterval: 60_000,
@@ -57,398 +128,146 @@ export default function HomeScreen() {
   // §3.2 personalized rail — fetched separately so the shared home payload
   // stays cacheable; anonymous readers simply never see the block.
   const forYou = useQuery({
-    queryKey: ["for-you-home"],
+    queryKey: ['for-you-home'],
     queryFn: () => engagementApi.fetchForYou(0, 5),
     enabled: authed,
     staleTime: 120_000,
   });
 
   const config = useQuery({
-    queryKey: ["config"],
+    queryKey: ['config'],
     queryFn: publicApi.fetchSiteConfig,
     staleTime: 300_000,
   });
   const topics = useQuery({
-    queryKey: ["top-topics"],
+    queryKey: ['top-topics'],
     queryFn: epaperApi.fetchTopics,
   });
   const polls = useQuery({
-    queryKey: ["big-question"],
+    queryKey: ['big-question'],
     queryFn: () => epaperApi.fetchPolls(true),
   });
 
-  const editionName = (() => {
-    if (!edition) return null;
-    const district = config.data?.districts.find((d) => d.slug === edition);
-    return district ? pick(district.name_te, district.name_en) : null;
-  })();
+  // The player lives here, not in the row: a virtualised row unmounts a few
+  // viewports down and would release the audio mid-bulletin.
+  const bulletin = useBulletin();
+  const onAir = bulletin.data?.available && bulletin.data.url ? bulletin.data : undefined;
+  const player = useAudioPlayer(onAir ? absoluteMediaUrl(onAir.url) : null);
+
+  const district = edition ? config.data?.districts.find((d) => d.slug === edition) : undefined;
+  const editionName = district ? pick(district.name_te, district.name_en) : null;
+  const unreadCount = authed ? (unread.data?.unread ?? 0) : 0;
+
+  const scrollY = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((e) => {
+    scrollY.value = e.contentOffset.y;
+  });
+
+  // The entering stagger is a first-paint effect: once the reader has scrolled,
+  // rows 0–5 (recycled by removeClippedSubviews + windowSize) get no index, so
+  // they re-enter plainly. State, not a ref — reading a ref in render is a
+  // Compiler rule violation.
+  const [firstPaint, setFirstPaint] = useState(true);
+  const renderRow: ListRenderItem<Row> = ({ item, index }) => {
+    const stagger = firstPaint && index < STAGGER_MAX ? index : undefined;
+    switch (item.type) {
+      case 'lead':
+        return <LeadCard article={item.article} index={stagger} />;
+      case 'row':
+        return <RowCard article={item.article} index={stagger} />;
+      case 'compact':
+        return <CompactCard article={item.article} index={stagger} />;
+      case 'section': {
+        const href = item.href;
+        return <SectionHeader title={item.title} onSeeAll={href ? () => router.push(href) : undefined} />;
+      }
+      case 'poll':
+        return <PollCard poll={item.poll} />;
+      case 'bulletin':
+        return <BulletinCard bulletin={item.bulletin} player={item.player} />;
+      case 'video':
+        return <VideoStrip />;
+      case 'empty':
+        return <EmptyState />;
+    }
+  };
+
+  const rows = home.data
+    ? flatten(
+        home.data,
+        authed ? (forYou.data?.articles ?? []) : [],
+        onAir ? { bulletin: onAir, player } : undefined,
+        polls.data?.[0],
+        pick,
+        t('foryou.title'),
+        t('home.latest'),
+      )
+    : [];
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
-      {/* ------------------------------------------------ masthead ---------- */}
-      <View style={styles.masthead}>
-        <Text style={styles.mastheadTitle}>టాప్ తెలుగు న్యూస్</Text>
-        <View style={styles.mastheadActions}>
-          <Pressable
-            onPress={() => router.push("/short-news")}
-            accessibilityRole="button"
-            accessibilityLabel={t("shorts.title")}
-            style={styles.editionChip}
-          >
-            <Text style={styles.editionText}>⚡ {t("shorts.title")}</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => router.push("/local")}
-            accessibilityRole="button"
-            style={styles.editionChip}
-          >
-            <Text style={styles.editionText}>
-              ◉ {editionName ?? t("local.chooseDistrict")}
-            </Text>
-          </Pressable>
-          {authed ? (
-            <Pressable
-              onPress={() => router.push("/notifications")}
-              accessibilityRole="button"
-              accessibilityLabel={t("notify.title")}
-              style={styles.bell}
-            >
-              <Text style={styles.bellGlyph}>🔔</Text>
-              {(unread.data?.unread ?? 0) > 0 ? (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>
-                    {unread.data!.unread > 99 ? "99+" : unread.data!.unread}
-                  </Text>
-                </View>
-              ) : null}
-            </Pressable>
-          ) : null}
-        </View>
-      </View>
+    <Screen>
+      <ScreenHeader
+        large
+        title={t('site.name')}
+        subtitle={editionName ?? undefined}
+        collapsible={{ scrollY }}
+        right={
+          <View style={styles.actions}>
+            {editionName ? null : (
+              <IconButton name="mapPin" label={t('ui.chooseDistrict')} onPress={() => router.push('/local')} />
+            )}
+            <IconButton name="zap" label={t('shorts.title')} onPress={() => router.push('/short-news')} />
+            {authed ? (
+              <IconButton
+                name="bell"
+                label={t('notify.title')}
+                badge={unreadCount > 99 ? '99+' : unreadCount}
+                onPress={() => router.push('/notifications')}
+              />
+            ) : null}
+          </View>
+        }
+      />
 
-      {home.isLoading ? <LoadingState /> : null}
-      {home.isError ? <ErrorState onRetry={() => home.refetch()} /> : null}
-
-      {home.data ? (
-        <ScrollView
+      {home.isLoading ? (
+        <SkeletonFeed />
+      ) : home.isError && !home.data ? (
+        <ErrorState error={home.error} onRetry={() => home.refetch()} />
+      ) : (
+        <Animated.FlatList
+          data={rows}
+          keyExtractor={keyOf}
+          renderItem={renderRow}
+          onScroll={onScroll}
+          onScrollBeginDrag={() => setFirstPaint(false)}
+          scrollEventThrottle={16}
+          ListHeaderComponent={
+            <HomeListHeader
+              breaking={home.data?.breaking ?? []}
+              epaper={home.data?.epaper ?? null}
+              topics={topics.data?.items ?? []}
+            />
+          }
+          contentContainerStyle={styles.content}
           refreshControl={
             <RefreshControl
               refreshing={home.isRefetching}
               onRefresh={() => home.refetch()}
               tintColor={color.brand}
               colors={[color.brand]}
+              progressBackgroundColor={color.surface}
             />
           }
-        >
-          {/* -------------------------------------------- breaking ---------- */}
-          {home.data.breaking.length ? (
-            <View style={styles.breakingBar}>
-              <Text style={styles.breakingLabel}>⚡ {t("home.breaking")}</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {home.data.breaking.map((item) => (
-                  <Pressable
-                    key={item.short_id}
-                    onPress={() =>
-                      router.push({
-                        pathname: "/article/[shortId]",
-                        params: { shortId: item.short_id },
-                      })
-                    }
-                    accessibilityRole="button"
-                    style={styles.breakingItem}
-                  >
-                    <Text style={styles.breakingText} numberOfLines={1}>
-                      {pick(item.title_te, item.title_en)}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-          ) : null}
-
-          {home.data.epaper ? (
-            <View
-              style={[
-                styles.epaper,
-                { borderColor: color.brand, backgroundColor: color.paper },
-              ]}
-            >
-              <Text style={[styles.epaperKicker, { color: color.brand }]}>
-                📰 TODAY’S TOP TELUGU NEWS — E-PAPER
-              </Text>
-              <Text style={[styles.epaperTitle, { color: color.ink }]}>
-                వార్తాపత్రికలా చదవండి
-              </Text>
-              <Text style={{ color: color.muted }}>
-                {home.data.epaper.pub_date} · {home.data.epaper.page_count}{" "}
-                పేజీలు
-              </Text>
-              <View style={styles.epaperButtons}>
-                <Pressable
-                  style={[
-                    styles.epaperPrimary,
-                    { backgroundColor: color.brand },
-                  ]}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/epaper/[date]",
-                      params: { date: home.data!.epaper!.pub_date },
-                    })
-                  }
-                >
-                  <Text style={{ color: color.onBrand, fontWeight: "800" }}>
-                    చదవండి
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.epaperSecondary, { borderColor: color.brand }]}
-                  onPress={() => router.push({ pathname: "/epaper/[date]", params: { date: home.data!.epaper!.pub_date } })}
-                ><Text style={{ color: color.brand, fontWeight: "800" }}>🎧 వినండి</Text></Pressable>
-                <Pressable
-                  style={[styles.epaperSecondary, { borderColor: color.rule }]}
-                  onPress={() => Share.share({ message: `Today's Telugu News\nhttps://telugunews.influencioweb.com/epaper/${home.data!.epaper!.pub_date}/page/1` })}
-                ><Text style={{ color: color.ink, fontWeight: "800" }}>షేర్</Text></Pressable>
-                <Pressable
-                  style={[styles.epaperSecondary, { borderColor: color.rule }]}
-                  onPress={() => Linking.openURL(`${API_BASE}/epaper/${home.data!.epaper!.pub_date}/pdf`)}
-                ><Text style={{ color: color.ink, fontWeight: "800" }}>PDF</Text></Pressable>
-                <Pressable
-                  style={[styles.epaperSecondary, { borderColor: color.brand }]}
-                  onPress={() => router.push("/my-epaper")}
-                >
-                  <Text style={{ color: color.brand, fontWeight: "800" }}>
-                    నా ఈ-పేపర్
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-          ) : null}
-
-          {topics.data?.items.length ? (
-            <View>
-              <SectionHeader title="🔥 ప్రజలు మాట్లాడుకుంటున్న టాప్ 3 అంశాలు" />
-              {topics.data.items.map((x, i) => (
-                <Pressable
-                  key={x.slug}
-                  style={[
-                    styles.topic,
-                    { borderColor: color.rule, backgroundColor: color.paper },
-                  ]}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/topic/[slug]",
-                      params: { slug: x.slug },
-                    })
-                  }
-                >
-                  <Text style={[styles.topicNumber, { color: color.brand }]}>
-                    {i + 1}
-                  </Text>
-                  <Text style={[styles.topicTitle, { color: color.ink }]}>
-                    {x.title_te}
-                  </Text>
-                  <Text style={{ color: color.brand }}>›</Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
-
-          {/* -------------------------------------------- top of the page --- */}
-          {home.data.lead ? <LeadCard article={home.data.lead} /> : null}
-          {home.data.secondary.map((article) => (
-            <RowCard key={article.short_id} article={article} />
-          ))}
-          {home.data.mid_column.map((article) => (
-            <RowCard key={article.short_id} article={article} />
-          ))}
-
-          {/* -------------------------------------------- for you (§3.2) ---- */}
-          {authed && (forYou.data?.articles.length ?? 0) >= 3 ? (
-            <>
-              <SectionHeader title={t("foryou.title")} />
-              {forYou.data!.articles.map((article) => (
-                <RowCard key={`fy-${article.short_id}`} article={article} />
-              ))}
-            </>
-          ) : null}
-
-          {/* Renders nothing when no bulletin is on air — the ordinary case
-              between slots, and also when an admin has switched them off. */}
-          <BulletinCard />
-
-          {polls.data?.[0] ? <PollCard poll={polls.data[0]} /> : null}
-
-          {/* -------------------------------------------- latest rail ------- */}
-          {home.data.latest.length ? (
-            <>
-              <SectionHeader title={t("home.latest")} />
-              {home.data.latest.slice(0, 6).map((article) => (
-                <CompactCard
-                  key={`latest-${article.short_id}`}
-                  article={article}
-                />
-              ))}
-            </>
-          ) : null}
-
-          {/* --------------------------- §3 what's happening in your mandal - */}
-          {home.data.mandal_block?.articles.length ? (
-            <View>
-              <SectionHeader
-                title={pick(
-                  home.data.mandal_block.title_te,
-                  home.data.mandal_block.title_en,
-                )}
-                onSeeAll={() => router.push("/local")}
-              />
-              <LeadCard article={home.data.mandal_block.articles[0]} />
-              {home.data.mandal_block.articles.slice(1, 5).map((article) => (
-                <RowCard key={article.short_id} article={article} />
-              ))}
-            </View>
-          ) : null}
-
-          {/* -------------------------------------------- video strip (§15) - */}
-          <VideoStrip />
-
-          {/* -------------------------------------------- sections ---------- */}
-          {home.data.sections.map((section) => (
-            <View key={section.key}>
-              <SectionHeader
-                title={pick(section.title_te, section.title_en)}
-                onSeeAll={() =>
-                  section.key === "trending"
-                    ? router.push("/trending")
-                    : router.push({
-                        pathname: "/section/[slug]",
-                        params: { slug: section.key },
-                      })
-                }
-              />
-              {section.articles[0] ? (
-                <LeadCard article={section.articles[0]} />
-              ) : null}
-              {section.articles.slice(1, 5).map((article) => (
-                <RowCard key={article.short_id} article={article} />
-              ))}
-            </View>
-          ))}
-
-          {!home.data.lead && !home.data.sections.length ? (
-            <EmptyState />
-          ) : null}
-          <View style={styles.footerSpace} />
-        </ScrollView>
-      ) : null}
-    </SafeAreaView>
+          removeClippedSubviews
+          windowSize={7}
+          initialNumToRender={8}
+        />
+      )}
+    </Screen>
   );
 }
 
-const useStyles = makeStyles((color) => ({
-  safe: { flex: 1, backgroundColor: color.canvas },
-  masthead: {
-    backgroundColor: color.paper,
-    borderBottomWidth: 2,
-    borderBottomColor: color.brand,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  mastheadTitle: {
-    fontFamily: font.headlineHeavy,
-    fontSize: 22,
-    lineHeight: 34,
-    color: color.brand,
-  },
-  mastheadActions: { flexDirection: "row", alignItems: "center", gap: 8 },
-  editionChip: {
-    borderWidth: 1,
-    borderColor: color.rule,
-    borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    maxWidth: 150,
-  },
-  bell: { padding: 4 },
-  bellGlyph: { fontSize: 18 },
-  badge: {
-    position: "absolute",
-    top: 0,
-    right: -2,
-    backgroundColor: color.breaking,
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 3,
-  },
-  badgeText: {
-    color: color.white,
-    fontSize: 9,
-    fontWeight: "700",
-    lineHeight: 12,
-  },
-  editionText: {
-    fontFamily: font.telugu,
-    fontSize: 11.5,
-    lineHeight: 17,
-    color: color.muted,
-  },
-  breakingBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: color.breaking,
-    paddingVertical: 7,
-    paddingLeft: 12,
-  },
-  breakingLabel: {
-    fontFamily: font.teluguBold,
-    fontSize: 12.5,
-    lineHeight: 19,
-    color: color.white,
-    marginRight: 10,
-  },
-  breakingItem: { marginRight: 22, maxWidth: 320 },
-  breakingText: {
-    fontFamily: font.telugu,
-    fontSize: 13,
-    lineHeight: 20,
-    color: color.white,
-  },
-  epaper: { margin: 12, padding: 18, borderWidth: 2, borderRadius: 10 },
-  epaperKicker: { fontWeight: "800", fontSize: 11, letterSpacing: 0.6 },
-  epaperTitle: {
-    fontFamily: font.headlineHeavy,
-    fontSize: 26,
-    lineHeight: 40,
-    marginTop: 7,
-  },
-  epaperButtons: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 },
-  epaperPrimary: {
-    paddingHorizontal: 16,
-    paddingVertical: 11,
-    borderRadius: 7,
-  },
-  epaperSecondary: {
-    paddingHorizontal: 16,
-    paddingVertical: 11,
-    borderRadius: 7,
-    borderWidth: 1,
-  },
-  topic: {
-    marginHorizontal: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 13,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  topicNumber: { fontSize: 22, fontWeight: "900" },
-  topicTitle: { fontFamily: font.teluguBold, fontSize: 15, flex: 1 },
-  footerSpace: { height: 24 },
+const useStyles = makeStyles(() => ({
+  actions: { flexDirection: 'row', alignItems: 'center' },
+  content: { paddingBottom: space.xl },
 }));

@@ -92,7 +92,7 @@ export default function BulletinPage() {
   const live = (data?.items ?? []).filter((b) => b.available);
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-6">
+    <div className="mx-auto max-w-3xl px-4 py-6">
       <header className="mb-5">
         <h1 className="th text-[26px] font-extrabold text-ink">
           {en ? 'Audio news' : 'ఆడియో వార్తలు'}
@@ -121,6 +121,6 @@ export default function BulletinPage() {
             : 'ప్రస్తుతం బులెటిన్ ఏదీ లేదు. తదుపరిది మూడు గంటల తర్వాత వస్తుంది.'}
         </p>
       ) : null}
-    </main>
+    </div>
   );
 }

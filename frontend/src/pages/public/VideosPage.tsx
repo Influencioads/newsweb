@@ -118,7 +118,7 @@ export default function VideosPage() {
   const rails = (hub.data?.rails ?? []).filter((r) => !active || r.key === active);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-6">
+    <div className="mx-auto max-w-6xl px-4 py-6">
       <header className="border-b-2 border-brand pb-3">
         <h1 className={`${te ? 'th' : 'font-sans'} text-[26px] font-extrabold text-ink`}>
           ▶ {te ? 'వీడియోలు' : 'Videos'}
@@ -182,6 +182,6 @@ export default function VideosPage() {
       {rails.map((rail) => (
         <Rail key={rail.key} rail={rail} />
       ))}
-    </main>
+    </div>
   );
 }

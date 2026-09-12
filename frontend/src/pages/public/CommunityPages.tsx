@@ -15,7 +15,7 @@ export function PollPage() {
     enabled: Boolean(id),
   });
   return (
-    <main className="mx-auto max-w-2xl px-4 py-10">
+    <div className="mx-auto max-w-2xl px-4 py-10">
       {poll.isLoading ? (
         <p>Loading…</p>
       ) : poll.data ? (
@@ -23,7 +23,7 @@ export function PollPage() {
       ) : (
         <p role="alert">Poll not found.</p>
       )}
-    </main>
+    </div>
   );
 }
 
@@ -37,7 +37,7 @@ export function TopicPage() {
     queryFn: () => epaperApi.fetchTopic(slug, district),
   });
   return (
-    <main className="mx-auto max-w-[1100px] px-4 py-8">
+    <div className="mx-auto max-w-[1100px] px-4 py-8">
       <header className="border-b-2 border-brand pb-3">
         <p className="text-xs font-bold uppercase tracking-widest text-brand">
           {en ? "Topic" : "అంశం"}
@@ -65,6 +65,6 @@ export function TopicPage() {
       <Link to="/" className="mt-8 inline-block font-bold text-brand">
         ← {en ? "Home" : "హోమ్"}
       </Link>
-    </main>
+    </div>
   );
 }

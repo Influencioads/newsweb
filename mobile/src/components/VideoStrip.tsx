@@ -1,107 +1,66 @@
 import { useQuery } from '@tanstack/react-query';
-import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FlatList, View } from 'react-native';
 
 import * as publicApi from '@/api/public';
+import type { VideoOut } from '@/api/types';
+import { SectionHeader } from '@/components/SectionHeader';
+import { VIDEO_CARD_WIDTH, VideoCard } from '@/components/VideoCard';
 import { useI18n } from '@/lib/i18n';
-import { color, font } from '@/lib/theme';
+import { space } from '@/lib/theme';
 import { makeStyles } from '@/lib/useTheme';
+import { SkeletonCard } from '@/ui/Skeleton';
 
-/** Horizontal YouTube strip (§15); hidden when the category has no videos. */
+const keyOf = (video: VideoOut) => String(video.id);
+const renderItem = ({ item }: { item: VideoOut }) => <VideoCard video={item} />;
+
+/**
+ * Horizontal YouTube strip (§15). Skeleton while loading so it does not pop
+ * into the feed; hidden (not an error row — it is embedded) when the category
+ * has no videos or the request fails.
+ */
 export function VideoStrip({ category }: { category?: string }) {
   const styles = useStyles();
-  const { t, pick } = useI18n();
+  const { t } = useI18n();
   const videos = useQuery({
     queryKey: ['videos-strip', category ?? 'all'],
     queryFn: () => publicApi.fetchVideos({ category, limit: 6 }),
     staleTime: 120_000,
   });
+  if (videos.isPending) {
+    return (
+      <View style={styles.wrap}>
+        <SectionHeader title={t('tab.videos')} />
+        <View style={[styles.track, styles.skeletonRow]}>
+          <SkeletonCard variant="video" />
+          <SkeletonCard variant="video" />
+        </View>
+      </View>
+    );
+  }
   const items = videos.data?.videos ?? [];
   if (items.length === 0) return null;
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.head}>
-        <Text style={styles.title}>▶ {t('tab.videos')}</Text>
-        <Pressable onPress={() => router.push('/videos')} accessibilityRole="button">
-          <Text style={styles.seeAll}>{t('home.seeAll')} →</Text>
-        </Pressable>
-      </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-        {items.map((video) => (
-          <Pressable
-            key={video.id}
-            onPress={() =>
-              router.push({ pathname: '/video/[id]', params: { id: String(video.id) } })
-            }
-            accessibilityRole="button"
-            style={styles.card}
-          >
-            <View style={styles.thumbWrap}>
-              <Image source={{ uri: video.thumbnail_url }} style={styles.thumb} contentFit="cover" transition={150} />
-              <View style={styles.playBadge}>
-                <Text style={styles.playGlyph}>▶</Text>
-              </View>
-            </View>
-            <Text style={styles.videoTitle} numberOfLines={2}>
-              {pick(video.title_te, video.title_en)}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+      <SectionHeader title={t('tab.videos')} onSeeAll={() => router.push('/videos')} />
+      <FlatList
+        horizontal
+        data={items}
+        keyExtractor={keyOf}
+        renderItem={renderItem}
+        showsHorizontalScrollIndicator={false}
+        snapToInterval={VIDEO_CARD_WIDTH + space.md}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        contentContainerStyle={styles.track}
+      />
     </View>
   );
 }
 
-const useStyles = makeStyles((color) => ({
-  wrap: {
-    backgroundColor: color.paper,
-    borderTopWidth: 2,
-    borderTopColor: color.ink,
-    paddingBottom: 12,
-  },
-  head: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  title: { fontFamily: font.headline, fontSize: 18, lineHeight: 28, color: color.brand },
-  seeAll: { fontFamily: font.teluguSemiBold, fontSize: 12, lineHeight: 18, color: color.info },
-  row: { paddingHorizontal: 14, gap: 12 },
-  card: { width: 200 },
-  thumbWrap: { position: 'relative' },
-  thumb: {
-    width: 200,
-    height: 112,
-    borderRadius: 6,
-    backgroundColor: color.placeholder,
-  },
-  playBadge: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  playGlyph: {
-    fontSize: 15,
-    color: color.white,
-    backgroundColor: 'rgba(0,0,0,0.55))',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 18,
-    overflow: 'hidden',
-  },
-  videoTitle: {
-    fontFamily: font.teluguSemiBold,
-    fontSize: 12.5,
-    lineHeight: 20,
-    color: color.ink,
-    marginTop: 6,
-  },
+const useStyles = makeStyles(() => ({
+  wrap: { paddingBottom: space.sm },
+  track: { paddingHorizontal: space.lg },
+  skeletonRow: { flexDirection: 'row', gap: space.md },
 }));

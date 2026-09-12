@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -49,7 +49,7 @@ beforeEach(() => {
 });
 
 describe('PublicLayout', () => {
-  it('exposes the sections nav landmark fed by the site config', async () => {
+  it('renders the shell: skip link, sections nav fed by the site config, one main landmark', async () => {
     render(
       <Providers>
         <Routes>
@@ -59,10 +59,16 @@ describe('PublicLayout', () => {
         </Routes>
       </Providers>,
     );
-    expect(screen.getByRole('navigation', { name: 'విభాగాలు' })).toBeInTheDocument();
-    expect(screen.getByText('page body')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'ప్రధాన కంటెంట్‌కు వెళ్లండి' })).toHaveAttribute('href', '#main');
+
+    const main = screen.getByRole('main');
+    expect(main).toHaveAttribute('id', 'main');
+    expect(within(main).getByText('page body')).toBeInTheDocument();
+
+    const nav = screen.getByRole('navigation', { name: 'విభాగాలు' });
+    expect(within(nav).getByRole('link', { name: 'హోమ్' })).toHaveAttribute('aria-current', 'page');
     expect(publicApi.fetchSiteConfig).toHaveBeenCalled();
-    expect((await screen.findAllByText('రాజకీయాలు')).length).toBeGreaterThan(0);
+    expect(await within(nav).findByRole('link', { name: 'రాజకీయాలు' })).toHaveAttribute('href', '/section/politics');
     expect(screen.queryByText('దాచినది')).toBeNull();
   });
 });

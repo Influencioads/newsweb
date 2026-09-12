@@ -49,15 +49,22 @@ export function ReadingProgress({ progress }: ReadingProgressProps) {
 
 export interface FontSizeGroupProps {
   className?: string;
+  /** Id of a visible caption; replaces the group's own `reader.fontSize` name. */
+  'aria-labelledby'?: string;
 }
 
 /** Four 44px chips bound to the persisted reader font step. */
-export function FontSizeGroup({ className }: FontSizeGroupProps) {
+export function FontSizeGroup({ className, 'aria-labelledby': labelledBy }: FontSizeGroupProps) {
   const { t } = useI18n();
   const fontStep = useReaderPrefs((s) => s.fontStep);
   const setFontStep = useReaderPrefs((s) => s.setFontStep);
   return (
-    <div role="group" aria-label={t('reader.fontSize')} className={cn('flex items-center gap-1', className)}>
+    <div
+      role="group"
+      aria-label={labelledBy ? undefined : t('reader.fontSize')}
+      aria-labelledby={labelledBy}
+      className={cn('flex items-center gap-1', className)}
+    >
       {FONT_STEPS.map((step) => (
         <Chip
           key={step}

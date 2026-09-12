@@ -36,7 +36,7 @@ function PageShell({
   children: React.ReactNode;
 }) {
   return (
-    <main className="mx-auto min-h-[55vh] max-w-[900px] px-4 py-7 sm:py-10">
+    <div className="mx-auto min-h-[55vh] max-w-[900px] px-4 py-7 sm:py-10">
       <div className="mb-6 border-b-2 border-ink pb-4">
         <p className="flex items-center gap-1.5 font-sans text-[11px] font-bold uppercase tracking-[0.16em] text-brand">
           {icon}
@@ -45,7 +45,7 @@ function PageShell({
         <h1 className="th mt-1 text-[27px] font-extrabold text-ink sm:text-[32px]">{title}</h1>
       </div>
       {children}
-    </main>
+    </div>
   );
 }
 

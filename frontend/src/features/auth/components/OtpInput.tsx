@@ -4,7 +4,7 @@ interface OtpInputProps {
   value: string;
   onChange: (value: string) => void;
   length?: number;
-  /** Mockup 1k uses 40x44 boxes for the OTP card and 34x38 for the TOTP step. */
+  /** Kept for callers; both sizes now sit on the 44px tap floor and the named type scale. */
   size?: 'lg' | 'sm';
   disabled?: boolean;
   autoFocus?: boolean;
@@ -73,10 +73,8 @@ export function OtpInput({
     }
   }
 
-  const box =
-    size === 'lg'
-      ? 'w-10 h-11 text-[17px]'
-      : 'w-[34px] h-[38px] text-[15px] bg-white';
+  // Both variants meet the 44px floor; `sm` only narrows the box.
+  const box = size === 'lg' ? 'h-tap w-11 text-headline-sm' : 'h-tap w-10 text-ui';
 
   return (
     <div role="group" aria-labelledby={`${id}-label`}>
@@ -103,7 +101,7 @@ export function OtpInput({
             onFocus={(e) => e.target.select()}
             className={[
               box,
-              'rounded-control text-center font-sans font-bold text-ink outline-none transition-colors',
+              'rounded-xl bg-field text-center font-sans font-bold text-ink outline-none transition-[colors,transform,box-shadow,opacity] duration-base ease-standard',
               digit ? 'border-2 border-brand' : 'border border-rule-input',
               'focus:border-2 focus:border-brand disabled:opacity-50',
             ].join(' ')}

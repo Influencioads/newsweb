@@ -306,24 +306,44 @@
     .reveal { opacity: 1; transform: none; }
   }
 
-  /* Ticker: one DOM copy, translated by its own width. Pause is a class the
-     button toggles; hover/focus pause for pointer users. */
+  /* Ticker: two copies in one track; one lap = -50% (keyframe in
+     tailwind.config.ts). Pause is a class the button toggles; hover pauses
+     for pointer users. Keyboard focus drops the animation entirely so the
+     focused link sits at its layout position, and the viewport (.marquee-clip)
+     turns into a scroll container that can bring it into view; leaving
+     restores overflow:clip, which also discards the scroll offset. Reduced
+     motion keeps the band scrollable by touch/wheel and hides the duplicate. */
   .animate-marquee {
     display: flex;
     width: max-content;
     animation: marquee var(--marquee-duration, 40s) linear infinite;
   }
   .animate-marquee:hover,
-  .animate-marquee:focus-within,
   .marquee-paused .animate-marquee {
     animation-play-state: paused;
   }
-
-  /* Fade the edges of a horizontal rail to show it scrolls. */
-  .fade-edges {
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent);
-    mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent);
+  .animate-marquee:focus-within {
+    animation: none;
   }
+  .marquee-clip { overflow-x: clip; }
+  .marquee-clip:focus-within { overflow-x: auto; }
+  @media (prefers-reduced-motion: reduce) {
+    .marquee-clip { overflow-x: auto; }
+    .animate-marquee { animation: none; }
+    .animate-marquee > [aria-hidden] { display: none; }
+  }
+
+  /* Fade the edges of a horizontal rail to show it scrolls. ChipRail adds
+     .fade-l / .fade-r per side, so an edge the rail is resting on stays sharp
+     (a 0px stop is a hard edge). */
+  .fade-edges {
+    --fade-l: 0px;
+    --fade-r: 0px;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
+  }
+  .fade-l { --fade-l: 24px; }
+  .fade-r { --fade-r: 24px; }
 
   .no-scrollbar { scrollbar-width: none; }
   .no-scrollbar::-webkit-scrollbar { display: none; }

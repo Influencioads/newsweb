@@ -16,7 +16,7 @@ export default function LiveNewsPage() {
   });
 
   return (
-    <main className="mx-auto max-w-[860px] px-4 py-7">
+    <div className="mx-auto max-w-[860px] px-4 py-7">
       <div className="mb-6 flex items-start justify-between gap-4 border-b-2 border-ink pb-4">
         <div>
           <div className="mb-1 flex items-center gap-2 text-breaking">
@@ -64,6 +64,6 @@ export default function LiveNewsPage() {
       <p className="mt-5 font-sans text-[11px] text-muted-light">
         {te ? 'చివరిసారి నవీకరించబడింది' : 'Last refreshed'}: {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString() : '—'}
       </p>
-    </main>
+    </div>
   );
 }

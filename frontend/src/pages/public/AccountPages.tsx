@@ -22,11 +22,11 @@ const input =
 
 function Shell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
-    <main className="mx-auto max-w-md px-4 py-10">
+    <div className="mx-auto max-w-md px-4 py-10">
       <h1 className="th text-[26px] font-extrabold leading-tight text-ink">{title}</h1>
       <p className="te mt-1.5 text-[13px] leading-telugu text-muted">{subtitle}</p>
       <div className="mt-6">{children}</div>
-    </main>
+    </div>
   );
 }
 

@@ -72,7 +72,7 @@ export default function MyEpaperPage() {
     preferences.some((x) => x.preference_type === type && x.target_id === id);
   if (!me)
     return (
-      <main className="mx-auto max-w-xl p-10 text-center">
+      <div className="mx-auto max-w-xl p-10 text-center">
         <h1 className="th text-2xl font-bold">
           {en
             ? "Sign in to create your E-Paper"
@@ -84,12 +84,12 @@ export default function MyEpaperPage() {
         >
           {en ? "Sign in" : "లాగిన్"}
         </Link>
-      </main>
+      </div>
     );
   const chip = (active: boolean) =>
     `rounded-full border px-3 py-2 text-sm ${active ? "border-brand bg-brand text-white" : "border-rule bg-white"}`;
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
+    <div className="mx-auto max-w-5xl px-4 py-8">
       <h1 className="th text-[30px] font-extrabold">
         {en ? "Create My E-Paper" : "నా ఈ-పేపర్ సృష్టించండి"}
       </h1>
@@ -216,7 +216,7 @@ export default function MyEpaperPage() {
             </article>
           ))}
       </div>
-    </main>
+    </div>
   );
 }
 

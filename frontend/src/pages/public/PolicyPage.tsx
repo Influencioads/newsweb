@@ -138,11 +138,11 @@ export default function PolicyPage() {
 
   if (!entry) {
     return (
-      <main className="mx-auto max-w-article px-4 py-16 text-center">
+      <div className="mx-auto max-w-article px-4 py-16 text-center">
         <h1 className={`${language === 'te' ? 'th' : 'font-sans'} text-[22px] font-bold text-ink`}>
           {t('state.articleNotFound')}
         </h1>
-      </main>
+      </div>
     );
   }
 
@@ -150,7 +150,7 @@ export default function PolicyPage() {
   const script = language === 'te' ? 'te' : 'font-sans';
 
   return (
-    <main className="mx-auto max-w-article bg-white px-4 py-8">
+    <div className="mx-auto max-w-article bg-white px-4 py-8">
       <h1
         className={`${language === 'te' ? 'th' : 'font-sans'} text-[26px] font-extrabold text-ink`}
       >
@@ -163,6 +163,6 @@ export default function PolicyPage() {
           </p>
         ))}
       </div>
-    </main>
+    </div>
   );
 }

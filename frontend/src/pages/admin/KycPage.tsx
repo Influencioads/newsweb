@@ -1,12 +1,26 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Check, ExternalLink, FileText, FolderOpen, MessageCircleQuestion, X } from 'lucide-react';
 
 import { api } from '@/api/client';
-import { inputClass } from '@/components/admin/FormControls';
+import { AdminPage } from '@/components/admin/AdminPage';
+import { DataTable, type DataTableColumn } from '@/components/admin/DataTable';
+import { KycPill } from '@/components/admin/StatusPill';
+import { Badge } from '@/components/ui/Badge';
+import { Button, ButtonLink } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { ConfirmDialog, Dialog, PromptDialog } from '@/components/ui/Dialog';
+import { EmptyState, ErrorState, QueryState, Skeleton } from '@/components/ui/State';
+import { Tabs } from '@/components/ui/Tabs';
+import { useToast } from '@/components/ui/Toast';
 import * as cmsApi from '@/features/cms/api';
-import { useI18n } from '@/i18n';
+import { KYC_STATUS } from '@/features/cms/status';
+import { useI18n, useScript } from '@/i18n';
 import { useAuth } from '@/stores/auth';
 import type { KycDocumentRow, KycProfileRow, KycStatus } from '@/types/cms';
+import { cn } from '@/utils/cn';
+
+import { useL } from './useL';
 
 /**
  * Contributor applications — citizens, freelance and student journalists.
@@ -20,17 +34,6 @@ import type { KycDocumentRow, KycProfileRow, KycStatus } from '@/types/cms';
  * teaches people to ignore permission errors.
  */
 
-const STATUS: Record<KycStatus, { te: string; en: string; tone: string }> = {
-  not_started: { te: 'ప్రారంభం కాలేదు', en: 'Not started', tone: 'bg-canvas text-muted' },
-  draft: { te: 'డ్రాఫ్ట్', en: 'Draft', tone: 'bg-canvas text-muted' },
-  submitted: { te: 'సమర్పించారు', en: 'Submitted', tone: 'bg-info/12 text-info' },
-  in_review: { te: 'సమీక్షలో', en: 'In review', tone: 'bg-info/12 text-info' },
-  more_info: { te: 'మరింత సమాచారం', en: 'More info asked', tone: 'bg-partial/15 text-partial' },
-  approved: { te: 'ఆమోదించారు', en: 'Approved', tone: 'bg-success/12 text-success' },
-  rejected: { te: 'తిరస్కరించారు', en: 'Rejected', tone: 'bg-breaking-tint text-breaking' },
-  expired: { te: 'గడువు ముగిసింది', en: 'Expired', tone: 'bg-canvas text-muted' },
-};
-
 const TABS: KycStatus[] = ['submitted', 'more_info', 'approved', 'rejected'];
 
 const TYPE_LABEL: Record<string, { te: string; en: string }> = {
@@ -39,34 +42,36 @@ const TYPE_LABEL: Record<string, { te: string; en: string }> = {
   student: { te: 'విద్యార్థి', en: 'Student' },
 };
 
+type Decision = 'approve' | 'reject' | 'request-more';
+
 /**
  * The document viewer.
  *
  * An `<img src>` cannot carry a bearer token, so the obvious implementation
  * ships a viewer that always 401s. The bytes are fetched as a blob with the
  * axios client's auth header and turned into an object URL, which is revoked
- * on unmount so the image does not linger in memory after the reviewer closes
- * it.
+ * when the dialog closes so the image does not linger in memory.
  */
-function DocumentViewer({ profileId, document: doc, onClose }: {
+function DocumentDialog({ profileId, document: doc, onClose }: {
   profileId: number;
-  document: KycDocumentRow;
+  document: KycDocumentRow | null;
   onClose: () => void;
 }) {
-  const { language } = useI18n();
-  const en = language === 'en';
+  const L = useL();
+  const s = useScript();
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const docId = doc?.id;
 
   useEffect(() => {
+    if (docId === undefined) return;
     let revoked = false;
     let url: string | null = null;
+    setObjectUrl(null);
+    setFailed(false);
     (async () => {
       try {
-        const response = await api.get(
-          `/cms/kyc/${profileId}/documents/${doc.id}/raw`,
-          { responseType: 'blob' },
-        );
+        const response = await api.get(`/cms/kyc/${profileId}/documents/${docId}/raw`, { responseType: 'blob' });
         if (revoked) return;
         url = URL.createObjectURL(response.data as Blob);
         setObjectUrl(url);
@@ -78,185 +83,210 @@ function DocumentViewer({ profileId, document: doc, onClose }: {
       revoked = true;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [profileId, doc.id]);
+  }, [profileId, docId]);
 
   return (
-    <div className="mt-2 rounded-control border border-rule bg-canvas p-3">
-      <div className="mb-2 flex items-center gap-2">
-        <span className="font-sans text-[12px] font-bold text-ink">{doc.kind}</span>
-        {doc.number_masked ? (
-          <span className="font-mono text-[11.5px] text-muted">{doc.number_masked}</span>
-        ) : null}
-        <button type="button" onClick={onClose}
-          className="te ml-auto text-[12px] font-semibold text-muted underline">
-          {en ? 'Close' : 'మూసివేయండి'}
-        </button>
-      </div>
+    <Dialog open={doc !== null} onClose={onClose} title={doc?.kind ?? ''} description={doc?.number_masked ?? undefined} size="lg">
       {failed ? (
-        <p className="te text-[12.5px] text-breaking">
-          {en ? 'Could not open this document.' : 'ఈ పత్రాన్ని తెరవలేకపోయాం.'}
-        </p>
-      ) : objectUrl ? (
+        <ErrorState compact title={L('ఈ పత్రాన్ని తెరవలేకపోయాం.', 'Could not open this document.')} />
+      ) : objectUrl && doc ? (
         doc.mime === 'application/pdf' ? (
-          <iframe src={objectUrl} title={doc.kind} className="h-[520px] w-full border-0" />
+          <iframe src={objectUrl} title={doc.kind} className="h-[60vh] w-full rounded-xl border border-rule" />
         ) : (
-          <img src={objectUrl} alt="" className="max-h-[520px] w-auto rounded" />
+          <img src={objectUrl} alt={`${doc.kind}${doc.number_masked ? ` · ${doc.number_masked}` : ''}`} className="mx-auto max-h-[60vh] w-auto rounded-xl" />
         )
       ) : (
-        <p className="te text-[12.5px] text-muted">{en ? 'Opening…' : 'తెరుస్తోంది…'}</p>
+        <Skeleton variant="image" ratio="4/3" />
       )}
-      <p className="te mt-2 text-[11px] text-muted">
-        {en
-          ? 'This view is recorded in the audit log with your name, IP and the time.'
-          : 'ఈ వీక్షణ మీ పేరు, IP, సమయంతో ఆడిట్ లాగ్‌లో నమోదవుతుంది.'}
+      <p className={cn(s.body, 'mt-4 text-meta text-muted')}>
+        {L(
+          'ఈ వీక్షణ మీ పేరు, IP, సమయంతో ఆడిట్ లాగ్‌లో నమోదవుతుంది.',
+          'This view is recorded in the audit log with your name, IP and the time.',
+        )}
       </p>
-    </div>
+    </Dialog>
   );
 }
 
-function ApplicationCard({ profile, onChanged }: {
-  profile: KycProfileRow;
+function ApplicationDialog({ profile, onClose, onChanged }: {
+  profile: KycProfileRow | null;
+  onClose: () => void;
   onChanged: () => void;
 }) {
-  const { language } = useI18n();
-  const en = language === 'en';
-  const can = useAuth((s) => s.can);
+  const L = useL();
+  const s = useScript();
+  const toast = useToast();
+  const can = useAuth((st) => st.can);
   const mayOpen = can('kyc.view_document');
-  const [open, setOpen] = useState(false);
   const [viewing, setViewing] = useState<KycDocumentRow | null>(null);
-  const [note, setNote] = useState('');
+  const [decision, setDecision] = useState<Decision | null>(null);
+  const open = profile !== null;
+  const profileId = profile?.id ?? 0;
 
   const detail = useQuery({
-    queryKey: ['cms', 'kyc', profile.id],
-    queryFn: () => cmsApi.fetchKycApplication(profile.id),
+    queryKey: ['cms', 'kyc', profileId],
+    queryFn: () => cmsApi.fetchKycApplication(profileId),
     enabled: open,
   });
 
   const decide = useMutation({
-    mutationFn: (action: 'approve' | 'reject' | 'request-more') =>
-      cmsApi.decideKyc(profile.id, action, { note: note || null }),
-    onSuccess: () => { setNote(''); onChanged(); },
+    mutationFn: ({ action, note }: { action: Decision; note: string }) =>
+      cmsApi.decideKyc(profileId, action, { note: note || null }),
+    onSuccess: (_row, { action }) => {
+      toast.success(
+        action === 'approve'
+          ? L('ఆమోదించారు', 'Approved')
+          : action === 'reject'
+            ? L('తిరస్కరించారు', 'Rejected')
+            : L('మరింత సమాచారం అడిగారు', 'Asked for more information'),
+      );
+      setDecision(null);
+      onChanged();
+      onClose();
+    },
+    onError: (e) => toast.error(e),
   });
 
-  const label = STATUS[profile.status];
-  const type = TYPE_LABEL[profile.contributor_type ?? 'citizen'];
+  const type = profile ? TYPE_LABEL[profile.contributor_type ?? 'citizen'] : undefined;
+  const notePlaceholder = L(
+    'దరఖాస్తుదారుకు కనిపించే గమనిక — ఏమి లేదో చెప్పండి.',
+    'A note the applicant will see — say what is missing, not just no.',
+  );
 
   return (
-    <article className="rounded-card border border-rule bg-white p-4 shadow-card dark:bg-surface">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="te text-[15px] font-bold text-ink">{profile.display_name_te}</span>
-        <span className={`inline-block rounded-chip px-2 py-0.5 font-sans text-[10.5px] font-bold ${label.tone}`}>
-          {en ? label.en : label.te}
-        </span>
-        <span className="te rounded-chip bg-canvas px-2 py-0.5 text-[11px] text-ink-soft">
-          {en ? type?.en : type?.te}
-        </span>
-        {!profile.phone_verified ? (
-          <span className="te rounded-chip bg-breaking-tint px-2 py-0.5 text-[11px] font-semibold text-breaking">
-            {en ? 'phone unverified' : 'ఫోన్ ధృవీకరించలేదు'}
-          </span>
-        ) : null}
-      </div>
+    <>
+      <Dialog
+        open={open}
+        onClose={onClose}
+        size="lg"
+        title={<span lang="te" className="th">{profile?.display_name_te}</span>}
+        description={
+          profile ? (
+            <span className="font-sans">
+              <span lang="te" className="te">
+                {profile.name_te}
+              </span>{' '}
+              · {profile.phone ?? '—'} · {profile.document_count} {L('పత్రాలు', 'documents')}
+              {profile.submitted_at ? ` · ${new Date(profile.submitted_at).toLocaleString('en-IN')}` : ''}
+            </span>
+          ) : undefined
+        }
+        footer={
+          <>
+            <Button variant="danger" icon={X} disabled={decide.isPending} onClick={() => setDecision('reject')}>
+              {L('తిరస్కరించండి', 'Reject')}
+            </Button>
+            <Button variant="secondary" icon={MessageCircleQuestion} disabled={decide.isPending} onClick={() => setDecision('request-more')}>
+              {L('మరింత అడగండి', 'Ask for more')}
+            </Button>
+            <Button icon={Check} disabled={decide.isPending} onClick={() => setDecision('approve')}>
+              {L('ఆమోదించండి', 'Approve')}
+            </Button>
+          </>
+        }
+      >
+        {profile ? (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <KycPill status={profile.status} />
+              {type ? <Badge tone="district" size="xs">{L(type.te, type.en)}</Badge> : null}
+              {!profile.phone_verified ? (
+                <Badge tone="partial" size="xs">{L('ఫోన్ ధృవీకరించలేదు', 'phone unverified')}</Badge>
+              ) : null}
+            </div>
 
-      <p className="mt-1 font-sans text-[11.5px] text-muted">
-        {profile.name_te} · {profile.phone ?? '—'} · {profile.document_count}{' '}
-        {en ? 'documents' : 'పత్రాలు'}
-        {profile.submitted_at
-          ? ` · ${new Date(profile.submitted_at).toLocaleString('en-IN')}`
-          : ''}
-      </p>
+            {profile.organisation ? (
+              <p lang="te" className="te text-te-body-xs text-ink-soft">
+                {profile.organisation}
+                {profile.course_year ? ` · ${L('సంవత్సరం', 'year')} ${profile.course_year}` : ''}
+              </p>
+            ) : null}
+            {profile.portfolio_url ? (
+              <ButtonLink to={profile.portfolio_url} external variant="link" size="sm" iconRight={ExternalLink} className="-ml-1 break-all">
+                {profile.portfolio_url}
+              </ButtonLink>
+            ) : null}
 
-      {profile.organisation ? (
-        <p className="te mt-1 text-[12.5px] leading-telugu text-ink-soft">
-          {profile.organisation}
-          {profile.course_year ? ` · ${en ? 'year' : 'సంవత్సరం'} ${profile.course_year}` : ''}
-        </p>
-      ) : null}
-      {profile.portfolio_url ? (
-        <a href={profile.portfolio_url} target="_blank" rel="noreferrer noopener"
-          className="mt-1 block font-sans text-[12px] text-info underline">
-          {profile.portfolio_url}
-        </a>
-      ) : null}
+            <QueryState query={detail} compact isEmpty={() => false} skeleton={<Skeleton lines={3} />}>
+              {(data) => (
+                <div className="space-y-4">
+                  {data.bio_te ? <p lang="te" className="te text-te-body-xs text-ink-soft">{data.bio_te}</p> : null}
+                  {data.documents?.length ? (
+                    <ul className="divide-y divide-rule-soft rounded-xl border border-rule">
+                      {data.documents.map((d) => (
+                        <li key={d.id} className="flex min-h-tap flex-wrap items-center gap-3 px-3 py-2">
+                          <span className="font-sans text-ui-sm font-semibold text-ink">{d.kind}</span>
+                          <span className="font-mono text-meta text-muted">{d.number_masked ?? '—'}</span>
+                          <span className="font-sans text-meta tabular-nums text-muted">{Math.round(d.bytes / 1024)} KB</span>
+                          {mayOpen ? (
+                            <Button variant="secondary" size="sm" icon={FileText} className="ml-auto" onClick={() => setViewing(d)}>
+                              {L('తెరవండి', 'Open')}
+                            </Button>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              )}
+            </QueryState>
 
-      <button type="button" onClick={() => setOpen((v) => !v)}
-        className="te mt-2 text-[12px] font-semibold text-info underline">
-        {open ? (en ? 'Hide details' : 'వివరాలు దాచండి') : (en ? 'Open application' : 'దరఖాస్తు తెరవండి')}
-      </button>
-
-      {open ? (
-        <div className="mt-2 space-y-2">
-          {detail.data?.bio_te ? (
-            <p className="te text-[12.5px] leading-telugu text-ink-soft">{detail.data.bio_te}</p>
-          ) : null}
-
-          <ul className="space-y-1">
-            {(detail.data?.documents ?? []).map((doc) => (
-              <li key={doc.id} className="flex flex-wrap items-center gap-2">
-                <span className="font-sans text-[12px] text-ink">{doc.kind}</span>
-                <span className="font-mono text-[11px] text-muted">
-                  {doc.number_masked ?? '—'}
-                </span>
-                <span className="font-sans text-[11px] text-muted">
-                  {Math.round(doc.bytes / 1024)} KB
-                </span>
-                {mayOpen ? (
-                  <button type="button" onClick={() => setViewing(doc)}
-                    className="te text-[11.5px] font-semibold text-brand underline">
-                    {en ? 'Open' : 'తెరవండి'}
-                  </button>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-
-          {!mayOpen ? (
-            <p className="te text-[11.5px] leading-telugu text-muted">
-              {en
-                ? 'Opening an identity document needs a separate permission. Triage from the declaration and the masked numbers, or ask an editor-in-chief.'
-                : 'గుర్తింపు పత్రం తెరవడానికి ప్రత్యేక అనుమతి కావాలి. మాస్క్ చేసిన నంబర్లతో పరిశీలించండి, లేదా ఎడిటర్-ఇన్-చీఫ్‌ను అడగండి.'}
-            </p>
-          ) : null}
-
-          {viewing ? (
-            <DocumentViewer profileId={profile.id} document={viewing}
-              onClose={() => setViewing(null)} />
-          ) : null}
-
-          <textarea value={note} onChange={(e) => setNote(e.target.value)}
-            placeholder={en
-              ? 'A note the applicant will see — say what is missing, not just no.'
-              : 'దరఖాస్తుదారుకు కనిపించే గమనిక — ఏమి లేదో చెప్పండి.'}
-            className={`te ${inputClass} min-h-16`} />
-
-          <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={decide.isPending}
-              onClick={() => decide.mutate('approve')}
-              className="te min-h-[32px] rounded-control bg-brand px-3 text-[12px] font-bold text-white disabled:opacity-50">
-              {en ? 'Approve' : 'ఆమోదించండి'}
-            </button>
-            <button type="button" disabled={decide.isPending}
-              onClick={() => decide.mutate('request-more')}
-              className="te min-h-[32px] rounded-control border border-rule px-3 text-[12px] font-semibold text-ink-soft disabled:opacity-50">
-              {en ? 'Ask for more' : 'మరింత అడగండి'}
-            </button>
-            <button type="button" disabled={decide.isPending}
-              onClick={() => decide.mutate('reject')}
-              className="te min-h-[32px] rounded-control border border-breaking-border px-3 text-[12px] font-semibold text-breaking disabled:opacity-50">
-              {en ? 'Reject' : 'తిరస్కరించండి'}
-            </button>
+            {!mayOpen ? (
+              <p className={cn(s.body, 'text-meta text-muted')}>
+                {L(
+                  'గుర్తింపు పత్రం తెరవడానికి ప్రత్యేక అనుమతి కావాలి. మాస్క్ చేసిన నంబర్లతో పరిశీలించండి, లేదా ఎడిటర్-ఇన్-చీఫ్‌ను అడగండి.',
+                  'Opening an identity document needs a separate permission. Triage from the declaration and the masked numbers, or ask an editor-in-chief.',
+                )}
+              </p>
+            ) : null}
           </div>
-        </div>
-      ) : null}
-    </article>
+        ) : null}
+      </Dialog>
+
+      <DocumentDialog profileId={profileId} document={viewing} onClose={() => setViewing(null)} />
+
+      <ConfirmDialog
+        open={decision === 'approve'}
+        onClose={() => setDecision(null)}
+        title={L('దరఖాస్తును ఆమోదించాలా?', 'Approve this application?')}
+        body={L(
+          'ఆమోదం వారి గుర్తింపును ధృవీకరిస్తుంది, పంపగలిగే వాటిని పెంచుతుంది — ప్రచురణ హక్కు ఇవ్వదు.',
+          'Approval verifies who they are and raises what they may send — it never lets them publish.',
+        )}
+        confirmLabel={L('ఆమోదించండి', 'Approve')}
+        pending={decide.isPending}
+        onConfirm={() => decide.mutate({ action: 'approve', note: '' })}
+      />
+
+      <PromptDialog
+        open={decision === 'reject' || decision === 'request-more'}
+        onClose={() => setDecision(null)}
+        title={decision === 'reject' ? L('దరఖాస్తును తిరస్కరించాలా?', 'Reject this application?') : L('మరింత సమాచారం అడగండి', 'Ask for more information')}
+        fields={[
+          {
+            name: 'note',
+            label: L('గమనిక', 'Note'),
+            type: 'textarea',
+            placeholder: notePlaceholder,
+            hint: L('దరఖాస్తుదారుకు కనిపిస్తుంది', 'The applicant will see this'),
+          },
+        ]}
+        submitLabel={decision === 'reject' ? L('తిరస్కరించండి', 'Reject') : L('మరింత అడగండి', 'Ask for more')}
+        pending={decide.isPending}
+        onSubmit={(v) => {
+          if (decision) decide.mutate({ action: decision, note: v.note ?? '' });
+        }}
+      />
+    </>
   );
 }
 
 export default function KycPage() {
-  const { language } = useI18n();
-  const en = language === 'en';
+  const { t } = useI18n();
+  const L = useL();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<KycStatus>('submitted');
+  const [selected, setSelected] = useState<KycProfileRow | null>(null);
 
   const applications = useQuery({
     queryKey: ['cms', 'kyc-queue', tab],
@@ -268,40 +298,108 @@ export default function KycPage() {
     void queryClient.invalidateQueries({ queryKey: ['cms', 'kyc'] });
   };
 
+  const columns: DataTableColumn<KycProfileRow>[] = [
+    {
+      key: 'applicant',
+      header: L('దరఖాస్తుదారు', 'Applicant'),
+      lang: 'te',
+      render: (p) => (
+        <>
+          <span className="block font-bold text-ink">{p.display_name_te}</span>
+          <span className="block text-meta text-muted">
+            {p.name_te ?? ''}
+            {p.phone ? ` · ${p.phone}` : ''}
+          </span>
+        </>
+      ),
+    },
+    {
+      key: 'type',
+      header: L('రకం', 'Type'),
+      hideBelow: 'md',
+      render: (p) => {
+        const type = TYPE_LABEL[p.contributor_type ?? 'citizen'];
+        return type ? L(type.te, type.en) : (p.contributor_type ?? '—');
+      },
+    },
+    {
+      key: 'status',
+      header: L('స్థితి', 'Status'),
+      render: (p) => (
+        <span className="flex flex-wrap gap-1">
+          <KycPill status={p.status} />
+          {!p.phone_verified ? <Badge tone="partial" size="xs">{L('ఫోన్ ధృవీకరించలేదు', 'phone unverified')}</Badge> : null}
+        </span>
+      ),
+    },
+    {
+      key: 'documents',
+      header: L('పత్రాలు', 'Documents'),
+      align: 'right',
+      hideBelow: 'lg',
+      render: (p) => <span className="font-sans tabular-nums">{p.document_count}</span>,
+    },
+    {
+      key: 'submitted',
+      header: L('సమర్పించినది', 'Submitted'),
+      hideBelow: 'md',
+      nowrap: true,
+      render: (p) => (
+        <span className="font-sans text-meta text-muted">
+          {p.submitted_at ? new Date(p.submitted_at).toLocaleString('en-IN') : '—'}
+        </span>
+      ),
+    },
+  ];
+
+  const rowKey = (p: KycProfileRow) => p.id;
+
   return (
-    <main className="mx-auto max-w-4xl px-4 py-6">
-      <header className="mb-4">
-        <h1 className="th text-[25px] font-extrabold text-ink">
-          {en ? 'Contributor applications' : 'విలేకరి దరఖాస్తులు'}
-        </h1>
-        <p className="te mt-1 max-w-[70ch] text-[12px] leading-telugu text-muted">
-          {en
-            ? 'Citizens, freelance and student journalists asking to file stories. Approval verifies who they are and raises what they may send — it never lets them publish.'
-            : 'కథనాలు పంపాలనుకునే పౌరులు, ఫ్రీలాన్స్, విద్యార్థి విలేకరులు. ఆమోదం వారి గుర్తింపును ధృవీకరిస్తుంది — ప్రచురణ హక్కు ఇవ్వదు.'}
-        </p>
-      </header>
+    <AdminPage
+      title={t('admin.page.kyc')}
+      width="page"
+      subtitle={L(
+        'కథనాలు పంపాలనుకునే పౌరులు, ఫ్రీలాన్స్, విద్యార్థి విలేకరులు. ఆమోదం వారి గుర్తింపును ధృవీకరిస్తుంది — ప్రచురణ హక్కు ఇవ్వదు.',
+        'Citizens, freelance and student journalists asking to file stories. Approval verifies who they are and raises what they may send — it never lets them publish.',
+      )}
+    >
+      <Tabs
+        ariaLabel={L('స్థితి', 'Status')}
+        scrollable
+        items={TABS.map((key) => ({ key, label: L(KYC_STATUS[key].te, KYC_STATUS[key].en) }))}
+        value={tab}
+        onChange={(key) => setTab(key as KycStatus)}
+      />
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        {TABS.map((key) => (
-          <button key={key} type="button" onClick={() => setTab(key)} aria-pressed={tab === key}
-            className={`te min-h-[34px] rounded-chip border px-3.5 text-[12.5px] font-semibold ${
-              tab === key ? 'border-brand bg-brand text-white' : 'border-rule bg-white text-ink dark:bg-surface'
-            }`}>
-            {en ? STATUS[key].en : STATUS[key].te}
-          </button>
-        ))}
+      <div role="tabpanel" aria-label={L(KYC_STATUS[tab].te, KYC_STATUS[tab].en)}>
+        <QueryState
+          query={applications}
+          isEmpty={(data) => data.items.length === 0}
+          skeleton={<DataTable rows={[]} columns={columns} rowKey={rowKey} loading />}
+          empty={
+            <Card padding="none">
+              <EmptyState title={L('ఈ క్యూలో ఏమీ లేదు.', 'Nothing in this queue.')} compact />
+            </Card>
+          }
+        >
+          {(data) => (
+            <DataTable
+              rows={data.items}
+              columns={columns}
+              rowKey={rowKey}
+              caption={t('admin.page.kyc')}
+              onRowClick={setSelected}
+              rowActions={(p) => (
+                <Button variant="secondary" size="sm" icon={FolderOpen} onClick={() => setSelected(p)}>
+                  {L('దరఖాస్తు తెరవండి', 'Open application')}
+                </Button>
+              )}
+            />
+          )}
+        </QueryState>
       </div>
 
-      <div className="space-y-3">
-        {(applications.data?.items ?? []).map((profile) => (
-          <ApplicationCard key={profile.id} profile={profile} onChanged={refresh} />
-        ))}
-        {applications.data && applications.data.items.length === 0 ? (
-          <p className="te rounded-card border border-rule bg-white p-8 text-center text-[13px] text-muted dark:bg-surface">
-            {en ? 'Nothing in this queue.' : 'ఈ క్యూలో ఏమీ లేదు.'}
-          </p>
-        ) : null}
-      </div>
-    </main>
+      <ApplicationDialog profile={selected} onClose={() => setSelected(null)} onChanged={refresh} />
+    </AdminPage>
   );
 }

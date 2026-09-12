@@ -1,69 +1,177 @@
-import { Suspense, useState } from 'react';
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LogOut, Menu, Search, X } from 'lucide-react';
+import { Suspense, useEffect, useState, type FormEvent } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { ChevronRight, LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun } from 'lucide-react';
 
 import { RouteFallback, SkipLink } from '@/components/app';
-import { useAuth } from '@/stores/auth';
-import type { PermissionKey } from '@/types/auth';
 import { LanguageToggle } from '@/components/layout/LanguageToggle';
-import { useI18n } from '@/i18n';
+import { Badge } from '@/components/ui/Badge';
+import { Button, IconButton } from '@/components/ui/Button';
+import { Sheet } from '@/components/ui/Dialog';
+import { Input } from '@/components/ui/Field';
+import { Icon } from '@/components/ui/Icon';
+import { useToast } from '@/components/ui/Toast';
+import { useI18n, useScript } from '@/i18n';
+import { useAuth } from '@/stores/auth';
+import { useReaderPrefs } from '@/stores/readerPrefs';
+import { cn } from '@/utils/cn';
+import { useScrolled, withViewTransition } from '@/utils/motion';
+
+import { findAdminNav, visibleAdminNav, type AdminNavGroup } from './adminNav';
 
 /**
- * Newsroom CMS shell — the dark topbar from mockup `1h`.
- *
- *   [టాప్ తెలుగు · NEWSROOM CMS]        [⌕ వెతకండి…]  [name · role · district]
- *
- * Nav entries are permission-gated so a stringer never sees an approval queue
- * they cannot use. Entries are added as each phase lands — nothing here links to
- * a screen that does not exist (brief §40).
+ * Newsroom CMS shell — collapsible ink sidebar (lg+), glass topbar with
+ * breadcrumb / search / language / theme / user chip / sign-out, and a left
+ * Sheet carrying the same grouped nav under lg. The shell owns the one
+ * `<main id="main">` landmark; pages render as PageContainer roots inside it.
  */
 
-interface NavItem {
-  to: string;
-  labelTe: string;
-  labelEn: string;
-  permission?: PermissionKey;
+const COLLAPSED_KEY = 'tn.admin-nav-collapsed';
+
+function readCollapsed(): boolean {
+  try {
+    return localStorage.getItem(COLLAPSED_KEY) === '1';
+  } catch {
+    return false;
+  }
 }
 
-const NAV: NavItem[] = [
-  { to: '/admin/dashboard', labelTe: 'డాష్‌బోర్డ్', labelEn: 'Dashboard' },
-  { to: '/admin/articles', labelTe: 'కథనాలు', labelEn: 'Articles' },
-  { to: '/admin/review', labelTe: 'రివ్యూ క్యూ', labelEn: 'Review queue', permission: 'article.review' },
-  { to: '/admin/pending', labelTe: 'పెండింగ్ కథనాలు', labelEn: 'Pending articles', permission: 'article.review' },
-  { to: '/admin/ai', labelTe: 'AI సూచనలు', labelEn: 'AI suggestions', permission: 'ai.use' },
-  { to: '/admin/sources', labelTe: 'కంటెంట్ మూలాలు', labelEn: 'Content sources', permission: 'article.review' },
-  { to: '/admin/moderation', labelTe: 'మోడరేషన్', labelEn: 'Moderation', permission: 'comment.moderate' },
-  { to: '/admin/kyc', labelTe: 'విలేకరి దరఖాస్తులు', labelEn: 'Contributors', permission: 'kyc.review' },
-  { to: '/admin/trending', labelTe: 'ట్రెండింగ్', labelEn: 'Trending', permission: 'dashboard.view' },
-  { to: '/admin/pins', labelTe: 'పిన్‌లు', labelEn: 'Pins', permission: 'article.publish' },
-  { to: '/admin/notifications', labelTe: 'నోటిఫికేషన్లు', labelEn: 'Notifications', permission: 'push.create' },
-  { to: '/admin/videos', labelTe: 'వీడియోలు', labelEn: 'Videos', permission: 'video.view' },
-  { to: '/admin/epaper', labelTe: 'ఈ-పేపర్', labelEn: 'E-Paper', permission: 'epaper.view' },
-  { to: '/admin/polls', labelTe: 'పోల్స్', labelEn: 'Polls', permission: 'article.view' },
-  { to: '/admin/ads', labelTe: 'ప్రకటనలు', labelEn: 'Ads', permission: 'ads.manage' },
-  { to: '/admin/homepage', labelTe: 'హోమ్ విభాగాలు', labelEn: 'Homepage', permission: 'settings.manage' },
-  { to: '/admin/analytics', labelTe: 'విశ్లేషణలు', labelEn: 'Analytics', permission: 'analytics.view' },
-  { to: '/admin/taxonomy', labelTe: 'వర్గీకరణ', labelEn: 'Taxonomy', permission: 'taxonomy.view' },
-  { to: '/admin/media', labelTe: 'మీడియా', labelEn: 'Media', permission: 'media.view' },
-  { to: '/admin/users', labelTe: 'వినియోగదారులు', labelEn: 'Users', permission: 'user.view' },
-  { to: '/admin/roles', labelTe: 'పాత్రలు', labelEn: 'Roles', permission: 'role.view' },
-  { to: '/admin/audit', labelTe: 'ఆడిట్', labelEn: 'Audit', permission: 'audit.view' },
-  { to: '/admin/voice', labelTe: 'వాయిస్', labelEn: 'Voice', permission: 'voice.manage' },
-  { to: '/admin/bulletins', labelTe: 'బులెటిన్లు', labelEn: 'Bulletins', permission: 'voice.manage' },
-  { to: '/admin/settings', labelTe: 'సెట్టింగ్స్', labelEn: 'Settings', permission: 'settings.view' },
-];
+function writeCollapsed(value: boolean): void {
+  try {
+    localStorage.setItem(COLLAPSED_KEY, value ? '1' : '0');
+  } catch {
+    // Private mode / quota: the choice simply does not persist.
+  }
+}
+
+const ITEM =
+  'relative flex min-h-tap items-center gap-3 rounded-xl px-3 text-ui-sm font-medium ' +
+  'transition-[colors,transform,box-shadow,opacity] duration-base ease-standard active:scale-[.98]';
+
+/** Item / group-label classes per surface: the ink sidebar or the light drawer. */
+const TONE = {
+  ink: {
+    idle: 'text-muted-inverse hover:bg-ink-panel hover:text-on-ink',
+    active: 'bg-brand-tint/20 text-on-ink',
+    label: 'text-muted-inverse',
+  },
+  surface: {
+    idle: 'text-ink-soft hover:bg-paper-sub hover:text-ink',
+    active: 'bg-brand-tint text-brand',
+    label: 'text-muted',
+  },
+} as const;
+
+interface NavGroupsProps {
+  groups: AdminNavGroup[];
+  tone: keyof typeof TONE;
+  collapsed?: boolean;
+}
+
+/** Grouped NavLinks. Collapsed = icons only (title + sr-only label). */
+function NavGroups({ groups, tone, collapsed = false }: NavGroupsProps) {
+  const { t } = useI18n();
+  const s = useScript();
+  const c = TONE[tone];
+  return (
+    <div className="space-y-4">
+      {groups.map((group) => (
+        <div key={group.key}>
+          {collapsed ? (
+            <div aria-hidden className="mx-3 mb-2 border-t border-on-ink/10" />
+          ) : (
+            <p
+              className={cn(
+                'mb-1 px-3',
+                c.label,
+                s.te ? 'te text-meta font-semibold' : 'font-sans text-eyebrow font-semibold uppercase',
+              )}
+            >
+              {t(group.labelKey)}
+            </p>
+          )}
+          <ul className="space-y-0.5">
+            {group.items.map((item) => {
+              const label = t(item.labelKey);
+              return (
+                <li key={item.to}>
+                  <NavLink
+                    to={item.to}
+                    title={collapsed ? label : undefined}
+                    className={({ isActive }) =>
+                      cn(ITEM, s.body, isActive ? c.active : c.idle, collapsed && 'justify-center px-0')
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        {isActive ? (
+                          <span aria-hidden className="absolute inset-y-2 left-0 w-1 rounded-pill bg-brand" />
+                        ) : null}
+                        <Icon icon={item.icon} size="md" />
+                        <span className={cn('min-w-0 flex-1', collapsed && 'sr-only')}>{label}</span>
+                      </>
+                    )}
+                  </NavLink>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Wordmark({ collapsed }: { collapsed: boolean }) {
+  const { t } = useI18n();
+  const s = useScript();
+  return (
+    <Link
+      to="/admin/dashboard"
+      className={cn(
+        'flex min-h-tap-lg flex-col justify-center rounded-xl px-3 py-2 transition-[colors,transform,box-shadow,opacity] duration-base ease-standard hover:bg-ink-panel',
+        collapsed && 'items-center px-0',
+      )}
+    >
+      <span lang="te" className="th text-headline-xs font-extrabold text-on-ink">
+        {collapsed ? 'టా' : 'టాప్ తెలుగు'}
+      </span>
+      <span
+        className={cn(
+          'text-muted-inverse',
+          s.te ? 'te text-meta' : 'font-sans text-eyebrow font-semibold uppercase',
+          collapsed && 'sr-only',
+        )}
+      >
+        {t('admin.cms')}
+      </span>
+    </Link>
+  );
+}
 
 export default function AdminLayout() {
   const navigate = useNavigate();
-  const me = useAuth((s) => s.me);
-  const can = useAuth((s) => s.can);
-  const signOut = useAuth((s) => s.signOut);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const { language } = useI18n();
+  const { pathname } = useLocation();
+  const { t, language } = useI18n();
+  const s = useScript();
+  const me = useAuth((a) => a.me);
+  const can = useAuth((a) => a.can);
+  const signOut = useAuth((a) => a.signOut);
+  const toast = useToast();
+  const resolvedTheme = useReaderPrefs((p) => p.resolvedTheme);
+  const toggleTheme = useReaderPrefs((p) => p.toggleTheme);
+  const scrolled = useScrolled(8);
+  const [collapsed, setCollapsed] = useState(readCollapsed);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [q, setQ] = useState('');
 
-  const visibleNav = NAV.filter((item) => !item.permission || can(item.permission));
+  // Close the drawer on navigation.
+  useEffect(() => setDrawerOpen(false), [pathname]);
 
-  // The mockup shows "name · role · district" in the user chip.
+  const groups = visibleAdminNav(can);
+  const current = findAdminNav(pathname);
+
+  // "name · role · district" in the user chip.
   const primaryRole = me?.roles[0];
   const chip = [
     language === 'en' ? me?.user.name_en : me?.user.name_te,
@@ -73,104 +181,138 @@ export default function AdminLayout() {
     .filter(Boolean)
     .join(' · ');
 
-  async function handleSignOut() {
-    await signOut();
-    navigate('/admin/login', { replace: true });
+  function toggleCollapsed() {
+    setCollapsed((v) => {
+      writeCollapsed(!v);
+      return !v;
+    });
   }
 
-  return (
-    <div className="min-h-screen bg-canvas-cms">
-      <SkipLink />
-      <header className="bg-ink text-white">
-        <div className="flex items-center justify-between gap-3 px-4 py-2.5 md:px-[18px]">
-          <div className="flex items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => setMobileNavOpen((v) => !v)}
-              aria-label="Toggle navigation"
-              aria-expanded={mobileNavOpen}
-              className="-ml-1 flex h-9 w-9 items-center justify-center rounded md:hidden"
-            >
-              {mobileNavOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
-            <Link to="/admin/dashboard" className="flex items-baseline gap-2.5">
-              <span className="th text-[16px] font-extrabold text-[#FF9A9A]">{language === 'en' ? 'Top Telugu' : 'టాప్ తెలుగు'}</span>
-              <span className="hidden font-sans text-[10px] font-semibold tracking-[0.14em] text-muted-inverse sm:inline">
-                NEWSROOM CMS
-              </span>
-            </Link>
-          </div>
+  function onSearch(e: FormEvent) {
+    e.preventDefault();
+    navigate(`/admin/articles?q=${encodeURIComponent(q.trim())}`);
+  }
 
-          <div className="flex items-center gap-3.5">
-            <div className="rounded-md bg-white"><LanguageToggle compact /></div>
-            <button
-              type="button"
-              className="te hidden items-center gap-1.5 text-[11px] text-[#D8D2C8] hover:text-white md:flex"
-              aria-label={language === 'en' ? 'Search' : 'వెతకండి'}
-            >
-              <Search className="h-3.5 w-3.5" aria-hidden />
-              {language === 'en' ? 'Search…' : 'వెతకండి…'}
-            </button>
+  const logout = useMutation({
+    mutationFn: () => signOut(),
+    onSuccess: () => navigate('/admin/login', { replace: true }),
+    onError: (e) => toast.error(e),
+  });
+
+  const collapseLabel = t(collapsed ? 'admin.expandNav' : 'admin.collapseNav');
+  // The group crumb points at the group's first visible page, so text and target agree.
+  const groupTo = current ? (groups.find((g) => g.key === current.group.key)?.items[0]?.to ?? '/admin/dashboard') : '/admin/dashboard';
+
+  return (
+    <div className="flex min-h-screen bg-canvas-cms">
+      <SkipLink />
+
+      <aside
+        className={cn(
+          'sticky top-0 hidden h-screen shrink-0 flex-col bg-ink text-on-ink transition-[width] duration-base ease-standard lg:flex',
+          collapsed ? 'w-20' : 'w-72',
+        )}
+      >
+        <div className="px-3 pt-3">
+          <Wordmark collapsed={collapsed} />
+        </div>
+        <nav aria-label={t('admin.cms')} className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+          <NavGroups groups={groups} tone="ink" collapsed={collapsed} />
+        </nav>
+        <div className={cn('border-t border-on-ink/10 p-3', collapsed && 'flex justify-center')}>
+          {collapsed ? (
+            <IconButton variant="inverse" icon={PanelLeftOpen} label={collapseLabel} aria-expanded={false} onClick={toggleCollapsed} />
+          ) : (
+            <Button variant="inverse" full icon={PanelLeftClose} aria-expanded onClick={toggleCollapsed} className="!justify-start">
+              {collapseLabel}
+            </Button>
+          )}
+        </div>
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header
+          className={cn('glass sticky top-0 z-header border-b border-rule', scrolled && 'shadow-header')}
+        >
+          <div className="flex min-h-tap-lg items-center gap-2 px-4 py-2 md:px-6">
+            <IconButton
+              icon={Menu}
+              label={t('ui.openMenu')}
+              onClick={() => setDrawerOpen(true)}
+              aria-expanded={drawerOpen}
+              className="-ml-2 lg:hidden"
+            />
+
+            <nav aria-label={t('ui.pages')} className="min-w-0 flex-1">
+              <ol className={cn(s.body, 'flex min-w-0 items-center gap-1 text-ui-sm')}>
+                {current ? (
+                  <>
+                    <li className="hidden shrink-0 sm:block">
+                      <Link
+                        to={groupTo}
+                        className="inline-flex min-h-tap items-center text-muted transition-[colors,transform,box-shadow,opacity] duration-base ease-standard hover:text-brand"
+                      >
+                        {t(current.group.labelKey)}
+                      </Link>
+                    </li>
+                    <li aria-hidden className="hidden sm:block">
+                      <Icon icon={ChevronRight} size="xs" className="text-muted-light" />
+                    </li>
+                    <li aria-current="page" className="min-w-0 font-semibold text-ink te-clamp-1">
+                      {t(current.item.labelKey)}
+                    </li>
+                  </>
+                ) : (
+                  <li className="min-w-0 font-semibold text-ink te-clamp-1">{t('admin.cms')}</li>
+                )}
+              </ol>
+            </nav>
+
+            <form role="search" onSubmit={onSearch} className="hidden w-full max-w-xs md:block">
+              <Input
+                size="md"
+                leading={Search}
+                type="search"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder={t('admin.searchPlaceholder')}
+                aria-label={t('admin.searchPlaceholder')}
+              />
+            </form>
+
+            <LanguageToggle />
+
+            <IconButton
+              icon={resolvedTheme === 'dark' ? Sun : Moon}
+              label={t('ui.darkMode')}
+              pressed={resolvedTheme === 'dark'}
+              onClick={() => withViewTransition(toggleTheme)}
+            />
 
             {me ? (
-              <span
-                className="te max-w-[220px] truncate rounded-chip bg-[#3A342C] px-2.5 py-[3px] font-sans text-[11px] text-[#D8D2C8]"
-                title={chip}
-              >
-                {chip}
+              <span title={chip} className="hidden min-w-0 xl:block">
+                <Badge tone="muted" size="sm" lang={language} className="max-w-56">
+                  <span className="min-w-0 whitespace-normal te-clamp-1">{chip}</span>
+                </Badge>
               </span>
             ) : null}
 
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="flex h-9 w-9 items-center justify-center rounded text-[#D8D2C8] hover:text-white"
-              aria-label={language === 'en' ? 'Sign out' : 'లాగ్ అవుట్'}
-              title={language === 'en' ? 'Sign out' : 'లాగ్ అవుట్'}
-            >
-              <LogOut className="h-4 w-4" aria-hidden />
-            </button>
+            <IconButton icon={LogOut} label={t('admin.signOut')} disabled={logout.isPending} onClick={() => logout.mutate()} />
           </div>
-        </div>
+        </header>
 
-        {visibleNav.length > 0 ? (
-          <nav
-            aria-label="CMS sections"
-            className={[
-              'border-t border-white/10 px-4 md:block md:px-[18px]',
-              mobileNavOpen ? 'block' : 'hidden',
-            ].join(' ')}
-          >
-            <ul className="flex flex-col gap-1 py-2 md:flex-row md:gap-1 md:py-0">
-              {visibleNav.map((item) => (
-                <li key={item.to}>
-                  <NavLink
-                    to={item.to}
-                    onClick={() => setMobileNavOpen(false)}
-                    className={({ isActive }) =>
-                      [
-                      `${language === 'te' ? 'te leading-telugu' : 'font-sans'} block min-h-tap px-3 py-2.5 text-[13px] font-medium transition-colors`,
-                        isActive
-                          ? 'text-white md:border-b-2 md:border-[#FF9A9A]'
-                          : 'text-[#B7AFA4] hover:text-white',
-                      ].join(' ')
-                    }
-                  >
-                    {language === 'te' ? item.labelTe : item.labelEn}
-                  </NavLink>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        ) : null}
-      </header>
-
-      {/* Skip-link / focus target (pages render their own <main>); Suspense keeps the topbar up while a chunk loads. */}
-      <div id="main" tabIndex={-1} className="outline-none">
-        <Suspense fallback={<RouteFallback />}>
-          <Outlet />
-        </Suspense>
+        <main id="main" tabIndex={-1} className="flex-1 outline-none">
+          <Suspense fallback={<RouteFallback />}>
+            <Outlet />
+          </Suspense>
+        </main>
       </div>
+
+      <Sheet open={drawerOpen} onClose={() => setDrawerOpen(false)} title={t('admin.cms')} side="left">
+        <nav aria-label={t('admin.cms')}>
+          <NavGroups groups={groups} tone="surface" />
+        </nav>
+      </Sheet>
     </div>
   );
 }

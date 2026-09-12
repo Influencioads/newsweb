@@ -1,67 +1,37 @@
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
 
 import { useI18n } from '@/lib/i18n';
-import { font } from '@/lib/theme';
-import { useColors } from '@/lib/useTheme';
+import { TabIcon, type IconName } from '@/ui/Icon';
+import { TabBar } from '@/ui/TabBar';
 
-/** Bottom tab bar (DailyHunt-benchmarked): Home · Local · Search · Profile. */
+/** Bottom tab bar (DailyHunt-benchmarked): Home · Local · Video · Search · Profile. */
 
-function TabIcon({ glyph, focused }: { glyph: string; focused: boolean }) {
-  const color = useColors();
-  return (
-    <Text style={{ fontSize: 20, color: focused ? color.brand : color.mutedLight }}>{glyph}</Text>
-  );
-}
+const TABS: { name: string; icon: IconName; title: 'tab.home' | 'tab.local' | 'tab.videos' | 'tab.search' | 'tab.profile' }[] = [
+  { name: 'index', icon: 'home', title: 'tab.home' },
+  { name: 'local', icon: 'mapPin', title: 'tab.local' },
+  { name: 'videos', icon: 'play', title: 'tab.videos' },
+  { name: 'search', icon: 'search', title: 'tab.search' },
+  { name: 'profile', icon: 'user', title: 'tab.profile' },
+];
 
 export default function TabsLayout() {
   const { t } = useI18n();
-  const color = useColors();
+
+  // No tab badge: the inbox is reached from the Home masthead bell, which
+  // carries the unread count; Profile has no inbox row to resolve one.
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: color.brand,
-        tabBarInactiveTintColor: color.mutedLight,
-        tabBarStyle: { backgroundColor: color.paper, borderTopColor: color.rule, height: 62 },
-        tabBarLabelStyle: { fontFamily: font.teluguSemiBold, fontSize: 11, marginBottom: 6 },
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: t('tab.home'),
-          tabBarIcon: ({ focused }) => <TabIcon glyph="⌂" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="local"
-        options={{
-          title: t('tab.local'),
-          tabBarIcon: ({ focused }) => <TabIcon glyph="◉" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="videos"
-        options={{
-          title: t('tab.videos'),
-          tabBarIcon: ({ focused }) => <TabIcon glyph="▶" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="search"
-        options={{
-          title: t('tab.search'),
-          tabBarIcon: ({ focused }) => <TabIcon glyph="⌕" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: t('tab.profile'),
-          tabBarIcon: ({ focused }) => <TabIcon glyph="♟" focused={focused} />,
-        }}
-      />
+    <Tabs tabBar={(p) => <TabBar {...p} />} screenOptions={{ headerShown: false }}>
+      {TABS.map(({ name, icon, title }) => (
+        <Tabs.Screen
+          key={name}
+          name={name}
+          options={{
+            title: t(title),
+            // TabBar hands over a palette string; String() only widens the ColorValue type.
+            tabBarIcon: ({ focused, color }) => <TabIcon name={icon} focused={focused} color={String(color)} />,
+          }}
+        />
+      ))}
     </Tabs>
   );
 }

@@ -87,7 +87,7 @@ export default function SearchPage() {
   const suggestions = meta.data?.recent.length ? meta.data.recent : meta.data?.popular ?? [];
 
   return (
-    <main className="mx-auto min-h-[55vh] max-w-[900px] px-4 py-7 sm:py-10">
+    <div className="mx-auto min-h-[55vh] max-w-[900px] px-4 py-7 sm:py-10">
       <div className="mb-7 border-b-2 border-ink pb-4">
         <p className="font-sans text-[11px] font-bold uppercase tracking-[0.16em] text-brand">
           {te ? 'వార్తల అన్వేషణ' : 'NEWS SEARCH'}
@@ -188,6 +188,6 @@ export default function SearchPage() {
           ) : null}
         </section>
       ) : null}
-    </main>
+    </div>
   );
 }

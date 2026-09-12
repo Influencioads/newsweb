@@ -46,7 +46,7 @@ export default function NotificationsPage() {
   if (status !== 'authenticated') return null;
 
   return (
-    <main className="mx-auto min-h-[55vh] max-w-[760px] px-4 py-7 sm:py-10">
+    <div className="mx-auto min-h-[55vh] max-w-[760px] px-4 py-7 sm:py-10">
       <div className="mb-6 border-b-2 border-ink pb-4">
         <p className="flex items-center gap-1.5 font-sans text-[11px] font-bold uppercase tracking-[0.16em] text-brand">
           <Bell className="h-3.5 w-3.5" aria-hidden />
@@ -99,6 +99,6 @@ export default function NotificationsPage() {
           })}
         </div>
       )}
-    </main>
+    </div>
   );
 }

@@ -1,4 +1,9 @@
+import type { ReactNode } from 'react';
+
+import { Chip } from '@/components/ui/Chip';
+import { useI18n, useScript } from '@/i18n';
 import type { CmsCategoryOption } from '@/types/cms';
+import { cn } from '@/utils/cn';
 
 /**
  * §33 asks for categories as clickable chips rather than a dropdown — an
@@ -8,69 +13,62 @@ import type { CmsCategoryOption } from '@/types/cms';
  * Subcategories appear only once a parent is chosen, and only that parent's
  * children, which is the same rule the server enforces on save.
  */
-export function CategoryPicker({
-  categories, categoryId, subcategoryId, onChange,
-}: {
+export interface CategoryPickerProps {
   categories: CmsCategoryOption[];
   categoryId: number | null;
   subcategoryId: number | null;
   onChange: (categoryId: number | null, subcategoryId: number | null) => void;
-}) {
+  error?: ReactNode;
+}
+
+export function CategoryPicker({ categories, categoryId, subcategoryId, onChange, error }: CategoryPickerProps) {
+  const { language } = useI18n();
+  const s = useScript();
+  const L = (te: string, en: string) => (language === 'te' ? te : en);
   const roots = categories.filter((c) => c.parent_id == null);
   const children = categoryId == null ? [] : categories.filter((c) => c.parent_id === categoryId);
+  const legend = cn(s.body, 'mb-1.5 flex items-baseline gap-1.5 text-ui-sm font-semibold text-ink');
 
   return (
-    <div className="space-y-3">
-      <div>
-        <span className="te mb-1.5 block text-[12px] font-bold text-ink">
-          విభాగం · Category <span className="text-breaking" aria-hidden>*</span>
-        </span>
-        <div className="flex flex-wrap gap-1.5">
+    <div className="space-y-4">
+      <fieldset className="min-w-0">
+        <legend className={legend}>
+          {L('విభాగం', 'Category')}
+          <span aria-hidden className="text-breaking">
+            *
+          </span>
+        </legend>
+        <div className="flex flex-wrap gap-2">
           {roots.map((c) => {
             const active = c.id === categoryId;
             return (
-              <button
-                key={c.id}
-                type="button"
-                aria-pressed={active}
-                onClick={() => onChange(active ? null : c.id, null)}
-                className={`te min-h-[32px] rounded-chip border px-3 text-[12.5px] font-semibold transition ${
-                  active
-                    ? 'border-brand bg-brand text-white'
-                    : 'border-rule bg-white text-ink hover:border-brand hover:text-brand dark:bg-surface'
-                }`}
-              >
-                {c.name_te}
-              </button>
+              <Chip key={c.id} as="button" selected={active} lang={s.forText(c.name_te, c.name_en).lang} onClick={() => onChange(active ? null : c.id, null)}>
+                {s.pick(c.name_te, c.name_en)}
+              </Chip>
             );
           })}
         </div>
-      </div>
+        {error ? (
+          <p role="alert" className={cn(s.body, 'mt-1.5 text-meta text-breaking')}>
+            {error}
+          </p>
+        ) : null}
+      </fieldset>
 
       {children.length > 0 ? (
-        <div>
-          <span className="te mb-1.5 block text-[12px] font-bold text-ink">ఉప విభాగం · Subcategory</span>
-          <div className="flex flex-wrap gap-1.5">
+        <fieldset className="min-w-0">
+          <legend className={legend}>{L('ఉప విభాగం', 'Subcategory')}</legend>
+          <div className="flex flex-wrap gap-2">
             {children.map((c) => {
               const active = c.id === subcategoryId;
               return (
-                <button
-                  key={c.id}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => onChange(categoryId, active ? null : c.id)}
-                  className={`te min-h-[30px] rounded-chip border px-2.5 text-[12px] transition ${
-                    active
-                      ? 'border-ai bg-ai-tint font-semibold text-ai'
-                      : 'border-rule bg-white text-ink-soft hover:border-ai dark:bg-surface'
-                  }`}
-                >
-                  {c.name_te}
-                </button>
+                <Chip key={c.id} as="button" selected={active} lang={s.forText(c.name_te, c.name_en).lang} onClick={() => onChange(categoryId, active ? null : c.id)}>
+                  {s.pick(c.name_te, c.name_en)}
+                </Chip>
               );
             })}
           </div>
-        </div>
+        </fieldset>
       ) : null}
     </div>
   );

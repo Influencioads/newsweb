@@ -170,11 +170,11 @@ export default function ContributorApplyPage() {
 
   if (!me) {
     return (
-      <main className="mx-auto max-w-2xl px-4 py-10">
+      <div className="mx-auto max-w-2xl px-4 py-10">
         <p className="te text-[14px] leading-telugu text-ink">
           {en ? 'Please sign in to apply.' : 'దరఖాస్తు చేయడానికి సైన్ ఇన్ చేయండి.'}
         </p>
-      </main>
+      </div>
     );
   }
 
@@ -184,7 +184,7 @@ export default function ContributorApplyPage() {
   const submitError = (submit.error as ApiError | undefined)?.displayMessage;
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-6">
+    <div className="mx-auto max-w-2xl px-4 py-6">
       <header className="mb-5">
         <h1 className="th text-[26px] font-extrabold text-ink">
           {en ? 'Write for us' : 'మాతో కలిసి రాయండి'}
@@ -353,6 +353,6 @@ export default function ContributorApplyPage() {
           ? 'Verification raises how much you can send and puts a verified name on your byline. Every story is still read by an editor before it is published — that does not change.'
           : 'ధృవీకరణ వల్ల మీరు ఎక్కువ కథనాలు పంపవచ్చు, మీ పేరుపై ధృవీకరణ గుర్తు కనిపిస్తుంది. ప్రతి కథనాన్ని ఎడిటర్ చదివాకే ప్రచురిస్తాం — అది మారదు.'}
       </p>
-    </main>
+    </div>
   );
 }

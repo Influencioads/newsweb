@@ -1,53 +1,101 @@
 import { useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { Check, ImageOff, ImagePlus, Search, SearchX, Trash2, X } from 'lucide-react';
 
+import { Button, IconButton } from '@/components/ui/Button';
+import { Dialog } from '@/components/ui/Dialog';
+import { FileDrop, Input } from '@/components/ui/Field';
+import { Icon } from '@/components/ui/Icon';
+import { EmptyState, QueryState, Skeleton } from '@/components/ui/State';
+import { useToast } from '@/components/ui/Toast';
 import * as cmsApi from '@/features/cms/api';
+import { useI18n, useScript } from '@/i18n';
 import type { CmsMediaRef } from '@/types/cms';
+import { cn } from '@/utils/cn';
+import { useReveal } from '@/utils/motion';
 
 /**
  * §1 hero image and gallery.
  *
  * Two ways in, because both are real newsroom habits: pick from the library
  * (a photographer already uploaded it) or upload right here (the reporter has
- * it on their phone). Uploading adds to the library too, so the two paths do
- * not diverge.
+ * it on their phone). Both live in one Dialog — a FileDrop above a searchable
+ * grid — and uploading adds to the library too, so the two paths never diverge.
  */
-interface LibraryItem { id: number; url: string; alt_te: string | null; credit: string | null; width: number | null; height: number | null }
 
-function Thumb({
-  item, selected, onClick, label,
-}: { item: { url: string; alt_te: string | null }; selected?: boolean; onClick?: () => void; label?: string }) {
+type Target = 'hero' | 'gallery';
+
+interface LibraryItem {
+  id: number;
+  url: string;
+  alt_te: string | null;
+  credit: string | null;
+  width: number | null;
+  height: number | null;
+}
+
+const toRef = (m: LibraryItem): CmsMediaRef => ({
+  id: m.id,
+  url: m.url,
+  alt_te: m.alt_te ?? null,
+  credit: m.credit ?? null,
+  width: m.width ?? null,
+  height: m.height ?? null,
+});
+
+const ACCEPT = 'image/jpeg,image/png,image/webp';
+
+function Tile({
+  item,
+  selected,
+  onClick,
+  reveal,
+}: {
+  item: LibraryItem;
+  selected: boolean;
+  onClick: () => void;
+  reveal: (el: HTMLButtonElement | null) => void;
+}) {
   return (
     <button
       type="button"
+      ref={reveal}
       onClick={onClick}
       aria-pressed={selected}
-      className={`group relative aspect-[4/3] overflow-hidden rounded border-2 transition ${
-        selected ? 'border-brand' : 'border-rule hover:border-brand/60'
-      }`}
+      aria-label={item.alt_te ?? `#${item.id}`}
+      className={cn(
+        'relative block w-full overflow-hidden rounded-xl border-2 bg-placeholder shadow-card',
+        'transition-[colors,transform,box-shadow,opacity] duration-base ease-standard hover:-translate-y-0.5 hover:shadow-raised active:scale-[.98]',
+        selected ? 'border-brand' : 'border-rule hover:border-brand',
+      )}
     >
-      <img src={item.url} alt={item.alt_te ?? ''} loading="lazy" className="h-full w-full object-cover" />
-      {label ? (
-        <span className="absolute bottom-0 left-0 right-0 bg-ink/70 px-1 py-0.5 font-sans text-[10px] font-bold text-white">
-          {label}
+      <img src={item.url} alt="" loading="lazy" className="aspect-[4/3] w-full object-cover" />
+      {selected ? (
+        <span className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-pill bg-brand text-on-brand">
+          <Icon icon={Check} size="xs" strokeWidth={3} />
         </span>
       ) : null}
     </button>
   );
 }
 
-export function MediaPicker({
-  heroId, hero, gallery, onHeroChange, onGalleryChange,
-}: {
+export interface MediaPickerProps {
   heroId: number | null;
   hero: CmsMediaRef | null;
   gallery: CmsMediaRef[];
   onHeroChange: (media: CmsMediaRef | null) => void;
   onGalleryChange: (items: CmsMediaRef[]) => void;
-}) {
-  const [open, setOpen] = useState<'hero' | 'gallery' | null>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
-  const [uploadTarget, setUploadTarget] = useState<'hero' | 'gallery'>('hero');
+}
+
+export function MediaPicker({ heroId, hero, gallery, onHeroChange, onGalleryChange }: MediaPickerProps) {
+  const { t, language } = useI18n();
+  const s = useScript();
+  const toast = useToast();
+  const L = (te: string, en: string) => (language === 'te' ? te : en);
+  const [open, setOpen] = useState<Target | null>(null);
+  const [q, setQ] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
+  const reveal = useReveal<HTMLButtonElement>();
 
   const library = useQuery({
     queryKey: ['cms', 'media-library'],
@@ -56,141 +104,155 @@ export function MediaPicker({
   });
 
   const upload = useMutation({
-    mutationFn: (file: File) => cmsApi.uploadMedia(file),
-    onSuccess: (media) => {
-      const ref: CmsMediaRef = {
-        id: media.id, url: media.url, alt_te: media.alt_te ?? null,
-        credit: media.credit ?? null, width: media.width ?? null, height: media.height ?? null,
-      };
-      if (uploadTarget === 'hero') onHeroChange(ref);
-      else onGalleryChange([...gallery, ref]);
+    mutationFn: ({ file }: { file: File; target: Target }) => cmsApi.uploadMedia(file),
+    onSuccess: (media, { target }) => {
+      const ref = toRef(media);
+      if (target === 'hero') {
+        onHeroChange(ref);
+        setOpen(null);
+      } else {
+        onGalleryChange([...gallery, ref]);
+      }
       void library.refetch();
     },
+    onError: () => toast.error(L('అప్‌లోడ్ విఫలమైంది — JPEG/PNG/WebP మాత్రమే, 15MB లోపు.', 'Upload failed — JPEG, PNG or WebP only, under 15MB.')),
   });
 
   function pick(item: LibraryItem) {
-    const ref: CmsMediaRef = {
-      id: item.id, url: item.url, alt_te: item.alt_te, credit: item.credit,
-      width: item.width, height: item.height,
-    };
-    if (open === 'hero') { onHeroChange(ref); setOpen(null); }
-    else if (!gallery.some((g) => g.id === ref.id)) onGalleryChange([...gallery, ref]);
+    const ref = toRef(item);
+    if (open === 'hero') {
+      onHeroChange(ref);
+      setOpen(null);
+    } else if (!gallery.some((g) => g.id === ref.id)) {
+      onGalleryChange([...gallery, ref]);
+    }
   }
+
+  const label = cn(s.body, 'block text-ui-sm font-semibold text-ink');
+  const needle = q.trim().toLowerCase();
+  const matches = (item: LibraryItem) =>
+    !needle || (item.alt_te ?? '').toLowerCase().includes(needle) || (item.credit ?? '').toLowerCase().includes(needle);
 
   return (
     <div className="space-y-5">
-      <input
-        ref={fileInput}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        hidden
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) upload.mutate(f); e.target.value = ''; }}
-      />
-
       {/* -------------------------------------------------------- hero -- */}
-      <div>
-        <span className="te mb-1.5 block text-[12px] font-bold text-ink">ప్రధాన చిత్రం · Main image</span>
+      <div className="space-y-2">
+        <span className={label}>{L('ప్రధాన చిత్రం', 'Main image')}</span>
         {hero || heroId ? (
           <div className="flex items-start gap-3">
-            <div className="w-40 shrink-0">
-              {hero ? <Thumb item={hero} selected /> : <div className="aspect-[4/3] rounded border border-rule bg-canvas" />}
-            </div>
-            <div className="space-y-1.5">
-              {hero?.credit ? <p className="te text-[11.5px] text-muted">క్రెడిట్: {hero.credit}</p> : null}
-              <button type="button" onClick={() => onHeroChange(null)}
-                className="te rounded-control border border-rule px-2.5 py-1 text-[11.5px] font-semibold text-breaking">
-                తీసివేయండి
-              </button>
+            {hero ? (
+              <img src={hero.url} alt={hero.alt_te ?? ''} className="aspect-[4/3] w-40 shrink-0 rounded-xl border border-rule object-cover" />
+            ) : (
+              <div aria-hidden className="aspect-[4/3] w-40 shrink-0 rounded-xl border border-rule bg-placeholder" />
+            )}
+            <div className="min-w-0 space-y-2">
+              {hero?.credit ? (
+                <p className={cn(s.body, 'text-meta text-muted')}>
+                  {L('క్రెడిట్:', 'Credit:')} {hero.credit}
+                </p>
+              ) : null}
+              <Button variant="secondary" size="sm" icon={Trash2} onClick={() => onHeroChange(null)}>
+                {t('ui.remove')}
+              </Button>
             </div>
           </div>
-        ) : (
-          <div className="flex gap-2">
-            <button type="button" onClick={() => setOpen('hero')}
-              className="te min-h-[34px] rounded-control border border-rule bg-white px-3 text-[12.5px] font-semibold text-ink dark:bg-surface">
-              లైబ్రరీ నుంచి ఎంచుకోండి
-            </button>
-            <button type="button" disabled={upload.isPending}
-              onClick={() => { setUploadTarget('hero'); fileInput.current?.click(); }}
-              className="te min-h-[34px] rounded-control border border-brand px-3 text-[12.5px] font-bold text-brand disabled:opacity-50">
-              {upload.isPending && uploadTarget === 'hero' ? 'అప్‌లోడ్…' : 'కొత్తది అప్‌లోడ్'}
-            </button>
-          </div>
-        )}
+        ) : null}
+        <Button variant="secondary" size="sm" icon={ImagePlus} onClick={() => setOpen('hero')}>
+          {hero ? L('మార్చండి', 'Replace') : L('ఎంచుకోండి లేదా అప్‌లోడ్ చేయండి', 'Choose or upload')}
+        </Button>
       </div>
 
       {/* ----------------------------------------------------- gallery -- */}
-      <div>
-        <span className="te mb-1.5 block text-[12px] font-bold text-ink">
-          ఫోటో గ్యాలరీ · Gallery <span className="font-normal text-muted">({gallery.length})</span>
+      <div className="space-y-2">
+        <span className={label}>
+          {L('ఫోటో గ్యాలరీ', 'Gallery')} <span className="font-normal text-muted">({gallery.length})</span>
         </span>
         {gallery.length > 0 ? (
-          <div className="mb-2 grid grid-cols-4 gap-2 sm:grid-cols-6">
+          <ul className="grid grid-cols-3 gap-3">
             {gallery.map((g, index) => (
-              <div key={g.id} className="relative">
-                <Thumb item={g} label={`${index + 1}`} />
-                <button
-                  type="button"
-                  aria-label="గ్యాలరీ నుంచి తీసివేయండి"
+              <li key={g.id} className="relative">
+                <img src={g.url} alt={g.alt_te ?? ''} loading="lazy" className="aspect-[4/3] w-full rounded-xl border border-rule object-cover" />
+                <span aria-hidden className="absolute bottom-1 left-1 rounded-pill bg-ink/70 px-2 font-sans text-meta font-bold text-on-ink">
+                  {index + 1}
+                </span>
+                <IconButton
+                  icon={X}
+                  label={`${t('ui.remove')} ${index + 1}`}
+                  variant="secondary"
+                  iconSize="sm"
+                  className="absolute -right-2 -top-2 shadow-card"
                   onClick={() => onGalleryChange(gallery.filter((x) => x.id !== g.id))}
-                  className="absolute -right-1.5 -top-1.5 h-5 w-5 rounded-full bg-breaking font-sans text-[11px] font-bold leading-none text-white"
-                >
-                  ×
-                </button>
-              </div>
+                />
+              </li>
             ))}
-          </div>
+          </ul>
         ) : null}
-        <div className="flex gap-2">
-          <button type="button" onClick={() => setOpen('gallery')}
-            className="te min-h-[32px] rounded-control border border-rule bg-white px-3 text-[12px] font-semibold text-ink dark:bg-surface">
-            లైబ్రరీ నుంచి జోడించండి
-          </button>
-          <button type="button" disabled={upload.isPending}
-            onClick={() => { setUploadTarget('gallery'); fileInput.current?.click(); }}
-            className="te min-h-[32px] rounded-control border border-brand px-3 text-[12px] font-bold text-brand disabled:opacity-50">
-            అప్‌లోడ్
-          </button>
-        </div>
+        <Button variant="secondary" size="sm" icon={ImagePlus} onClick={() => setOpen('gallery')}>
+          {L('చిత్రాలు జోడించండి', 'Add images')}
+        </Button>
       </div>
 
-      {upload.isError ? (
-        <p className="te text-[12px] text-breaking">
-          అప్‌లోడ్ విఫలమైంది — JPEG/PNG/WebP మాత్రమే, 15MB లోపు.
-        </p>
-      ) : null}
-
       {/* ------------------------------------------------------ browser -- */}
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" role="dialog" aria-modal="true">
-          <div className="flex max-h-[80vh] w-full max-w-3xl flex-col rounded-card bg-white shadow-card dark:bg-surface">
-            <div className="flex items-center justify-between border-b border-rule px-4 py-3">
-              <h3 className="th text-[15px] font-bold text-ink">
-                {open === 'hero' ? 'ప్రధాన చిత్రం ఎంచుకోండి' : 'గ్యాలరీకి చిత్రాలు జోడించండి'}
-              </h3>
-              <button type="button" onClick={() => setOpen(null)}
-                className="font-sans text-[13px] font-bold text-muted">మూసివేయండి</button>
-            </div>
-            <div className="grid flex-1 grid-cols-3 gap-2 overflow-y-auto p-4 sm:grid-cols-5">
-              {(library.data?.items ?? []).map((item) => (
-                <Thumb key={item.id} item={item} onClick={() => pick(item)}
-                  selected={open === 'gallery' && gallery.some((g) => g.id === item.id)} />
-              ))}
-              {library.isLoading ? <p className="te col-span-full text-[12.5px] text-muted">లోడ్ అవుతోంది…</p> : null}
-              {library.data && library.data.items.length === 0 ? (
-                <p className="te col-span-full text-[12.5px] text-muted">లైబ్రరీ ఖాళీగా ఉంది. కొత్త చిత్రం అప్‌లోడ్ చేయండి.</p>
-              ) : null}
-            </div>
-            {open === 'gallery' ? (
-              <div className="border-t border-rule px-4 py-3 text-right">
-                <button type="button" onClick={() => setOpen(null)}
-                  className="te min-h-[34px] rounded-control bg-brand px-4 text-[13px] font-bold text-white">
-                  పూర్తయింది
-                </button>
+      <Dialog
+        open={open !== null}
+        onClose={() => setOpen(null)}
+        size="lg"
+        title={open === 'hero' ? L('ప్రధాన చిత్రం ఎంచుకోండి', 'Choose the main image') : L('గ్యాలరీకి చిత్రాలు జోడించండి', 'Add images to the gallery')}
+        initialFocusRef={searchRef}
+        footer={open === 'gallery' ? <Button onClick={() => setOpen(null)}>{t('ui.done')}</Button> : undefined}
+      >
+        <div className="space-y-4">
+          <FileDrop
+            accept={ACCEPT}
+            disabled={upload.isPending}
+            label={upload.isPending ? t('ui.uploading') : undefined}
+            hint={L('JPEG, PNG లేదా WebP — 15MB లోపు', 'JPEG, PNG or WebP — under 15MB')}
+            onFiles={(files) => {
+              const file = files[0];
+              if (file && open) upload.mutate({ file, target: open });
+            }}
+          />
+          <Input ref={searchRef} leading={Search} value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('ui.search')} aria-label={t('ui.search')} />
+          <QueryState
+            query={library}
+            isEmpty={(d) => d.items.length === 0}
+            skeleton={
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+                {Array.from({ length: 8 }, (_, i) => (
+                  <Skeleton key={i} variant="image" ratio="4/3" />
+                ))}
               </div>
-            ) : null}
-          </div>
+            }
+            empty={
+              <EmptyState
+                compact
+                icon={ImageOff}
+                title={L('లైబ్రరీ ఖాళీగా ఉంది', 'The library is empty')}
+                body={L('పైన కొత్త చిత్రం అప్‌లోడ్ చేయండి.', 'Upload a new image above.')}
+              />
+            }
+          >
+            {(data) => {
+              const items = data.items.filter(matches);
+              if (!items.length) return <EmptyState compact icon={SearchX} title={t('state.noResults')} />;
+              return (
+                <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+                  {items.map((item) => (
+                    <li key={item.id}>
+                      <Tile
+                        item={item}
+                        reveal={reveal}
+                        onClick={() => pick(item)}
+                        selected={open === 'gallery' ? gallery.some((g) => g.id === item.id) : hero?.id === item.id}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              );
+            }}
+          </QueryState>
         </div>
-      ) : null}
+      </Dialog>
     </div>
   );
 }

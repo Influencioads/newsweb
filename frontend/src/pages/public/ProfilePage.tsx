@@ -110,7 +110,7 @@ export default function ProfilePage() {
   const categories = (config.data?.categories ?? []).filter((c) => c.show_in_nav);
 
   return (
-    <main className="mx-auto max-w-[760px] px-4 py-7 sm:py-10">
+    <div className="mx-auto max-w-[760px] px-4 py-7 sm:py-10">
       {routeState.welcome ? (
         <div className={`${teCls} mb-5 border-l-4 border-success bg-success-tint px-4 py-3 text-[14px] text-ink`}>
           {te
@@ -329,6 +329,6 @@ export default function ProfilePage() {
           {error}
         </p>
       ) : null}
-    </main>
+    </div>
   );
 }

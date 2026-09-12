@@ -236,7 +236,10 @@ export function ChipRail({ ariaLabel, snap = true, fadeEdges = true, children, c
 
   const overflowing = !(edges.start && edges.end);
   const arrows = hoverable && overflowing;
-  const arrowCls = 'absolute top-1/2 z-10 -translate-y-1/2 shadow-card';
+  // Positioning lives on a wrapper: IconButton sets `relative` itself, and in
+  // Tailwind's stylesheet order `.relative` outranks `.absolute`, so putting
+  // `absolute` on the button leaves the arrows in flow, stacked under the rail.
+  const arrowWrap = 'absolute top-1/2 z-10 -translate-y-1/2';
 
   return (
     <div className={cn('relative', className)}>
@@ -260,24 +263,28 @@ export function ChipRail({ ariaLabel, snap = true, fadeEdges = true, children, c
       </div>
 
       {arrows && !edges.start && (
-        <IconButton
-          ref={prevBtn}
-          icon={ChevronLeft}
-          label={t('ui.scrollLeft')}
-          variant="secondary"
-          onClick={() => nudge(-1)}
-          className={cn(arrowCls, 'left-0')}
-        />
+        <div className={cn(arrowWrap, 'left-0')}>
+          <IconButton
+            ref={prevBtn}
+            icon={ChevronLeft}
+            label={t('ui.scrollLeft')}
+            variant="secondary"
+            onClick={() => nudge(-1)}
+            className="shadow-card"
+          />
+        </div>
       )}
       {arrows && !edges.end && (
-        <IconButton
-          ref={nextBtn}
-          icon={ChevronRight}
-          label={t('ui.scrollRight')}
-          variant="secondary"
-          onClick={() => nudge(1)}
-          className={cn(arrowCls, 'right-0')}
-        />
+        <div className={cn(arrowWrap, 'right-0')}>
+          <IconButton
+            ref={nextBtn}
+            icon={ChevronRight}
+            label={t('ui.scrollRight')}
+            variant="secondary"
+            onClick={() => nudge(1)}
+            className="shadow-card"
+          />
+        </div>
       )}
     </div>
   );

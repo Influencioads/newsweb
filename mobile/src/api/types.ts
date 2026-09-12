@@ -79,7 +79,7 @@ export interface TiptapNode {
   type: string;
   text?: string;
   attrs?: Record<string, unknown>;
-  marks?: Array<{ type: string; attrs?: Record<string, unknown> }>;
+  marks?: { type: string; attrs?: Record<string, unknown> }[];
   content?: TiptapNode[];
 }
 
@@ -260,7 +260,7 @@ export interface AuthUser {
 
 export interface Me {
   user: AuthUser;
-  roles: Array<{ role_key: string; level: number }>;
+  roles: { role_key: string; level: number }[];
   permissions: string[];
   level: number;
 }

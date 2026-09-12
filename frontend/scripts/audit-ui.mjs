@@ -88,6 +88,39 @@ for (const file of walk(SRC)) {
   });
 }
 
+/* ---------------------------------------------------------------------------
+ * Token-scale check (tailwind.config.ts, not src/).
+ *
+ * A responsive variant such as `md:text-display` is emitted after the `.th`
+ * rule in the same layer, so it wins on source order and a token that ships a
+ * line-height below the Telugu floor silently breaks §4.1 wherever it is used
+ * with a responsive prefix. The scale itself therefore has to satisfy the
+ * floor: 1.5 for the Anek headline tokens, 1.65 for the Noto body tokens.
+ * (ui / ui-sm / meta / eyebrow are Latin tokens; `.te` supplies 1.7 there.)
+ * ------------------------------------------------------------------------- */
+const SCALE_FLOOR = [
+  [/^(display|headline-)/, 1.5],
+  [/^te-(body|lead)/, 1.65],
+];
+const scaleIssues = [];
+try {
+  const cfg = readFileSync(join(ROOT, 'tailwind.config.ts'), 'utf8');
+  // Slice the fontSize map only. `lineHeight:` also appears inside every
+  // token tuple, so the end marker has to be the named lineHeight SCALE.
+  const from = cfg.indexOf('fontSize:');
+  const to = cfg.indexOf('lineHeight: {', from);
+  const block = cfg.slice(from, to > from ? to : undefined);
+  for (const m of block.matchAll(/'?([a-z-]+)'?:\s*\['(\d+(?:\.\d+)?)px',\s*\{\s*lineHeight:\s*'([\d.]+)'/g)) {
+    const [, name, size, lh] = m;
+    const floor = SCALE_FLOOR.find(([re]) => re.test(name));
+    if (floor && Number(lh) < floor[1] - 1e-9) {
+      scaleIssues.push(`tailwind.config.ts  text-${name}: ${size}px / ${lh} (floor ${floor[1]})`);
+    }
+  }
+} catch {
+  scaleIssues.push('tailwind.config.ts could not be read for the token-scale check');
+}
+
 let failing = 0;
 for (const rule of RULES) {
   const list = violations[rule.id];
@@ -105,5 +138,13 @@ for (const rule of RULES) {
   const n = violations[rule.id].reduce((a, v) => a + v.hits.length, 0);
   console.log(rule.id.padEnd(18) + rule.severity.padEnd(10) + n);
 }
+if (scaleIssues.length) {
+  console.log('');
+  console.log('[ERROR] te-scale - type token below the Telugu line-height floor');
+  for (const issue of scaleIssues) console.log('  ' + issue);
+}
+console.log('te-scale'.padEnd(18) + 'ERROR'.padEnd(10) + scaleIssues.length);
+failing += scaleIssues.length;
+
 console.log(`\n${failing} blocking violation(s)`);
 if (STRICT && failing) process.exit(1);

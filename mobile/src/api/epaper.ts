@@ -76,11 +76,11 @@ export interface UserEdition {
   auto_generate: boolean;
   generation_time: string;
   is_active: boolean;
-  preferences: Array<{
+  preferences: {
     preference_type: "category" | "district" | "mandal" | "tag";
     target_id: number;
     priority: number;
-  }>;
+  }[];
 }
 
 function normalize(e: EpaperEdition): EpaperEdition {
@@ -117,26 +117,26 @@ export const fetchAudio = async (date: string) => {
 export const fetchOptions = async () =>
   (
     await api.get<{
-      categories: Array<{
+      categories: {
         id: number;
         name_te: string;
         name_en: string;
         slug: string;
-      }>;
-      districts: Array<{
+      }[];
+      districts: {
         id: number;
         name_te: string;
         name_en: string;
         slug: string;
-      }>;
-      mandals: Array<{
+      }[];
+      mandals: {
         id: number;
         district_id: number;
         name_te: string;
         name_en: string;
         slug: string;
-      }>;
-      tags: Array<{ id: number; name_te: string; name_en: string; slug: string }>;
+      }[];
+      tags: { id: number; name_te: string; name_en: string; slug: string }[];
     }>("/epaper/options")
   ).data;
 export const fetchMine = async () =>

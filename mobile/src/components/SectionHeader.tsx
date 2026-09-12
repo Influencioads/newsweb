@@ -28,7 +28,7 @@ export function SectionHeader({ title, subtitle, onSeeAll }: SectionHeaderProps)
         <T variant="headlineMd" weight="bold" color="brand" accessibilityRole="header">
           {title}
         </T>
-        <View style={styles.rule} accessibilityElementsHidden importantForAccessibility="no" />
+        <View style={styles.rule} aria-hidden />
         {subtitle ? (
           <T variant="meta" color="muted">
             {subtitle}

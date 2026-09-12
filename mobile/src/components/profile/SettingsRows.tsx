@@ -118,8 +118,7 @@ export function SwitchRow({ label, value, onChange, icon }: SwitchRowProps) {
         trackColor={{ true: color.brand, false: color.ruleStrong }}
         thumbColor={color.surface}
         ios_backgroundColor={color.ruleStrong}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
+        aria-hidden
       />
     </PressableScale>
   );

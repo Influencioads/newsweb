@@ -121,8 +121,14 @@ export default {
         // 1.5 (Anek headlines, which sit tighter by design of the face).
         // Minimum chrome size is 12.5px (`text-meta`).
         // ------------------------------------------------------------------
-        /** Masthead wordmark. */
-        display: ['34px', { lineHeight: '1.35' }],
+        /**
+         * Masthead wordmark. 1.5, not the 1.35 a Latin display face would take:
+         * the wordmark is Telugu (Anek), and §4.1 puts the floor for a Telugu
+         * headline at 1.5. A responsive variant such as `md:text-display`
+         * outranks the `.th` rule (same layer, emitted later), so the token
+         * itself has to satisfy the floor.
+         */
+        display: ['34px', { lineHeight: '1.5' }],
         'headline-xl': ['33px', { lineHeight: '1.5' }],
         'headline-lg': ['28px', { lineHeight: '1.5' }],
         'headline-md': ['20px', { lineHeight: '1.5' }],

@@ -93,15 +93,56 @@ Ports are offset from the usual defaults (MySQL **3307**, Redis **6381**,
 Meilisearch **7701**, Vite **5174**) so this stack never collides with other
 projects on the same machine.
 
-## Tests
+## Tests and gates
 
 ```bash
 cd backend && .venv/Scripts/python.exe -m pytest
 ```
 
+The web app has five gates. All five must pass before a UI change merges:
+
 ```bash
-cd frontend && npm run typecheck && npm run build
+cd frontend && npm run lint && npm run typecheck && npm test && npm run build && npm run audit:ui:strict
 ```
+
+`audit:ui` is the design-system regression net (`frontend/scripts/audit-ui.mjs`).
+It fails the build on a hard-rule breach rather than leaving it to review:
+`text-[Npx]` instead of the named type scale, hex literals instead of tokens,
+`rounded`/`rounded-[Npx]` instead of the radius ladder, interactive elements
+under 44px, `line-clamp`/`truncate` on Telugu (use `.te-clamp-N`), `bg-white`
+instead of the theme-aware `bg-surface`, `window.prompt/confirm/alert` instead
+of the dialog primitives, and any type token whose line-height falls below the
+Telugu floor. `--strict` turns findings into a non-zero exit.
+
+The mobile app has its own equivalents:
+
+```bash
+cd mobile && npx tsc --noEmit -p tsconfig.json && npm run lint && npm run audit:ui
+```
+
+`mobile/scripts/audit-ui.mjs` blocks hex/rgba outside `src/lib/theme.ts`, the
+deprecated `color.white` alias, raw `Pressable` outside `src/ui/PressableScale`,
+emoji or Unicode glyphs used as icons, Telugu styles under a 1.65 line-height,
+`textTransform: uppercase` on a Telugu face, and ad-hoc Reanimated configs
+outside `src/lib/motion.ts`.
+
+## Design system
+
+Both apps render from one token contract, so a colour, size, radius, shadow or
+duration is picked from the system rather than invented:
+
+| | Web | App |
+|---|---|---|
+| Tokens | `frontend/tailwind.config.ts` + `src/assets/index.css` | `mobile/src/lib/theme.ts` |
+| Motion | `frontend/src/utils/motion.ts` (+ CSS keyframes) | `mobile/src/lib/motion.ts` (`useMotion`) |
+| Primitives | `frontend/src/components/ui/*` | `mobile/src/ui/*` |
+
+Reduced motion is honoured on both: the web kill switch lives in `index.css`
+and JS-driven motion checks `prefersReducedMotion()`; on the app every
+animation, transition and haptic goes through `useMotion()`, which reads the OS
+setting. Dark mode is three-state (`system` / `light` / `dark`) and is applied
+before first paint by an inline script in `frontend/index.html`, so a dark
+reader never sees a light flash.
 
 ## Production deployment
 

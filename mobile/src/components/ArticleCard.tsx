@@ -79,7 +79,7 @@ function Topline({ article }: { article: ArticleCardType }) {
   const styles = useStyles();
   if (!hasFlags(article) && !article.category) return null;
   return (
-    <View style={styles.topline} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+    <View style={styles.topline} aria-hidden>
       <Flags article={article} />
       <Kicker article={article} />
     </View>
@@ -149,7 +149,7 @@ export const LeadCard = memo(function LeadCard({ article, index }: ArticleCardPr
         <View>
           <Thumb article={article} style={styles.leadImage} />
           {hasFlags(article) ? (
-            <View style={styles.strip} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+            <View style={styles.strip} aria-hidden>
               <Flags article={article} />
             </View>
           ) : null}

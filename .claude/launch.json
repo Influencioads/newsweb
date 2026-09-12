@@ -4,20 +4,40 @@
     {
       "name": "api",
       "runtimeExecutable": "C:/Users/PREDATOR 12TH GEN/Desktop/Coding/newsweb/newsweb-main/backend/.venv/Scripts/python.exe",
-      "runtimeArgs": ["C:/Users/PREDATOR 12TH GEN/Desktop/Coding/newsweb/newsweb-main/backend/scripts/run_dev.py"],
+      "runtimeArgs": [
+        "C:/Users/PREDATOR 12TH GEN/Desktop/Coding/newsweb/newsweb-main/backend/scripts/run_dev.py"
+      ],
       "port": 8000
     },
     {
       "name": "web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "frontend", "--", "--port", "5175", "--strictPort", "false"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "frontend",
+        "--",
+        "--port",
+        "5175",
+        "--strictPort",
+        "false"
+      ],
       "port": 5175
     },
     {
       "name": "app",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "mobile", "run", "web", "--", "--port", "8081"],
-      "port": 8081
+      "runtimeArgs": [
+        "--prefix",
+        "mobile",
+        "run",
+        "web",
+        "--",
+        "--port",
+        "8085"
+      ],
+      "port": 8085
     }
   ]
 }

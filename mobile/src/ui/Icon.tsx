@@ -204,8 +204,7 @@ export function Icon({ name, size = 20, color, strokeWidth = 1.75, style }: Icon
       color={color ?? palette.ink}
       strokeWidth={strokeWidth}
       style={style}
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
+      aria-hidden
     />
   );
 }

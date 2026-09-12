@@ -193,7 +193,11 @@ export default function TeluguRenderTest() {
             {FACES.map(([family, cls]) => (
               <div key={family} className="rounded-xl border border-rule p-3">
                 <dt className="text-eyebrow uppercase text-muted">{family}</dt>
-                <dd lang="te" className={`${cls} text-headline-md`}>
+                {/* The specimen demonstrates the FACE, so it carries the Telugu
+                    line-height explicitly: the `font-sans` row renders Telugu
+                    through the fallback stack, where text-headline-md's 1.5
+                    would sit under the §4.1 floor. */}
+                <dd lang="te" className={`${cls} text-headline-md leading-telugu`}>
                   తెలుగు Abc 123
                 </dd>
               </div>

@@ -192,8 +192,7 @@ function renderNode(node: TiptapNode, key: string, ctx: Ctx): ReactNode {
               ) : (
                 <View
                   style={[ctx.styles.dot, { marginTop: ctx.bulletTop }]}
-                  accessibilityElementsHidden
-                  importantForAccessibility="no"
+                  aria-hidden
                 />
               )}
               <View style={ctx.styles.itemBody}>{children(item, `${key}.${i}`, ctx)}</View>

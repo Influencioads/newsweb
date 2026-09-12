@@ -76,7 +76,13 @@ export function Field({ label, hint, error, required, children, style }: FieldPr
   );
 }
 
-export interface InputProps extends TextInputProps {
+export interface InputProps extends Omit<TextInputProps, 'style'> {
+  /**
+   * Styles the WRAPPER, not the text. The field's own type styling is derived
+   * from `lang` so that a Telugu input can never be given a line-height under
+   * the §4.1 floor, which is why `style` is re-typed as a view style here.
+   */
+  style?: StyleProp<ViewStyle>;
   /** Validation failed: border and leading icon turn breaking. Implied by a `Field` error. */
   invalid?: boolean;
   leading?: IconName;

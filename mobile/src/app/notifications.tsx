@@ -90,7 +90,7 @@ function NotificationRow({ item }: { item: NotificationItem }) {
         </T>
       </View>
       {item.read_at == null ? (
-        <View style={styles.dot} accessibilityElementsHidden importantForAccessibility="no" />
+        <View style={styles.dot} aria-hidden />
       ) : null}
     </View>
   );

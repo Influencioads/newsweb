@@ -63,8 +63,7 @@ function Action({
         color="muted"
         align="center"
         numberOfLines={2}
-        accessibilityElementsHidden
-        importantForAccessibility="no"
+        aria-hidden
       >
         {label}
       </T>

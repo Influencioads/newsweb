@@ -35,8 +35,7 @@ function HistoryRow({ item }: { item: HistoryItem }) {
       <View style={styles.progressRow}>
         <View
           style={styles.track}
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
+          aria-hidden
         >
           <View style={[styles.fill, { width }]} />
         </View>

@@ -40,7 +40,7 @@ export function ArticleHeader({ title, subtitle, scrollY, progress }: ArticleHea
         collapsible={{ scrollY }}
         showRule={false}
       />
-      <View style={styles.track} accessibilityElementsHidden importantForAccessibility="no">
+      <View style={styles.track} aria-hidden>
         <Animated.View style={[styles.fill, fill]} />
       </View>
     </View>

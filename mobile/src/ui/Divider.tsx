@@ -22,8 +22,7 @@ export function Divider({ inset = 0, tone = 'rule', vertical = false, style }: D
   return (
     <View
       style={[line, { backgroundColor: color[tone] }, style]}
-      accessibilityElementsHidden
-      importantForAccessibility="no"
+      aria-hidden
     />
   );
 }

@@ -31,19 +31,33 @@ Type: headline `Anek Telugu 700` 30-34px web / lh 1.5 · body `Noto Sans Telugu 
 17sp app / **lh 1.7** · Latin + numerals `Inter`. Hit targets >= 44px.
 Font switcher `A- / A / A+ / A++` persisted in localStorage — a **required feature** (§4.1), not optional.
 
+> **Where the contract lives now.** The table above is the origin; the executable
+> contract is `frontend/tailwind.config.ts` + `frontend/src/assets/index.css` on
+> the web and `mobile/src/lib/theme.ts` on the app, and the two are kept in step
+> token for token. Both carry the same additions made during the UI upgrade:
+> a named type scale (`text-display` … `text-meta`, so `text-[Npx]` is banned),
+> `surface` / `field` / `partial` / `overlay` / `on-brand` colour tokens, a
+> radius ladder (12 / 16 / pill), an elevation ladder (`shadow-card`,
+> `-raised`, `-sheet`) and motion tokens (120 / 200 / 320 ms with two easings).
+> `scripts/audit-ui.mjs` in each app fails the build on a breach — including any
+> type token whose line-height would drop Telugu under the §4.1 floor.
+>
+> Dark mode is three-state (`system` / `light` / `dark`), applied before first
+> paint, and reduced motion disables every animation on both platforms.
+
 ## B. Screens -> routes -> components -> APIs
 
 ### Public web (React + Vite + React Router)
 
 | # | Screen | Route | Key components | API | Tables |
 |---|---|---|---|---|---|
-| `1b` | Home, district edition | `/` | `DateWeatherBar` `EditionSelector` `FontSizeSwitcher` `Masthead` `CategoryNav` `BreakingTicker` `LeadStory` `SecondaryList` `BriefsList` `EpaperPromoCard` `AdSlot` `VideoStrip` `PolicyFooter` | `GET /public/home?edition=` · `GET /public/breaking` (poll 20-30s) | articles, categories, districts, media, epaper_editions, videos |
-| `1c` | Article | `/:categorySlug/:slugShortId` | `ArticleHeader` `Byline` `ReaderToolbar` (A-/A/A+/A++, TTS, WhatsApp, bookmark) `HeroMedia` + credit `ArticleRenderer` `CorrectionNote` `AiDisclosure` `TagPills` `RelatedGrid` | `GET /public/articles/{short_id}` | articles, article_versions, media, tags, redirects |
+| `1b` | Home, district edition | `/` | `Masthead` `CategoryNav` `BreakingTicker` `ReaderSettings` (edition · A-/A/A+/A++ · language · theme) `NavDrawer` `LeadCard` `SecondaryCard` `BriefCard` `KickerCard` `LatestCard` `CompactCard` `AdSlot` `VideoStrip` `PolicyFooter` | `GET /public/home?edition=` · `GET /public/breaking` (poll 20-30s) | articles, categories, districts, media, epaper_editions, videos |
+| `1c` | Article | `/:categorySlug/:slugShortId` | `ReadingProgress` `ReaderToolbar` (A-/A/A+/A++ via `FontSizeSheet`, listen, save, share, comments — sticky bottom < md) `NewsImage` + `ImageCaption` `ArticleRenderer` `ArticleGallery` (Dialog lightbox) `AudioPlayer` `ShareSheet` `EngagementBar` `CommentsSection` `ReadNext` | `GET /public/articles/{short_id}` | articles, article_versions, media, tags, redirects |
 | `1d` | Search | `/search?q=` | `SearchBox` `ResultTypeTabs` `DistrictFilter` `DateFilter` `HighlightedResult` | `GET /public/search?q=` -> Meilisearch | meilisearch index + articles |
-| `1e` | Video hub | `/videos` | `VideoPlayer` (provider-agnostic) `ProviderBadge` `VideoGrid` `ShortsRail` `CategoryPills` | `GET /public/videos` · `GET /public/videos/{id}/playback` | videos, video_sources, media |
-| `1f` | Mobile feed | `/` at <768px | same components, responsive; `OfflineBanner` `BottomTabBar` | same | same |
-| `1g` | Mobile article | article route at <768px | `FontSizeSheet` (bottom sheet) | same | same |
-| `1m` | E-paper reader | `/epaper/:edition/:date`, `.../page-:n` | `EditionSwitcher` `DatePicker` `PageStrip` `DeepZoomViewer` `HotspotLayer` `ShareAsImageCard` | `GET /public/epaper/{edition}/{date}` · `.../pages/{n}` | epaper_editions, epaper_pages, epaper_hotspots |
+| `1e` | Video hub | `/videos` | `Tabs` (sliding indicator) `ChipRail` `VideoCard` grid `VideoStrip` `ReactionBar` | `GET /public/videos` · `GET /public/videos/{id}/playback` | videos, video_sources, media |
+| `1f` | Mobile feed | `/` at <768px | same components, responsive. The Expo app ships the native twin: `TabBar` (5 tabs, spring pill) + a sectioned `FlatList` with a collapsing `ScreenHeader` | same | same |
+| `1g` | Mobile article | article route at <768px | `FontSizeSheet` (Sheet on web, `BottomSheet` in the app) | same | same |
+| `1m` | E-paper reader | `/epaper/:edition/:date`, `.../page-:n` | `EditionReader` `EpaperSheet` (transform zoom, sheet-bound swipe) `EpaperRadio` (`AudioPlayer`) `EpaperArchive` (`ChipRail`) `ShareSheet` | `GET /public/epaper/{edition}/{date}` · `.../pages/{n}` | epaper_editions, epaper_pages, epaper_hotspots |
 | — | Static / compliance (§12.5) | `/about` `/contact` `/editorial-policy` `/corrections` `/grievance` `/privacy` `/terms` `/ai-disclosure` | `PolicyPage` `GrievanceForm` | `GET /public/pages/{slug}` · `POST /public/grievance` | settings, grievance_tickets |
 
 ### Newsroom CMS
@@ -56,8 +70,8 @@ Font switcher `A- / A / A+ / A++` persisted in localStorage — a **required fea
 | `1j` | AI cost dashboard | `/admin/ai/usage` | `BudgetMeter` (80% amber / 100% red markers) `ProviderCard` x3 `TaskRoutingTable` + edit routing | `GET /cms/ai/usage` · `PATCH /cms/ai/task-configs/{id}` | ai_cost_ledger, ai_jobs, ai_providers, ai_models, ai_task_configs |
 | `1l` | Push pipeline | `/admin/notifications` | `PushComposer` (**live 65-char counter**) `TopicChips` `QuietHoursNotice` `PushApprovalCard` (audience, article state, CDN pre-warm) `DevicePreview` `ReaderPrefsPanel` | `POST /cms/push` · `.../approve` · `.../send` | push_campaigns, articles, audit_log |
 | `1n` | Hotspot editor | `/admin/epaper/:editionId/pages/:n` | `PageCanvas` `HotspotRect` (8 handles) `AutoDetectBox` (violet dashed) `HotspotInspector` (normalized x/y/w/h) `ArticleLinkSearch` `KeyboardLegend` (N / Enter / arrows / Tab / A / Del) `PageStatusStrip` `SendToPublishButton` | `GET/POST/PATCH/DELETE /cms/epaper/pages/{id}/hotspots` · `POST /cms/epaper/editions/{id}/submit` | epaper_pages, epaper_hotspots, articles |
-| — | Dashboard | `/admin/dashboard` | `StatCard` grid — **every count from the database, never hardcoded** (brief §26) | `GET /cms/dashboard` | aggregate |
-| — | Articles CRUD | `/admin/articles`, `/new`, `/:id/edit` | `ArticleTable` (server-side paging/sort/filter/bulk) `TiptapEditor` + Telugu toolbar `LegacyPasteDetector` `MediaPicker` `SeoPanel` `WorkflowBar` | `CRUD /cms/articles` | articles, article_versions, article_tags, article_media |
+| — | Dashboard | `/admin/dashboard` | `AdminPage` + `StatCard` grid — **every count from the database, never hardcoded** (brief §26) | `GET /cms/dashboard` | aggregate |
+| — | Articles CRUD | `/admin/articles`, `/new`, `/:id/edit` | `DataTable` (stacks to cards < md) + `StatusPill` `WorkflowActions` (Approve hidden on your own story) `TiptapEditor` + Telugu toolbar `MediaPicker` (Dialog) `SeoPanel` | `CRUD /cms/articles` | articles, article_versions, article_tags, article_media |
 | — | Media / Users / Roles / Taxonomy / Audit / Settings | `/admin/media` `/users` `/roles` `/categories` `/districts` `/tags` `/glossary` `/audit` `/settings` | `MediaGrid` + presigned upload, `UserTable`, `RoleMatrix`, `AuditTable` (read-only) | respective `/cms/*` | media, users, roles, permissions, audit_log, settings |
 
 ## C. Roles (§6.1 — seed exactly)
@@ -107,3 +121,29 @@ P1 setup / docker / MySQL / Redis / FastAPI / React / Alembic · P2 auth + RBAC 
 P3 taxonomy + article CRUD + Tiptap · P4 workflow + approval · P5 public site + search + SEO ·
 P6 media · P7 AI gateway + tools + images · P8 e-paper Mode A · P9 video ·
 P10 notifications + analytics · P11 security + performance + tests + deployment.
+
+
+---
+
+## E. Shared UI primitives (added by the UI upgrade)
+
+Every screen above is assembled from these; a page does not hand-roll a button,
+a table, a dialog or an empty state. The two lists are deliberate twins.
+
+| Concern | Web (`frontend/src/components/ui`) | App (`mobile/src/ui`) |
+|---|---|---|
+| Text / script | `useScript()` + `.te` / `.th` classes | `T` (picks the face, floors Telugu line-height) |
+| Icons | `Icon` (lucide-react) | `Icon` / `TabIcon` (lucide-react-native + svg) |
+| Actions | `Button` `ButtonLink` `IconButton` `IconButtonLink` | `Button` `IconButton` `PressableScale` |
+| Selection | `Chip` `ChipRail` `Tabs` | `Chip` `ChipRail` |
+| Status | `Badge` `StatusPill` (+ `features/cms/status.ts`) | `Badge` |
+| Surfaces | `Card` `PageContainer` `PageHeader` `SectionHeader` | `Card` `Screen` `ScreenHeader` `Divider` |
+| States | `Skeleton` `SkeletonCard` `QueryState` `EmptyState` `ErrorState` | `Skeleton` `SkeletonFeed` `ListFooter` `Feedback` |
+| Overlays | `Dialog` `Sheet` `ConfirmDialog` `PromptDialog` `useConfirm` `Toaster` / `useToast` | `BottomSheet` `ConfirmSheet` `ToastHost` / `useToast` |
+| Forms | `Field` `Input` `Select` `Textarea` `Checkbox` `Radio` `Switch` `FileDrop` | `Field` `Input` |
+| Motion | `utils/motion.ts` (`useReveal` `useScrolled` `useHideOnScroll` `withViewTransition`) | `lib/motion.ts` (`useMotion`) |
+| Shell | `AppErrorBoundary` `RouteFallback` `ScrollToTop` `SkipLink` | `AppErrorBoundary` `TabBar` |
+
+`window.prompt` / `confirm` / `alert` are banned on the web and `Alert.alert` is
+no longer used for feedback in the app: both go through the dialog and toast
+primitives, and the audit scripts enforce it.

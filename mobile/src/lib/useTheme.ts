@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
-import { useColorScheme } from 'react-native';
-import { StyleSheet } from 'react-native';
+import { useColorScheme , StyleSheet } from 'react-native';
 
 import { palettes, type Palette, type ThemeName } from '@/lib/theme';
 import { usePrefs } from '@/stores/prefs';

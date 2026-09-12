@@ -149,8 +149,7 @@ function Dots({ count, index }: { count: number; index: number }) {
     <View
       style={styles.dots}
       pointerEvents="none"
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
+      aria-hidden
     >
       {Array.from({ length: shown }, (_, i) => start + i).map((at) => (
         <View key={at} style={[styles.dot, at === index && styles.dotOn]} />

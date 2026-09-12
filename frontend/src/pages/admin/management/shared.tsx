@@ -5,7 +5,7 @@ import type { DataTableColumn } from '@/components/admin/DataTable';
 import { Badge, StatusPill } from '@/components/ui/Badge';
 import { Field, Input } from '@/components/ui/Field';
 import { EmptyState } from '@/components/ui/State';
-import { useI18n } from '@/i18n';
+import { useI18n, useScript } from '@/i18n';
 
 /**
  * Shared bits for the management pages (users, roles, audit, taxonomy, media,
@@ -25,13 +25,29 @@ const DASH = '—';
 /**
  * Column factory. Cells format the way the legacy table did: null → dash,
  * booleans → yes/no badge, `status` → StatusPill, arrays → labels in the UI
- * language, `*_at` → local time. `*_te` columns are tagged Telugu, the rest
- * Latin; pass `lang: undefined` for a column whose values follow the UI language.
+ * language, `*_at` → local time. A `*_te` / `*_en` pair renders whichever value
+ * the reader actually gets — an English session still shows a Telugu-only name
+ * instead of a dash — tagged with the script it is in; every other column is
+ * Latin. Pass `lang: undefined` for a column whose values follow the UI language.
  */
 export function useColumn() {
   const { t, language } = useI18n();
+  const s = useScript();
   const en = language === 'en';
+  /** `name_en` in an English session is null far more often than it is filled. */
+  const pairBase = (key: string) => (/_(te|en)$/.test(key) ? key.slice(0, -3) : null);
   const render = (key: string) => (row: Row): ReactNode => {
+    const base = pairBase(key);
+    if (base) {
+      const v = s.text(row[`${base}_te`] as string | null, row[`${base}_en`] as string | null);
+      return v.text ? (
+        <span lang={v.lang} className={v.cls}>
+          {v.text}
+        </span>
+      ) : (
+        DASH
+      );
+    }
     const item = row[key];
     if (item == null || item === '') return DASH;
     if (typeof item === 'boolean') {
@@ -57,7 +73,8 @@ export function useColumn() {
     key,
     header,
     render: render(key),
-    lang: key.endsWith('_te') ? 'te' : 'en',
+    // A pair column's script varies per row, so the cell span carries lang, not the <td>.
+    lang: pairBase(key) ? undefined : 'en',
     nowrap: key === 'status' || key.endsWith('_at'),
     ...opts,
   });

@@ -1,16 +1,21 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-import { NewsImage } from '@/components/media/NewsImage';
-import { useI18n } from '@/i18n';
+import { ImageCaption, NewsImage } from '@/components/media/NewsImage';
+import { IconButton } from '@/components/ui/Button';
+import { Dialog } from '@/components/ui/Dialog';
+import { SectionHeader } from '@/components/ui/Layout';
+import { useI18n, useScript } from '@/i18n';
 import type { MediaOut } from '@/types/public';
+import { cn } from '@/utils/cn';
 
 /**
  * Photo gallery for an article (`article_media.role = 'gallery'`).
  *
- * Thumbnails open a lightbox. The lightbox is keyboard-driven — arrows move,
- * Escape closes — because a photo strip that can only be used with a mouse
- * fails the accessibility bar the brief sets in §1.
+ * Thumbnails open a lightbox built on `Dialog`, so the focus trap, Escape,
+ * scroll lock and focus restore are the app's one implementation rather than a
+ * second one grown here. On top of that the lightbox adds what a photo viewer
+ * needs: 44px prev/next buttons, arrow keys, and a pointer swipe for phones.
  *
  * Every frame keeps its Telugu caption and §12.5 credit visible; a photo whose
  * credit only appears on hover is a credit nobody reads.
@@ -21,11 +26,16 @@ interface Props {
   title?: string;
 }
 
+/** Below this many pixels a horizontal drag is a tap, not a swipe. */
+const SWIPE_PX = 48;
+
 export function ArticleGallery({ images, title }: Props) {
   const [openAt, setOpenAt] = useState<number | null>(null);
   const { t, language } = useI18n();
-  const script = language === 'te' ? 'te' : 'font-sans';
+  const s = useScript();
+  const L = (te: string, en: string) => (language === 'te' ? te : en);
   const heading = title ?? t('article.gallery');
+  const swipeFrom = useRef<number | null>(null);
 
   const close = useCallback(() => setOpenAt(null), []);
   const step = useCallback(
@@ -36,52 +46,43 @@ export function ArticleGallery({ images, title }: Props) {
     [images.length],
   );
 
+  // Arrows are listened for on the document: the focus may sit on the Dialog's
+  // own close button, which is outside this component's subtree.
   useEffect(() => {
     if (openAt === null) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') close();
+    const onKey = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight') step(1);
       if (e.key === 'ArrowLeft') step(-1);
-    }
-    document.addEventListener('keydown', onKey);
-    // Stop the page scrolling behind the lightbox.
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = previous;
     };
-  }, [openAt, close, step]);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [openAt, step]);
 
   if (images.length === 0) return null;
 
   const active = openAt === null ? null : images[openAt];
 
   return (
-    <section className="mt-6 border-t-2 border-ink pt-3">
-      <h2
-        className={`${language === 'te' ? 'th' : 'font-sans'} mb-3 text-[16px] font-bold text-brand`}
-      >
-        {heading}
-      </h2>
+    <section className="mt-8">
+      <SectionHeader title={heading} level={3} />
 
-      <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {images.map((image, index) => (
           <li key={image.id}>
             <button
               type="button"
               onClick={() => setOpenAt(index)}
               aria-label={`${image.caption_te ?? t('state.photo')} — ${t('gallery.enlarge')}`}
-              className="group block w-full text-left focus-visible:outline-2 focus-visible:outline-brand"
+              className="group block w-full rounded-xl text-left transition-[colors,transform,box-shadow,opacity] duration-base ease-standard hover:-translate-y-0.5 active:scale-[.98]"
             >
               <NewsImage
                 media={image}
                 ratio="4/3"
                 sizes="(max-width: 640px) 50vw, 220px"
-                className="rounded-[4px] transition-opacity group-hover:opacity-90"
+                className="group-hover:shadow-raised"
               />
               {image.caption_te ? (
-                <p className="te te-clamp-2 mt-1.5 text-[11.5px] leading-telugu text-muted">
+                <p lang="te" className="te te-clamp-2 mt-2 text-te-body-xs text-muted">
                   {image.caption_te}
                 </p>
               ) : null}
@@ -90,79 +91,58 @@ export function ArticleGallery({ images, title }: Props) {
         ))}
       </ul>
 
-      {active ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={active.caption_te ?? t('state.photo')}
-          className="fixed inset-0 z-50 flex flex-col bg-ink-deep/95 p-4"
-          onClick={close}
-        >
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={close}
-              aria-label={t('gallery.close')}
-              className="flex h-tap w-tap items-center justify-center rounded text-white/80 hover:text-white"
-            >
-              <X className="h-6 w-6" aria-hidden />
-            </button>
-          </div>
-
-          <div
-            className="flex min-h-0 flex-1 items-center justify-center gap-2"
-            onClick={(e) => e.stopPropagation()}
+      <Dialog
+        open={active !== null}
+        onClose={close}
+        title={heading}
+        sheetOnMobile={false}
+        closeLabel={t('gallery.close')}
+        className="md:max-w-4xl"
+      >
+        {active ? (
+          <figure
+            className="flex flex-col items-center"
+            onPointerDown={(e) => {
+              swipeFrom.current = e.clientX;
+            }}
+            onPointerUp={(e) => {
+              const from = swipeFrom.current;
+              swipeFrom.current = null;
+              if (from === null || images.length < 2) return;
+              const delta = e.clientX - from;
+              if (Math.abs(delta) >= SWIPE_PX) step(delta < 0 ? 1 : -1);
+            }}
           >
-            {images.length > 1 ? (
-              <button
-                type="button"
+            <img
+              src={active.url ?? ''}
+              {...(active.srcset ? { srcSet: active.srcset } : {})}
+              sizes="(max-width: 1024px) 100vw, 900px"
+              alt={active.alt_te ?? ''}
+              className="max-h-[60vh] w-auto select-none rounded-xl bg-placeholder object-contain"
+            />
+            <div className="mt-4 flex w-full items-center justify-between gap-3">
+              <IconButton
+                icon={ChevronLeft}
+                label={t('gallery.previous')}
                 onClick={() => step(-1)}
-                aria-label={t('gallery.previous')}
-                className="flex h-tap w-tap shrink-0 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
-              >
-                <ChevronLeft className="h-6 w-6" aria-hidden />
-              </button>
-            ) : null}
-
-            <figure className="flex min-h-0 max-w-4xl flex-col">
-              <img
-                src={active.url ?? ''}
-                {...(active.srcset ? { srcSet: active.srcset } : {})}
-                sizes="(max-width: 1024px) 100vw, 900px"
-                alt={active.alt_te ?? ''}
-                className="max-h-[70vh] w-auto rounded object-contain"
+                disabled={images.length < 2}
               />
-              <figcaption className="te mt-3 text-center text-[12.5px] leading-telugu text-white/85">
-                {active.caption_te}
-                {active.credit ? (
-                  <span className="ml-1 text-white/60">
-                    · {t('article.photoBy')}: {active.credit}
-                  </span>
-                ) : null}
-                {active.ai_generated ? (
-                  <span className={`${script} ml-1 font-semibold text-[#B9A6EE]`}>
-                    · {t('article.aiImage')}
-                  </span>
-                ) : null}
-                <span className="ml-2 font-sans text-white/50">
-                  {(openAt ?? 0) + 1} / {images.length}
-                </span>
-              </figcaption>
-            </figure>
-
-            {images.length > 1 ? (
-              <button
-                type="button"
+              {/* role="status": prev/next (and the document-level arrow keys)
+                  swap the photo and its caption with no other announcement. */}
+              <p role="status" lang={language} className={cn(s.body, 'text-meta tabular-nums text-muted')}>
+                {L(`ఫోటో ${(openAt ?? 0) + 1} / ${images.length}`, `Photo ${(openAt ?? 0) + 1} of ${images.length}`)}
+              </p>
+              <IconButton
+                icon={ChevronRight}
+                label={t('gallery.next')}
                 onClick={() => step(1)}
-                aria-label={t('gallery.next')}
-                className="flex h-tap w-tap shrink-0 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
-              >
-                <ChevronRight className="h-6 w-6" aria-hidden />
-              </button>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
+                disabled={images.length < 2}
+              />
+            </div>
+            <ImageCaption media={active} />
+          </figure>
+        ) : null}
+      </Dialog>
     </section>
   );
 }

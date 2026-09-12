@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Flag, Inbox, MessageSquare, ShieldCheck } from 'lucide-react';
 
 import { AdminPage } from '@/components/admin/AdminPage';
-import { PromptDialog, useConfirm } from '@/components/ui/Dialog';
+import { useConfirm } from '@/components/ui/Dialog';
+import { PromptDialog } from '@/components/ui/PromptDialog';
 import { EmptyState, QueryState } from '@/components/ui/State';
 import { Tabs, type TabItem } from '@/components/ui/Tabs';
 import { useToast } from '@/components/ui/Toast';

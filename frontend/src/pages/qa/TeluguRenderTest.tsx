@@ -1,4 +1,8 @@
+import type { ReactNode } from 'react';
+
+import { PageContainer, PageHeader } from '@/components/ui/Layout';
 import { useReaderPrefs, FONT_STEPS } from '@/stores/readerPrefs';
+import { useDocumentTitle } from '@/utils/motion';
 
 /**
  * The mandatory Telugu render test (§4.1, §15.4).
@@ -8,6 +12,9 @@ import { useReaderPrefs, FONT_STEPS } from '@/stores/readerPrefs';
  * item — it must stay in the app, and it must be checked on Samsung One UI,
  * Xiaomi HyperOS/MIUI, Realme/Oppo, a 3-year-old budget Android, iPhone (2
  * versions), Chrome desktop and Safari desktop before every release.
+ *
+ * A standalone route with no layout around it, so it owns the one
+ * `<main id="main">` landmark itself.
  */
 
 const TEST_LINES = [
@@ -20,41 +27,49 @@ const TEST_LINES = [
 const LONG_HEADLINE =
   'అమరావతి రాజధాని నిర్మాణానికి కేంద్ర ప్రభుత్వం తొలి విడతగా ఒక వెయ్యి రెండు వందల యాభై కోట్ల రూపాయల నిధులు విడుదల చేసినట్లు అధికారులు వెల్లడించారు';
 
-function Section({ title, spec, children }: { title: string; spec: string; children: React.ReactNode }) {
+/** The three faces, compared at one size so the difference read is the face. */
+const FACES: Array<[string, string]> = [
+  ['Anek Telugu', 'th font-bold'],
+  ['Noto Sans Telugu', 'te'],
+  ['Inter', 'font-sans'],
+];
+
+function Section({ title, spec, children }: { title: string; spec: string; children: ReactNode }) {
   return (
-    <section className="rounded-card border border-rule bg-white p-5 shadow-card">
+    <section className="rounded-xl border border-rule bg-surface p-5 shadow-card">
       <header className="mb-3">
-        <h2 className="font-sans text-[13px] font-semibold text-ink">{title}</h2>
-        <p className="mt-0.5 font-sans text-[11px] text-muted-light">{spec}</p>
+        <h2 className="text-ui-sm font-semibold text-ink">{title}</h2>
+        <p className="mt-0.5 text-meta text-muted">{spec}</p>
       </header>
       {children}
     </section>
   );
 }
 
+function Label({ children }: { children: ReactNode }) {
+  return <p className="mb-1 text-eyebrow uppercase text-muted">{children}</p>;
+}
+
 export default function TeluguRenderTest() {
+  useDocumentTitle('Telugu render test');
   const { fontStep, setFontStep } = useReaderPrefs();
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-      <header className="mb-6">
-        <h1 className="font-headline text-headline-lg font-bold text-brand">
-          తెలుగు రెండరింగ్ పరీక్ష
-        </h1>
-        <p className="mt-1 font-sans text-[12px] text-muted">
-          Telugu render test · Build Instructions §4.1 + §15.4 QA checklist. If any glyph clips,
-          boxes, or reorders, the build is not shippable.
-        </p>
-      </header>
+    <PageContainer as="main" id="main" tabIndex={-1} width="page" className="py-8 outline-none">
+      <PageHeader titleLang="te" title="తెలుగు రెండరింగ్ పరీక్ష" className="mb-4" />
+      <p lang="en" className="mb-8 text-meta text-muted">
+        Telugu render test · Build Instructions §4.1 + §15.4 QA checklist. If any glyph clips,
+        boxes, or reorders, the build is not shippable.
+      </p>
 
       <div className="flex flex-col gap-4">
         <Section
           title="Mandatory render test string"
           spec="§4.1 — must not clip, box, or reorder on any target device"
         >
-          <div className="rounded-control border-[1.5px] border-dashed border-breaking bg-[#FFF9F4] p-4">
+          <div className="rounded-xl border border-dashed border-breaking bg-paper-sub p-4">
             {TEST_LINES.map((line) => (
-              <p key={line} className="te text-te-body-sm">
+              <p key={line} lang="te" className="te text-te-body-sm">
                 {line}
               </p>
             ))}
@@ -67,25 +82,23 @@ export default function TeluguRenderTest() {
         >
           <div className="flex flex-col gap-4">
             <div>
-              <p className="mb-1 font-sans text-eyebrow uppercase tracking-[0.1em] text-muted-light">
-                Article header · Anek Telugu 700 · 33px
-              </p>
-              <h3 className="th text-headline-xl font-extrabold">{LONG_HEADLINE}</h3>
+              <Label>Article header · Anek Telugu 700 · headline-xl</Label>
+              <h3 lang="te" className="th text-headline-xl font-extrabold">
+                {LONG_HEADLINE}
+              </h3>
             </div>
             <div className="max-w-[320px]">
-              <p className="mb-1 font-sans text-eyebrow uppercase tracking-[0.1em] text-muted-light">
-                Narrow feed card · 320px — elastic height, never a fixed one
-              </p>
-              <div className="rounded-control border border-rule p-3">
-                <h4 className="th text-headline-xs font-bold">{LONG_HEADLINE}</h4>
+              <Label>Narrow feed card · 320px — elastic height, never a fixed one</Label>
+              <div className="rounded-xl border border-rule p-3">
+                <h4 lang="te" className="th text-headline-xs font-bold">
+                  {LONG_HEADLINE}
+                </h4>
               </div>
             </div>
             <div className="max-w-[320px]">
-              <p className="mb-1 font-sans text-eyebrow uppercase tracking-[0.1em] text-muted-light">
-                Push notification · truncated at 65 chars for Android collapsed view (§4.6)
-              </p>
-              <div className="rounded-control bg-ink-panel p-3">
-                <p className="te text-[13px] font-semibold leading-[1.6] text-white">
+              <Label>Push notification · truncated at 65 chars for Android collapsed view (§4.6)</Label>
+              <div className="rounded-xl bg-ink-panel p-3">
+                <p lang="te" className="te text-te-body-xs font-semibold text-on-ink">
                   {LONG_HEADLINE.slice(0, 65)}…
                 </p>
               </div>
@@ -93,33 +106,24 @@ export default function TeluguRenderTest() {
           </div>
         </Section>
 
-        <Section
-          title="Type scale"
-          spec="§4.1 — body 19px web / headline 30-34px / line-height >= 1.65x"
-        >
+        <Section title="Type scale" spec="§4.1 — body 19px web / headline 30-34px / line-height >= 1.65x">
           <div className="flex flex-col gap-3">
             <div>
-              <p className="mb-1 font-sans text-eyebrow uppercase tracking-[0.1em] text-muted-light">
-                Headline — Anek Telugu 700
-              </p>
-              <p className="th text-headline-lg font-bold">
+              <Label>Headline — Anek Telugu 700</Label>
+              <p lang="te" className="th text-headline-lg font-bold">
                 అమరావతి రాజధాని నిధులు విడుదల: తొలి విడత ₹1,250 కోట్లు
               </p>
             </div>
             <div>
-              <p className="mb-1 font-sans text-eyebrow uppercase tracking-[0.1em] text-muted-light">
-                Body — Noto Sans Telugu 400 · 19px · lh 1.7
-              </p>
-              <p className="te text-te-body">
+              <Label>Body — Noto Sans Telugu 400 · 19px · lh 1.7</Label>
+              <p lang="te" className="te text-te-body">
                 రాజధాని అమరావతి నిర్మాణానికి కేంద్ర ప్రభుత్వం తొలి విడత నిధులు విడుదల చేసింది. CRDA
                 అధికారులు వివరాలు వెల్లడించారు.
               </p>
             </div>
             <div>
-              <p className="mb-1 font-sans text-eyebrow uppercase tracking-[0.1em] text-muted-light">
-                Mixed script — Latin fallback must match x-height
-              </p>
-              <p className="text-[16px]">₹1,250 కోట్లు · 26 Aug 2026 · #Breaking · CM చంద్రబాబు · IPL</p>
+              <Label>Mixed script — Latin fallback must match x-height</Label>
+              <p className="te text-te-body-xs">₹1,250 కోట్లు · 26 Aug 2026 · #Breaking · CM చంద్రబాబు · IPL</p>
             </div>
           </div>
         </Section>
@@ -136,7 +140,8 @@ export default function TeluguRenderTest() {
                 onClick={() => setFontStep(step)}
                 aria-pressed={fontStep === step}
                 className={[
-                  'min-h-tap min-w-tap rounded-control border px-4 font-sans font-semibold transition-colors',
+                  'min-h-tap min-w-tap rounded-xl border px-4 text-ui font-semibold',
+                  'transition-[colors,transform,box-shadow,opacity] duration-base ease-standard active:scale-[.98]',
                   fontStep === step
                     ? 'border-brand bg-brand-tint text-brand'
                     : 'border-rule text-ink-soft hover:border-brand',
@@ -145,31 +150,25 @@ export default function TeluguRenderTest() {
                 {step}
               </button>
             ))}
-            <span className="ml-2 font-sans text-[11px] text-muted-light">
-              current: {fontStep}
-            </span>
+            <span className="ml-2 text-meta text-muted">current: {fontStep}</span>
           </div>
-          <p className="reader-body te mt-4">
+          <p lang="te" className="reader-body te mt-4">
             ఈ వాక్యం పైన ఎంచుకున్న అక్షర పరిమాణానికి అనుగుణంగా మారుతుంది. ఎంపిక అన్ని కథనాలకూ
             వర్తిస్తుంది.
           </p>
         </Section>
 
         <Section title="Font loading" spec="§4.1 — self-hosted WOFF2, no Google Fonts CDN">
-          <dl className="grid grid-cols-1 gap-2 font-sans text-[12px] sm:grid-cols-3">
-            {[
-              ['Anek Telugu', 'th text-[20px] font-bold'],
-              ['Noto Sans Telugu', 'te text-[18px]'],
-              ['Inter', 'text-[18px]'],
-            ].map(([family, cls]) => (
-              <div key={family} className="rounded-control border border-rule p-3">
-                <dt className="text-[10px] uppercase tracking-[0.1em] text-muted-light">{family}</dt>
-                <dd className={cls as string}>తెలుగు Abc 123</dd>
+          <dl className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {FACES.map(([family, cls]) => (
+              <div key={family} className="rounded-xl border border-rule p-3">
+                <dt className="text-eyebrow uppercase text-muted">{family}</dt>
+                <dd className={`${cls} text-headline-md`}>తెలుగు Abc 123</dd>
               </div>
             ))}
           </dl>
         </Section>
       </div>
-    </main>
+    </PageContainer>
   );
 }

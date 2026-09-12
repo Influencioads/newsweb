@@ -15,12 +15,12 @@ import { rowKey, useColumn, useL, type Row } from './shared';
 type TaxonomyPayload = { categories: Row[]; districts: Row[]; tags: Row[] };
 
 export function TaxonomyPage() {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
   const L = useL();
   const col = useColumn();
   const q = useQuery({ queryKey: ['cms', 'taxonomy'], queryFn: () => cmsApi.fetchManagement<TaxonomyPayload>('taxonomy') });
 
-  const name = col(language === 'en' ? 'name_en' : 'name_te', L('పేరు', 'Name'));
+  const name = col('name_te', L('పేరు', 'Name'));
   const active = col('active', L('క్రియాశీలం', 'Active'));
   const categories = [name, col('slug', 'Slug'), col('in_nav', L('నావిగేషన్', 'Navigation')), active];
   const groups: Array<{ key: keyof TaxonomyPayload; title: string; columns: typeof categories }> = [

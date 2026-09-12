@@ -45,12 +45,19 @@ export interface ChipProps {
   className?: string;
   /** Script of the label when it is DB content; defaults to the UI language. */
   lang?: string;
+  /**
+   * Type-scale class for the label, replacing the default 13px chrome size.
+   * A chip carrying Telugu DB content (a headline in the trending rail) owes it
+   * the te-body scale: `cn` is plain clsx, so a className override cannot win
+   * against the base class.
+   */
+  textClass?: string;
   disabled?: boolean;
 }
 
 const CHIP_BASE =
   'inline-flex shrink-0 snap-start items-center justify-center gap-1.5 whitespace-nowrap rounded-pill border ' +
-  'text-ui-sm font-semibold select-none transition-[colors,transform,box-shadow] duration-base ease-standard';
+  'font-semibold select-none transition-[colors,transform,box-shadow] duration-base ease-standard';
 
 export function Chip({
   selected = false,
@@ -63,6 +70,7 @@ export function Chip({
   children,
   className,
   lang,
+  textClass,
   disabled,
 }: ChipProps) {
   const s = useScript();
@@ -72,6 +80,7 @@ export function Chip({
 
   const cls = cn(
     CHIP_BASE,
+    textClass ?? 'text-ui-sm',
     compact ? 'min-h-9 px-3' : 'min-h-tap min-w-tap px-4',
     selected ? 'border-brand bg-brand text-on-brand' : 'border-rule bg-surface text-ink',
     interactive && 'active:scale-[.98]',

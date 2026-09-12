@@ -1,12 +1,22 @@
 import { Image } from 'expo-image';
 import { Fragment, type ReactNode } from 'react';
-import { Linking, StyleSheet, Text, View } from 'react-native';
+import { Linking, StyleSheet, View, type StyleProp, type TextStyle } from 'react-native';
 
 import { absoluteMediaUrl } from '@/api/client';
 import type { TiptapNode } from '@/api/types';
+import { useMotion } from '@/lib/motion';
+import {
+  BODY_FLOOR,
+  FONT_SCALE,
+  radius,
+  readerType,
+  space,
+  type,
+  type TypeVariant,
+} from '@/lib/theme';
+import { makeStyles } from '@/lib/useTheme';
 import { usePrefs } from '@/stores/prefs';
-import { font, FONT_SCALE, type Palette } from '@/lib/theme';
-import { makeStyles, useColors } from '@/lib/useTheme';
+import { hasTelugu, T, type PaletteKey, type TLang } from '@/ui/Text';
 
 /**
  * Tiptap/ProseMirror JSON → React Native.
@@ -16,28 +26,39 @@ import { makeStyles, useColors } from '@/lib/useTheme';
  * surfaces read the same source-of-truth document (§1). Every node becomes a
  * real component; no HTML string ever executes.
  *
- * §4.1: Telugu body text scales with the reader's A-/A/A+/A++ choice and keeps
- * a >= 1.65× line-height at every step.
+ * §4.1: every piece of copy goes through `<T scaled>`, so the reader's
+ * A-/A/A+/A++ step scales headings, body, quotes and captions together while
+ * Noto keeps its >= 1.65x line-height and the 17sp body floor.
  */
 
 /** Everything the pure render functions need from the render pass. */
 interface Ctx {
-  scale: number;
   styles: ReturnType<typeof useStyles>;
-  color: Palette;
+  /** Type step the current block's inline text is drawn at. */
+  variant: TypeVariant;
+  tone: PaletteKey;
+  imageTransition: number;
+  /** Vertical nudge that lines a list bullet up with its first line of text. */
+  bulletTop: number;
 }
 
-function textStyle(ctx: Ctx) {
-  return {
-    fontFamily: font.telugu,
-    fontSize: 17 * ctx.scale,
-    lineHeight: 29 * ctx.scale,
-    color: ctx.color.ink,
-  } as const;
+/** Heading level → type step (Anek stays at its 1.5x line-height at every step). */
+const HEADING: Record<number, TypeVariant> = { 2: 'headlineLg', 3: 'headlineMd', 4: 'headlineSm' };
+
+/** The node's own text, for script detection — `<T>` cannot sniff element children. */
+function plain(node: TiptapNode): string {
+  if (node.type === 'text') return node.text ?? '';
+  return (node.content ?? []).map(plain).join('');
+}
+
+function langOf(node: TiptapNode): TLang {
+  return hasTelugu(plain(node)) ? 'te' : 'auto';
 }
 
 function renderMarks(text: string, marks: TiptapNode['marks'], key: string, ctx: Ctx): ReactNode {
   if (!marks?.length) return <Fragment key={key}>{text}</Fragment>;
+  const lang: TLang = hasTelugu(text) ? 'te' : 'auto';
+  const common = { variant: ctx.variant, color: ctx.tone, scaled: true, lang } as const;
 
   return marks.reduce<ReactNode>(
     (acc, mark, i) => {
@@ -45,45 +66,54 @@ function renderMarks(text: string, marks: TiptapNode['marks'], key: string, ctx:
       switch (mark.type) {
         case 'bold':
           return (
-            <Text key={k} style={{ fontFamily: font.teluguBold }}>
+            <T key={k} {...common} weight="bold">
               {acc}
-            </Text>
+            </T>
           );
         case 'italic':
           return (
-            <Text key={k} style={{ fontStyle: 'italic' }}>
+            <T key={k} {...common} style={ctx.styles.italic}>
               {acc}
-            </Text>
+            </T>
           );
         case 'underline':
           return (
-            <Text key={k} style={{ textDecorationLine: 'underline' }}>
+            <T key={k} {...common} style={ctx.styles.underline}>
               {acc}
-            </Text>
+            </T>
           );
         case 'strike':
           return (
-            <Text key={k} style={{ textDecorationLine: 'line-through' }}>
+            <T key={k} {...common} style={ctx.styles.strike}>
               {acc}
-            </Text>
+            </T>
           );
         case 'highlight':
           return (
-            <Text key={k} style={{ backgroundColor: '#FBE9A9' }}>
+            <T key={k} {...common} style={ctx.styles.mark}>
               {acc}
-            </Text>
+            </T>
+          );
+        case 'code':
+          return (
+            <T key={k} {...common} style={ctx.styles.codeInline}>
+              {acc}
+            </T>
           );
         case 'link': {
           const href = String(mark.attrs?.href ?? '');
           if (!href) return acc;
           return (
-            <Text
+            <T
               key={k}
-              style={{ color: ctx.color.brand, textDecorationLine: 'underline' }}
+              {...common}
+              color="brand"
+              style={ctx.styles.underline}
+              accessibilityRole="link"
               onPress={() => Linking.openURL(href).catch(() => undefined)}
             >
               {acc}
-            </Text>
+            </T>
           );
         }
         default:
@@ -103,36 +133,50 @@ function inlineChildren(node: TiptapNode, key: string, ctx: Ctx): ReactNode[] {
   });
 }
 
+/** A block whose children are inline text, drawn at `variant`. */
+function block(
+  node: TiptapNode,
+  key: string,
+  ctx: Ctx,
+  variant: TypeVariant,
+  tone: PaletteKey,
+  weight: 'regular' | 'bold',
+  style: StyleProp<TextStyle>,
+  /** `header` gives a screen reader the landmark it navigates the story by. */
+  role?: 'header',
+): ReactNode {
+  const inner: Ctx = { ...ctx, variant, tone };
+  return (
+    <T
+      key={key}
+      variant={variant}
+      weight={weight}
+      color={tone}
+      scaled
+      lang={langOf(node)}
+      style={style}
+      accessibilityRole={role}
+    >
+      {inlineChildren(node, key, inner)}
+    </T>
+  );
+}
+
+function children(node: TiptapNode, key: string, ctx: Ctx): ReactNode[] {
+  return (node.content ?? []).map((child, i) => renderNode(child, `${key}.${i}`, ctx));
+}
+
 function renderNode(node: TiptapNode, key: string, ctx: Ctx): ReactNode {
   switch (node.type) {
     case 'doc':
-      return (
-        <Fragment key={key}>
-          {(node.content ?? []).map((child, i) => renderNode(child, `${key}.${i}`, ctx))}
-        </Fragment>
-      );
+      return <Fragment key={key}>{children(node, key, ctx)}</Fragment>;
 
     case 'paragraph':
-      return (
-        <Text key={key} style={[textStyle(ctx), ctx.styles.paragraph]}>
-          {inlineChildren(node, key, ctx)}
-        </Text>
-      );
+      return block(node, key, ctx, 'body', 'ink', 'regular', ctx.styles.paragraph);
 
     case 'heading': {
       const level = Math.min(Math.max(Number(node.attrs?.level ?? 2), 2), 4);
-      const sizes: Record<number, number> = { 2: 22, 3: 19, 4: 17 };
-      return (
-        <Text
-          key={key}
-          style={[
-            ctx.styles.heading,
-            { fontSize: sizes[level] * ctx.scale, lineHeight: sizes[level] * 1.5 * ctx.scale },
-          ]}
-        >
-          {inlineChildren(node, key, ctx)}
-        </Text>
-      );
+      return block(node, key, ctx, HEADING[level], 'ink', 'bold', ctx.styles.heading, 'header');
     }
 
     case 'bulletList':
@@ -140,15 +184,29 @@ function renderNode(node: TiptapNode, key: string, ctx: Ctx): ReactNode {
       return (
         <View key={key} style={ctx.styles.list}>
           {(node.content ?? []).map((item, i) => (
-            <View key={`${key}.${i}`} style={ctx.styles.listItem}>
-              <Text style={[textStyle(ctx), ctx.styles.bullet]}>
-                {node.type === 'orderedList' ? `${i + 1}.` : '•'}
-              </Text>
-              <View style={ctx.styles.listItemBody}>
-                {(item.content ?? []).map((child, j) => renderNode(child, `${key}.${i}.${j}`, ctx))}
-              </View>
+            <View key={`${key}.${i}`} style={ctx.styles.item}>
+              {node.type === 'orderedList' ? (
+                <T variant="body" scaled color="muted" lang="en">
+                  {`${i + 1}.`}
+                </T>
+              ) : (
+                <View
+                  style={[ctx.styles.dot, { marginTop: ctx.bulletTop }]}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
+                />
+              )}
+              <View style={ctx.styles.itemBody}>{children(item, `${key}.${i}`, ctx)}</View>
             </View>
           ))}
+        </View>
+      );
+
+    case 'listItem':
+      // A list item reached on its own (a nested list, or a stray node).
+      return (
+        <View key={key} style={ctx.styles.itemBody}>
+          {children(node, key, ctx)}
         </View>
       );
 
@@ -156,7 +214,22 @@ function renderNode(node: TiptapNode, key: string, ctx: Ctx): ReactNode {
     case 'pullQuote':
       return (
         <View key={key} style={ctx.styles.quote}>
-          {(node.content ?? []).map((child, i) => renderNode(child, `${key}.${i}`, ctx))}
+          {children(node, key, ctx)}
+        </View>
+      );
+
+    case 'highlight':
+      return (
+        <View key={key} style={ctx.styles.highlight}>
+          {children(node, key, ctx)}
+        </View>
+      );
+
+    case 'code':
+    case 'codeBlock':
+      return (
+        <View key={key} style={ctx.styles.codeBlock}>
+          {block(node, key, ctx, 'bodySmall', 'inkSoft', 'regular', ctx.styles.codeText)}
         </View>
       );
 
@@ -168,14 +241,19 @@ function renderNode(node: TiptapNode, key: string, ctx: Ctx): ReactNode {
       if (!src) return null;
       const width = Number(node.attrs?.width) || 16;
       const height = Number(node.attrs?.height) || 9;
+      // No alt = decorative: skipped by a screen reader rather than announced
+      // as a nameless image. expo-image is not accessible by default, so the
+      // flag has to be set for the alt to reach the tree at all.
+      const alt = String(node.attrs?.alt ?? '') || undefined;
       return (
         <Image
           key={key}
           source={{ uri: src }}
           style={[ctx.styles.image, { aspectRatio: width / height }]}
           contentFit="cover"
-          transition={150}
-          accessibilityLabel={String(node.attrs?.alt ?? '')}
+          transition={ctx.imageTransition}
+          accessible={alt !== undefined}
+          accessibilityLabel={alt}
         />
       );
     }
@@ -183,81 +261,100 @@ function renderNode(node: TiptapNode, key: string, ctx: Ctx): ReactNode {
     case 'figure':
       return (
         <View key={key} style={ctx.styles.figure}>
-          {(node.content ?? []).map((child, i) => renderNode(child, `${key}.${i}`, ctx))}
+          {children(node, key, ctx)}
         </View>
       );
 
     case 'figcaption':
-      return (
-        <Text key={key} style={ctx.styles.caption}>
-          {inlineChildren(node, key, ctx)}
-        </Text>
-      );
+      return block(node, key, ctx, 'meta', 'muted', 'regular', ctx.styles.caption);
 
     case 'factBox':
       return (
         <View key={key} style={ctx.styles.factBox}>
-          {(node.content ?? []).map((child, i) => renderNode(child, `${key}.${i}`, ctx))}
+          {children(node, key, ctx)}
         </View>
       );
 
     case 'text':
       // A stray inline node at block level — wrap it so it still shows.
       return (
-        <Text key={key} style={textStyle(ctx)}>
+        <T key={key} variant="body" scaled lang={langOf(node)}>
           {renderMarks(node.text ?? '', node.marks, key, ctx)}
-        </Text>
+        </T>
       );
 
     default:
       // Unknown block: render its children rather than dropping reader text.
-      return (
-        <Fragment key={key}>
-          {(node.content ?? []).map((child, i) => renderNode(child, `${key}.${i}`, ctx))}
-        </Fragment>
-      );
+      return <Fragment key={key}>{children(node, key, ctx)}</Fragment>;
   }
 }
 
 export function BodyRenderer({ doc }: { doc: TiptapNode | null }) {
   const fontStep = usePrefs((s) => s.fontStep);
   const styles = useStyles();
-  const color = useColors();
+  const m = useMotion();
   if (!doc) return null;
-  return <View>{renderNode(doc, 'n', { scale: FONT_SCALE[fontStep], styles, color })}</View>;
+
+  const line = readerType(type.body, FONT_SCALE[fontStep], BODY_FLOOR).lineHeight;
+  const ctx: Ctx = {
+    styles,
+    variant: 'body',
+    tone: 'ink',
+    imageTransition: m.imageTransition,
+    bulletTop: Math.round(line / 2) - 3,
+  };
+  return <View>{renderNode(doc, 'n', ctx)}</View>;
 }
 
 const useStyles = makeStyles((color) => ({
-  paragraph: { marginBottom: 14 },
-  heading: { fontFamily: font.teluguBold, color: color.ink, marginTop: 16, marginBottom: 8 },
-  list: { marginBottom: 14, gap: 6 },
-  listItem: { flexDirection: 'row', gap: 8 },
-  bullet: { marginBottom: 0 },
-  listItemBody: { flex: 1 },
+  paragraph: { marginBottom: space.md },
+  heading: { marginTop: space.lg, marginBottom: space.sm },
+  list: { marginBottom: space.md, gap: space.sm },
+  item: { flexDirection: 'row', gap: space.md },
+  dot: { width: 6, height: 6, borderRadius: radius.pill, backgroundColor: color.ink },
+  itemBody: { flex: 1 },
   quote: {
-    borderLeftWidth: 4,
+    borderLeftWidth: 3,
     borderLeftColor: color.brand,
     backgroundColor: color.paperSub,
-    paddingLeft: 12,
-    paddingVertical: 8,
-    marginBottom: 14,
+    borderTopRightRadius: radius.sm,
+    borderBottomRightRadius: radius.sm,
+    paddingLeft: space.md,
+    paddingRight: space.sm,
+    paddingVertical: space.sm,
+    marginBottom: space.md,
   },
-  rule: { height: 1, backgroundColor: color.rule, marginVertical: 18 },
-  image: { width: '100%', borderRadius: 4, backgroundColor: color.placeholder },
-  figure: { marginVertical: 12 },
-  caption: {
-    fontFamily: font.telugu,
-    fontSize: 12,
-    lineHeight: 19,
-    color: color.mutedLight,
-    marginTop: 6,
+  highlight: {
+    backgroundColor: color.highlight,
+    borderRadius: radius.sm,
+    padding: space.md,
+    marginBottom: space.md,
   },
-  factBox: {
-    borderWidth: 1,
-    borderColor: color.rule,
-    borderRadius: 8,
+  codeBlock: {
     backgroundColor: color.paperSub,
-    padding: 12,
-    marginBottom: 14,
+    borderLeftWidth: 3,
+    borderLeftColor: color.ruleStrong,
+    borderTopRightRadius: radius.sm,
+    borderBottomRightRadius: radius.sm,
+    padding: space.md,
+    marginBottom: space.md,
+  },
+  codeText: { marginBottom: 0 },
+  codeInline: { backgroundColor: color.paperSub },
+  mark: { backgroundColor: color.highlight },
+  italic: { fontStyle: 'italic' },
+  underline: { textDecorationLine: 'underline' },
+  strike: { textDecorationLine: 'line-through' },
+  rule: { height: StyleSheet.hairlineWidth, backgroundColor: color.rule, marginVertical: space.xl },
+  image: { width: '100%', borderRadius: radius.sm, backgroundColor: color.placeholder },
+  figure: { marginVertical: space.md },
+  caption: { marginTop: space.xs },
+  factBox: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: color.rule,
+    borderRadius: radius.md,
+    backgroundColor: color.paperSub,
+    padding: space.lg,
+    marginBottom: space.md,
   },
 }));

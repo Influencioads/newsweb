@@ -1,69 +1,124 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Radio, RefreshCw } from 'lucide-react';
+import { Clock3, Radio, RefreshCw } from 'lucide-react';
 
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Icon } from '@/components/ui/Icon';
+import { PageContainer, PageHeader } from '@/components/ui/Layout';
+import { EmptyState, QueryState } from '@/components/ui/State';
 import * as publicApi from '@/features/public/api';
-import { useI18n } from '@/i18n';
-import { relativeTime } from '@/utils/time';
+import { useI18n, useScript } from '@/i18n';
+import { cn } from '@/utils/cn';
+import { useDocumentTitle, useReveal } from '@/utils/motion';
+import { formatTime, relativeTime } from '@/utils/time';
 
+/**
+ * Breaking news, newest first (§6). The feed re-polls every 25 s on its own;
+ * the refresh button is for a reader who does not want to wait for the tick.
+ * Each entry is a Card carrying a time Badge — the newest one in the breaking
+ * tone, the rest muted, so "how old is this" is legible at a glance.
+ */
 export default function LiveNewsPage() {
-  const { language, pick, isFallback } = useI18n();
-  const te = language === 'te';
-  const { data = [], isLoading, dataUpdatedAt, refetch, isFetching } = useQuery({
+  const { t, pick, language } = useI18n();
+  const s = useScript();
+  // Page-specific copy with no strings.ts key yet (see neededStrings).
+  const L = (te: string, en: string) => (language === 'te' ? te : en);
+  const reveal = useReveal<HTMLLIElement>();
+  useDocumentTitle(t('page.live'));
+
+  const feed = useQuery({
     queryKey: ['public', 'breaking'],
     queryFn: publicApi.fetchBreaking,
     refetchInterval: 25_000,
   });
 
   return (
-    <div className="mx-auto max-w-[860px] px-4 py-7">
-      <div className="mb-6 flex items-start justify-between gap-4 border-b-2 border-ink pb-4">
-        <div>
-          <div className="mb-1 flex items-center gap-2 text-breaking">
-            <Radio className="h-5 w-5 animate-pulse" aria-hidden />
-            <span className="font-sans text-[11px] font-extrabold uppercase tracking-[0.16em]">Live</span>
-          </div>
-          <h1 className={`${te ? 'th' : 'font-sans'} text-[28px] font-extrabold text-ink`}>
-            {te ? 'తాజా వార్తలు — ప్రత్యక్ష అప్‌డేట్లు' : 'Breaking news — live updates'}
-          </h1>
-          <p className={`${te ? 'te' : 'font-sans'} mt-1 text-[13px] text-muted`}>
-            {te ? 'ముఖ్యమైన వార్తలు వచ్చిన వెంటనే ఇక్కడ అప్‌డేట్ అవుతాయి.' : 'Important developments, updated here as they happen.'}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void refetch()}
-          className="flex min-h-tap shrink-0 items-center gap-1.5 rounded-control border border-rule px-3 text-[12px] font-semibold text-muted hover:border-brand hover:text-brand"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
-          {te ? 'రిఫ్రెష్' : 'Refresh'}
-        </button>
-      </div>
+    <PageContainer width="wrap" className="py-7 md:py-10">
+      <PageHeader
+        eyebrow={
+          <span className="inline-flex items-center gap-1.5">
+            <Icon icon={Radio} size="sm" className="animate-pulse" />
+            {t('ui.live')}
+          </span>
+        }
+        title={L('తాజా వార్తలు — ప్రత్యక్ష అప్‌డేట్లు', 'Breaking news — live updates')}
+        subtitle={L(
+          'ముఖ్యమైన వార్తలు వచ్చిన వెంటనే ఇక్కడ అప్‌డేట్ అవుతాయి.',
+          'Important developments, updated here as they happen.',
+        )}
+        actions={
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={RefreshCw}
+            pending={feed.isFetching}
+            onClick={() => void feed.refetch()}
+          >
+            {L('రిఫ్రెష్', 'Refresh')}
+          </Button>
+        }
+      />
 
-      {isLoading ? <p className={`${te ? 'te' : 'font-sans'} text-muted`}>{te ? 'లోడ్ అవుతోంది…' : 'Loading…'}</p> : null}
-      <ol className="relative ml-2 border-l border-rule pl-6">
-        {data.map((item, index) => {
-          const fallback = isFallback(item.title_te, item.title_en);
-          return (
-            <li key={item.short_id} className="relative border-b border-rule py-5 first:pt-1">
-              <span className={`absolute -left-[31px] top-6 h-3 w-3 rounded-full border-2 border-white ${index === 0 ? 'bg-breaking ring-4 ring-red-50' : 'bg-muted-light'}`} />
-              <p className="mb-1 font-sans text-[11px] font-semibold text-muted">
-                {item.published_at ? relativeTime(item.published_at, language) : te ? 'ఇప్పుడే' : 'Just now'}
-              </p>
-              <Link
-                to={item.url}
-                lang={te || fallback ? 'te' : 'en'}
-                className={`${te || fallback ? 'th' : 'font-sans'} text-[20px] font-bold leading-[1.55] text-ink hover:text-brand`}
-              >
-                {pick(item.title_te, item.title_en)}
-              </Link>
-            </li>
-          );
-        })}
-      </ol>
-      <p className="mt-5 font-sans text-[11px] text-muted-light">
-        {te ? 'చివరిసారి నవీకరించబడింది' : 'Last refreshed'}: {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString() : '—'}
-      </p>
-    </div>
+      <div className="space-y-7 md:space-y-10">
+        <QueryState
+          query={feed}
+          empty={
+            <EmptyState
+              icon={Radio}
+              title={L('ఇప్పుడు ప్రత్యక్ష అప్‌డేట్లు లేవు.', 'No live updates right now.')}
+              body={L(
+                'ముఖ్యమైన వార్త వచ్చిన వెంటనే ఈ పేజీ దానంతట అదే నవీకరించబడుతుంది.',
+                'This page refreshes itself the moment something breaks.',
+              )}
+            />
+          }
+        >
+          {(items) => (
+            // The feed re-polls every 25s and prepends; without this a screen
+            // reader is never told an update arrived.
+            <ol aria-live="polite" aria-relevant="additions" className="flex flex-col gap-3">
+              {items.map((item, index) => {
+                const title = s.forText(item.title_te, item.title_en);
+                const when = item.published_at
+                  ? relativeTime(item.published_at, language)
+                  : L('ఇప్పుడే', 'Just now');
+                return (
+                  <li key={item.short_id} ref={reveal}>
+                    <Card as="article" interactive padding="md" className="relative">
+                      <Badge
+                        tone={index === 0 ? 'breaking' : 'muted'}
+                        size="xs"
+                        icon={index === 0 ? Radio : Clock3}
+                        lang={language}
+                      >
+                        {when}
+                      </Badge>
+                      <h2
+                        lang={title.lang}
+                        className={cn(title.head, 'mt-2 text-headline-sm font-bold text-ink')}
+                      >
+                        <Link
+                          to={item.url}
+                          className="rounded-xl transition-[colors,transform,box-shadow] duration-base ease-standard after:absolute after:inset-0 hover:text-brand"
+                        >
+                          {pick(item.title_te, item.title_en)}
+                        </Link>
+                      </h2>
+                    </Card>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </QueryState>
+
+        <p className={cn(s.body, 'text-meta text-muted')}>
+          {L('చివరిసారి నవీకరించబడింది', 'Last refreshed')}:{' '}
+          {feed.dataUpdatedAt ? formatTime(new Date(feed.dataUpdatedAt).toISOString()) : '—'}
+        </p>
+      </div>
+    </PageContainer>
   );
 }

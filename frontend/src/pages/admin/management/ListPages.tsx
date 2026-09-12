@@ -47,7 +47,7 @@ function ListPage({
 }
 
 export function UsersPage() {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
   const L = useL();
   const col = useColumn();
   return (
@@ -56,7 +56,7 @@ export function UsersPage() {
       title={t('admin.page.users')}
       subtitle={L('సిబ్బంది ఖాతాలు, స్థితి, పాత్రలు మరియు భద్రత', 'Staff accounts, status, roles, and security')}
       columns={[
-        col(language === 'en' ? 'name_en' : 'name_te', L('పేరు', 'Name')),
+        col('name_te', L('పేరు', 'Name')),
         col('email', 'Email'),
         col('phone', L('ఫోన్', 'Phone'), { hideBelow: 'lg' }),
         col('status', L('స్థితి', 'Status')),
@@ -69,7 +69,7 @@ export function UsersPage() {
 }
 
 export function RolesPage() {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
   const L = useL();
   const col = useColumn();
   return (
@@ -78,7 +78,7 @@ export function RolesPage() {
       title={t('admin.page.roles')}
       subtitle={L('పాత్ర పేరుకు బదులుగా permission key ఆధారంగా నియంత్రణ', 'Access is controlled by permission keys, not role names')}
       columns={[
-        col(language === 'en' ? 'label_en' : 'label_te', L('పాత్ర', 'Role')),
+        col('label_te', L('పాత్ర', 'Role')),
         col('key', 'Key'),
         col('level', L('స్థాయి', 'Level'), { align: 'right' }),
         col('scope', L('డిఫాల్ట్ పరిధి', 'Default scope')),

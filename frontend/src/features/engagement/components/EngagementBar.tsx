@@ -1,180 +1,204 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bookmark, Flag, Heart, MessageCircle, Share2 } from 'lucide-react';
+import { Flag, Heart } from 'lucide-react';
 
+import { ButtonLink, IconButton } from '@/components/ui/Button';
+import { ConfirmDialog, Sheet } from '@/components/ui/Dialog';
+import { Select } from '@/components/ui/Field';
+import { useToast } from '@/components/ui/Toast';
 import * as engagementApi from '@/features/engagement/api';
-import { trackShare } from '@/features/engagement/beacon';
-import { useI18n } from '@/i18n';
+import type { MyArticleFlags } from '@/features/engagement/api';
+import { useI18n, useScript } from '@/i18n';
 import { useAuth } from '@/stores/auth';
 import type { ArticleDetail } from '@/types/public';
+import { cn } from '@/utils/cn';
 
 /**
- * Like · comment · bookmark · share · report — the §5 article actions.
- * Anonymous taps on stateful actions route to /login with a return path;
- * counts render for everyone.
+ * Like · report — the §5 article actions that are *not* already on the reader
+ * toolbar. Share, bookmark and comments live there (a sticky bar under md, an
+ * inline row from md up); duplicating them here showed every one of them twice
+ * from md up and mounted a second ShareSheet, so this bar owns only what the
+ * toolbar does not.
+ *
+ * The like count rides on the button as a badge and renders for everyone. Both
+ * actions need an account: an anonymous tap opens a sign-in Sheet instead of
+ * yanking the reader off the story mid-sentence, and the sheet's button carries
+ * the return path so signing in lands back here.
+ *
+ * Like is optimistic (the heart fills and pulses before the round trip) and
+ * rolls back with a toast on failure, then invalidates the article query so the
+ * server's counter wins.
  */
+
+/** §5 report reasons, as the backend enum spells them. */
+const REPORT_REASONS = {
+  misinformation: { te: 'తప్పుడు సమాచారం', en: 'Misinformation' },
+  abuse: { te: 'అభ్యంతరకరం', en: 'Abusive' },
+  spam: { te: 'స్పామ్', en: 'Spam' },
+  copyright: { te: 'కాపీరైట్', en: 'Copyright' },
+  other: { te: 'ఇతరం', en: 'Other' },
+} as const;
+
+type ReportReason = keyof typeof REPORT_REASONS;
+
 export function EngagementBar({ article }: { article: ArticleDetail }) {
-  const { language } = useI18n();
-  const te = language === 'te';
-  const teCls = te ? 'te' : 'font-sans';
+  const { t, language } = useI18n();
+  const s = useScript();
+  // Page-specific copy with no strings.ts key yet (see neededStrings).
+  const L = (te: string, en: string) => (language === 'te' ? te : en);
   const navigate = useNavigate();
-  const authed = useAuth((s) => s.status === 'authenticated');
+  const toast = useToast();
+  const authed = useAuth((state) => state.status === 'authenticated');
   const queryClient = useQueryClient();
 
+  const flagsKey = ['engagement', 'flags', article.short_id];
   const [likeCount, setLikeCount] = useState(article.like_count);
-  const [shareCount, setShareCount] = useState(article.share_count);
-  const [reported, setReported] = useState(false);
+  const [popping, setPopping] = useState(false);
+  const [signInOpen, setSignInOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [reported, setReported] = useState(false);
+  const [reason, setReason] = useState<ReportReason>('misinformation');
 
+  // The server's count wins whenever the article query refreshes…
+  useEffect(() => setLikeCount(article.like_count), [article.like_count]);
+  // …but "already reported" is per story, and a refreshed count must not clear it.
   useEffect(() => {
-    setLikeCount(article.like_count);
-    setShareCount(article.share_count);
     setReported(false);
     setReportOpen(false);
-  }, [article.short_id, article.like_count, article.share_count]);
+  }, [article.short_id]);
 
   const flags = useQuery({
-    queryKey: ['engagement', 'flags', article.short_id],
+    queryKey: flagsKey,
     queryFn: () => engagementApi.fetchMyFlags(article.short_id),
     enabled: authed,
   });
 
-  function requireLogin(): boolean {
-    if (authed) return false;
-    navigate('/login', { state: { from: article.url } });
-    return true;
-  }
+  const liked = flags.data?.liked ?? false;
+
+  /** The like moves the article's counters; the page query must not keep the stale ones. */
+  const refreshArticle = () =>
+    void queryClient.invalidateQueries({ queryKey: ['public', 'article', article.short_id] });
+
+  const patchFlags = (next: Partial<MyArticleFlags>) =>
+    queryClient.setQueryData<MyArticleFlags>(flagsKey, (prev) => ({
+      liked: prev?.liked ?? false,
+      bookmarked: prev?.bookmarked ?? false,
+      ...next,
+    }));
 
   const like = useMutation({
     mutationFn: (next: boolean) => engagementApi.setLike(article.short_id, next),
-    onSuccess: (counts, next) => {
+    onMutate: (next) => {
+      const previous = { liked, count: likeCount };
+      patchFlags({ liked: next });
+      setLikeCount((n) => Math.max(0, n + (next ? 1 : -1)));
+      if (next) setPopping(true);
+      return previous;
+    },
+    onError: (error, _next, previous) => {
+      if (previous) {
+        patchFlags({ liked: previous.liked });
+        setLikeCount(previous.count);
+      }
+      toast.error(error);
+    },
+    onSuccess: (counts) => {
       setLikeCount(counts.like_count);
-      queryClient.setQueryData(['engagement', 'flags', article.short_id], {
-        liked: next,
-        bookmarked: flags.data?.bookmarked ?? false,
-      });
+      refreshArticle();
     },
   });
 
-  const bookmark = useMutation({
-    mutationFn: (next: boolean) => engagementApi.setBookmark(article.short_id, next),
-    onSuccess: (data) =>
-      queryClient.setQueryData(['engagement', 'flags', article.short_id], data),
-  });
-
-  async function share() {
-    const url = `${window.location.origin}${article.url}`;
-    trackShare(article.short_id);
-    setShareCount((n: number) => n + 1);
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: article.title_te, url });
-        return;
-      }
-    } catch {
-      /* dismissed */
-    }
-    const text = encodeURIComponent(`${article.title_te}\n${url}`);
-    window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
-  }
-
   const report = useMutation({
-    mutationFn: (reason: string) => engagementApi.reportArticle(article.short_id, reason),
+    mutationFn: () => engagementApi.reportArticle(article.short_id, reason),
     onSuccess: () => {
       setReported(true);
       setReportOpen(false);
+      toast.success(t('state.reported'));
     },
+    onError: (error) => toast.error(error),
   });
 
-  const liked = flags.data?.liked ?? false;
-  const bookmarked = flags.data?.bookmarked ?? false;
-
-  const buttonCls = (active: boolean) =>
-    [
-      'flex min-h-tap items-center gap-1.5 rounded-control border px-3 text-[12.5px] font-semibold transition-colors',
-      teCls,
-      active
-        ? 'border-brand bg-brand-tint text-brand'
-        : 'border-rule text-muted hover:border-brand hover:text-brand',
-    ].join(' ');
+  /** True when the action needs an account the reader does not have (the sheet is now open). */
+  function needsAccount(): boolean {
+    if (authed) return false;
+    setSignInOpen(true);
+    return true;
+  }
 
   return (
-    <div className="mt-5 border-y border-rule py-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
+    <div className="mt-7 border-y border-rule py-2">
+      <div className="flex flex-wrap items-center gap-1">
+        <IconButton
+          icon={Heart}
+          label={liked ? t('ui.liked') : t('ui.like')}
+          badge={likeCount}
+          pressed={liked}
+          disabled={like.isPending}
           onClick={() => {
-            if (requireLogin()) return;
+            if (needsAccount()) return;
             like.mutate(!liked);
           }}
-          aria-pressed={liked}
-          className={buttonCls(liked)}
-        >
-          <Heart className={`h-4 w-4 ${liked ? 'fill-brand' : ''}`} aria-hidden />
-          {likeCount > 0 ? likeCount : ''} {te ? 'ఇష్టం' : 'Like'}
-        </button>
+          // The class is removed on animationend, so the next like replays it
+          // without remounting the button and stealing keyboard focus.
+          onAnimationEnd={() => setPopping(false)}
+          className={cn(liked && '[&>svg]:fill-current', popping && 'animate-pop')}
+        />
 
-        <a href="#comments" className={buttonCls(false)}>
-          <MessageCircle className="h-4 w-4" aria-hidden />
-          {article.comment_count > 0 ? article.comment_count : ''} {te ? 'వ్యాఖ్యలు' : 'Comments'}
-        </a>
-
-        <button
-          type="button"
+        <IconButton
+          icon={Flag}
+          label={reported ? t('state.reported') : L('నివేదించండి', 'Report')}
+          disabled={reported || report.isPending}
+          className="ml-auto"
           onClick={() => {
-            if (requireLogin()) return;
-            bookmark.mutate(!bookmarked);
+            if (needsAccount()) return;
+            setReportOpen(true);
           }}
-          aria-pressed={bookmarked}
-          className={buttonCls(bookmarked)}
-        >
-          <Bookmark className={`h-4 w-4 ${bookmarked ? 'fill-brand' : ''}`} aria-hidden />
-          {bookmarked ? (te ? 'సేవ్ అయింది' : 'Saved') : te ? 'సేవ్' : 'Save'}
-        </button>
-
-        <button type="button" onClick={() => void share()} className={buttonCls(false)}>
-          <Share2 className="h-4 w-4" aria-hidden />
-          {shareCount > 0 ? shareCount : ''} {te ? 'షేర్' : 'Share'}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setReportOpen((v) => !v)}
-          disabled={reported}
-          className={`${teCls} ml-auto flex min-h-tap items-center gap-1 px-2 text-[11.5px] text-muted-light hover:text-breaking disabled:text-success`}
-        >
-          <Flag className="h-3.5 w-3.5" aria-hidden />
-          {reported ? (te ? 'నివేదించారు' : 'Reported') : te ? 'నివేదించండి' : 'Report'}
-        </button>
+        />
       </div>
 
-      {reportOpen && !reported ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-control border border-rule bg-paper-sub p-2.5">
-          <span className={`${teCls} text-[12px] font-semibold text-ink`}>
-            {te ? 'కారణం:' : 'Reason:'}
-          </span>
-          {(
-            [
-              ['misinformation', te ? 'తప్పుడు సమాచారం' : 'Misinformation'],
-              ['abuse', te ? 'అభ్యంతరకరం' : 'Abusive'],
-              ['spam', te ? 'స్పామ్' : 'Spam'],
-              ['copyright', te ? 'కాపీరైట్' : 'Copyright'],
-              ['other', te ? 'ఇతరం' : 'Other'],
-            ] as const
-          ).map(([reason, label]) => (
-            <button
-              key={reason}
-              type="button"
-              disabled={report.isPending}
-              onClick={() => report.mutate(reason)}
-              className={`${teCls} rounded-chip border border-rule bg-white px-3 py-1 text-[12px] text-muted hover:border-breaking hover:text-breaking`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      ) : null}
+      <Sheet open={signInOpen} onClose={() => setSignInOpen(false)} title={t('ui.signInToContinue')}>
+        <p className={cn(s.body, s.te ? 'text-te-body-sm' : 'text-ui', 'text-muted')}>
+          {t('ui.signInBody')}
+        </p>
+        <ButtonLink
+          to="/login"
+          size="lg"
+          full
+          className="mt-4"
+          onClick={(event) => {
+            // LoginPage reads the return path from the router location state,
+            // which a plain anchor cannot carry.
+            event.preventDefault();
+            navigate('/login', { state: { from: article.url } });
+          }}
+        >
+          {L('సైన్ ఇన్ చేయండి', 'Sign in')}
+        </ButtonLink>
+      </Sheet>
+
+      <ConfirmDialog
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        onConfirm={() => report.mutate()}
+        pending={report.isPending}
+        tone="danger"
+        title={L('ఈ కథనాన్ని నివేదించాలా?', 'Report this story?')}
+        confirmLabel={L('నివేదించండి', 'Report')}
+        body={
+          <Select
+            value={reason}
+            onChange={(event) => setReason(event.target.value as ReportReason)}
+            aria-label={L('కారణం', 'Reason')}
+          >
+            {Object.entries(REPORT_REASONS).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label[language]}
+              </option>
+            ))}
+          </Select>
+        }
+      />
     </div>
   );
 }

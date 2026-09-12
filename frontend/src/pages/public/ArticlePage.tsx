@@ -1,141 +1,98 @@
-import { useEffect } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Sparkles } from 'lucide-react';
 
-import { ApiError, api } from '@/api/client';
+import { api } from '@/api/client';
 import { AdSlot } from '@/components/ads/AdSlot';
-import { VideoStrip } from '@/components/video/VideoStrip';
-import { GridCard } from '@/components/article/ArticleCard';
 import { ArticleGallery } from '@/components/article/ArticleGallery';
 import { ArticleRenderer } from '@/components/article/ArticleRenderer';
-import { ImageCaption, NewsImage } from '@/components/media/NewsImage';
+import { ArticleVideo } from '@/components/article/ArticleVideo';
+import { AudioPlayer } from '@/components/article/AudioPlayer';
+import { ReaderToolbar, ReadingProgress } from '@/components/article/ReaderToolbar';
+import { ShareSheet } from '@/components/article/ShareSheet';
+import { Badge } from '@/components/ui/Badge';
+import { Card } from '@/components/ui/Card';
+import { Chip } from '@/components/ui/Chip';
+import { PageContainer } from '@/components/ui/Layout';
+import { QueryState, Skeleton } from '@/components/ui/State';
+import { useToast } from '@/components/ui/Toast';
+import * as engagementApi from '@/features/engagement/api';
 import { useReadingBeacon } from '@/features/engagement/beacon';
 import { CommentsSection } from '@/features/engagement/components/CommentsSection';
 import { EngagementBar } from '@/features/engagement/components/EngagementBar';
 import { FollowButton } from '@/features/engagement/components/FollowButton';
-import * as publicApi from '@/features/public/api';
-import { AudioPlayer } from '@/components/article/AudioPlayer';
-import { ArticleVideo } from '@/components/article/ArticleVideo';
-import { ShareButton } from '@/components/article/ShareSheet';
-import { extractPlainText, useTts } from '@/features/reader/tts';
-import { useI18n } from '@/i18n';
-import { FONT_STEPS, useReaderPrefs } from '@/stores/readerPrefs';
-import type { ArticleDetail, StoryFormats } from '@/types/public';
 import { PollCard } from '@/features/epaper/PollCard';
-import { formatDate, formatTime, readingTime } from '@/utils/time';
+import * as publicApi from '@/features/public/api';
+import { extractPlainText, useTts } from '@/features/reader/tts';
+import { useI18n, useScript } from '@/i18n';
+import { useAuth } from '@/stores/auth';
+import type { ArticleDetail, StoryFormats } from '@/types/public';
+import { cn } from '@/utils/cn';
+import { prefersReducedMotion, useDocumentTitle } from '@/utils/motion';
+import { readingTime } from '@/utils/time';
+
+import { ArticleBreadcrumb, ArticleHead, ArticleHero } from './article/ArticleHead';
+import { useNewsArticleJsonLd } from './article/jsonLd';
+import { ReadNext } from './article/ReadNext';
 
 /**
- * Article reader — mockup `1c`.
+ * Article reader.
  *
- * Carries three things the spec makes non-negotiable:
- *   * the A-/A/A+/A++ switcher and TTS control (§4.1, §10.4)
- *   * the AI-assistance disclosure when `ai_generated` is true (§7.2)
- *   * "సవరించబడింది: {date}" plus the editor's note on a material correction (§12.5)
+ * The page owns the story's data and its controls; everything visual is a
+ * design-system part. Three things the spec makes non-negotiable live here:
+ * the §7.2 AI disclosure, the §12.5 correction note, and the §3.1 reading
+ * beacon. The reader controls (font size, listen, save, share, comments) are
+ * `ReaderToolbar` — rendered ONCE: a sticky bottom bar under md, an inline row
+ * from md up. Hence `pb-20 md:pb-0` on the page, so the bar never covers the
+ * last paragraph.
  */
 
-/** §10.3 — NewsArticle JSON-LD on every article page. */
-function useNewsArticleJsonLd(article: ArticleDetail | undefined) {
+/**
+ * Fraction of the story column scrolled, for `ReadingProgress`.
+ *
+ * rAF-throttled, and measured for everyone: the bar is a reading-position
+ * affordance, not decoration, so withholding it from readers who asked for less
+ * motion would take information away from exactly the cohort that wants it. The
+ * bar's own transition is already flattened by the reduced-motion block in
+ * assets/index.css.
+ */
+function useReadingProgress(ref: RefObject<HTMLElement>): number {
+  const [progress, setProgress] = useState(0);
+
   useEffect(() => {
-    if (!article) return;
-    const id = 'newsarticle-jsonld';
-    document.getElementById(id)?.remove();
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const el = ref.current;
+      if (!el) return;
+      const span = el.offsetHeight - window.innerHeight;
+      const read = window.scrollY - el.offsetTop;
+      setProgress(span <= 0 ? (read > 0 ? 1 : 0) : Math.min(1, Math.max(0, read / span)));
+    };
+    const onScroll = () => {
+      frame ||= window.requestAnimationFrame(measure);
+    };
+    measure();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [ref]);
 
-    const script = document.createElement('script');
-    script.id = id;
-    script.type = 'application/ld+json';
-    script.textContent = JSON.stringify({
-      '@context': 'https://schema.org',
-      '@type': 'NewsArticle',
-      // §10.3 — headline in the language the page is serving.
-      headline: article.title_en || article.title_te,
-      alternativeHeadline: article.title_en ? article.title_te : undefined,
-      description: article.summary_te ?? undefined,
-      inLanguage: 'te',
-      datePublished: article.published_at ?? undefined,
-      dateModified: article.updated_at ?? article.published_at ?? undefined,
-      articleSection: article.category?.name_en ?? undefined,
-      author: article.author
-        ? {
-            '@type': 'Person',
-            name: article.author.name_te,
-            url: article.author.author_slug
-              ? `${window.location.origin}/author/${article.author.author_slug}`
-              : undefined,
-          }
-        : undefined,
-      publisher: {
-        '@type': 'NewsMediaOrganization',
-        name: 'టాప్ తెలుగు న్యూస్',
-      },
-      image: article.hero?.url ? [article.hero.url] : undefined,
-      mainEntityOfPage: window.location.href,
-    });
-    document.head.appendChild(script);
-
-    document.title = `${article.title_te} · టాప్ తెలుగు న్యూస్`;
-    return () => document.getElementById(id)?.remove();
-  }, [article]);
+  return progress;
 }
 
-function ReaderToolbar({ article }: { article: ArticleDetail }) {
-  const { fontStep, setFontStep } = useReaderPrefs();
-  const { t, language } = useI18n();
-  // §16 audio news, v1: on-device Telugu speech. The headline leads so a
-  // listener knows immediately which story started.
-  const tts = useTts(`${article.title_te}. ${extractPlainText(article.body)}`);
-
-  // Which of the four formats this story actually has. A host that cannot
-  // shape Telugu reports `card.available: false`, and the download button
-  // simply is not offered rather than handing out an unreadable image.
-  const { data: formats } = useQuery({
-    queryKey: ['formats', article.short_id],
-    queryFn: async () =>
-      (await api.get<StoryFormats>(`/public/articles/${article.short_id}/formats`)).data,
-    retry: false,
-    staleTime: 5 * 60_000,
-  });
-
+function ArticleSkeleton() {
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <div
-        className="flex items-center gap-0.5 rounded-control border border-rule px-1.5 py-1"
-        role="group"
-        aria-label={t('reader.fontSize')}
-      >
-        {FONT_STEPS.map((step) => (
-          <button
-            key={step}
-            type="button"
-            onClick={() => setFontStep(step)}
-            aria-pressed={fontStep === step}
-            className={[
-              'min-h-[32px] min-w-[32px] rounded px-1 font-sans text-[11px] font-semibold',
-              fontStep === step ? 'bg-brand-tint text-brand' : 'text-ink-soft hover:text-brand',
-            ].join(' ')}
-          >
-            {step}
-          </button>
-        ))}
-      </div>
-
-      {/* §19 — a server-generated file when one exists (seek + speed), the
-          device voice when it does not, nothing when voice is switched off. */}
-      <AudioPlayer
-        shortId={article.short_id}
-        readingLabel={readingTime(article.reading_time_sec, language)}
-        deviceTts={tts}
-      />
-
-      {/* §4.6 — WhatsApp is the #1 distribution channel. The Latin slug keeps
-          the shared link readable, and the link preview now carries a rendered
-          Telugu headline card (see app/api/v1/crawler.py). */}
-      <ShareButton
-        variant="button"
-        shortId={article.short_id}
-        url={article.url}
-        title={language === 'en' && article.title_en ? article.title_en : article.title_te}
-        cardAvailable={formats?.card.available ?? false}
-      />
+    <div className="mx-auto flex max-w-article flex-col gap-4">
+      <Skeleton variant="headline" lines={2} />
+      <Skeleton variant="text" lines={2} />
+      <Skeleton variant="image" ratio="16/9" />
+      <Skeleton variant="text" lines={6} />
     </div>
   );
 }
@@ -145,361 +102,236 @@ export default function ArticlePage() {
   // §4.5 URL pattern: /{category}/{slug}-{shortId}; the short id is the last segment.
   const shortId = slugAndId?.split('-').pop() ?? '';
 
-  const { t, pick, isFallback, language } = useI18n();
-  const script = language === 'te' ? 'te' : 'font-sans';
+  const { t, pick, language } = useI18n();
+  const s = useScript();
+  const toast = useToast();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const authed = useAuth((a) => a.status === 'authenticated');
 
-  const { data, isLoading, isError, error } = useQuery({
+  const query = useQuery({
     queryKey: ['public', 'article', shortId],
     queryFn: () => publicApi.fetchArticle(shortId),
     enabled: Boolean(shortId),
   });
+  const article = query.data;
 
-  useNewsArticleJsonLd(data);
-  // §3.1 behaviour tracking: view on open, read-time heartbeats, scroll depth.
-  useReadingBeacon(data ? shortId : undefined);
-
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [shortId]);
-
-  if (isLoading) {
-    return (
-      <div className="mx-auto max-w-article px-4 py-8" aria-busy="true">
-        <p className="sr-only" role="status">
-          {t('state.loadingArticle')}
-        </p>
-        <div className="h-8 w-11/12 animate-pulse rounded bg-placeholder" />
-        <div className="mt-3 h-8 w-7/12 animate-pulse rounded bg-placeholder" />
-        <div className="ph mt-5 rounded-[6px]" style={{ aspectRatio: '16/9' }} />
-      </div>
-    );
-  }
-
-  if (isError || !data) {
-    const notFound = error instanceof ApiError && error.status === 404;
-    return (
-      <div className="mx-auto max-w-[680px] px-4 py-16 text-center">
-        <h1 className={`${language === 'te' ? 'th' : 'font-sans'} text-[22px] font-bold text-ink`}>
-          {notFound ? t('state.articleNotFound') : t('state.articleFailed')}
-        </h1>
-        <p className={`${script} mt-2 text-[14px] text-muted`}>
-          {error instanceof ApiError
-            ? language === 'en'
-              ? error.messageEn
-              : error.messageTe
-            : t('state.retry')}
-        </p>
-        <Link
-          to="/"
-          className={`${script} mt-4 inline-block min-h-tap rounded-control bg-brand px-6 py-3 font-bold text-white`}
-        >
-          {t('state.goHome')}
-        </Link>
-      </div>
-    );
-  }
-
-  // Which script the headline actually renders in, and whether to tell the
-  // reader the rest of the story is Telugu-only.
-  const teluguHeadline =
-    language === 'te' || isFallback(data.title_te, data.title_en);
-  const showTeluguOnlyNotice = language === 'en' && Boolean(data.title_en);
-
-  return (
-    <div className="bg-white">
-      {/* Breadcrumb strip — mockup 1c shows the canonical URL here. */}
-      <div className="border-b border-rule bg-paper-sub">
-        <div className="mx-auto max-w-[880px] px-4 py-1.5">
-          <nav aria-label="Breadcrumb" className={`${script} text-[11px] text-muted`}>
-            <Link to="/" className="hover:text-brand">
-              {t('nav.home')}
-            </Link>
-            {data.category ? (
-              <>
-                {' › '}
-                <Link to={`/section/${data.category.slug}`} className="hover:text-brand">
-                  {pick(data.category.name_te, data.category.name_en)}
-                </Link>
-              </>
-            ) : null}
-            {data.district
-              ? ` › ${pick(data.district.name_te, data.district.name_en)}`
-              : null}
-          </nav>
-        </div>
-      </div>
-
-      <article className="mx-auto max-w-article px-4 py-6">
-        <div className="mb-2.5 flex flex-wrap gap-1.5">
-          {data.category ? (
-            <span className={`${script} rounded-[3px] bg-brand-tint px-2.5 py-0.5 text-[11px] font-bold leading-[1.4] text-brand`}>
-              {pick(data.category.name_te, data.category.name_en)}
-            </span>
-          ) : null}
-          {data.is_exclusive ? (
-            <span className={`${script} rounded-[3px] bg-exclusive-tint px-2.5 py-0.5 text-[11px] font-bold leading-[1.4] text-exclusive`}>
-              ★ {t('article.exclusive')}
-            </span>
-          ) : null}
-          {data.is_breaking ? (
-            <span className={`${script} rounded-[3px] bg-breaking px-2.5 py-0.5 text-[11px] font-bold leading-[1.4] text-white`}>
-              ⚡ {t('home.breaking')}
-            </span>
-          ) : null}
-        </div>
-
-        {/* Headline: no fixed height, no overflow hidden (§4.1). */}
-        <h1
-          lang={teluguHeadline ? 'te' : 'en'}
-          className={`${teluguHeadline ? 'th' : 'font-sans'} text-[26px] font-extrabold text-ink sm:text-headline-xl`}
-        >
-          {pick(data.title_te, data.title_en)}
-        </h1>
-
-        {/* Standfirst and body exist only in Telugu until AI translation
-            lands (§7.3), so they are always tagged lang="te". */}
-        {data.sub_title_te ? (
-          <p lang="te" className="te mt-2 text-[16px] text-ink-soft sm:text-te-lead">
-            {data.sub_title_te}
-          </p>
-        ) : null}
-
-        {showTeluguOnlyNotice ? (
-          <p className="mt-2 font-sans text-[12px] text-muted-light">
-            {t('article.teluguOnly')}
-          </p>
-        ) : null}
-
-        {/* Byline + toolbar */}
-        <div className="mt-3.5 flex flex-col gap-3 border-y border-rule py-2.5 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-2.5">
-            <span
-              aria-hidden
-              className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-placeholder font-sans text-[12px] font-semibold text-muted-light"
-            >
-              {data.author?.name_te?.[0] ?? '·'}
-            </span>
-            <div>
-              <p lang="te" className="te text-[12.5px] font-bold leading-[1.5] text-ink">
-                {data.author?.name_te ?? data.byline_te ?? t('reader.desk')}
-                {data.author?.author_slug ? (
-                  <Link
-                    to={`/author/${data.author.author_slug}`}
-                    className="ml-1.5 font-sans text-[10.5px] font-normal text-info hover:underline"
-                  >
-                    — {t('reader.authorPage')}
-                  </Link>
-                ) : null}
-              </p>
-              <p className="font-sans text-[10.5px] text-muted-light">
-                {formatDate(data.published_at, language)} · {formatTime(data.published_at)}
-                {data.corrected_at ? (
-                  <span className={`${script} ml-1 font-semibold text-exclusive`}>
-                    · {t('article.corrected')}: {formatDate(data.corrected_at, language)}
-                  </span>
-                ) : null}
-              </p>
-            </div>
-          </div>
-
-          <ReaderToolbar article={data} />
-        </div>
-
-        {/* Hero — the LCP element on this page, so it loads eagerly. */}
-        <figure className="mt-4">
-          <NewsImage
-            media={data.hero}
-            ratio="16/9"
-            sizes="(max-width: 768px) 100vw, 680px"
-            priority
-            placeholderLabel={t('state.heroPhoto')}
-            className="rounded-[4px]"
-          />
-          <ImageCaption media={data.hero} />
-        </figure>
-
-        {/* Correction note (§12.5) */}
-        {data.correction_note_te ? (
-          <aside className="mt-4 rounded-r-[6px] border border-l-4 border-rule border-l-exclusive bg-[#FDFBF5] px-3.5 py-2.5">
-            <p className={`${script} text-[10px] font-bold tracking-[0.08em] text-exclusive`}>
-              {t('article.editorNote')}
-            </p>
-            <p lang="te" className="te mt-1 text-[13.5px] text-ink-soft">
-              {data.correction_note_te}
-            </p>
-          </aside>
-        ) : null}
-
-        {/* Body — Tiptap JSON rendered as React */}
-        <div className="mt-5">
-          <ArticleRenderer doc={data.body} />
-          {/* Renders nothing when the story has no video — no placeholder. */}
-          <ArticleVideo video={data.video} />
-          {data.poll ? <PollCard poll={data.poll} /> : null}
-        </div>
-
-        {/* AI disclosure (§7.2) — non-optional when AI assisted the draft. */}
-        {data.ai_generated ? (
-          <aside className="mt-5 flex items-start gap-2 rounded-[6px] border border-ai-border bg-ai-tint px-3.5 py-2.5">
-            <span className="mt-0.5 shrink-0 rounded-[3px] bg-ai px-1.5 py-0.5 font-sans text-[9px] font-bold tracking-[0.06em] text-white">
-              AI
-            </span>
-            <p className={`${script} text-[12.5px] text-ai-text`}>
-              {t('article.aiDisclosure')}
-            </p>
-          </aside>
-        ) : null}
-
-        {/* Source credit (§12.5) */}
-        {data.source_credit ? (
-          <p className={`${script} mt-3 text-[12px] text-muted`}>
-            {t('article.source')}: {data.source_credit}
-          </p>
-        ) : null}
-
-        {/* Like · comment · save · share · report (§5) */}
-        <EngagementBar article={data} />
-
-        {/* §26 article-page ad, category-targeted; collapses when unfilled. */}
-        <AdSlot placement="article" category={data.category?.slug} className="mt-6" />
-
-        {/* Follow the threads this story belongs to (§12) */}
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className={`${script} text-[12px] font-semibold text-muted`}>
-            {language === 'te' ? 'ఫాలో అవ్వండి:' : 'Follow:'}
-          </span>
-          {data.category ? (
-            <FollowButton
-              targetType="category"
-              slug={data.category.slug}
-              name={pick(data.category.name_te, data.category.name_en)}
-              compact
-            />
-          ) : null}
-          {data.district ? (
-            <FollowButton
-              targetType="district"
-              slug={data.district.slug}
-              name={pick(data.district.name_te, data.district.name_en)}
-              compact
-            />
-          ) : null}
-          {data.author?.author_slug ? (
-            <FollowButton
-              targetType="author"
-              slug={data.author.author_slug}
-              name={pick(data.author.name_te, data.author.name_en)}
-              compact
-            />
-          ) : null}
-          {data.tags.slice(0, 3).map((tag) => (
-            <FollowButton
-              key={tag.slug}
-              targetType="tag"
-              slug={tag.slug}
-              name={`# ${tag.name_te}`}
-              compact
-            />
-          ))}
-        </div>
-
-        {/* Photo gallery — the rest of the desk's take on this story. */}
-        <ArticleGallery images={data.gallery} />
-
-        {/* Tags */}
-        {data.tags.length > 0 ? (
-          <div className="mt-5 flex flex-wrap gap-1.5">
-            {data.tags.map((tag) => (
-              <Link
-                key={tag.slug}
-                to={`/tag/${tag.slug}`}
-                lang="te"
-                className="te rounded-chip border border-rule px-3 py-1 text-[11px] font-medium leading-[1.5] text-muted hover:border-brand hover:text-brand"
-              >
-                # {tag.name_te}
-              </Link>
-            ))}
-          </div>
-        ) : null}
-
-        {/* Comments (§5) */}
-        <CommentsSection shortId={data.short_id} />
-
-        {/* Related */}
-        {data.related.length > 0 ? (
-          <section className="mt-7 border-t-2 border-ink pt-3">
-            <h2 className={`${language === 'te' ? 'th' : 'font-sans'} mb-2.5 text-[16px] font-bold text-brand`}>
-              {t('article.related')}
-            </h2>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {data.related.map((a) => (
-                <GridCard key={a.short_id} article={a} />
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {/* §5: more from the same category and the same location */}
-        <MoreFromRail
-          kind="category"
-          slug={data.category?.slug}
-          name={data.category ? pick(data.category.name_te, data.category.name_en) : ''}
-          exclude={[data.short_id, ...data.related.map((a) => a.short_id)]}
-        />
-        <MoreFromRail
-          kind="district"
-          slug={data.district?.slug}
-          name={data.district ? pick(data.district.name_te, data.district.name_en) : ''}
-          exclude={[data.short_id, ...data.related.map((a) => a.short_id)]}
-        />
-
-        {/* §15 — videos from this story's section */}
-        <VideoStrip category={data.category?.slug} limit={4} className="mt-7" />
-      </article>
-    </div>
-  );
-}
-
-/** §5 "More from same category" / "More from same location" rails. */
-function MoreFromRail({
-  kind,
-  slug,
-  name,
-  exclude,
-}: {
-  kind: 'category' | 'district';
-  slug: string | undefined;
-  name: string;
-  exclude: string[];
-}) {
-  const { language } = useI18n();
-  const te = language === 'te';
-  const feed = useQuery({
-    queryKey: ['public', 'more-from', kind, slug],
-    queryFn: () => publicApi.fetchFeed({ [kind]: slug, limit: 7 }),
-    enabled: Boolean(slug),
-    staleTime: 60_000,
+  // Which of the four formats this story actually has. A host that cannot
+  // shape Telugu reports `card.available: false`, and the card download simply
+  // is not offered rather than handing out an unreadable image.
+  const formats = useQuery({
+    queryKey: ['formats', shortId],
+    queryFn: async () => (await api.get<StoryFormats>(`/public/articles/${shortId}/formats`)).data,
+    enabled: Boolean(shortId),
+    retry: false,
+    staleTime: 5 * 60_000,
   });
-  const articles = (feed.data?.articles ?? [])
-    .filter((a) => !exclude.includes(a.short_id))
-    .slice(0, 3);
-  if (!slug || articles.length === 0) return null;
+  const serverAudio = formats.data?.audio.available === true;
 
-  const title =
-    kind === 'category'
-      ? te ? `${name}లో మరిన్ని` : `More from ${name}`
-      : te ? `${name} నుంచి మరిన్ని` : `More from ${name}`;
+  // §16 audio news, v1: on-device Telugu speech. The headline leads so a
+  // listener knows immediately which story started.
+  const tts = useTts(article ? `${article.title_te}. ${extractPlainText(article.body)}` : '');
+
+  useNewsArticleJsonLd(article);
+  useDocumentTitle(article ? pick(article.title_te, article.title_en) : t('state.loadingArticle'));
+  // §3.1 behaviour tracking: view on open, read-time heartbeats, scroll depth.
+  useReadingBeacon(article ? shortId : undefined);
+
+  const columnRef = useRef<HTMLDivElement>(null);
+  const progress = useReadingProgress(columnRef);
+
+  const [shareOpen, setShareOpen] = useState(false);
+
+  // Bookmarks share one query key with EngagementBar, so the toolbar and the
+  // bar can never disagree about whether this story is saved.
+  const flags = useQuery({
+    queryKey: ['engagement', 'flags', shortId],
+    queryFn: () => engagementApi.fetchMyFlags(shortId),
+    enabled: authed && Boolean(shortId),
+  });
+  const saved = flags.data?.bookmarked ?? false;
+  const bookmark = useMutation({
+    mutationFn: (next: boolean) => engagementApi.setBookmark(shortId, next),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['engagement', 'flags', shortId], data);
+      toast.success(t(data.bookmarked ? 'state.saved' : 'ui.done'));
+    },
+    onError: (error) => toast.error(error),
+  });
+
+  function toggleSave(): void {
+    if (!authed) {
+      navigate('/login', { state: { from: article?.url } });
+      return;
+    }
+    bookmark.mutate(!saved);
+  }
+
+  function openComments(): void {
+    document
+      .getElementById('comments')
+      ?.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' });
+  }
+
+  const shareTitle = article
+    ? language === 'en' && article.title_en
+      ? article.title_en
+      : article.title_te
+    : '';
 
   return (
-    <section className="mt-7 border-t border-rule pt-3">
-      <h2 className={`${te ? 'th' : 'font-sans'} mb-2.5 text-[15px] font-bold text-brand`}>
-        {title}
-      </h2>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {articles.map((a) => (
-          <GridCard key={a.short_id} article={a} />
-        ))}
-      </div>
-    </section>
+    <>
+      {article ? <ReadingProgress progress={progress} /> : null}
+
+      <PageContainer width="wrap" className="py-5 pb-20 md:pb-8">
+        <QueryState query={query} skeleton={<ArticleSkeleton />} errorTitle={t('state.articleFailed')}>
+          {(data: ArticleDetail) => (
+            <div className="space-y-7 md:space-y-10">
+              <article className="reader-column mx-auto max-w-article">
+                {/* Only the story column is measured: the ad, follow row, gallery,
+                    tags and comments below would otherwise report the reader as
+                    nowhere near done at the moment they finish reading. */}
+                <div ref={columnRef}>
+                  <ArticleBreadcrumb article={data} />
+                  <div className="mt-4">
+                    <ArticleHead article={data} />
+                  </div>
+
+                  {/* The one toolbar: sticky bottom bar under md, inline row from md up. */}
+                  <div className="mt-3">
+                    <ReaderToolbar
+                      article={data}
+                      formats={serverAudio ? null : formats.data}
+                      onListen={serverAudio || tts.state === 'unavailable' ? undefined : tts.toggle}
+                      listening={tts.state === 'speaking'}
+                      onShare={() => setShareOpen(true)}
+                      onComments={openComments}
+                      saved={saved}
+                      onSave={toggleSave}
+                      commentCount={data.comment_count}
+                    />
+                  </div>
+
+                  {/* §19 — the server-generated file when one exists (seek + speed).
+                      Without it the toolbar's listen button speaks on-device. */}
+                  {serverAudio ? (
+                    <AudioPlayer
+                      shortId={data.short_id}
+                      readingLabel={readingTime(data.reading_time_sec, language)}
+                      deviceTts={tts}
+                    />
+                  ) : null}
+
+                  <ArticleHero article={data} />
+
+                  {/* §12.5 — the editor's note on a material correction. */}
+                  {data.correction_note_te ? (
+                    <Card tone="warm" padding="md" as="aside" className="mt-5 border-l-4 border-l-exclusive">
+                      <p className={cn(s.body, 'text-meta font-bold text-exclusive-text')}>
+                        {t('article.editorNote')}
+                      </p>
+                      <p lang="te" className="te reader-caption mt-1 text-ink-soft">
+                        {data.correction_note_te}
+                      </p>
+                    </Card>
+                  ) : null}
+
+                  <div className="mt-6">
+                    <ArticleRenderer doc={data.body} />
+                    {/* Renders nothing when the story has no video — no placeholder. */}
+                    <ArticleVideo video={data.video} />
+                    {data.poll ? <PollCard poll={data.poll} className="mt-6" /> : null}
+                  </div>
+                </div>
+
+                {/* §7.2 — non-optional when AI assisted the draft. */}
+                {data.ai_generated ? (
+                  <Card tone="warm" padding="md" as="aside" className="mt-6 flex items-start gap-3">
+                    <Badge tone="ai" icon={Sparkles}>
+                      {t('ui.aiAssisted')}
+                    </Badge>
+                    <p lang="te" className="te reader-caption min-w-0 text-ink-soft">
+                      {t('article.aiDisclosure')}
+                    </p>
+                  </Card>
+                ) : null}
+
+                {/* §12.5 source credit */}
+                {data.source_credit ? (
+                  <p className={cn(s.body, 'mt-4 text-meta text-muted')}>
+                    {t('article.source')}: {data.source_credit}
+                  </p>
+                ) : null}
+
+                {/* Like · comment · save · share · report (§5) */}
+                <EngagementBar article={data} />
+
+                {/* §26 article-page ad, category-targeted; collapses when unfilled. */}
+                <AdSlot placement="article" category={data.category?.slug} className="mt-6" />
+
+                {/* Follow the threads this story belongs to (§12) */}
+                <div className="mt-6 flex flex-wrap items-center gap-2">
+                  <span className={cn(s.body, 'text-ui-sm font-semibold text-muted')}>
+                    {t('ui.follow')}
+                  </span>
+                  {data.category ? (
+                    <FollowButton
+                      targetType="category"
+                      slug={data.category.slug}
+                      name={pick(data.category.name_te, data.category.name_en)}
+                      compact
+                    />
+                  ) : null}
+                  {data.district ? (
+                    <FollowButton
+                      targetType="district"
+                      slug={data.district.slug}
+                      name={pick(data.district.name_te, data.district.name_en)}
+                      compact
+                    />
+                  ) : null}
+                  {data.tags.slice(0, 3).map((tag) => (
+                    <FollowButton
+                      key={tag.slug}
+                      targetType="tag"
+                      slug={tag.slug}
+                      name={tag.name_te}
+                      compact
+                    />
+                  ))}
+                </div>
+
+                {/* The rest of the desk's take on this story. */}
+                <ArticleGallery images={data.gallery} />
+
+                {data.tags.length > 0 ? (
+                  <div className="mt-6 flex flex-wrap gap-2">
+                    {data.tags.map((tag) => (
+                      <Chip key={tag.slug} as="link" to={`/tag/${tag.slug}`} lang="te">
+                        {`#${tag.name_te}`}
+                      </Chip>
+                    ))}
+                  </div>
+                ) : null}
+
+                <CommentsSection shortId={data.short_id} />
+              </article>
+
+              <ReadNext article={data} />
+
+              {/* One share implementation for the whole app. */}
+              <ShareSheet
+                open={shareOpen}
+                onClose={() => setShareOpen(false)}
+                shortId={data.short_id}
+                url={data.url}
+                title={shareTitle}
+                cardAvailable={formats.data?.card.available ?? false}
+              />
+            </div>
+          )}
+        </QueryState>
+      </PageContainer>
+    </>
   );
 }

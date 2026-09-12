@@ -2,19 +2,33 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Linking, Pressable, ScrollView, Share, Text, TextInput, View } from 'react-native';
+import { Linking, ScrollView, Share, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 import * as engagementApi from '@/api/engagement';
 import * as publicApi from '@/api/public';
+import type { ReactionKind, VideoComment } from '@/api/types';
 import { EmptyState, ErrorState, LoadingState } from '@/components/Feedback';
+import { SectionHeader } from '@/components/SectionHeader';
 import { VideoCard, formatCount } from '@/components/VideoCard';
 import { anonId } from '@/lib/beacon';
-import { useI18n } from '@/lib/i18n';
-import { font } from '@/lib/theme';
+import { timeAgo, useI18n } from '@/lib/i18n';
+import { useMotion } from '@/lib/motion';
+import { radius, space, TAP_LG } from '@/lib/theme';
 import { makeStyles, useColors } from '@/lib/useTheme';
 import { useAuth } from '@/stores/auth';
-import type { ReactionKind } from '@/api/types';
+import { Badge } from '@/ui/Badge';
+import { Button } from '@/ui/Button';
+import { Card } from '@/ui/Card';
+import { Chip } from '@/ui/Chip';
+import { Divider } from '@/ui/Divider';
+import { Icon, type IconName } from '@/ui/Icon';
+import { Input } from '@/ui/Input';
+import { ListFooter } from '@/ui/ListFooter';
+import { Screen } from '@/ui/Screen';
+import { ScreenHeader } from '@/ui/ScreenHeader';
+import { T } from '@/ui/Text';
+import { useToast } from '@/ui/Toast';
 
 /**
  * Video screen (§15) — the app twin of the web video page.
@@ -25,39 +39,55 @@ import type { ReactionKind } from '@/api/types';
  * reader tapped a card to get here — §15's "no aggressive autoplay" is about
  * feeds, not a screen someone opened on purpose.
  */
-
-const REACTIONS: Array<{ kind: ReactionKind; glyph: string; te: string; en: string }> = [
-  { kind: 'happy', glyph: '☺', te: 'సంతోషం', en: 'Happy' },
-  { kind: 'sad', glyph: '☹', te: 'బాధ', en: 'Sad' },
-  { kind: 'angry', glyph: '😠', te: 'కోపం', en: 'Angry' },
+const REACTIONS: { kind: ReactionKind; icon: IconName; te: string; en: string }[] = [
+  { kind: 'happy', icon: 'smile', te: 'సంతోషం', en: 'Happy' },
+  { kind: 'sad', icon: 'frown', te: 'బాధ', en: 'Sad' },
+  { kind: 'angry', icon: 'angry', te: 'కోపం', en: 'Angry' },
 ];
+
+const COMMENT_MAX = 1000;
 
 // YouTube error 153 is returned when an embedded player has no HTTP Referer
 // or equivalent client identity. Native WebViews do not reliably add one, so
 // identify this app with the same public origin that serves its API and web UI.
 const PLAYER_ORIGIN = 'https://telugunews.influencioweb.com';
 
-function relative(iso: string | null, te: boolean): string {
-  if (!iso) return '';
-  const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
-  if (minutes < 1) return te ? 'ఇప్పుడే' : 'just now';
-  if (minutes < 60) return `${minutes}${te ? ' ని' : 'm'}`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}${te ? ' గం' : 'h'}`;
-  return `${Math.floor(hours / 24)}${te ? ' రో' : 'd'}`;
+function CommentRow({ comment }: { comment: VideoComment }) {
+  const styles = useStyles();
+  const { pick, language } = useI18n();
+  return (
+    <View style={styles.comment}>
+      <View style={styles.commentHead}>
+        <T variant="meta" weight="bold" numberOfLines={1} style={styles.commentAuthor}>
+          {pick(comment.author_name_te, comment.author_name_en)}
+        </T>
+        <T variant="meta" color="muted">
+          {timeAgo(comment.created_at, language)}
+        </T>
+      </View>
+      <T variant="bodySmall" color="inkSoft" scaled>
+        {comment.body}
+      </T>
+    </View>
+  );
 }
 
 export default function VideoScreen() {
   const styles = useStyles();
   const color = useColors();
+  const m = useMotion();
   const { id } = useLocalSearchParams<{ id: string }>();
   const videoId = Number(id);
-  const { pick, isTelugu } = useI18n();
+  const { t, pick, isTelugu, language } = useI18n();
+  const L = (te: string, en: string) => (isTelugu ? te : en);
+  const toast = useToast();
   const queryClient = useQueryClient();
   const authed = useAuth((s) => s.status === 'authenticated');
 
   const [anon, setAnon] = useState<string | null>(null);
-  useEffect(() => { void anonId().then(setAnon); }, []);
+  useEffect(() => {
+    void anonId().then(setAnon);
+  }, []);
 
   const video = useQuery({
     queryKey: ['video', videoId, anon],
@@ -75,12 +105,14 @@ export default function VideoScreen() {
     onSuccess: (summary) =>
       queryClient.setQueryData(['video', videoId, anon], (old: unknown) =>
         old ? { ...(old as object), reactions: summary } : old),
+    onError: (error) => toast.error(error),
   });
 
   const follow = useMutation({
     mutationFn: (next: boolean) =>
       engagementApi.setFollow('channel', video.data!.channel!.key, next),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['video', videoId, anon] }),
+    onError: (error) => toast.error(error),
   });
 
   const comments = useQuery({
@@ -97,6 +129,8 @@ export default function VideoScreen() {
       void queryClient.invalidateQueries({ queryKey: ['video-comments', videoId] });
       void queryClient.invalidateQueries({ queryKey: ['video', videoId, anon] });
     },
+    // The draft is only cleared on success, so a failed post keeps the text.
+    onError: (error) => toast.error(error),
   });
 
   async function share() {
@@ -106,30 +140,53 @@ export default function VideoScreen() {
     await Share.share({ message: `${pick(data.title_te, data.title_en)}\n${data.watch_url}` });
   }
 
+  // The route draws its own ScreenHeader (the title still names it in the
+  // navigator): a native header would sit outside the KeyboardAvoidingView's
+  // frame and under-lift the comment composer by its own height.
+  const chrome = (
+    <>
+      <Stack.Screen options={{ headerShown: false, title: t('screen.video') }} />
+      <ScreenHeader title={t('screen.video')} />
+    </>
+  );
+
   if (video.isLoading || anon === null) {
-    return <View style={styles.page}><LoadingState /></View>;
+    return (
+      <Screen edges={['top']}>
+        {chrome}
+        <LoadingState />
+      </Screen>
+    );
   }
   if (video.isError || !video.data) {
-    return <View style={styles.page}><ErrorState onRetry={() => video.refetch()} /></View>;
+    return (
+      <Screen edges={['top']}>
+        {chrome}
+        <ErrorState error={video.error} onRetry={() => void video.refetch()} />
+      </Screen>
+    );
   }
 
   const data = video.data;
+  const channel = data.channel;
   const threads = (comments.data?.comments ?? []).filter((c) => c.parent_id == null);
   const playerUrl = `${data.embed_url}?autoplay=1&rel=0&playsinline=1&origin=${encodeURIComponent(
     PLAYER_ORIGIN,
   )}&widget_referrer=${encodeURIComponent(PLAYER_ORIGIN)}`;
+  const draftText = draft.trim();
 
   return (
-    <>
-      <Stack.Screen options={{ title: '' }} />
-      <ScrollView style={styles.page} contentContainerStyle={styles.content}>
+    <Screen edges={['top']} keyboard bottomInset>
+      {chrome}
+      <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
         {/* ------------------------------------------------------ player -- */}
-        <View style={styles.player}>
+        <View
+          style={styles.player}
+          accessible
+          accessibilityLabel={pick(data.title_te, data.title_en)}
+        >
           <WebView
-            source={{
-              uri: playerUrl,
-              headers: { Referer: `${PLAYER_ORIGIN}/` },
-            }}
+            source={{ uri: playerUrl, headers: { Referer: `${PLAYER_ORIGIN}/` } }}
             style={styles.webview}
             allowsFullscreenVideo
             allowsInlineMediaPlayback
@@ -139,280 +196,220 @@ export default function VideoScreen() {
         </View>
 
         <View style={styles.body}>
-          <Text style={styles.title}>{pick(data.title_te, data.title_en)}</Text>
+          <T variant="headlineMd" weight="bold" scaled accessibilityRole="header">
+            {pick(data.title_te, data.title_en)}
+          </T>
+
+          <T variant="meta" color="muted">
+            {[
+              `${formatCount(data.view_count, isTelugu)} ${L('వ్యూస్', 'views')}`,
+              timeAgo(data.published_at, language),
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </T>
 
           {data.tags.length ? (
-            <View style={styles.tagRow}>
+            <View style={styles.chips}>
               {data.tags.map((tag) => (
-                <Pressable
+                <Chip
                   key={tag.slug}
-                  accessibilityRole="button"
-                  onPress={() => router.push({ pathname: '/section/[slug]', params: { slug: tag.slug } })}
-                  style={styles.tag}
-                >
-                  <Text style={styles.tagText}>#{pick(tag.name_te, tag.name_en)}</Text>
-                </Pressable>
+                  label={`#${pick(tag.name_te, tag.name_en)}`}
+                  onPress={() =>
+                    router.push({ pathname: '/section/[slug]', params: { slug: tag.slug } })
+                  }
+                />
               ))}
             </View>
           ) : null}
 
-          <Text style={styles.meta}>
-            {[
-              `${formatCount(data.view_count, isTelugu)} ${isTelugu ? 'వ్యూస్' : 'views'}`,
-              data.published_at
-                ? new Date(data.published_at).toLocaleString('en-IN',
-                    { hour: 'numeric', minute: '2-digit', day: 'numeric', month: 'short' })
-                : null,
-            ].filter(Boolean).join(' · ')}
-          </Text>
+          {/* --------------------------------------------- publisher row -- */}
+          <Card padding="md" style={styles.channel}>
+            <View style={styles.avatar}>
+              {channel?.avatar_url ? (
+                <Image
+                  source={{ uri: channel.avatar_url }}
+                  style={styles.avatarImage}
+                  contentFit="cover"
+                  transition={m.imageTransition}
+                />
+              ) : (
+                <Icon name="video" size={20} color={color.brand} />
+              )}
+            </View>
+            <View style={styles.channelText}>
+              <T variant="headlineSm" weight="bold" scaled numberOfLines={1}>
+                {channel?.name ?? L('YouTube నుంచి', 'From YouTube')}
+              </T>
+              {channel ? (
+                <T variant="meta" color="muted" numberOfLines={1}>
+                  {channel.follower_count > 0
+                    ? `${formatCount(channel.follower_count, isTelugu)} ${L('ఫాలోయర్లు', 'followers')}`
+                    : L('YouTube ఛానెల్', 'YouTube channel')}
+                </T>
+              ) : null}
+            </View>
+            {channel?.is_verified ? (
+              <Badge tone="info" size="xs" icon="checkCircle2" label={L('ధృవీకరించినది', 'Verified')} />
+            ) : null}
+            {channel ? (
+              <Chip
+                label={data.following_channel ? t('ui.following') : t('ui.follow')}
+                icon={data.following_channel ? 'check' : 'plus'}
+                selected={data.following_channel}
+                disabled={follow.isPending}
+                accessibilityLabel={`${data.following_channel ? t('ui.following') : t('ui.follow')}: ${channel.name}`}
+                onPress={() =>
+                  authed ? follow.mutate(!data.following_channel) : router.push('/profile')
+                }
+              />
+            ) : null}
+          </Card>
 
-          {/* ------------------------------------------- publisher row -- */}
-          <View style={styles.channelRow}>
-            {data.channel ? (
-              <>
-                <View style={styles.avatar}>
-                  {data.channel.avatar_url ? (
-                    <Image source={{ uri: data.channel.avatar_url }} style={styles.avatarImage}
-                           contentFit="cover" />
-                  ) : (
-                    <Text style={styles.avatarLetter}>
-                      {data.channel.name.trim().charAt(0).toUpperCase()}
-                    </Text>
-                  )}
-                </View>
-                <View style={styles.channelText}>
-                  <Text style={styles.channelName} numberOfLines={1}>
-                    {data.channel.name}{data.channel.is_verified ? ' ✓' : ''}
-                  </Text>
-                  <Text style={styles.channelMeta} numberOfLines={1}>
-                    {data.channel.follower_count > 0
-                      ? `${formatCount(data.channel.follower_count, isTelugu)} ${isTelugu ? 'ఫాలోయర్లు' : 'followers'}`
-                      : (isTelugu ? 'YouTube ఛానెల్' : 'YouTube channel')}
-                    {data.published_at ? ` · ${relative(data.published_at, isTelugu)}` : ''}
-                  </Text>
-                </View>
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={follow.isPending}
-                  onPress={() => (authed ? follow.mutate(!data.following_channel) : router.push('/profile'))}
-                  style={[styles.followButton, data.following_channel && styles.followingButton]}
-                >
-                  <Text style={[styles.followText, data.following_channel && styles.followingText]}>
-                    {data.following_channel
-                      ? (isTelugu ? 'ఫాలో అవుతున్నారు' : 'Following')
-                      : (isTelugu ? 'ఫాలో' : 'Follow')}
-                  </Text>
-                </Pressable>
-              </>
-            ) : (
-              <Text style={styles.channelMeta}>{isTelugu ? 'YouTube నుంచి' : 'From YouTube'}</Text>
+          <View style={styles.actions}>
+            <Button label={t('ui.share')} icon="share2" variant="secondary" onPress={() => void share()} />
+            <Button
+              label="YouTube"
+              icon="externalLink"
+              variant="secondary"
+              lang="en"
+              onPress={() => void Linking.openURL(data.watch_url).catch(() => undefined)}
+            />
+          </View>
+
+          <T variant="meta" color="muted" scaled>
+            {L(
+              'ఈ వీడియో YouTubeలో ప్రచురితమైంది. హక్కులు సంబంధిత ఛానెల్‌వి.',
+              'This video is published on YouTube. Rights belong to the channel.',
             )}
-          </View>
+          </T>
 
-          <View style={styles.actionRow}>
-            <Pressable accessibilityRole="button" onPress={share} style={styles.actionButton}>
-              <Text style={styles.actionText}>↗ {isTelugu ? 'షేర్' : 'Share'}</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => Linking.openURL(data.watch_url).catch(() => undefined)}
-              style={styles.actionButton}
-            >
-              <Text style={styles.actionText}>YouTube</Text>
-            </Pressable>
-          </View>
-
-          <Text style={styles.disclaimer}>
-            {isTelugu
-              ? 'ఈ వీడియో YouTubeలో ప్రచురితమైంది. హక్కులు సంబంధిత ఛానెల్‌వి.'
-              : 'This video is published on YouTube. Rights belong to the channel.'}
-          </Text>
-
-          {/* ----------------------------------------------- reactions -- */}
-          <Text style={styles.sectionTitle}>
-            {isTelugu ? 'మీ స్పందన ఏంటి?' : 'How do you feel about this?'}
-          </Text>
-          <View style={styles.reactionRow}>
+          {/* ------------------------------------------------- reactions -- */}
+          <Divider style={styles.rule} />
+          <T variant="headlineSm" weight="bold" accessibilityRole="header">
+            {L('మీ స్పందన ఏంటి?', 'How do you feel about this?')}
+          </T>
+          <View style={styles.chips} accessibilityRole="radiogroup">
             {REACTIONS.map((choice) => {
               const mine = data.reactions.mine === choice.kind;
               return (
-                <Pressable
+                <Chip
                   key={choice.kind}
-                  accessibilityRole="button"
-                  accessibilityLabel={isTelugu ? choice.te : choice.en}
-                  accessibilityState={{ selected: mine }}
+                  label={L(choice.te, choice.en)}
+                  icon={choice.icon}
+                  role="radio"
+                  selected={mine}
+                  count={data.reactions.counts[choice.kind]}
                   disabled={react.isPending}
                   // Tapping the chosen one again clears it — a reaction you
                   // cannot take back is a trap, not a control.
                   onPress={() => react.mutate(mine ? null : choice.kind)}
-                  style={[styles.reaction, mine && styles.reactionActive]}
-                >
-                  <Text style={styles.reactionGlyph}>{choice.glyph}</Text>
-                  <Text style={[styles.reactionText, mine && styles.reactionTextActive]}>
-                    {data.reactions.percent[choice.kind]}%
-                  </Text>
-                </Pressable>
+                />
               );
             })}
           </View>
 
-          {/* ------------------------------------------------ comments -- */}
-          <Text style={styles.sectionTitle}>
-            {isTelugu ? 'కామెంట్స్' : 'Comments'} {data.comment_count}
-          </Text>
+          {/* -------------------------------------------------- comments -- */}
+          <Divider style={styles.rule} />
+          <View style={styles.commentsHead}>
+            <T variant="headlineSm" weight="bold" accessibilityRole="header">
+              {t('comments.title')}
+            </T>
+            {data.comment_count > 0 ? (
+              <T variant="meta" color="muted" lang="en">
+                {String(data.comment_count)}
+              </T>
+            ) : null}
+          </View>
 
           {authed ? (
-            <View style={styles.commentForm}>
-              <TextInput
+            <View style={styles.composer}>
+              <Input
                 value={draft}
                 onChangeText={setDraft}
-                maxLength={1000}
-                placeholder={isTelugu ? 'కామెంట్ వ్రాయండి' : 'Write a comment'}
-                placeholderTextColor={color.mutedLight}
-                style={styles.commentInput}
+                placeholder={t('comments.placeholder')}
+                multiline
+                counter={COMMENT_MAX}
+                accessibilityLabel={t('comments.placeholder')}
               />
-              <Pressable
-                accessibilityRole="button"
-                disabled={!draft.trim() || addComment.isPending}
+              <Button
+                label={addComment.isPending ? t('comments.posting') : t('comments.post')}
+                icon="send"
+                pending={addComment.isPending}
+                disabled={draftText.length === 0}
                 onPress={() => addComment.mutate()}
-                style={[styles.postButton, (!draft.trim() || addComment.isPending) && styles.disabled]}
-              >
-                <Text style={styles.postText}>{isTelugu ? 'పంపండి' : 'Post'}</Text>
-              </Pressable>
+                style={styles.send}
+              />
             </View>
           ) : (
-            <Pressable accessibilityRole="button" onPress={() => router.push('/profile')}>
-              <Text style={styles.signInPrompt}>
-                {isTelugu ? 'కామెంట్ చేయడానికి లాగిన్ అవ్వండి' : 'Sign in to comment'}
-              </Text>
-            </Pressable>
+            <Card padding="sm" tone="paper" onPress={() => router.push('/profile')} accessibilityLabel={t('comments.signIn')}>
+              <T variant="bodySmall" color="muted">
+                {t('comments.signIn')}
+              </T>
+            </Card>
           )}
 
-          {threads.length === 0 ? (
-            <Text style={styles.channelMeta}>
-              {isTelugu ? 'ఇంకా కామెంట్లు లేవు.' : 'No comments yet.'}
-            </Text>
+          {comments.isLoading ? <LoadingState /> : null}
+          {comments.isError ? (
+            <ErrorState error={comments.error} onRetry={() => void comments.refetch()} fill={false} />
+          ) : null}
+          {comments.data && threads.length === 0 ? (
+            <EmptyState icon="messageCircle" body={t('comments.first')} />
           ) : (
-            threads.map((comment) => (
-              <View key={comment.id} style={styles.comment}>
-                <View style={styles.commentAvatar}>
-                  <Text style={styles.avatarLetter}>
-                    {(comment.author_name_en || '?').trim().charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-                <View style={styles.commentBody}>
-                  <Text style={styles.commentAuthor}>
-                    {pick(comment.author_name_te, comment.author_name_en)}
-                    {'  '}
-                    <Text style={styles.channelMeta}>{relative(comment.created_at, isTelugu)}</Text>
-                  </Text>
-                  <Text style={styles.commentText}>{comment.body}</Text>
-                </View>
+            threads.map((comment, i) => (
+              <View key={comment.id}>
+                {i > 0 ? <Divider /> : null}
+                <CommentRow comment={comment} />
               </View>
             ))
           )}
+        </View>
 
-          {/* ------------------------------------------------- related -- */}
-          {data.related.length ? (
-            <>
-              <Text style={styles.sectionTitle}>
-                {isTelugu ? 'సిఫారసు చేసిన వీడియోలు' : 'Recommended videos'}
-              </Text>
+        {/* --------------------------------------------------- related -- */}
+        {data.related.length ? (
+          <>
+            <SectionHeader title={L('సిఫారసు చేసిన వీడియోలు', 'Recommended videos')} />
+            <View style={styles.related}>
               {data.related.map((item) => (
                 <VideoCard key={item.id} video={item} wide />
               ))}
-            </>
-          ) : null}
-        </View>
+            </View>
+            <ListFooter end />
+          </>
+        ) : null}
       </ScrollView>
-    </>
+    </Screen>
   );
 }
 
 const useStyles = makeStyles((color) => ({
-  page: { flex: 1, backgroundColor: color.canvas },
-  content: { paddingBottom: 32 },
-  player: { width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000' },
-  webview: { flex: 1, backgroundColor: '#000' },
-  body: { paddingHorizontal: 16, paddingTop: 12 },
-  title: { fontFamily: font.headline, fontSize: 19, lineHeight: 29, color: color.ink },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  tag: {
-    borderWidth: 1, borderColor: color.rule, borderRadius: 14,
-    paddingHorizontal: 10, paddingVertical: 3,
-  },
-  tagText: { fontFamily: font.telugu, fontSize: 12, color: color.inkSoft },
-  meta: { fontFamily: font.telugu, fontSize: 12, color: color.mutedLight, marginTop: 8 },
+  scroll: { flex: 1 },
+  player: { width: '100%', aspectRatio: 16 / 9, backgroundColor: color.inkDeep },
+  webview: { flex: 1, backgroundColor: color.inkDeep },
+  body: { paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.xl, gap: space.sm },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  rule: { marginTop: space.md },
 
-  channelRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12,
-    borderWidth: 1, borderColor: color.rule, backgroundColor: color.paper,
-    borderRadius: 8, padding: 10,
-  },
+  channel: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginTop: space.sm },
   avatar: {
-    width: 36, height: 36, borderRadius: 18, overflow: 'hidden',
-    backgroundColor: color.brandTint, alignItems: 'center', justifyContent: 'center',
+    width: TAP_LG,
+    height: TAP_LG,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+    backgroundColor: color.brandTint,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatarImage: { width: '100%', height: '100%' },
-  avatarLetter: { fontFamily: font.headline, fontSize: 15, color: color.brand },
-  channelText: { flex: 1, minWidth: 0 },
-  channelName: { fontFamily: font.teluguBold, fontSize: 13.5, color: color.ink },
-  channelMeta: { fontFamily: font.telugu, fontSize: 11.5, lineHeight: 18, color: color.mutedLight },
-  followButton: {
-    minHeight: 34, justifyContent: 'center', borderRadius: 6,
-    backgroundColor: color.brand, paddingHorizontal: 14,
-  },
-  followingButton: { backgroundColor: color.canvas, borderWidth: 1, borderColor: color.rule },
-  followText: { fontFamily: font.teluguBold, fontSize: 12.5, color: color.onBrand },
-  followingText: { color: color.muted },
+  channelText: { flex: 1, minWidth: 0, gap: space.xs },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.sm },
 
-  actionRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  actionButton: {
-    minHeight: 36, justifyContent: 'center', borderWidth: 1, borderColor: color.rule,
-    borderRadius: 6, paddingHorizontal: 14,
-  },
-  actionText: { fontFamily: font.teluguSemiBold, fontSize: 12.5, color: color.brand },
-  disclaimer: { fontFamily: font.telugu, fontSize: 11, lineHeight: 18, color: color.mutedLight, marginTop: 10 },
+  commentsHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  composer: { gap: space.sm },
+  send: { alignSelf: 'flex-end' },
+  comment: { paddingVertical: space.sm, gap: space.xs },
+  commentHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  commentAuthor: { flex: 1 },
 
-  sectionTitle: {
-    fontFamily: font.headline, fontSize: 15, color: color.ink,
-    marginTop: 22, marginBottom: 10,
-    borderTopWidth: 1, borderTopColor: color.rule, paddingTop: 16,
-  },
-  reactionRow: { flexDirection: 'row', gap: 10 },
-  reaction: {
-    flex: 1, minHeight: 46, flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: 6,
-    borderWidth: 1, borderColor: color.rule, backgroundColor: color.paper, borderRadius: 6,
-  },
-  reactionActive: { borderColor: color.brand, backgroundColor: color.brandTint },
-  reactionGlyph: { fontSize: 16, color: color.inkSoft },
-  reactionText: { fontFamily: font.teluguSemiBold, fontSize: 13, color: color.inkSoft },
-  reactionTextActive: { color: color.brand },
-
-  commentForm: { flexDirection: 'row', gap: 8, marginBottom: 14 },
-  commentInput: {
-    flex: 1, minHeight: 44, borderWidth: 1, borderColor: color.ruleStrong,
-    borderRadius: 6, paddingHorizontal: 12, backgroundColor: color.paper,
-    fontFamily: font.telugu, fontSize: 13.5, color: color.ink,
-  },
-  postButton: {
-    minHeight: 44, justifyContent: 'center', borderRadius: 6,
-    backgroundColor: color.brand, paddingHorizontal: 16,
-  },
-  postText: { fontFamily: font.teluguBold, fontSize: 13, color: color.onBrand },
-  disabled: { opacity: 0.5 },
-  signInPrompt: {
-    fontFamily: font.teluguSemiBold, fontSize: 12.5, color: color.brand,
-    borderWidth: 1, borderColor: color.rule, borderRadius: 6,
-    padding: 12, marginBottom: 14, textAlign: 'center',
-  },
-  comment: { flexDirection: 'row', gap: 10, marginBottom: 14 },
-  commentAvatar: {
-    width: 28, height: 28, borderRadius: 14, backgroundColor: color.canvas,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  commentBody: { flex: 1, minWidth: 0 },
-  commentAuthor: { fontFamily: font.teluguSemiBold, fontSize: 12, color: color.ink },
-  commentText: { fontFamily: font.telugu, fontSize: 13.5, lineHeight: 22, color: color.inkSoft, marginTop: 2 },
+  related: { paddingHorizontal: space.lg, paddingBottom: space.lg },
 }));

@@ -6,7 +6,8 @@ import { AdminPage } from '@/components/admin/AdminPage';
 import { DataTable, type DataTableColumn } from '@/components/admin/DataTable';
 import { Badge, StatusPill } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
-import { PromptDialog } from '@/components/ui/Dialog';
+import { useConfirm } from '@/components/ui/Dialog';
+import { PromptDialog } from '@/components/ui/PromptDialog';
 import { ErrorState } from '@/components/ui/State';
 import { useToast } from '@/components/ui/Toast';
 import * as api from '@/features/epaper/adminApi';
@@ -24,6 +25,7 @@ export function AdminPollsPage() {
   const L = useL();
   const toast = useToast();
   const qc = useQueryClient();
+  const { confirm, dialog } = useConfirm();
   const [creating, setCreating] = useState(false);
   const polls = useQuery({ queryKey: ['admin-polls'], queryFn: api.fetchAdminPolls });
   const invalidate = () => void qc.invalidateQueries({ queryKey: ['admin-polls'] });
@@ -57,6 +59,21 @@ export function AdminPollsPage() {
     onError: (e) => toast.error(e),
   });
   const changing = (id: number) => status.isPending && status.variables?.id === id;
+
+  /** Starting is direct; stopping closes voting for readers, so it is confirmed. */
+  const stop = async (p: Poll) => {
+    const ok = await confirm({
+      title: L('ఈ పోల్‌ను ఆపాలా?', 'Stop this poll?'),
+      body: (
+        <span lang="te" className="te">
+          {p.question_te}
+        </span>
+      ),
+      tone: 'danger',
+      confirmLabel: L('ఆపండి', 'Stop'),
+    });
+    if (ok) status.mutate({ id: p.id, status: 'STOPPED' });
+  };
 
   const submit = (v: Record<string, string>) => {
     const question = (v.question ?? '').trim();
@@ -131,7 +148,7 @@ export function AdminPollsPage() {
                 icon={Square}
                 label={L('ఆపండి', 'Stop')}
                 disabled={changing(p.id)}
-                onClick={() => status.mutate({ id: p.id, status: 'STOPPED' })}
+                onClick={() => void stop(p)}
               />
               <IconButton
                 icon={Download}
@@ -172,6 +189,7 @@ export function AdminPollsPage() {
         pending={create.isPending}
         onSubmit={submit}
       />
+      {dialog}
     </AdminPage>
   );
 }

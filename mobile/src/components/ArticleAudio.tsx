@@ -1,11 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { Pressable, Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import { api } from '@/api/client';
 import { useI18n } from '@/lib/i18n';
-import { font } from '@/lib/theme';
-import { makeStyles, useColors } from '@/lib/useTheme';
+import { radius, space, TAP_LG } from '@/lib/theme';
+import { makeStyles } from '@/lib/useTheme';
+import { Button, IconButton } from '@/ui/Button';
+import { Chip } from '@/ui/Chip';
+import { T } from '@/ui/Text';
 
 /**
  * §19–21 listen control — the app twin of the web AudioPlayer.
@@ -25,6 +28,10 @@ interface AudioState {
 }
 
 const SPEEDS = [0.75, 1, 1.25, 1.5] as const;
+const SKIP = 15;
+
+// ponytail: no i18n keys yet for these — see neededStrings.
+const L = (te: string, en: string, telugu: boolean) => (telugu ? te : en);
 
 function format(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
@@ -33,8 +40,30 @@ function format(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+const useStyles = makeStyles((color) => ({
+  player: {
+    borderWidth: 1,
+    borderColor: color.rule,
+    backgroundColor: color.paperSub,
+    borderRadius: radius.md,
+    padding: space.sm,
+    gap: space.sm,
+  },
+  top: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  middle: { flex: 1, minWidth: 120, gap: space.xs },
+  track: { height: 4, borderRadius: radius.pill, backgroundColor: color.rule, overflow: 'hidden' },
+  fill: { height: 4, borderRadius: radius.pill, backgroundColor: color.brand },
+  speeds: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm },
+  speed: { paddingHorizontal: space.md },
+}));
+
 export function ArticleAudio({
-  shortId, deviceSpeaking, onToggleDevice, listenLabel, stopLabel, endpoint,
+  shortId,
+  deviceSpeaking,
+  onToggleDevice,
+  listenLabel,
+  stopLabel,
+  endpoint,
 }: {
   shortId: string;
   deviceSpeaking: boolean;
@@ -46,8 +75,7 @@ export function ArticleAudio({
   endpoint?: string;
 }) {
   const styles = useStyles();
-  const color = useColors();
-  const { isTelugu } = useI18n();
+  const { t, isTelugu } = useI18n();
   const source = endpoint ?? `/public/articles/${shortId}/audio`;
 
   const audio = useQuery({
@@ -68,116 +96,65 @@ export function ArticleAudio({
 
   if (!hasFile) {
     return (
-      <Pressable
+      <Button
+        variant={deviceSpeaking ? 'primary' : 'secondary'}
+        icon={deviceSpeaking ? 'pause' : 'volume2'}
+        label={deviceSpeaking ? stopLabel : listenLabel}
         onPress={onToggleDevice}
-        accessibilityRole="button"
-        accessibilityState={{ selected: deviceSpeaking }}
-        style={[styles.button, deviceSpeaking && styles.buttonActive]}
-      >
-        <Text style={styles.buttonText}>
-          {deviceSpeaking ? `■ ${stopLabel}` : `🔊 ${listenLabel}`}
-        </Text>
-      </Pressable>
+      />
     );
   }
 
   const total = status.duration || audio.data!.duration_sec;
   const elapsed = status.currentTime ?? 0;
+  const percent = total ? Math.min(100, (elapsed / total) * 100) : 0;
+  const back = L(`${SKIP} సెకన్లు వెనక్కి`, `Back ${SKIP} seconds`, isTelugu);
 
   return (
     <View style={styles.player}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={status.playing ? stopLabel : listenLabel}
-        onPress={() => (status.playing ? player.pause() : player.play())}
-        style={styles.playButton}
-      >
-        <Text style={styles.playGlyph}>{status.playing ? '❚❚' : '▶'}</Text>
-      </Pressable>
-
-      <View style={styles.middle}>
-        <View style={styles.track}>
+      <View style={styles.top}>
+        <IconButton
+          name={status.playing ? 'pause' : 'play'}
+          label={status.playing ? stopLabel : listenLabel}
+          size={TAP_LG}
+          variant="primary"
+          haptic="medium"
+          onPress={() => (status.playing ? player.pause() : player.play())}
+        />
+        <View style={styles.middle}>
           <View
-            style={[
-              styles.fill,
-              { width: `${total ? Math.min(100, (elapsed / total) * 100) : 0}%` },
-            ]}
-          />
+            style={styles.track}
+            accessibilityRole="progressbar"
+            accessibilityLabel={listenLabel}
+            accessibilityValue={{ min: 0, max: 100, now: Math.round(percent) }}
+          >
+            <View style={[styles.fill, { width: `${percent}%` }]} />
+          </View>
+          <T variant="meta" color="muted" lang="en">
+            {`${format(elapsed)} / ${format(total)}`}
+          </T>
         </View>
-        <Text style={styles.time}>
-          {format(elapsed)} / {format(total)}
-        </Text>
+        <IconButton
+          name="history"
+          label={back}
+          onPress={() => player.seekTo(Math.max(0, elapsed - SKIP))}
+        />
       </View>
 
-      <View style={styles.skipRow}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={isTelugu ? '15 సెకన్లు వెనక్కి' : 'Back 15 seconds'}
-          onPress={() => player.seekTo(Math.max(0, elapsed - 15))}
-          style={styles.skip}
-        >
-          <Text style={styles.skipText}>−15</Text>
-        </Pressable>
+      <View style={styles.speeds} accessibilityRole="radiogroup" accessibilityLabel={t('ui.speed')}>
         {SPEEDS.map((s) => (
-          <Pressable
+          <Chip
             key={s}
-            accessibilityRole="button"
-            accessibilityState={{ selected: status.playbackRate === s }}
+            role="radio"
+            label={`${s}x`}
+            lang="en"
+            selected={status.playbackRate === s}
+            accessibilityLabel={`${t('ui.speed')} ${s}x`}
             onPress={() => player.setPlaybackRate(s)}
-            style={[styles.skip, status.playbackRate === s && styles.skipActive]}
-          >
-            <Text
-              style={[styles.skipText, status.playbackRate === s && styles.skipTextActive]}
-            >
-              {s}×
-            </Text>
-          </Pressable>
+            style={styles.speed}
+          />
         ))}
       </View>
     </View>
   );
 }
-
-const useStyles = makeStyles((color) => ({
-  button: {
-    borderWidth: 1,
-    borderColor: color.rule,
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-  },
-  buttonActive: { borderColor: color.brand, backgroundColor: color.brandTint },
-  buttonText: { fontFamily: font.teluguSemiBold, fontSize: 12.5, color: color.brand },
-  player: {
-    borderWidth: 1,
-    borderColor: color.brand,
-    backgroundColor: color.brandTint,
-    borderRadius: 6,
-    padding: 8,
-    gap: 8,
-  },
-  playButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: color.brand,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  playGlyph: { color: color.white, fontSize: 13 },
-  middle: { gap: 4 },
-  track: { height: 4, borderRadius: 2, backgroundColor: color.rule, overflow: 'hidden' },
-  fill: { height: 4, backgroundColor: color.brand },
-  time: { fontFamily: font.telugu, fontSize: 11, color: color.brand },
-  skipRow: { flexDirection: 'row', gap: 6, alignItems: 'center' },
-  skip: {
-    borderWidth: 1,
-    borderColor: color.rule,
-    borderRadius: 4,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-  },
-  skipActive: { backgroundColor: color.brand, borderColor: color.brand },
-  skipText: { fontFamily: font.telugu, fontSize: 11, color: color.brand },
-  skipTextActive: { color: color.white },
-}));

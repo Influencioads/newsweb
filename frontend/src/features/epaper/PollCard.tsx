@@ -1,90 +1,125 @@
-import { useMutation } from "@tanstack/react-query";
-import { useState } from "react";
-import { Share2 } from "lucide-react";
-import type { Poll } from "@/types/epaper";
-import * as epaperApi from "./api";
-import { useI18n } from "@/i18n";
+import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { HelpCircle, Share2 } from 'lucide-react';
 
-export function PollCard({
-  poll,
-  className = "",
-}: {
-  poll: Poll;
-  className?: string;
-}) {
+import { useShareActions } from '@/components/article/ShareSheet';
+import { IconButton } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Icon } from '@/components/ui/Icon';
+import { useToast } from '@/components/ui/Toast';
+import { useI18n, useScript } from '@/i18n';
+import type { Poll } from '@/types/epaper';
+import { cn } from '@/utils/cn';
+
+import * as epaperApi from './api';
+
+/**
+ * The Big Question / poll card.
+ *
+ * Before the vote each option is a plain 44px row. After it — or once the poll
+ * has closed — the same rows grow a result bar from 0 to their share, and stay
+ * fully legible: a voted poll is a *result*, not a greyed-out form, so nothing
+ * here dims the text it is asking the reader to read.
+ */
+export function PollCard({ poll, className }: { poll: Poll; className?: string }) {
   const { language } = useI18n();
-  const en = language === "en";
+  const s = useScript();
+  const toast = useToast();
+  // Page-specific copy with no strings.ts key yet (see neededStrings).
+  const L = (te: string, en: string) => (language === 'te' ? te : en);
   const [current, setCurrent] = useState(poll);
+
   const vote = useMutation({
     mutationFn: (optionId: number) => epaperApi.votePoll(current.id, optionId),
     onSuccess: setCurrent,
+    onError: (error) => toast.error(error),
   });
-  const show = current.has_voted || current.status !== "ACTIVE";
-  const share = () =>
-    navigator.share?.({
-      title: en ? "Big Question" : "బిగ్ క్వశ్చన్",
-      text: en
-        ? current.question_en || current.question_te
-        : current.question_te,
-      url: `${location.origin}/polls/${current.id}`,
-    });
+
+  const question = s.text(current.question_te, current.question_en);
+  const kicker = current.is_big_question ? L('బిగ్ క్వశ్చన్', 'Big Question') : L('పోల్', 'Poll');
+  // Results appear once this reader has voted, or once voting has closed.
+  const show = current.has_voted || current.status !== 'ACTIVE';
+  const locked = current.has_voted || vote.isPending;
+
+  const share = useShareActions(String(current.id), `/polls/${current.id}`, question.text);
+
   return (
-    <section
-      className={`rounded-card border-2 border-brand/20 bg-white p-5 shadow-card ${className}`}
-    >
-      <div className="mb-3 flex items-center justify-between">
-        <p className="font-sans text-[11px] font-extrabold uppercase tracking-[.16em] text-brand">
-          ❓{" "}
-          {current.is_big_question
-            ? en
-              ? "Big Question"
-              : "బిగ్ క్వశ్చన్"
-            : en
-              ? "Poll"
-              : "పోల్"}
+    <Card as="section" tone="surface" padding="lg" className={cn('rounded-2xl', className)}>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className={cn(s.body, 'flex items-center gap-1.5 font-bold text-brand', s.te ? 'text-meta' : 'text-eyebrow uppercase')}>
+          <Icon icon={HelpCircle} size="sm" />
+          {kicker}
         </p>
-        <button onClick={share} aria-label="Share poll">
-          <Share2 className="h-4 w-4" />
-        </button>
+        <IconButton
+          icon={Share2}
+          label={L('పోల్ షేర్ చేయండి', 'Share this poll')}
+          variant="ghost"
+          onClick={() => void (share.canNative ? share.native() : share.copy())}
+        />
       </div>
-      <h2 className="th text-[22px] font-extrabold leading-telugu">
-        {en ? current.question_en || current.question_te : current.question_te}
+
+      <h2 lang={question.lang} className={cn(question.head, 'text-headline-md font-extrabold text-ink')}>
+        {question.text}
       </h2>
-      <div className="mt-4 space-y-2">
-        {current.options.map((o) => (
-          <button
-            key={o.id}
-            disabled={current.has_voted || vote.isPending}
-            onClick={() => vote.mutate(o.id)}
-            className={`relative flex min-h-tap w-full overflow-hidden rounded-control border px-4 py-2 text-left ${current.selected_option_id === o.id ? "border-brand text-brand" : "border-rule"}`}
-          >
-            {show ? (
-              <span
-                className="absolute inset-y-0 left-0 bg-brand-tint"
-                style={{ width: `${o.percentage}%` }}
-              />
-            ) : null}
-            <span className="te relative z-10 font-semibold">
-              {en ? o.option_text_en || o.option_text_te : o.option_text_te}
-            </span>
-            {show ? (
-              <span className="relative z-10 ml-auto font-sans font-bold">
-                {o.percentage}%
+
+      <div className="mt-4 flex flex-col gap-2" aria-busy={vote.isPending || undefined}>
+        {current.options.map((option) => {
+          const label = s.text(option.option_text_te, option.option_text_en);
+          const picked = current.selected_option_id === option.id;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              // aria-disabled, not `disabled`: the row the reader just activated
+              // would otherwise lose focus to <body> the instant it locks, and
+              // the percentages it now shows would be unreachable by keyboard.
+              aria-disabled={locked || undefined}
+              aria-pressed={show ? picked : undefined}
+              onClick={() => {
+                if (!locked) vote.mutate(option.id);
+              }}
+              className={cn(
+                'relative flex min-h-tap w-full items-center gap-3 rounded-xl border px-4 py-2 text-left',
+                'transition-[colors,transform,box-shadow] duration-base ease-standard',
+                picked ? 'border-brand text-brand' : 'border-rule text-ink',
+                // Never dim a result: locked here means "already answered", not
+                // "unavailable", and the percentages still have to be read.
+                locked ? 'cursor-default' : 'hover:border-brand hover:text-brand active:scale-[.98]',
+              )}
+            >
+              {show ? (
+                <span aria-hidden className="absolute inset-0 overflow-hidden rounded-xl">
+                  <span
+                    className="block h-full bg-brand-tint transition-[width] duration-slow ease-standard"
+                    style={{ width: `${option.percentage}%` }}
+                  />
+                </span>
+              ) : null}
+              <span lang={label.lang} className={cn(label.cls, 'relative z-10 text-te-body-xs font-semibold')}>
+                {label.text}
               </span>
-            ) : null}
-          </button>
-        ))}
+              {show ? (
+                <span className="relative z-10 ml-auto flex shrink-0 items-baseline gap-2 font-sans tabular-nums">
+                  <span className="text-meta text-muted">
+                    {option.votes}{' '}
+                    <span lang={language} className={s.body}>
+                      {L('ఓట్లు', 'votes')}
+                    </span>
+                  </span>
+                  <span className="text-ui font-bold text-ink">{option.percentage}%</span>
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
       </div>
-      {vote.isError ? (
-        <p role="alert" className="mt-2 text-sm text-breaking">
-          {en ? "Your vote could not be recorded." : "మీ ఓటు నమోదు కాలేదు."}
-        </p>
-      ) : null}
+
       {show ? (
-        <p className="mt-3 font-sans text-[11px] text-muted">
-          {current.total_votes} {en ? "votes" : "ఓట్లు"}
+        // role="status" so the outcome is announced once the vote resolves.
+        <p role="status" lang={language} className={cn(s.body, 'mt-3 text-meta text-muted')}>
+          {current.total_votes} {L('ఓట్లు', 'votes')}
         </p>
       ) : null}
-    </section>
+    </Card>
   );
 }

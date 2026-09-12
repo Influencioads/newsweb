@@ -228,6 +228,10 @@
     font-size: calc(17px * var(--reader-scale));
     line-height: 1.7;
   }
+  .reader-h1 {
+    font-size: calc(33px * var(--reader-scale));
+    line-height: 1.5;
+  }
   .reader-h2 {
     font-size: calc(24px * var(--reader-scale));
     line-height: 1.5;

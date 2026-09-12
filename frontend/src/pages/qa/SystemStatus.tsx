@@ -1,6 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+
+import { ButtonLink, Button } from '@/components/ui/Button';
+import { PageContainer, PageHeader } from '@/components/ui/Layout';
+import { useDocumentTitle } from '@/utils/motion';
 
 interface HealthResponse {
   status: 'ok' | 'degraded';
@@ -16,8 +19,12 @@ interface HealthResponse {
  * This exists so "does the stack actually run end to end" is answerable without
  * a terminal. It reads the real `/health` endpoint — nothing on this page is
  * hardcoded (brief §40).
+ *
+ * A standalone route with no layout around it, so it owns the one
+ * `<main id="main">` landmark itself.
  */
 export default function SystemStatus() {
+  useDocumentTitle('System status');
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['health'],
     queryFn: async () => {
@@ -36,21 +43,17 @@ export default function SystemStatus() {
   ];
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <header className="mb-6">
-        <h1 className="font-headline text-headline-lg font-bold text-brand">System status</h1>
-        <p className="mt-1 font-sans text-[12px] text-muted">
-          Phase 1 · live readiness probe. Values come from the API, none are hardcoded.
-        </p>
-      </header>
+    <PageContainer as="main" id="main" tabIndex={-1} width="wrap" className="py-10 outline-none">
+      <PageHeader
+        titleLang="en"
+        title="System status"
+        subtitle="Phase 1 · live readiness probe. Values come from the API, none are hardcoded."
+      />
 
       {isError && (
-        <div
-          role="alert"
-          className="mb-4 rounded-control border border-breaking-border bg-breaking-tint p-4"
-        >
-          <p className="font-sans text-[13px] font-semibold text-breaking">API unreachable</p>
-          <p className="mt-1 font-sans text-[12px] text-ink-soft">
+        <div role="alert" className="mb-4 rounded-xl border border-breaking-border bg-breaking-tint p-4">
+          <p className="text-ui-sm font-semibold text-breaking">API unreachable</p>
+          <p className="mt-1 text-meta text-ink-soft">
             {error instanceof Error ? error.message : 'Unknown error'} — is the backend running on
             port 8000?
           </p>
@@ -61,15 +64,15 @@ export default function SystemStatus() {
         {rows.map(([label, ok, detail]) => (
           <li
             key={label}
-            className="flex items-center justify-between gap-4 rounded-card border border-rule bg-white p-4 shadow-card"
+            className="flex items-center justify-between gap-4 rounded-xl border border-rule bg-surface p-4 shadow-card"
           >
             <div className="min-w-0">
-              <p className="font-sans text-[13px] font-medium text-ink">{label}</p>
-              <p className="truncate font-mono text-[11px] text-muted-light">{detail}</p>
+              <p className="text-ui-sm font-medium text-ink">{label}</p>
+              <p className="truncate font-mono text-meta text-muted">{detail}</p>
             </div>
             <span
               className={[
-                'shrink-0 rounded-chip px-3 py-1 font-sans text-[11px] font-bold',
+                'shrink-0 rounded-pill px-3 py-1 text-meta font-bold',
                 ok === true
                   ? 'bg-success-tint text-success'
                   : ok === false
@@ -84,29 +87,16 @@ export default function SystemStatus() {
       </ul>
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() => void refetch()}
-          disabled={isFetching}
-          className="min-h-tap rounded-control bg-ink px-5 font-sans text-[13px] font-semibold text-white disabled:opacity-60"
-        >
+        <Button onClick={() => void refetch()} pending={isFetching}>
           {isFetching ? 'Checking…' : 'Re-check'}
-        </button>
-        <Link
-          to="/qa/telugu-render"
-          className="min-h-tap rounded-control border border-ink px-5 py-2.5 font-sans text-[13px] font-semibold text-ink"
-        >
-          Telugu render test →
-        </Link>
-        <a
-          href="/docs"
-          className="font-sans text-[12px] font-medium text-info underline"
-          target="_blank"
-          rel="noreferrer"
-        >
+        </Button>
+        <ButtonLink to="/qa/telugu-render" variant="secondary">
+          Telugu render test
+        </ButtonLink>
+        <ButtonLink to="/docs" external variant="link">
           OpenAPI docs
-        </a>
+        </ButtonLink>
       </div>
-    </main>
+    </PageContainer>
   );
 }

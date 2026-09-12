@@ -9,8 +9,10 @@ import type { CmsTagRef } from '@/types/cms';
 import { cn } from '@/utils/cn';
 
 /**
- * §1 tags. Type a name and press Enter (or the add button), or pick a
- * suggestion. Each chosen tag is a chip that removes itself when pressed.
+ * §1 tags. Type a name and press Enter (or comma, or the add button), or pick
+ * a suggestion. Each chosen tag is a chip that removes itself when pressed.
+ * Blur deliberately does not commit: tabbing from the box to the add button
+ * would consume the draft and disable the control focus is moving to.
  *
  * Names that do not exist yet are created server-side as topic tags — an
  * editor naming a new person or scheme mid-story should not have to leave the
@@ -70,9 +72,8 @@ export function TagInput({ value, onChange, suggestions }: TagInputProps) {
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={onKeyDown}
-        onBlur={() => add(draft)}
         placeholder={L('ట్యాగ్ టైప్ చేసి Enter నొక్కండి', 'Type a tag and press Enter')}
-        trailing={<IconButton icon={Plus} label={t('ui.add')} disabled={!draft.trim()} onClick={() => add(draft)} />}
+        trailing={<IconButton icon={Plus} label={t('ui.add')} onClick={() => add(draft)} />}
       />
       {unused.length ? (
         <div className="flex flex-wrap items-center gap-2">

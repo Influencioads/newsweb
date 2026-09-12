@@ -1,6 +1,8 @@
 import { Fragment, type ReactNode } from 'react';
 
-import type { TiptapNode } from '@/types/public';
+import { ImageCaption, NewsImage } from '@/components/media/NewsImage';
+import type { MediaOut, TiptapNode } from '@/types/public';
+import { cn } from '@/utils/cn';
 
 /**
  * Tiptap/ProseMirror JSON -> React.
@@ -15,12 +17,20 @@ import type { TiptapNode } from '@/types/public';
  * Never `dangerouslySetInnerHTML`. Every node becomes a real React element, so a
  * script tag a stringer pasted in from a website cannot execute even if it
  * somehow survived the backend sanitiser (§12.1 — defence in depth).
+ *
+ * Every block is Telugu body copy: `lang="te"`, the `te` font class and one of
+ * the `.reader-*` sizes, so the A-/A/A+/A++ switcher resizes paragraphs,
+ * headings, quotes and captions together. The output carries `.reader-column`
+ * for the same reason.
  */
 
 interface Props {
   doc: TiptapNode | null;
   className?: string;
 }
+
+/** Body copy: Telugu font + the scale the reader chose. */
+const BODY = 'te reader-body text-ink';
 
 function renderMarks(text: string, marks: TiptapNode['marks']): ReactNode {
   if (!marks?.length) return text;
@@ -36,11 +46,11 @@ function renderMarks(text: string, marks: TiptapNode['marks']): ReactNode {
       case 'strike':
         return <s>{acc}</s>;
       case 'code':
-        return (
-          <code className="rounded bg-rule-soft px-1 py-0.5 font-mono text-[0.9em]">{acc}</code>
-        );
+        // No size: code inherits the surrounding .reader-body, so it follows
+        // the reader scale like everything else in the column.
+        return <code className="rounded-xl bg-rule-soft px-1.5 py-0.5 font-mono">{acc}</code>;
       case 'highlight':
-        return <mark className="bg-highlight px-0.5">{acc}</mark>;
+        return <mark className="rounded-xl bg-highlight px-1 text-ink">{acc}</mark>;
       case 'link': {
         const href = String(mark.attrs?.href ?? '');
         if (!href) return acc;
@@ -48,7 +58,7 @@ function renderMarks(text: string, marks: TiptapNode['marks']): ReactNode {
         return (
           <a
             href={href}
-            className="text-brand underline underline-offset-2 hover:text-brand-dark"
+            className="text-brand underline underline-offset-4 transition-colors duration-base ease-standard hover:text-brand-dark"
             {...(external ? { target: '_blank', rel: 'noopener noreferrer nofollow' } : {})}
           >
             {acc}
@@ -59,6 +69,34 @@ function renderMarks(text: string, marks: TiptapNode['marks']): ReactNode {
         return acc;
     }
   }, text);
+}
+
+/** A body image node as the MediaOut shape `NewsImage` / `ImageCaption` read. */
+function nodeMedia(node: TiptapNode, src: string): MediaOut {
+  const width = Number(node.attrs?.width) || null;
+  const height = Number(node.attrs?.height) || null;
+  return {
+    id: 0,
+    url: src,
+    // The CMS embeds the responsive candidates into the node, so a body image
+    // gets the same width negotiation as the hero.
+    srcset: node.attrs?.srcset ? String(node.attrs.srcset) : null,
+    alt_te: node.attrs?.alt ? String(node.attrs.alt) : null,
+    caption_te: node.attrs?.caption ? String(node.attrs.caption) : null,
+    credit: node.attrs?.credit ? String(node.attrs.credit) : null,
+    license_label: null,
+    source_url: null,
+    width,
+    height,
+    blurhash: null,
+    ai_generated: node.attrs?.ai_generated === true,
+  };
+}
+
+function headingClass(level: number): string {
+  if (level === 2) return 'reader-h2';
+  if (level === 3) return 'reader-h3';
+  return 'reader-small';
 }
 
 function renderNode(node: TiptapNode, key: string): ReactNode {
@@ -72,24 +110,17 @@ function renderNode(node: TiptapNode, key: string): ReactNode {
       return <Fragment key={key}>{renderMarks(node.text ?? '', node.marks)}</Fragment>;
 
     case 'paragraph':
-      // `reader-body` scales with the A-/A/A+/A++ switcher and carries lh 1.7 —
-      // §4.1 requires >= 1.65x for Telugu.
       return (
-        <p key={key} className="te reader-body mb-4 text-ink">
+        <p key={key} lang="te" className={cn(BODY, 'mb-5')}>
           {children}
         </p>
       );
 
     case 'heading': {
       const level = Math.min(Math.max(Number(node.attrs?.level ?? 2), 2), 4);
-      const sizes: Record<number, string> = {
-        2: 'text-[24px]',
-        3: 'text-[20px]',
-        4: 'text-[18px]',
-      };
       const Tag = `h${level}` as 'h2' | 'h3' | 'h4';
       return (
-        <Tag key={key} className={`th mb-3 mt-6 font-bold text-ink ${sizes[level]}`}>
+        <Tag key={key} lang="te" className={cn('th mb-3 mt-8 font-bold text-ink', headingClass(level))}>
           {children}
         </Tag>
       );
@@ -97,21 +128,21 @@ function renderNode(node: TiptapNode, key: string): ReactNode {
 
     case 'bulletList':
       return (
-        <ul key={key} className="te reader-body mb-4 list-disc pl-6 text-ink">
+        <ul key={key} lang="te" className={cn(BODY, 'mb-5 list-disc pl-6 marker:text-brand')}>
           {children}
         </ul>
       );
 
     case 'orderedList':
       return (
-        <ol key={key} className="te reader-body mb-4 list-decimal pl-6 text-ink">
+        <ol key={key} lang="te" className={cn(BODY, 'mb-5 list-decimal pl-6 marker:font-semibold marker:text-brand')}>
           {children}
         </ol>
       );
 
     case 'listItem':
       return (
-        <li key={key} className="mb-1.5">
+        <li key={key} className="mb-2 pl-1">
           {children}
         </li>
       );
@@ -121,7 +152,8 @@ function renderNode(node: TiptapNode, key: string): ReactNode {
       return (
         <blockquote
           key={key}
-          className="te reader-body mb-4 border-l-4 border-brand bg-paper py-2 pl-4 text-ink-soft"
+          lang="te"
+          className={cn(BODY, 'mb-5 rounded-r-xl border-l-4 border-brand bg-paper-sub py-3 pl-4 pr-3 text-ink-soft')}
         >
           {children}
         </blockquote>
@@ -129,16 +161,13 @@ function renderNode(node: TiptapNode, key: string): ReactNode {
 
     case 'codeBlock':
       return (
-        <pre
-          key={key}
-          className="mb-4 overflow-x-auto rounded-control bg-ink p-3 font-mono text-[13px] text-white"
-        >
+        <pre key={key} className="mb-5 overflow-x-auto rounded-xl bg-ink p-4 font-mono text-ui-sm text-on-ink">
           <code>{children}</code>
         </pre>
       );
 
     case 'horizontalRule':
-      return <hr key={key} className="my-6 border-rule" />;
+      return <hr key={key} className="my-8 border-rule" />;
 
     case 'hardBreak':
       return <br key={key} />;
@@ -146,34 +175,21 @@ function renderNode(node: TiptapNode, key: string): ReactNode {
     case 'image': {
       const src = String(node.attrs?.src ?? '');
       if (!src) return null;
-      const alt = String(node.attrs?.alt ?? '');
-      const width = Number(node.attrs?.width) || undefined;
-      const height = Number(node.attrs?.height) || undefined;
-      // The CMS embeds the responsive candidates into the node, so an inline
-      // body image gets the same width negotiation as the hero rather than
-      // always pulling the 1600px rendition.
-      const srcSet = node.attrs?.srcset ? String(node.attrs.srcset) : undefined;
-      const sizes = node.attrs?.sizes ? String(node.attrs.sizes) : '100vw';
+      const media = nodeMedia(node, src);
+      // Intrinsic ratio when the CMS recorded one, so the box reserves exactly
+      // the right space and nothing is cropped (§10.3, CLS < 0.1).
+      const ratio = media.width && media.height ? `${media.width}/${media.height}` : '16/9';
       return (
-        <img
-          key={key}
-          src={src}
-          {...(srcSet ? { srcSet } : {})}
-          sizes={sizes}
-          alt={alt}
-          width={width}
-          height={height}
-          loading="lazy"
-          decoding="async"
-          // Intrinsic size reserves the box before load — §10.3 CLS < 0.1.
-          className="mb-0 h-auto w-full rounded-[4px]"
-        />
+        <figure key={key} className="my-6">
+          <NewsImage media={media} ratio={ratio} radius="2xl" sizes="(max-width: 768px) 100vw, 680px" />
+          <ImageCaption media={media} />
+        </figure>
       );
     }
 
     case 'figure':
       return (
-        <figure key={key} className="my-5">
+        <figure key={key} className="my-6">
           {children}
         </figure>
       );
@@ -181,17 +197,14 @@ function renderNode(node: TiptapNode, key: string): ReactNode {
     case 'figcaption':
       // §12.5 — the credit travels with the picture, always visible.
       return (
-        <figcaption key={key} className="te mt-1.5 text-[12px] leading-telugu text-muted-light">
+        <figcaption key={key} lang="te" className="te reader-caption mt-2 text-muted">
           {children}
         </figcaption>
       );
 
     case 'factBox':
       return (
-        <aside
-          key={key}
-          className="mb-4 rounded-control border border-rule bg-paper-sub p-4"
-        >
+        <aside key={key} className="mb-5 rounded-xl border border-rule bg-paper-sub p-4 shadow-card">
           {children}
         </aside>
       );
@@ -204,5 +217,5 @@ function renderNode(node: TiptapNode, key: string): ReactNode {
 
 export function ArticleRenderer({ doc, className }: Props) {
   if (!doc) return null;
-  return <div className={className}>{renderNode(doc, 'n')}</div>;
+  return <div className={cn('reader-column', className)}>{renderNode(doc, 'n')}</div>;
 }

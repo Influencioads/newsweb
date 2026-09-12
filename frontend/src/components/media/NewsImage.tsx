@@ -1,7 +1,11 @@
+import { Image as ImageIcon } from 'lucide-react';
 import { useState } from 'react';
 
-import { useI18n } from '@/i18n';
+import { Badge } from '@/components/ui/Badge';
+import { Icon } from '@/components/ui/Icon';
+import { useI18n, useScript } from '@/i18n';
 import type { MediaOut } from '@/types/public';
+import { cn } from '@/utils/cn';
 
 /**
  * The single image component for the whole reader site.
@@ -11,6 +15,8 @@ import type { MediaOut } from '@/types/public';
  *
  *  §10.3  The box reserves its space before the file arrives (aspect-ratio +
  *         width/height), so images never shift the layout. CLS target < 0.1.
+ *         The wrapper declares `aspect-ratio` unconditionally — placeholder,
+ *         loading and loaded states all occupy the same box.
  *  §10.3  `srcset` + `sizes` let the browser pick one of the four §7.4 widths.
  *         A 120px thumbnail must not download the 1600px rendition — on the
  *         patchy district 4G we target, that is the difference between a page
@@ -29,6 +35,8 @@ interface Props {
   ratio?: string;
   /** `sizes` hint — tell the browser how wide this slot actually renders. */
   sizes?: string;
+  /** Corner radius: the card ladder default, or `2xl` for heroes. */
+  radius?: 'xl' | '2xl';
   className?: string;
   /** Eager-load the LCP image (the lead story hero); everything else is lazy. */
   priority?: boolean;
@@ -37,6 +45,8 @@ interface Props {
   /** Render the AI label. Defaults to the media's own flag. */
   showAiLabel?: boolean;
 }
+
+const RADIUS = { xl: 'rounded-xl', '2xl': 'rounded-2xl' } as const;
 
 /** Average colour extracted from a blurhash, used as the placeholder tint. */
 function blurhashTint(hash: string | null | undefined): string | undefined {
@@ -64,13 +74,18 @@ export function NewsImage({
   media,
   ratio = '16/9',
   sizes = '100vw',
+  radius = 'xl',
   className = '',
   priority = false,
   placeholderLabel,
   showAiLabel,
 }: Props) {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
+  const s = useScript();
   const [loaded, setLoaded] = useState(false);
+  // A 404 or a blocked host would otherwise leave the <img> at opacity-0
+  // forever; failing over to the placeholder is the honest empty state.
+  const [failed, setFailed] = useState(false);
   const tint = blurhashTint(media?.blurhash);
   const showAi = showAiLabel ?? media?.ai_generated ?? false;
 
@@ -81,16 +96,17 @@ export function NewsImage({
 
   return (
     <div
-      className={`relative overflow-hidden bg-placeholder ${className}`}
+      className={cn('relative overflow-hidden bg-placeholder', RADIUS[radius], className)}
       style={{ aspectRatio: ratio, backgroundColor: tint }}
     >
-      {media?.url ? (
+      {media?.url && !failed ? (
         <>
           <img
             src={media.url}
             {...(media.srcset ? { srcSet: media.srcset } : {})}
             sizes={sizes}
-            alt={media.alt_te ?? ''}
+            // An empty alt means "decorative"; a captioned news photo is not.
+            alt={media.alt_te ?? media.caption_te ?? ''}
             width={media.width ?? undefined}
             height={media.height ?? undefined}
             loading={priority ? 'eager' : 'lazy'}
@@ -98,24 +114,24 @@ export function NewsImage({
             decoding={priority ? 'sync' : 'async'}
             {...priorityAttrs}
             onLoad={() => setLoaded(true)}
-            className={[
-              'h-full w-full object-cover transition-opacity duration-300',
+            onError={() => setFailed(true)}
+            className={cn(
+              'h-full w-full object-cover transition-opacity duration-slow ease-standard',
               loaded ? 'opacity-100' : 'opacity-0',
-            ].join(' ')}
+            )}
           />
           {showAi ? (
             // §7.4 — "The frontend renders a visible 'AI రూపొందించిన చిత్రం'
             // label on the image itself and in the caption. Non-optional."
-            <span
-              className={`${language === 'te' ? 'te' : 'font-sans'} absolute bottom-1.5 left-1.5 rounded-[3px] bg-ai/95 px-1.5 py-0.5 text-[9px] font-bold leading-[1.4] text-white`}
-            >
+            <Badge tone="ai" size="xs" className="absolute bottom-2 left-2 shadow-card">
               {t('article.aiImage')}
-            </span>
+            </Badge>
           ) : null}
         </>
       ) : (
-        <span className="te absolute inset-0 flex items-center justify-center px-2 text-center text-[11px] text-placeholder-text">
-          {placeholderLabel ?? t('state.photo')}
+        <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 px-2 text-center text-placeholder-text">
+          <Icon icon={ImageIcon} size="md" />
+          <span className={cn(s.body, 'text-meta')}>{placeholderLabel ?? t('state.photo')}</span>
         </span>
       )}
     </div>
@@ -131,7 +147,8 @@ export function NewsImage({
  * `source_url`, the credit becomes a real link rather than plain text.
  */
 export function ImageCaption({ media }: { media: MediaOut | null | undefined }) {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
+  const s = useScript();
   if (!media || (!media.caption_te && !media.credit)) return null;
 
   const credit = media.credit ? (
@@ -140,17 +157,20 @@ export function ImageCaption({ media }: { media: MediaOut | null | undefined }) 
         href={media.source_url}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-exclusive underline decoration-dotted underline-offset-2 hover:text-brand"
+        className="text-ink-soft underline decoration-dotted underline-offset-2 transition-colors duration-base ease-standard hover:text-brand"
       >
         {media.credit}
       </a>
     ) : (
-      <span className="text-exclusive">{media.credit}</span>
+      <span className="text-ink-soft">{media.credit}</span>
     )
   ) : null;
 
   return (
-    <figcaption className="te mt-1.5 text-[11px] leading-telugu text-muted-light">
+    // `.reader-caption` carries the reader scale (13px * --reader-scale); `.te`
+    // carries the Telugu line-height. A fixed text-meta here froze every photo
+    // caption in the article column at 12.5px.
+    <figcaption lang="te" className="te reader-caption mt-1.5 text-muted">
       {media.caption_te}
       {credit ? (
         <span className={media.caption_te ? 'ml-1' : ''}>
@@ -159,9 +179,7 @@ export function ImageCaption({ media }: { media: MediaOut | null | undefined }) 
         </span>
       ) : null}
       {media.ai_generated ? (
-        <span className={`${language === 'te' ? 'te' : 'font-sans'} ml-1 font-semibold text-ai`}>
-          · {t('article.aiImage')}
-        </span>
+        <span className={cn(s.body, 'ml-1 font-semibold text-ai-text')}>· {t('article.aiImage')}</span>
       ) : null}
     </figcaption>
   );

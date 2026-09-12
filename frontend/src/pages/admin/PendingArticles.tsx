@@ -108,7 +108,7 @@ export default function PendingArticlesPage() {
               onClick={(e) => e.stopPropagation()}
               className={cn(
                 title.cls,
-                'block font-semibold text-ink transition-[colors,transform,box-shadow,opacity] duration-base ease-standard hover:text-brand',
+                'inline-flex min-h-tap items-center font-semibold text-ink transition-[colors,transform,box-shadow,opacity] duration-base ease-standard hover:text-brand',
                 title.telugu && 'text-te-body-sm',
               )}
             >

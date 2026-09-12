@@ -1,5 +1,10 @@
-import { useI18n } from '@/i18n';
+import { Angry, Frown, Smile } from 'lucide-react';
+
+import { Chip } from '@/components/ui/Chip';
+import type { LucideIcon } from '@/components/ui/Icon';
+import { useI18n, useScript } from '@/i18n';
 import type { ReactionKind, ReactionSummary } from '@/types/public';
+import { cn } from '@/utils/cn';
 
 /**
  * The three-way sentiment bar ("మీ స్పందన ఏంటి?").
@@ -10,12 +15,15 @@ import type { ReactionKind, ReactionSummary } from '@/types/public';
  *
  * Percentages are rounded per option and shown per option, never stacked, so
  * they need not total 100 and the display stays honest.
+ *
+ * The face is a lucide icon, not a glyph: an emoji renders as a different
+ * drawing on every platform and a Unicode dingbat as a tofu box on some.
  */
 
-const CHOICES: Array<{ kind: ReactionKind; glyph: string; te: string; en: string }> = [
-  { kind: 'happy', glyph: '☺', te: 'సంతోషం', en: 'Happy' },
-  { kind: 'sad', glyph: '☹', te: 'బాధ', en: 'Sad' },
-  { kind: 'angry', glyph: '😠', te: 'కోపం', en: 'Angry' },
+const CHOICES: Array<{ kind: ReactionKind; icon: LucideIcon; te: string; en: string }> = [
+  { kind: 'happy', icon: Smile, te: 'సంతోషం', en: 'Happy' },
+  { kind: 'sad', icon: Frown, te: 'బాధ', en: 'Sad' },
+  { kind: 'angry', icon: Angry, te: 'కోపం', en: 'Angry' },
 ];
 
 export function ReactionBar({
@@ -26,40 +34,37 @@ export function ReactionBar({
   pending?: boolean;
 }) {
   const { language } = useI18n();
+  const s = useScript();
   const te = language === 'te';
 
   return (
     <section className="mt-6 border-t border-rule pt-4">
-      <h2 className={`${te ? 'th' : 'font-sans'} mb-2.5 text-[15px] font-bold text-ink`}>
+      <h2 lang={language} className={cn(s.head, 'mb-2.5 text-headline-xs font-bold text-ink')}>
         {te ? 'మీ స్పందన ఏంటి?' : 'How do you feel about this?'}
       </h2>
       <div className="grid grid-cols-3 gap-2.5">
         {CHOICES.map((choice) => {
           const mine = summary.mine === choice.kind;
           return (
-            <button
+            <Chip
               key={choice.kind}
-              type="button"
+              icon={choice.icon}
+              selected={mine}
               disabled={pending}
-              aria-pressed={mine}
+              lang={language}
               // Tapping the chosen one again clears it — a reaction you cannot
               // take back is a trap, not a control.
               onClick={() => onChange(mine ? null : choice.kind)}
-              className={`flex min-h-[46px] items-center justify-center gap-2 rounded-control border text-[13px] transition disabled:opacity-60 ${
-                mine
-                  ? 'border-brand bg-brand-tint font-bold text-brand'
-                  : 'border-rule bg-white text-ink-soft hover:border-brand dark:bg-surface'
-              }`}
+              className="w-full"
             >
-              <span aria-hidden className="text-[16px]">{choice.glyph}</span>
-              <span className="sr-only">{te ? choice.te : choice.en}</span>
+              <span className="sr-only">{te ? choice.te : choice.en} — </span>
               <span className="font-sans tabular-nums">{summary.percent[choice.kind]}%</span>
-            </button>
+            </Chip>
           );
         })}
       </div>
       {summary.total > 0 ? (
-        <p className={`${te ? 'te' : 'font-sans'} mt-1.5 text-[11.5px] text-muted`}>
+        <p lang={language} className={cn(s.body, 'mt-1.5 text-meta text-muted')}>
           {summary.total} {te ? 'మంది స్పందించారు' : 'people responded'}
         </p>
       ) : null}

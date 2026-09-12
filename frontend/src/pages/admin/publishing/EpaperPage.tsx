@@ -6,7 +6,7 @@ import { AdminPage } from '@/components/admin/AdminPage';
 import { DataTable, type DataTableColumn } from '@/components/admin/DataTable';
 import { StatusPill } from '@/components/ui/Badge';
 import { Button, ButtonLink, IconButton } from '@/components/ui/Button';
-import { PromptDialog } from '@/components/ui/Dialog';
+import { PromptDialog } from '@/components/ui/PromptDialog';
 import { SectionHeader } from '@/components/ui/Layout';
 import { EmptyState, ErrorState } from '@/components/ui/State';
 import { useToast } from '@/components/ui/Toast';

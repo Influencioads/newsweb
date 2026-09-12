@@ -216,17 +216,22 @@ export default function AdminLayout() {
         <div className="px-3 pt-3">
           <Wordmark collapsed={collapsed} />
         </div>
-        <nav aria-label={t('admin.cms')} className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+        <nav id="admin-nav" aria-label={t('admin.cms')} className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
           <NavGroups groups={groups} tone="ink" collapsed={collapsed} />
         </nav>
-        <div className={cn('border-t border-on-ink/10 p-3', collapsed && 'flex justify-center')}>
-          {collapsed ? (
-            <IconButton variant="inverse" icon={PanelLeftOpen} label={collapseLabel} aria-expanded={false} onClick={toggleCollapsed} />
-          ) : (
-            <Button variant="inverse" full icon={PanelLeftClose} aria-expanded onClick={toggleCollapsed} className="!justify-start">
-              {collapseLabel}
-            </Button>
-          )}
+        <div className="border-t border-on-ink/10 p-3">
+          {/* One control across both states: swapping elements would drop focus to <body> on every toggle. */}
+          <Button
+            variant="inverse"
+            full
+            icon={collapsed ? PanelLeftOpen : PanelLeftClose}
+            aria-expanded={!collapsed}
+            aria-controls="admin-nav"
+            onClick={toggleCollapsed}
+            className={collapsed ? undefined : '!justify-start'}
+          >
+            <span className={cn(collapsed && 'sr-only')}>{collapseLabel}</span>
+          </Button>
         </div>
       </aside>
 

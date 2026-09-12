@@ -8,7 +8,7 @@ import { WorkflowPill } from '@/components/admin/StatusPill';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { PromptDialog } from '@/components/ui/Dialog';
+import { PromptDialog } from '@/components/ui/PromptDialog';
 import { SectionHeader } from '@/components/ui/Layout';
 import { EmptyState, QueryState, SkeletonCard } from '@/components/ui/State';
 import { useToast } from '@/components/ui/Toast';

@@ -1,310 +1,334 @@
+import { Sparkles, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { NewsImage } from '@/components/media/NewsImage';
-import { useI18n } from '@/i18n';
-import type { ArticleCard as Card } from '@/types/public';
+import { Badge } from '@/components/ui/Badge';
+import { Card } from '@/components/ui/Card';
+import { useI18n, useScript } from '@/i18n';
+import type { ArticleCard as Item } from '@/types/public';
+import { cn } from '@/utils/cn';
 import { relativeTime } from '@/utils/time';
 
 /**
- * Article cards.
+ * Article cards — ONE system, eight shapes.
  *
- * Telugu rules that apply to every variant (§4.1):
- *   * Telugu headlines use `.th` (Anek Telugu, lh 1.5) and never a fixed height
- *   * clamping is by line count (`.te-clamp-*`), so the box grows with the text
- *   * every image box declares an aspect ratio so nothing shifts on load (§10.3)
+ * Shared across every variant:
+ *   * `<Badges>` — breaking / exclusive / AI / category / district, in that
+ *     order, from the same component. A breaking or AI-written story is
+ *     flagged wherever it appears, not only in the two variants that used to
+ *     bother (§7.4, §14).
+ *   * `<Meta>` — byline · relative time, on the 12.5px `text-meta` floor.
+ *   * headline script + `lang` from `useScript().text`, clamped by *line count*
+ *     (`te-clamp-N`) so a Telugu box grows with its text — never `truncate`,
+ *     never a fixed height (§4.1).
+ *   * Scroll reveal is the *list's* job: a card owning its own observer means
+ *     one IntersectionObserver per card and a batch of one, so the 40ms
+ *     stagger never fires. Lists wrap items in `<div ref={reveal}>` instead.
  *
- * Bilingual rules (§16 item 3, decided in favour of Telugu + English):
- *   * a headline renders English when the story has one, otherwise Telugu
- *   * whichever script actually renders carries a matching `lang` attribute, so
- *     a screen reader does not read Telugu with an English voice
- *   * summaries and bylines stay Telugu until AI translation lands (§7.3)
+ * Boxed variants (Lead / Secondary / Grid / Row) sit on `Card`; the list
+ * variants (Kicker / Latest / Compact / Brief) stay hairline-separated rows
+ * with a hover wash, because a column of boxes reads as noise.
  */
 
-/** Headline text plus the `lang` and font class it needs. */
+export interface ArticleCardProps {
+  article: Item;
+}
+
+/** Headline weight + hover, shared so every variant hovers identically. */
+const HEADLINE = 'font-bold text-ink transition-colors duration-base ease-standard group-hover:text-brand';
+
+/** Hairline row shell for the imageless list variants. */
+const ROW = 'border-b border-rule-soft last:border-0';
+const ROW_LINK =
+  'group -mx-2 block min-h-tap rounded-xl px-2 py-3 transition-[colors,transform,box-shadow,opacity] duration-base ease-standard hover:bg-paper-sub';
+
+/** Headline text with the `lang` + font class of whichever script renders. */
 function useHeadline() {
-  const { pick, isFallback, language } = useI18n();
-  return (article: Card) => {
-    const text = pick(article.title_te, article.title_en);
-    const telugu = language === 'te' || isFallback(article.title_te, article.title_en);
-    return { text, lang: telugu ? 'te' : 'en', telugu, cls: telugu ? 'th' : 'font-sans' };
-  };
+  const s = useScript();
+  return (article: Item) => s.text(article.title_te, article.title_en);
 }
 
 /**
- * Thin wrapper over `NewsImage` so every card declares an honest `sizes` hint.
- * Without it the browser assumes 100vw and downloads the 1600px rendition for a
- * 120px thumbnail.
+ * Badge row. `flagsOnly` drops category/district for the one-line Brief, where
+ * there is room for the flags but not for the taxonomy.
  */
-function Media({
-  hero,
-  ratio = '16/9',
-  className = '',
-  sizes = '100vw',
-  priority = false,
+function Badges({
+  article,
+  flagsOnly = false,
+  className,
 }: {
-  hero: Card['hero'];
-  ratio?: string;
+  article: Item;
+  flagsOnly?: boolean;
   className?: string;
-  sizes?: string;
-  priority?: boolean;
 }) {
-  const { t } = useI18n();
-  return (
-    <NewsImage
-      media={hero}
-      ratio={ratio}
-      sizes={sizes}
-      priority={priority}
-      placeholderLabel={t('state.photo')}
-      className={`rounded-[4px] ${className}`}
-    />
-  );
-}
+  const { t, language } = useI18n();
+  const s = useScript();
+  const category = !flagsOnly && article.category ? s.text(article.category.name_te, article.category.name_en) : null;
+  const district = !flagsOnly && article.district ? s.text(article.district.name_te, article.district.name_en) : null;
 
-function Badges({ article }: { article: Card }) {
-  const { pick, t, language } = useI18n();
-  const script = language === 'te' ? 'te' : 'font-sans';
+  if (!article.is_breaking && !article.is_exclusive && !article.ai_generated && !category && !district) return null;
+
   return (
-    <div className="mb-1.5 flex flex-wrap gap-1.5">
-      {article.category ? (
-        <span
-          className={`${script} rounded-[3px] bg-brand-tint px-2 py-0.5 text-[10.5px] font-bold leading-[1.4] text-brand`}
-        >
-          {pick(article.category.name_te, article.category.name_en)}
-        </span>
-      ) : null}
-      {article.district ? (
-        <span
-          className={`${script} rounded-[3px] bg-rule-soft px-2 py-0.5 text-[10.5px] font-medium leading-[1.4] text-muted`}
-        >
-          {pick(article.district.name_te, article.district.name_en)}
-        </span>
+    <div className={cn('flex flex-wrap items-center gap-1.5', className)}>
+      {article.is_breaking ? (
+        <Badge tone="breaking" size="xs" icon={Zap}>
+          {t('ui.breaking')}
+        </Badge>
       ) : null}
       {article.is_exclusive ? (
-        <span
-          className={`${script} rounded-[3px] bg-exclusive-tint px-2 py-0.5 text-[10.5px] font-bold leading-[1.4] text-exclusive`}
-        >
-          ★ {t('article.exclusive')}
-        </span>
+        <Badge tone="exclusive" size="xs">
+          {t('article.exclusive')}
+        </Badge>
       ) : null}
       {article.ai_generated ? (
-        <span className="rounded-[3px] bg-ai-tint px-2 py-0.5 font-sans text-[10.5px] font-bold leading-[1.4] text-ai">
-          AI
-        </span>
+        // The language sits on the two runs, not the badge: the visible "AI" is
+        // Latin, the sr-only expansion is whatever the reader's language is.
+        <Badge tone="ai" size="xs" icon={Sparkles}>
+          <span lang="en">AI</span>
+          <span className="sr-only" lang={language}>
+            {' — '}
+            {t('ui.aiAssisted')}
+          </span>
+        </Badge>
+      ) : null}
+      {category ? (
+        <Badge tone="brand" size="xs" lang={category.lang}>
+          {category.text}
+        </Badge>
+      ) : null}
+      {district ? (
+        <Badge tone="district" size="xs" lang={district.lang}>
+          {district.text}
+        </Badge>
       ) : null}
     </div>
   );
 }
 
-function Meta({ article }: { article: Card }) {
+/** Byline · relative time. District lives in the badge row, not here. */
+function Meta({ article, className }: { article: Item; className?: string }) {
   const { language } = useI18n();
+  const s = useScript();
+  const time = relativeTime(article.published_at, language);
+  if (!article.byline_te && !time) return null;
   return (
-    <p className="mt-2 font-sans text-[11.5px] text-muted-light">
+    <p className={cn('mt-2 text-meta text-muted', className)}>
       {/* Bylines are personal names; they stay in Telugu script in both modes. */}
       {article.byline_te ? (
         <span lang="te" className="te">
           {article.byline_te}
         </span>
       ) : null}
-      {article.byline_te && article.published_at ? ' · ' : ''}
-      {relativeTime(article.published_at, language)}
+      {article.byline_te && time ? <span aria-hidden> · </span> : null}
+      {/* relativeTime returns Telugu in te mode — it is content, not chrome. */}
+      {time ? (
+        <span lang={language} className={cn(s.body, 'tabular-nums')}>
+          {time}
+        </span>
+      ) : null}
     </p>
   );
 }
 
-/** Translated district label, reused across several card metas. */
-function DistrictLabel({ article }: { article: Card }) {
-  const { pick } = useI18n();
-  if (!article.district) return null;
-  return <span>{pick(article.district.name_te, article.district.name_en)} · </span>;
+/** Card image. Every call site declares an honest `sizes` — a 112px thumbnail
+ * must not pull the 1600px rendition on district 4G (§7.4, §10.3). */
+function Media({
+  article,
+  ratio,
+  sizes,
+  radius = 'xl',
+  className,
+  priority = false,
+}: {
+  article: Item;
+  ratio: string;
+  sizes: string;
+  radius?: 'xl' | '2xl';
+  className?: string;
+  priority?: boolean;
+}) {
+  const { t } = useI18n();
+  return (
+    <NewsImage
+      media={article.hero}
+      ratio={ratio}
+      sizes={sizes}
+      radius={radius}
+      priority={priority}
+      placeholderLabel={t('state.photo')}
+      className={className}
+    />
+  );
 }
 
-/** Lead story — the big one at the top left of the home grid. */
-export function LeadCard({ article }: { article: Card }) {
+/** Lead story — the big one at the top of the home and section grids. */
+export function LeadCard({ article }: ArticleCardProps) {
   const headline = useHeadline()(article);
   return (
-    <article>
+    <Card as="article" padding="sm" interactive>
       <Link to={article.url} className="group block">
-        {/* Lead hero is the LCP element — eager, high priority (§10.3). */}
-        <Media hero={article.hero} sizes="(max-width: 1024px) 100vw, 600px" priority />
-        <div className="mt-2.5">
-          <Badges article={article} />
-          <h2
-            lang={headline.lang}
-            className={`${headline.cls} text-[24px] font-bold text-ink group-hover:text-brand sm:text-headline-lg`}
-          >
+        <div className="relative">
+          {/* The lead hero is the LCP element — eager, high priority (§10.3). */}
+          <Media
+            article={article}
+            ratio="16/9"
+            radius="2xl"
+            sizes="(max-width: 1024px) 100vw, 640px"
+            priority
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-24 rounded-b-2xl bg-gradient-to-t from-overlay/60 to-transparent"
+          />
+          {/* Right-aligned: NewsImage parks its AI-image label bottom-left. */}
+          <Badges article={article} className="absolute inset-x-3 bottom-3 justify-end" />
+        </div>
+        <div className="mt-3">
+          <h2 lang={headline.lang} className={cn(headline.head, HEADLINE, 'te-clamp-3 text-headline-md sm:text-headline-lg')}>
             {headline.text}
           </h2>
           {/* Summaries exist only in Telugu until AI translation lands (§7.3). */}
           {article.summary_te ? (
-            <p lang="te" className="te te-clamp-3 mt-1.5 text-[15.5px] text-ink-soft">
+            <p lang="te" className="te te-clamp-3 mt-2 text-te-body-sm text-ink-soft">
               {article.summary_te}
             </p>
           ) : null}
           <Meta article={article} />
         </div>
       </Link>
-    </article>
+    </Card>
   );
 }
 
 /** Secondary story — thumbnail left, headline right. */
-export function SecondaryCard({ article }: { article: Card }) {
+export function SecondaryCard({ article }: ArticleCardProps) {
   const headline = useHeadline()(article);
-  const { language } = useI18n();
   return (
-    <article>
-      <Link to={article.url} className="group flex gap-2.5">
-        <Media hero={article.hero} className="w-[120px] shrink-0" sizes="120px" />
-        <div className="min-w-0">
-          <h3
-            lang={headline.lang}
-            className={`${headline.cls} te-clamp-3 text-[16.5px] font-bold text-ink group-hover:text-brand`}
-          >
+    <Card as="article" padding="sm" interactive>
+      <Link to={article.url} className="group flex gap-3">
+        <Media
+          article={article}
+          ratio="4/3"
+          sizes="(max-width: 768px) 112px, 128px"
+          className="w-28 shrink-0 sm:w-32"
+        />
+        <div className="min-w-0 flex-1">
+          <Badges article={article} className="mb-1.5" />
+          <h3 lang={headline.lang} className={cn(headline.head, HEADLINE, 'te-clamp-3 text-headline-sm')}>
             {headline.text}
           </h3>
-          <p className="mt-1 font-sans text-[10.5px] text-muted-light">
-            <DistrictLabel article={article} />
-            {relativeTime(article.published_at, language)}
-          </p>
+          <Meta article={article} className="mt-1.5" />
         </div>
       </Link>
-    </article>
+    </Card>
   );
 }
 
 /** Brief — a single bulleted headline, no image. */
-export function BriefCard({ article }: { article: Card }) {
+export function BriefCard({ article }: ArticleCardProps) {
   const headline = useHeadline()(article);
   return (
-    <li>
-      <Link
-        to={article.url}
-        lang={headline.lang}
-        className={`${headline.telugu ? 'te' : 'font-sans'} block text-[14.5px] font-medium text-ink hover:text-brand`}
-      >
-        <span aria-hidden className="text-muted-light">
-          •{' '}
-        </span>
-        {headline.text}
+    <li className={ROW}>
+      <Link to={article.url} className={cn(ROW_LINK, 'flex items-start gap-2')}>
+        <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-pill bg-brand" />
+        <div className="min-w-0 flex-1">
+          <Badges article={article} flagsOnly className="mb-1" />
+          <span
+            lang={headline.lang}
+            className={cn(headline.head, HEADLINE, 'te-clamp-2 block text-headline-xs')}
+          >
+            {headline.text}
+          </span>
+        </div>
       </Link>
     </li>
   );
 }
 
-/** Grid card — used by section rails and category feeds. */
-export function GridCard({ article }: { article: Card }) {
+/** Grid card — used by section rails, category feeds and "read next". */
+export function GridCard({ article }: ArticleCardProps) {
   const headline = useHeadline()(article);
-  const { language } = useI18n();
   return (
-    <article>
+    <Card as="article" padding="sm" interactive>
       <Link to={article.url} className="group block">
-        <Media hero={article.hero} ratio="16/10" sizes="(max-width: 768px) 50vw, 280px" />
-        <div className="mt-2">
-          <Badges article={article} />
-          <h3
-            lang={headline.lang}
-            className={`${headline.cls} te-clamp-3 text-[15px] font-bold text-ink group-hover:text-brand`}
-          >
+        <Media article={article} ratio="16/10" sizes="(max-width: 768px) 50vw, 300px" />
+        <div className="mt-3">
+          <Badges article={article} className="mb-1.5" />
+          <h3 lang={headline.lang} className={cn(headline.head, HEADLINE, 'te-clamp-3 text-headline-sm')}>
             {headline.text}
           </h3>
-          <p className="mt-1 font-sans text-[10.5px] text-muted-light">
-            {relativeTime(article.published_at, language)}
-          </p>
+          <Meta article={article} />
         </div>
       </Link>
-    </article>
+    </Card>
   );
 }
 
-/** Row card — used by search results and district feeds. */
-export function RowCard({ article }: { article: Card }) {
+/** Row card — used by search results, district feeds and saved lists. */
+export function RowCard({ article }: ArticleCardProps) {
   const headline = useHeadline()(article);
-  const { language } = useI18n();
   return (
-    <article className="border-b border-rule-soft pb-3.5 last:border-0">
+    <Card as="article" padding="sm" interactive>
       <Link to={article.url} className="group flex gap-3">
-        <Media hero={article.hero} className="w-[110px] shrink-0" sizes="110px" />
-        <div className="min-w-0">
-          <h3
-            lang={headline.lang}
-            className={`${headline.cls} text-[16px] font-bold text-ink group-hover:text-brand`}
-          >
+        <Media
+          article={article}
+          ratio="4/3"
+          sizes="(max-width: 768px) 112px, 144px"
+          className="w-28 shrink-0 sm:w-36"
+        />
+        <div className="min-w-0 flex-1">
+          <Badges article={article} className="mb-1.5" />
+          <h3 lang={headline.lang} className={cn(headline.head, HEADLINE, 'te-clamp-3 text-headline-sm')}>
             {headline.text}
           </h3>
           {article.summary_te ? (
-            <p lang="te" className="te te-clamp-2 mt-1 text-[13px] text-muted">
+            <p lang="te" className="te te-clamp-2 mt-1.5 text-te-body-xs text-ink-soft">
               {article.summary_te}
             </p>
           ) : null}
-          <p className="mt-1 font-sans text-[11px] text-muted-light">
-            <DistrictLabel article={article} />
-            {relativeTime(article.published_at, language)}
-          </p>
+          <Meta article={article} className="mt-1.5" />
         </div>
       </Link>
-    </article>
+    </Card>
   );
 }
 
 /**
- * Mid-column story — section kicker above the headline, byline below,
- * separated by a hairline rule. The standard broadsheet front-page pattern:
- * it lets a reader scan section + headline without images.
+ * Mid-column story — badge kicker above the headline, byline below, separated
+ * by a hairline. The broadsheet front-page pattern: a reader scans section +
+ * headline without needing images.
  */
-export function KickerCard({ article }: { article: Card }) {
+export function KickerCard({ article }: ArticleCardProps) {
   const headline = useHeadline()(article);
-  const { pick, language } = useI18n();
-  const script = language === 'te' ? 'te' : 'font-sans';
   return (
-    <article className="border-b border-rule py-3 first:pt-0 last:border-0">
-      <Link to={article.url} className="group block">
-        {article.category ? (
-          <p className={`${script} mb-1 text-[11px] font-bold leading-[1.4] text-brand`}>
-            {pick(article.category.name_te, article.category.name_en)}
-            {article.district ? (
-              <span className="font-medium text-muted-light">
-                {' · '}
-                {pick(article.district.name_te, article.district.name_en)}
-              </span>
-            ) : null}
-          </p>
-        ) : null}
-        <h3
-          lang={headline.lang}
-          className={`${headline.cls} text-[17px] font-bold text-ink group-hover:text-brand`}
-        >
+    <article className={ROW}>
+      <Link to={article.url} className={ROW_LINK}>
+        <Badges article={article} className="mb-1.5" />
+        <h3 lang={headline.lang} className={cn(headline.head, HEADLINE, 'te-clamp-3 text-headline-sm')}>
           {headline.text}
         </h3>
-        {article.byline_te ? (
-          <p
-            lang="te"
-            className="te mt-1.5 text-[10.5px] font-medium tracking-[0.04em] text-muted-light"
-          >
-            {article.byline_te}
-          </p>
-        ) : null}
+        <Meta article={article} className="mt-1.5" />
       </Link>
     </article>
   );
 }
 
 /** Latest-news rail item — relative timestamp above the headline. */
-export function LatestCard({ article }: { article: Card }) {
+export function LatestCard({ article }: ArticleCardProps) {
   const headline = useHeadline()(article);
   const { language } = useI18n();
+  const s = useScript();
+  const time = relativeTime(article.published_at, language);
   return (
-    <article className="border-b border-rule py-2.5 first:pt-0 last:border-0">
-      <Link to={article.url} className="group block">
-        <p
-          className={`${language === 'te' ? 'te' : 'font-sans'} mb-0.5 text-[10.5px] font-bold leading-[1.4] text-brand`}
-        >
-          {relativeTime(article.published_at, language)}
-        </p>
-        <h3
-          lang={headline.lang}
-          className={`${headline.cls} text-[14.5px] font-semibold text-ink group-hover:text-brand`}
-        >
+    <article className={ROW}>
+      <Link to={article.url} className={ROW_LINK}>
+        {time ? (
+          <p lang={language} className={cn(s.body, 'mb-1 text-meta font-semibold text-brand')}>
+            {time}
+          </p>
+        ) : null}
+        <Badges article={article} className="mb-1.5" />
+        <h3 lang={headline.lang} className={cn(headline.head, HEADLINE, 'te-clamp-2 text-headline-xs')}>
           {headline.text}
         </h3>
       </Link>
@@ -313,22 +337,16 @@ export function LatestCard({ article }: { article: Card }) {
 }
 
 /** Compact list row used inside section blocks — no image, hairline separated. */
-export function CompactCard({ article }: { article: Card }) {
+export function CompactCard({ article }: ArticleCardProps) {
   const headline = useHeadline()(article);
-  const { language } = useI18n();
   return (
-    <article className="border-b border-rule py-2.5 first:pt-0 last:border-0">
-      <Link to={article.url} className="group block">
-        <h3
-          lang={headline.lang}
-          className={`${headline.cls} text-[14.5px] font-semibold text-ink group-hover:text-brand`}
-        >
+    <article className={ROW}>
+      <Link to={article.url} className={ROW_LINK}>
+        <Badges article={article} className="mb-1.5" />
+        <h3 lang={headline.lang} className={cn(headline.head, HEADLINE, 'te-clamp-2 text-headline-xs')}>
           {headline.text}
         </h3>
-        <p className="mt-1 font-sans text-[10.5px] text-muted-light">
-          <DistrictLabel article={article} />
-          {relativeTime(article.published_at, language)}
-        </p>
+        <Meta article={article} className="mt-1.5" />
       </Link>
     </article>
   );

@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
 import { api } from '@/api/client';
@@ -111,7 +111,9 @@ export function useReadingBeacon(shortId: string | undefined): (pct: number) => 
     };
   }, [shortId]);
 
-  return (pct: number) => {
+  // Stable: it only writes a ref, and the article screen feeds it to a
+  // useAnimatedScrollHandler worklet that would otherwise rebuild every render.
+  return useCallback((pct: number) => {
     maxScroll.current = Math.max(maxScroll.current, Math.min(Math.round(pct), 100));
-  };
+  }, []);
 }

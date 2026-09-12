@@ -12,7 +12,8 @@ import { cn } from '@/utils/cn';
  * - `Dialog`         centred panel (bottom sheet under md by default).
  * - `Sheet`          edge-anchored panel: bottom (grab handle), left or right.
  * - `ConfirmDialog`  yes/no with a primary or danger confirm.
- * - `PromptDialog`   small form — the `window.prompt` replacement (./PromptDialog).
+ * `PromptDialog` is the sibling file `./PromptDialog` — it imports Dialog, so it
+ * is NOT re-exported here; a barrel re-export would make the pair circular.
  * - `useConfirm`     imperative `await confirm({...})`; render `{dialog}` once.
  *
  * Shared behaviour: portal into `#overlay-root`, role=dialog + aria-modal,
@@ -381,6 +382,3 @@ export function useConfirm(): { confirm: (opts: ConfirmOptions) => Promise<boole
   );
   return { confirm, dialog };
 }
-
-// PromptDialog lives in its own file for size; re-exported so the import path stays './Dialog'.
-export { PromptDialog, type PromptDialogProps, type PromptField } from './PromptDialog';

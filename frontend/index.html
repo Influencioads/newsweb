@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#A61C24" />
+    <meta name="theme-color" content="#0F5F57" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
     <!--
@@ -23,7 +23,7 @@
           if (dark) root.classList.add('dark');
           root.style.colorScheme = dark ? 'dark' : 'light';
           var meta = document.querySelector('meta[name="theme-color"]');
-          if (meta) meta.setAttribute('content', dark ? '#201B16' : '#A61C24');
+          if (meta) meta.setAttribute('content', dark ? '#1A1F1E' : '#0F5F57');
           var scale = { 'A-': 0.9, 'A': 1, 'A+': 1.15, 'A++': 1.32 }[st.fontStep];
           if (scale) root.style.setProperty('--reader-scale', String(scale));
         } catch (e) {}

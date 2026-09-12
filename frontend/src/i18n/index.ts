@@ -95,8 +95,8 @@ export interface ScriptAttrs {
   lang: Language;
   /** `te` (Noto Sans Telugu, lh 1.7) or `font-sans` (Inter). */
   cls: 'te' | 'font-sans';
-  /** `th` (Anek Telugu, lh 1.5) or `font-sans` — for headlines. */
-  head: 'th' | 'font-sans';
+  /** `th` (Noto Serif Telugu, lh 1.5) or `font-serif` (Fraunces) — for headlines. */
+  head: 'th' | 'font-serif';
   telugu: boolean;
 }
 
@@ -119,7 +119,7 @@ export function useScript() {
     return {
       lang: telugu ? 'te' : 'en',
       cls: telugu ? 'te' : 'font-sans',
-      head: telugu ? 'th' : 'font-sans',
+      head: telugu ? 'th' : 'font-serif',
       telugu,
     };
   };
@@ -129,7 +129,7 @@ export function useScript() {
     /** Body-copy font class for chrome in the interface language. */
     body: (te ? 'te' : 'font-sans') as 'te' | 'font-sans',
     /** Headline font class for chrome in the interface language. */
-    head: (te ? 'th' : 'font-sans') as 'th' | 'font-sans',
+    head: (te ? 'th' : 'font-serif') as 'th' | 'font-serif',
     pick,
     forText,
     /** Convenience: text + attrs for a bilingual pair in one call. */

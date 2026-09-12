@@ -12,23 +12,29 @@ Screen ids (`1a`..`1n`) are the mockup's own ids. `§x` refers to Build Instruct
 
 | Token | Value | Use |
 |---|---|---|
-| `--brand` | `#A61C24` | masthead, primary buttons, active nav, links |
-| `--breaking` | `#C6111F` | breaking ticker/chips, overdue age chip, destructive |
-| `--ink` | `#1A1714` | body text, CMS topbar, dark surfaces |
-| `--muted` | `#6B635A` | secondary text |
-| `--muted-2` | `#8A7F70` | labels, meta, uppercase eyebrows |
-| `--paper` | `#FAF7F2` | card/page surface |
-| `--canvas` | `#EFEBE3` | app background |
-| `--cms-canvas` | `#F4F2ED` | CMS working background |
-| `--rule` | `#E5DFD6` | borders, dividers |
+| `--brand` | `#0F5F57` peacock teal | masthead, primary buttons, active nav, links |
+| `--breaking` | `#9A5B0B` burnished amber | breaking ticker/chips, overdue age chip, destructive — **never red** |
+| `--exclusive` | `#B48A2A` champagne gold | exclusive star, the premium accent, correction / editor note |
+| `--ink` | `#191C1C` | body text, CMS sidebar, dark surfaces |
+| `--muted` | `#6A6E6B` | secondary text |
+| `--muted-2` | `#8C918D` | decoration only (chevrons, placeholders) |
+| `--paper` | `#FBF9F4` ivory | card/page surface |
+| `--canvas` | `#F2EFE8` | app background |
+| `--cms-canvas` | `#F5F3EE` | CMS working background |
+| `--rule` | `#E4E0D6` | borders, dividers |
 | `--ai` | `#6D4FC4` | AI badges, AI drafts tab, auto-detected hotspots |
-| `--exclusive` | `#B98A2E` | exclusive star, correction / editor note |
-| `--success` | `#2E7D4F` | linked hotspot, published state, toggles on |
-| `--info` | `#1E66C8` | IN_REVIEW / SCHEDULED state, "see all" links |
-| `--placeholder` | `#E9E2D6` | reserved-height media boxes |
+| `--partial` | `#7A6A25` olive gold | pending / partially available |
+| `--success` | `#3B7D45` | linked hotspot, published state, toggles on |
+| `--info` | `#2F5E8C` | IN_REVIEW / SCHEDULED state, "see all" links |
+| `--placeholder` | `#E9E5DC` | reserved-height media boxes |
 
-Type: headline `Anek Telugu 700` 30-34px web / lh 1.5 · body `Noto Sans Telugu 400` 19px web,
-17sp app / **lh 1.7** · Latin + numerals `Inter`. Hit targets >= 44px.
+The original mockup `1a` palette was brand-red; it was replaced in the UI
+upgrade with the teal-and-gold identity above (no red anywhere), and the dark
+palette lightens the teal, amber and gold so foregrounds on those fills become
+ink rather than white.
+
+Type: headline `Noto Serif Telugu 700/800` 30-34px web / lh 1.5 · body `Noto Sans Telugu 400` 19px web,
+17sp app / **lh 1.7** · Latin display `Fraunces` · Latin chrome + numerals `Manrope`. Hit targets >= 44px.
 Font switcher `A- / A / A+ / A++` persisted in localStorage — a **required feature** (§4.1), not optional.
 
 > **Where the contract lives now.** The table above is the origin; the executable

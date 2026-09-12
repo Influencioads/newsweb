@@ -11,37 +11,38 @@
  * ------------------------------------------------------------------------- */
 :root {
   /* RGB triplets consumed by tailwind.config.ts via rgb(var(--tn-*) / a).
-     Light theme = the mockup-1a palette verbatim. */
-  --tn-brand: 166 28 36;          --tn-brand-dark: 126 18 25;
-  --tn-brand-deep: 142 11 22;     --tn-brand-tint: 253 236 236;
-  --tn-breaking: 198 17 31;       --tn-breaking-tint: 253 236 236;
-  --tn-breaking-border: 242 196 199;
-  --tn-ink: 26 23 20;             --tn-ink-soft: 74 68 60;
-  --tn-ink-panel: 36 32 25;       --tn-ink-deep: 20 17 14;
-  --tn-muted: 107 99 90;          --tn-muted-light: 138 127 112;
-  --tn-muted-inverse: 183 175 164;
-  --tn-paper: 250 247 242;        --tn-paper-warm: 255 253 248;
-  --tn-paper-sub: 245 242 234;
-  --tn-canvas: 239 235 227;       --tn-canvas-cms: 244 242 237;
-  --tn-rule: 229 223 214;         --tn-rule-soft: 241 237 228;
-  --tn-rule-strong: 216 210 200;  --tn-rule-input: 221 216 206;
+     Light theme: peacock teal brand, champagne-gold accent, ivory paper,
+     charcoal ink. Urgency is amber — there is no red anywhere in the system. */
+  --tn-brand: 15 95 87;          --tn-brand-dark: 11 72 65;
+  --tn-brand-deep: 8 54 47;     --tn-brand-tint: 228 241 238;
+  --tn-breaking: 154 91 11;       --tn-breaking-tint: 251 240 220;
+  --tn-breaking-border: 235 211 163;
+  --tn-ink: 25 28 28;             --tn-ink-soft: 74 78 76;
+  --tn-ink-panel: 35 39 42;       --tn-ink-deep: 17 20 20;
+  --tn-muted: 106 110 107;          --tn-muted-light: 140 145 141;
+  --tn-muted-inverse: 185 189 182;
+  --tn-paper: 251 249 244;        --tn-paper-warm: 255 253 248;
+  --tn-paper-sub: 245 242 235;
+  --tn-canvas: 242 239 232;       --tn-canvas-cms: 245 243 238;
+  --tn-rule: 228 224 214;         --tn-rule-soft: 239 236 228;
+  --tn-rule-strong: 213 208 196;  --tn-rule-input: 217 212 200;
   --tn-ai: 109 79 196;            --tn-ai-tint: 244 240 251;
   --tn-ai-border: 221 210 242;    --tn-ai-text: 74 63 110;
-  --tn-exclusive: 185 138 46;     --tn-exclusive-tint: 251 243 220;
-  --tn-exclusive-border: 235 217 168; --tn-exclusive-text: 122 97 30;
-  --tn-success: 46 125 79;        --tn-success-tint: 234 244 236;
-  --tn-success-border: 191 220 198;
-  --tn-info: 30 102 200;          --tn-info-tint: 232 240 251;
-  --tn-partial: 184 112 20;       --tn-partial-tint: 253 243 226;
-  --tn-partial-border: 240 210 160;
-  --tn-placeholder: 233 226 214;  --tn-placeholder-text: 138 127 112;
-  --tn-placeholder-line: 201 194 182;
-  --tn-highlight: 251 233 169;
+  --tn-exclusive: 180 138 42;     --tn-exclusive-tint: 251 243 220;
+  --tn-exclusive-border: 234 214 160; --tn-exclusive-text: 124 93 28;
+  --tn-success: 47 112 58;        --tn-success-tint: 232 242 233;
+  --tn-success-border: 190 218 195;
+  --tn-info: 47 94 140;          --tn-info-tint: 231 238 246;
+  --tn-partial: 122 106 37;       --tn-partial-tint: 246 242 225;
+  --tn-partial-border: 222 212 168;
+  --tn-placeholder: 233 229 220;  --tn-placeholder-text: 140 145 141;
+  --tn-placeholder-line: 201 196 184;
+  --tn-highlight: 247 233 188;
   /* Card / sheet fill (was the `bg-white` hack); field = input fill. */
-  --tn-surface: 255 255 255;      --tn-surface-sub: 250 247 242;
+  --tn-surface: 255 255 255;      --tn-surface-sub: 251 249 244;
   --tn-field: 255 255 255;
   /* Scrim behind dialogs (used with alpha) and constant-white foregrounds. */
-  --tn-overlay: 20 17 14;
+  --tn-overlay: 17 20 20;
   --tn-on-brand: 255 255 255;
   --tn-on-ink: 255 255 255;
 
@@ -71,45 +72,43 @@
 }
 
 /* ---------------------------------------------------------------------------
- * §1.1 dark mode — same warm-newsprint identity at night. Brand and breaking
- * hues brighten for contrast; the "deep" panels stay dark in both themes.
+ * §1.1 dark mode — the same ivory-and-charcoal identity at night. Teal, amber
+ * and gold lighten for contrast; the "deep" panels stay dark in both themes.
  * ------------------------------------------------------------------------- */
 .dark {
-  /* brand: one token serves both `text-brand` on surface (4.2:1) and
-     `bg-brand text-on-brand` (3.8:1). No single value clears 4.5:1 for both on
-     this palette — fills are large/bold-text AA; a fill-vs-text split is a
-     contract revision. brand-dark stays DARKER than brand so hover deepens
-     (white on it = 5.4:1) exactly as it does in light. */
-  --tn-brand: 217 87 94;          --tn-brand-dark: 190 60 68;
-  --tn-brand-tint: 64 31 32;
-  /* breaking brightens like brand: error text on surface = 4.9:1, on
-     breaking-tint = 4.2:1 (white on a `bg-breaking` fill drops to ~3.3:1). */
-  --tn-breaking: 232 96 106;
-  --tn-breaking-tint: 64 37 37;   --tn-breaking-border: 110 52 55;
-  --tn-ink: 237 231 221;          --tn-ink-soft: 201 192 179;
+  /* Fills are light-toned here (teal, amber, gold), so `--tn-on-brand` is ink:
+     a light fill with white text would fail AA. `on-ink` stays white for the
+     constant-dark panels. Brand as TEXT on the dark surface clears 6:1. */
+  --tn-brand: 77 182 166;          --tn-brand-dark: 60 156 142;
+  --tn-brand-tint: 30 51 48;
+  --tn-breaking: 217 160 85;
+  --tn-breaking-tint: 59 44 23;   --tn-breaking-border: 107 80 40;
+  --tn-ink: 236 234 227;          --tn-ink-soft: 198 195 186;
   /* muted-inverse is only used on the constant-dark panels (footer, CMS
      topbar), so it keeps its light value in both themes. */
-  --tn-muted: 170 159 145;        --tn-muted-light: 140 129 114;
-  --tn-paper: 32 27 22;           --tn-paper-warm: 39 33 27;
-  --tn-paper-sub: 44 38 31;
-  --tn-canvas: 23 19 16;          --tn-canvas-cms: 27 23 19;
-  --tn-rule: 58 51 43;            --tn-rule-soft: 47 41 34;
-  --tn-rule-strong: 77 68 58;     --tn-rule-input: 66 58 49;
+  --tn-muted: 169 173 166;        --tn-muted-light: 140 145 141;
+  --tn-paper: 26 31 30;           --tn-paper-warm: 31 37 36;
+  --tn-paper-sub: 36 42 41;
+  --tn-canvas: 18 22 21;          --tn-canvas-cms: 22 27 26;
+  --tn-rule: 49 56 55;            --tn-rule-soft: 40 48 48;
+  --tn-rule-strong: 67 73 74;     --tn-rule-input: 59 66 65;
   --tn-ai: 164 143 224;           --tn-ai-tint: 45 39 62;
   --tn-ai-border: 77 66 106;      --tn-ai-text: 196 183 232;
-  --tn-exclusive: 211 168 83;     --tn-exclusive-tint: 56 47 30;
-  --tn-exclusive-border: 100 82 44; --tn-exclusive-text: 222 190 122;
-  --tn-success: 109 187 140;      --tn-success-tint: 33 51 41;
-  --tn-success-border: 58 88 69;
-  --tn-info: 111 163 232;         --tn-info-tint: 30 41 56;
-  --tn-partial: 232 170 82;       --tn-partial-tint: 58 44 26;
-  --tn-partial-border: 110 82 44;
-  --tn-placeholder: 46 40 34;     --tn-placeholder-text: 140 129 114;
-  --tn-placeholder-line: 84 75 64;
-  --tn-highlight: 92 74 27;
-  --tn-surface: 38 32 26;         --tn-surface-sub: 44 38 31;
-  --tn-field: 31 26 21;
+  --tn-exclusive: 212 176 97;     --tn-exclusive-tint: 54 46 30;
+  --tn-exclusive-border: 100 84 46; --tn-exclusive-text: 226 196 128;
+  --tn-success: 121 190 132;      --tn-success-tint: 30 48 34;
+  --tn-success-border: 56 88 62;
+  --tn-info: 127 169 218;         --tn-info-tint: 28 38 52;
+  --tn-partial: 201 178 90;       --tn-partial-tint: 52 46 26;
+  --tn-partial-border: 96 86 44;
+  --tn-placeholder: 42 48 47;     --tn-placeholder-text: 140 145 141;
+  --tn-placeholder-line: 80 88 86;
+  --tn-highlight: 90 76 30;
+  --tn-surface: 32 38 37;         --tn-surface-sub: 36 42 41;
+  --tn-field: 23 28 27;
   --tn-overlay: 0 0 0;
+
+  --tn-on-brand: 14 17 17;
 
   color-scheme: dark;
 }
@@ -266,14 +265,20 @@
    * --------------------------------------------------------------------- */
   .te,
   .telugu {
-    font-family: 'Noto Sans Telugu', Inter, sans-serif;
+    font-family: 'Noto Sans Telugu', Manrope, sans-serif;
     line-height: 1.7;
   }
 
   .th,
   .telugu-headline {
-    font-family: 'Anek Telugu', 'Noto Sans Telugu', sans-serif;
+    font-family: 'Noto Serif Telugu', 'Noto Sans Telugu', serif;
     line-height: 1.5;
+  }
+
+  /* Fraunces carries an optical-size axis; let the browser pick it per size so
+     the wordmark tagline and English headlines get the display cut. */
+  .font-serif {
+    font-optical-sizing: auto;
   }
 
   /* Reveal-on-scroll (utils/motion.ts useReveal). Elements start hidden and

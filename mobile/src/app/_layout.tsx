@@ -1,5 +1,6 @@
-import { AnekTelugu_700Bold, AnekTelugu_800ExtraBold } from '@expo-google-fonts/anek-telugu';
-import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
+import { Fraunces_600SemiBold, Fraunces_800ExtraBold } from '@expo-google-fonts/fraunces';
+import { Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold } from '@expo-google-fonts/manrope';
+import { NotoSerifTelugu_700Bold, NotoSerifTelugu_800ExtraBold } from '@expo-google-fonts/noto-serif-telugu';
 import {
   NotoSansTelugu_400Regular,
   NotoSansTelugu_600SemiBold,
@@ -45,12 +46,14 @@ export default function RootLayout() {
     NotoSansTelugu_400Regular,
     NotoSansTelugu_600SemiBold,
     NotoSansTelugu_700Bold,
-    AnekTelugu_700Bold,
-    AnekTelugu_800ExtraBold,
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
+    NotoSerifTelugu_700Bold,
+    NotoSerifTelugu_800ExtraBold,
+    Manrope_400Regular,
+    Manrope_500Medium,
+    Manrope_600SemiBold,
+    Manrope_700Bold,
+    Fraunces_600SemiBold,
+    Fraunces_800ExtraBold,
   });
   const styles = useStyles();
   const bootstrap = useAuth((s) => s.bootstrap);

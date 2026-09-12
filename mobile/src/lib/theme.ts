@@ -13,47 +13,47 @@ import { Platform, type ViewStyle } from 'react-native';
  * mobile/scripts/audit-ui.mjs blocks hex/rgba literals outside this file.
  */
 export const lightColor = {
-  brand: '#A61C24',
-  brandDark: '#7E1219',
-  brandDeep: '#8E0B16',
-  brandTint: '#FDECEC',
-  breaking: '#C6111F',
-  breakingTint: '#FDECEC',
-  ink: '#1A1714',
-  inkSoft: '#4A443C',
+  brand: '#0F5F57',
+  brandDark: '#0B4841',
+  brandDeep: '#08362F',
+  brandTint: '#E4F1EE',
+  breaking: '#9A5B0B',
+  breakingTint: '#FBF0DC',
+  ink: '#191C1C',
+  inkSoft: '#4A4E4C',
   /** Constant-dark panel (footer / ink cards) — the same in both themes. */
-  inkDeep: '#14110E',
-  muted: '#6B635A',
-  mutedLight: '#8A7F70',
-  paper: '#FAF7F2',
-  paperSub: '#F5F2EA',
-  canvas: '#EFEBE3',
-  rule: '#E5DFD6',
-  ruleSoft: '#F1EDE4',
-  ruleStrong: '#D8D2C8',
+  inkDeep: '#111414',
+  muted: '#6A6E6B',
+  mutedLight: '#8C918D',
+  paper: '#FBF9F4',
+  paperSub: '#F5F2EB',
+  canvas: '#F2EFE8',
+  rule: '#E4E0D6',
+  ruleSoft: '#EFECE4',
+  ruleStrong: '#D5D0C4',
   ai: '#6D4FC4',
   aiTint: '#F4F0FB',
-  exclusive: '#B98A2E',
+  exclusive: '#B48A2A',
   exclusiveTint: '#FBF3DC',
-  success: '#2E7D4F',
-  successTint: '#EAF4EC',
-  info: '#1E66C8',
-  infoTint: '#E8F0FB',
+  success: '#2F703A',
+  successTint: '#E8F2E9',
+  info: '#2F5E8C',
+  infoTint: '#E7EEF6',
   /** Pending / partially-available / warning tone (amber). */
-  partial: '#B87014',
-  partialTint: '#FDF3E2',
-  highlight: '#FBE9A9',
-  placeholder: '#E9E2D6',
+  partial: '#7A6A25',
+  partialTint: '#F6F2E1',
+  highlight: '#F7E9BC',
+  placeholder: '#E9E5DC',
   /** Card / sheet fill — white in light, warm charcoal in dark. */
   surface: '#FFFFFF',
   /** Input / textarea fill. */
   field: '#FFFFFF',
   /** Scrim behind sheets; use with an alpha via `rgba(palette.overlay, .55)` → see `alpha()`. */
-  overlay: '#14110E',
+  overlay: '#111414',
   /** Foreground on top of an overlay / image scrim / ink panel (always light). */
   onOverlay: '#FFFFFF',
-  /** Foreground on a brand-filled surface. Light on the deep red here; dark on
-   *  the lightened red the dark palette uses, where white would not contrast. */
+  /** Foreground on a brand-filled surface. Light on the deep teal here; ink on
+   *  the lightened teal the dark palette uses, where white would not contrast. */
   onBrand: '#FFFFFF',
 } as const;
 
@@ -62,13 +62,17 @@ export const font = {
   telugu: 'NotoSansTelugu_400Regular',
   teluguSemiBold: 'NotoSansTelugu_600SemiBold',
   teluguBold: 'NotoSansTelugu_700Bold',
-  headline: 'AnekTelugu_700Bold',
-  headlineHeavy: 'AnekTelugu_800ExtraBold',
-  /** Inter — Latin chrome, numerals, eyebrows. Loaded in app/_layout.tsx. */
-  latin: 'Inter_400Regular',
-  latinMedium: 'Inter_500Medium',
-  latinSemiBold: 'Inter_600SemiBold',
-  latinBold: 'Inter_700Bold',
+  /** Noto Serif Telugu — headlines and the wordmark: the editorial voice. */
+  headline: 'NotoSerifTelugu_700Bold',
+  headlineHeavy: 'NotoSerifTelugu_800ExtraBold',
+  /** Manrope — Latin chrome, numerals, eyebrows. Loaded in app/_layout.tsx. */
+  latin: 'Manrope_400Regular',
+  latinMedium: 'Manrope_500Medium',
+  latinSemiBold: 'Manrope_600SemiBold',
+  latinBold: 'Manrope_700Bold',
+  /** Fraunces — Latin display: English headlines and the wordmark tagline. */
+  latinDisplay: 'Fraunces_600SemiBold',
+  latinDisplayHeavy: 'Fraunces_800ExtraBold',
 } as const;
 
 /**
@@ -145,47 +149,47 @@ export const MAX_FONT_MULTIPLIER = 1.3;
 /**
  * Dark palette.
  *
- * Not an inversion: the brand red is lightened so it still reads as the
- * masthead colour on a dark ground rather than turning into a muddy maroon,
+ * Not an inversion: the peacock teal is lightened so it still reads as the
+ * masthead colour on a dark ground rather than sinking into it,
  * and the neutrals carry the same warm bias as the light set so the two
  * themes feel like one publication. Values are the web `.dark` tokens
  * (frontend/src/assets/index.css) converted to hex.
  */
 export const darkColor: Palette = {
-  brand: '#D9575E',
-  brandDark: '#E77A80',
-  brandDeep: '#8E0B16',
-  brandTint: '#401F20',
-  breaking: '#C6111F',
-  breakingTint: '#402525',
-  ink: '#EDE7DD',
-  inkSoft: '#C9C0B3',
-  inkDeep: '#14110E',
-  muted: '#AA9F91',
-  mutedLight: '#8C8172',
-  paper: '#201B16',
-  paperSub: '#2C261F',
-  canvas: '#171310',
-  rule: '#3A332B',
-  ruleSoft: '#2F2922',
-  ruleStrong: '#4D443A',
+  brand: '#4DB6A6',
+  brandDark: '#3C9C8E',
+  brandDeep: '#1B5F55',
+  brandTint: '#1E3330',
+  breaking: '#D9A055',
+  breakingTint: '#3B2C17',
+  ink: '#ECEAE3',
+  inkSoft: '#C6C3BA',
+  inkDeep: '#0E1111',
+  muted: '#A9ADA6',
+  mutedLight: '#8C918D',
+  paper: '#1A1F1E',
+  paperSub: '#242A29',
+  canvas: '#121615',
+  rule: '#313837',
+  ruleSoft: '#283030',
+  ruleStrong: '#43494A',
   ai: '#A48FE0',
   aiTint: '#2D273E',
-  exclusive: '#D3A853',
-  exclusiveTint: '#382F1E',
-  success: '#6DBB8C',
-  successTint: '#213329',
-  info: '#6FA3E8',
-  infoTint: '#1E2938',
-  partial: '#E8AA52',
-  partialTint: '#3A2C1A',
-  highlight: '#5C4A1B',
-  placeholder: '#2E2822',
-  surface: '#26201A',
-  field: '#1F1A15',
+  exclusive: '#D4B061',
+  exclusiveTint: '#362E1E',
+  success: '#79BE84',
+  successTint: '#1E3022',
+  info: '#7FA9DA',
+  infoTint: '#1C2634',
+  partial: '#C9B25A',
+  partialTint: '#342E1A',
+  highlight: '#5A4C1E',
+  placeholder: '#2A302F',
+  surface: '#202625',
+  field: '#171C1B',
   overlay: '#000000',
   onOverlay: '#FFFFFF',
-  onBrand: '#FFFFFF',
+  onBrand: '#0E1111',
 };
 
 export type Palette = { -readonly [K in keyof typeof lightColor]: string };

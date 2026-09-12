@@ -80,7 +80,7 @@ export function BreakingTicker() {
         <span
           className={cn(
             s.body,
-            'flex min-h-9 shrink-0 items-center gap-1.5 rounded-pill bg-brand-deep px-3 text-ui-sm font-bold',
+            'flex min-h-9 shrink-0 items-center gap-1.5 rounded-pill bg-brand-deep px-3 text-ui-sm font-bold text-on-ink',
           )}
         >
           <Icon icon={Zap} size="sm" />
@@ -94,7 +94,7 @@ export function BreakingTicker() {
         <IconButton
           icon={paused ? Play : Pause}
           label={paused ? t('ui.tickerPlay') : t('ui.tickerPause')}
-          variant="inverse"
+          variant="on-fill"
           onClick={() => setPaused((p) => !p)}
           className="order-last"
         />

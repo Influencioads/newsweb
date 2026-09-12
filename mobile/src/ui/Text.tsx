@@ -70,6 +70,10 @@ function face(variant: TypeVariant, weight: TWeight, telugu: boolean): string {
     if (weight === 'medium' || weight === 'semibold') return font.teluguSemiBold;
     return font.telugu;
   }
+  // Latin headlines take the serif display face; chrome stays on Manrope.
+  if (isHeadline(variant)) {
+    return weight === 'heavy' || weight === 'bold' ? font.latinDisplayHeavy : font.latinDisplay;
+  }
   switch (weight) {
     case 'medium':
       return font.latinMedium;

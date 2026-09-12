@@ -32,9 +32,10 @@ const LONG_HEADLINE =
 
 /** The three faces, compared at one size so the difference read is the face. */
 const FACES: Array<[string, string]> = [
-  ['Anek Telugu', 'th font-bold'],
+  ['Noto Serif Telugu', 'th font-bold'],
   ['Noto Sans Telugu', 'te'],
-  ['Inter', 'font-sans'],
+  ['Manrope', 'font-sans'],
+  ['Fraunces', 'font-serif font-semibold'],
 ];
 
 function Section({ title, spec, children }: { title: string; spec: string; children: ReactNode }) {
@@ -130,7 +131,7 @@ export default function TeluguRenderTest() {
         >
           <div className="flex flex-col gap-4">
             <div>
-              <Label>Article header · Anek Telugu 700 · headline-xl</Label>
+              <Label>Article header · Noto Serif Telugu 700 · headline-xl</Label>
               <h3 lang="te" className="th text-headline-xl font-extrabold">
                 {LONG_HEADLINE}
               </h3>
@@ -157,7 +158,7 @@ export default function TeluguRenderTest() {
         <Section title="Type scale" spec="§4.1 — body 19px web / headline 30-34px / line-height >= 1.65x">
           <div className="flex flex-col gap-3">
             <div>
-              <Label>Headline — Anek Telugu 700</Label>
+              <Label>Headline — Noto Serif Telugu 700</Label>
               <p lang="te" className="th text-headline-lg font-bold">
                 అమరావతి రాజధాని నిధులు విడుదల: తొలి విడత ₹1,250 కోట్లు
               </p>

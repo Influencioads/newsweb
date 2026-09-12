@@ -58,7 +58,7 @@ function CrashScreen() {
     'transition-[colors,transform,box-shadow] duration-base ease-standard active:scale-[.98]';
   return (
     <div role="alert" className="mx-auto w-full max-w-form px-4 py-16 text-center md:px-6">
-      {/* font-bold: Anek Telugu ships 600/700/800 only, so an unweighted th heading would be synthesised. */}
+      {/* font-bold: the serif headline face is loaded as a 400–900 variable font; 700 is the headline weight. */}
       <h1 className={cn(s.head, 'text-headline-md font-bold text-ink')}>{t('state.errorTitle')}</h1>
       <p className={cn(s.body, s.te ? 'text-te-body-sm' : 'text-ui', 'mt-2 text-muted')}>
         {t('state.errorBody')}

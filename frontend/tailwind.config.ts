@@ -106,12 +106,16 @@ export default {
         'on-ink': 'rgb(var(--tn-on-ink) / <alpha-value>)',
       },
       fontFamily: {
-        // Headlines. Anek Telugu carries the display weight the mastheads need.
-        headline: ['"Anek Telugu"', '"Noto Sans Telugu"', 'sans-serif'],
-        // Body Telugu.
-        telugu: ['"Noto Sans Telugu"', 'Inter', 'sans-serif'],
-        // Latin, numerals, and the CMS chrome.
-        sans: ['Inter', '"Noto Sans Telugu"', 'system-ui', 'sans-serif'],
+        // Headlines and the wordmark: a serif Telugu voice — the editorial
+        // register that separates this product from the sans-only Telugu press.
+        headline: ['"Noto Serif Telugu"', '"Noto Sans Telugu"', 'serif'],
+        // Body Telugu stays a sans: the most legible face at 19px on the
+        // mid-range Android we target.
+        telugu: ['"Noto Sans Telugu"', 'Manrope', 'sans-serif'],
+        // Latin chrome, numerals, and the CMS.
+        sans: ['Manrope', '"Noto Sans Telugu"', 'system-ui', 'sans-serif'],
+        // Latin display: English headlines, the wordmark tagline, pull quotes.
+        serif: ['Fraunces', '"Noto Serif Telugu"', 'Georgia', 'serif'],
         mono: ['ui-monospace', 'Menlo', 'monospace'],
       },
       fontSize: {
@@ -166,10 +170,10 @@ export default {
         form: '560px',
       },
       boxShadow: {
-        card: '0 1px 2px rgba(26,23,20,.04), 0 6px 20px -8px rgba(26,23,20,.10)',
-        raised: '0 8px 28px -10px rgba(26,23,20,.18)',
+        card: '0 1px 2px rgba(25,28,28,.04), 0 6px 20px -8px rgba(25,28,28,.10)',
+        raised: '0 8px 28px -10px rgba(25,28,28,.18)',
         sheet: '0 -6px 24px rgba(0,0,0,.18)',
-        header: '0 1px 0 rgb(var(--tn-rule)), 0 8px 24px -16px rgba(26,23,20,.18)',
+        header: '0 1px 0 rgb(var(--tn-rule)), 0 8px 24px -16px rgba(25,28,28,.18)',
       },
       borderRadius: {
         /** Cards and controls. */

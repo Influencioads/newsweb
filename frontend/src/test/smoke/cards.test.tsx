@@ -97,7 +97,7 @@ describe('useScript().forText', () => {
     expect(result.current.forText('తెలుగు', 'English')).toEqual({
       lang: 'en',
       cls: 'font-sans',
-      head: 'font-sans',
+      head: 'font-serif',
       telugu: false,
     });
     expect(result.current.text('తెలుగు', null).text).toBe('తెలుగు');

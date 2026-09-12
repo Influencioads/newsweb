@@ -127,7 +127,7 @@ export function PageHeader({
                 {eyebrow}
               </p>
             ) : null}
-            <h1 lang={lang} className={cn(telugu ? 'th' : 'font-sans', 'text-headline-lg font-extrabold text-ink')}>
+            <h1 lang={lang} className={cn(telugu ? 'th' : 'font-serif', 'text-headline-lg font-extrabold text-ink')}>
               {title}
             </h1>
             {subtitle ? (
@@ -206,7 +206,7 @@ export function SectionHeader({
         <Heading
           lang={lang}
           className={cn(
-            lang === 'te' ? 'th' : 'font-sans',
+            lang === 'te' ? 'th' : 'font-serif',
             'text-headline-md font-extrabold',
             tone === 'brand' ? 'text-brand' : 'text-ink',
           )}

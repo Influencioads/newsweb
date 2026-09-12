@@ -25,7 +25,7 @@ import { cn } from '@/utils/cn';
  *     <ButtonLink to="/search" variant="secondary" iconRight={ChevronRight}>…</ButtonLink>
  *     <IconButton icon={Bell} label={t('ui.notifications')} badge={unread} />
  */
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link' | 'inverse';
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link' | 'inverse' | 'on-fill';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 export interface ButtonVisualProps {
@@ -54,7 +54,12 @@ const VARIANT: Record<ButtonVariant, string> = {
   link: 'text-brand underline-offset-4 hover:underline',
   /** Ghost on a brand / breaking fill (the ticker's pause button). The global
       brand focus ring is invisible on that fill, so the ring goes white here. */
-  inverse: 'text-on-brand hover:bg-on-brand/10 focus-visible:outline-on-brand',
+  // On constant-dark panels (admin sidebar, ink cards): on-ink stays white in
+  // both themes, whereas on-brand becomes ink in dark mode.
+  inverse: 'text-on-ink hover:bg-on-ink/10 focus-visible:outline-on-ink',
+  // On a brand/breaking FILL (ticker band, hero scrim): follows on-brand, which
+  // is white on the deep light-mode fills and ink on the lighter dark-mode ones.
+  'on-fill': 'text-on-brand hover:bg-on-brand/10 focus-visible:outline-on-brand',
 };
 
 const SIZE: Record<ButtonSize, string> = {

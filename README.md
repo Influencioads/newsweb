@@ -137,6 +137,16 @@ duration is picked from the system rather than invented:
 | Motion | `frontend/src/utils/motion.ts` (+ CSS keyframes) | `mobile/src/lib/motion.ts` (`useMotion`) |
 | Primitives | `frontend/src/components/ui/*` | `mobile/src/ui/*` |
 
+**Identity.** Peacock teal (`#0F5F57`) as the brand, champagne gold as the
+accent, ivory paper and charcoal ink, with urgency carried by a burnished
+amber — there is no red anywhere in the system, deliberately unlike the rest of
+the Telugu news market. Headlines and the wordmark are set in **Noto Serif
+Telugu**, body copy in **Noto Sans Telugu** (the most legible face at 19px on
+a mid-range Android), Latin display in **Fraunces** and Latin chrome in
+**Manrope**. All four are self-hosted variable WOFF2 files in
+`frontend/public/fonts` (the Telugu subsets keep U+200C–200D) and the same
+families load through `@expo-google-fonts/*` in the app.
+
 Reduced motion is honoured on both: the web kill switch lives in `index.css`
 and JS-driven motion checks `prefersReducedMotion()`; on the app every
 animation, transition and haptic goes through `useMotion()`, which reads the OS

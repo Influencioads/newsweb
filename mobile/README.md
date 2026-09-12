@@ -49,8 +49,9 @@ src/app/         expo-router: (tabs)/{index,local,videos,search,profile}, articl
 elevation, and it mirrors the web contract token for token. Rules that the
 audit script enforces rather than trusting to review:
 
-* every string renders through `<T>`, which picks the face (Anek for headlines,
-  Noto for body, Inter for Latin chrome), applies the scale and floors Telugu
+* every string renders through `<T>`, which picks the face (Noto Serif Telugu
+  for headlines, Noto Sans Telugu for body, Fraunces for Latin display, Manrope
+  for Latin chrome), applies the scale and floors Telugu
   line-height at 1.65× — body never drops below 17sp, including at `A-`;
 * every colour comes from `useColors()` / `makeStyles`, never a literal;
 * every touchable is `<PressableScale>` (or a primitive built on it), so press

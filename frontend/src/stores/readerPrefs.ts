@@ -31,8 +31,8 @@ const SCALE: Record<FontStep, number> = {
 export type Theme = 'system' | 'light' | 'dark';
 export type ResolvedTheme = 'light' | 'dark';
 
-/** Brand red in light, the paper tone in dark — what the browser chrome tints to. */
-const THEME_COLOR: Record<ResolvedTheme, string> = { light: '#A61C24', dark: '#201B16' }; // audit-allow-hex
+/** Brand teal in light, the paper tone in dark — what the browser chrome tints to. */
+const THEME_COLOR: Record<ResolvedTheme, string> = { light: '#0F5F57', dark: '#1A1F1E' }; // audit-allow-hex
 
 export interface ReaderPrefsState {
   fontStep: FontStep;

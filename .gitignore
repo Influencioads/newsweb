@@ -38,3 +38,6 @@ backend/.mysql-local/
 
 # Build artifacts — the APK is produced by EAS, never committed.
 *.apk
+
+# local sqlite dev databases
+*.db

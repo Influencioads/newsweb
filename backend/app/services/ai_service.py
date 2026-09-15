@@ -165,9 +165,7 @@ def generate_suggestions(
         )
     room = cap - made_today
 
-    _creds = settings_service.ai_credentials(db)
-    provider_name = _creds["provider"]
-    provider = get_ai(**_creds)
+    provider = get_ai(**settings_service.ai_credentials(db))
     min_score = float(settings_service.get(db, "ai.min_score") or 0.0)
 
     raw: list[dict[str, Any]] = []
@@ -199,7 +197,10 @@ def generate_suggestions(
             )
 
     if not raw:
-        raw = _coverage_gaps(db, room)
+        # The keyless path scores its own gaps, so it has to honour the same
+        # floor: otherwise ai.min_score silently applies to the provider path
+        # only, and the default install shows suggestions it was told to hide.
+        raw = [g for g in _coverage_gaps(db, room) if float(g.get("score", 0)) >= min_score]
 
     existing = {
         s.topic_te
@@ -220,7 +221,10 @@ def generate_suggestions(
             district_id=item.get("district_id"),
             score=float(item.get("score", 0.5)),
             engine=provider.key,
-            model=provider_name if provider.key != "heuristic" else None,
+            # The model that actually answered, not the adapter name — an
+            # aggregator can serve many models under one provider, so
+            # "aimlapi" alone does not identify what wrote this.
+            model=getattr(provider, "model_name", None),
         )
         db.add(suggestion)
         db.flush()
@@ -321,7 +325,7 @@ def create_draft(
         category_id=suggestion.category_id,
         district_id=suggestion.district_id,
         engine=provider.key,
-        model=str(settings_service.get(db, "ai.provider")),
+        model=getattr(provider, "model_name", None),
         confidence=text.confidence,
         word_count=words,
         created_by=actor_id,

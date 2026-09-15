@@ -38,7 +38,7 @@ from app.integrations.tts import get_tts
 from app.models.bulletin import AudioBulletin, AudioBulletinItem
 from app.models.content import Article
 from app.models.enums import BulletinStatus
-from app.services import epaper_service, settings_service, tts_service
+from app.services import ai_usage_service, epaper_service, settings_service, tts_service
 from app.telugu.normalize import normalize_headline, normalize_text
 
 logger = get_logger(__name__)
@@ -187,6 +187,9 @@ def _ai_connectives(db: Session, headlines: list[str]) -> list[str] | None:
         return None
     try:
         provider = get_ai(**settings_service.ai_credentials(db))
+        if provider.key != "heuristic":
+            # Unattended: bills the newsroom, no user to quota.
+            ai_usage_service.check_budget(db)
         draft = provider.write_draft(
             topic="ఈ గంట వార్తల మధ్య కలిపే చిన్న వాక్యాలు",
             notes="\n".join(headlines),

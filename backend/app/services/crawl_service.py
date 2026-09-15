@@ -42,7 +42,12 @@ from app.integrations.ai import get_ai
 from app.integrations.feeds import FeedResult, extract_article, fetch_feed
 from app.models.enums import IngestStatus, RewriteStatus, SourceBeat
 from app.models.ingestion import ContentSource, IngestedItem, IngestedRewrite
-from app.services import ingestion_service, settings_service, tiptap
+from app.services import (
+    ai_usage_service,
+    ingestion_service,
+    settings_service,
+    tiptap,
+)
 from app.telugu.normalize import normalize_headline, normalize_text
 
 logger = get_logger(__name__)
@@ -465,6 +470,11 @@ def rewrite_one(
         )
 
     provider = get_ai(**settings_service.ai_credentials(db))
+    # The rewrite pass is the highest-volume spender: hourly, up to
+    # crawl.hourly_item_cap items a run. It bills to the newsroom, not to the
+    # editor who happened to trigger it, so only the budget is checked here.
+    if provider.key != "heuristic":
+        ai_usage_service.check_budget(db)
     try:
         result = provider.rewrite_item(
             headline=headline,
@@ -475,6 +485,19 @@ def rewrite_one(
         )
     except AiProviderError as exc:
         logger.warning("crawl_rewrite_failed", item_id=item.id, error=str(exc.details)[:200])
+        if provider.key != "heuristic":
+            # Bill the failure too: a provider that errors after consuming
+            # tokens must not make retries look free.
+            ai_usage_service.record(
+                db,
+                operation="rewrite",
+                provider=provider.key,
+                model=getattr(provider, "model_name", None),
+                actor_id=actor_id,
+                usage=getattr(provider, "last_usage", None),
+                ok=False,
+                error=str(exc.details)[:300],
+            )
         return _record(
             db,
             item,
@@ -492,6 +515,17 @@ def rewrite_one(
             reason=str(exc)[:300],
             actor_id=actor_id,
             engine=provider.key,
+        )
+
+    if provider.key != "heuristic":
+        # A refusal still cost a call, so this is recorded before the branch.
+        ai_usage_service.record(
+            db,
+            operation="rewrite",
+            provider=provider.key,
+            model=getattr(provider, "model_name", None),
+            actor_id=actor_id,
+            usage=getattr(provider, "last_usage", None),
         )
 
     if result.refused:

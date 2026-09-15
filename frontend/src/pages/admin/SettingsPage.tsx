@@ -101,6 +101,7 @@ export default function SettingsPage() {
   const renderForm = (payload: SettingsPayload) => {
     const env = payload.environment;
     const usage = payload.voice_usage;
+    const aiUsage = payload.ai_usage;
     const aiBlocked = !env.ai_available;
     // A secret comes back from the API as a mask, never as its value, so the
     // only thing the screen can honestly say is whether one is stored.
@@ -152,6 +153,50 @@ export default function SettingsPage() {
                 value={num('ai.daily_suggestion_limit')}
                 onChange={(e) => set('ai.daily_suggestion_limit', Number(e.target.value))} />
             </Field>
+          </div>
+
+          {/* §7.1 — the spend ceiling was declared in config for months and
+              enforced by nothing. Now that it bites, it has to be visible:
+              an editor blocked by AI_BUDGET_EXCEEDED needs somewhere to see
+              why, and a desk needs to see it coming before it does. */}
+          <div className="rounded-xl border border-rule bg-canvas p-3">
+            <p className={cn(s.body, 'text-meta font-semibold text-muted')}>
+              {en ? 'AI spend this month' : 'ఈ నెల AI ఖర్చు'}
+            </p>
+            <p className={cn(s.body, 'mt-1 text-ink', s.te ? 'text-te-body-xs' : 'text-ui')}>
+              {aiUsage.budget_inr ? (
+                <>
+                  <span className="font-sans tabular-nums">
+                    ₹{aiUsage.spent_inr.toLocaleString('en-IN')} / ₹{aiUsage.budget_inr.toLocaleString('en-IN')}
+                  </span>{' '}
+                  <span
+                    className={cn(
+                      'font-sans font-bold tabular-nums',
+                      aiUsage.percent_used >= 100
+                        ? 'text-breaking'
+                        : aiUsage.percent_used >= aiUsage.alert_percent
+                          ? 'text-partial'
+                          : undefined,
+                    )}
+                  >
+                    ({aiUsage.percent_used}%)
+                  </span>
+                </>
+              ) : (
+                <span className="font-sans">
+                  {en ? 'No monthly ceiling set' : 'నెలవారీ పరిమితి పెట్టలేదు'}
+                </span>
+              )}
+              {' · '}{en ? 'calls' : 'కాల్స్'}: <span className="font-sans tabular-nums">{aiUsage.calls_this_month}</span>
+              {aiUsage.calls_failed ? ` · ${en ? 'failed' : 'విఫలం'}: ${aiUsage.calls_failed}` : ''}
+            </p>
+            {aiUsage.budget_inr && aiUsage.percent_used >= 100 ? (
+              <p className={cn(s.body, 'mt-2 text-meta text-breaking')}>
+                {en
+                  ? 'The month’s budget is spent. Drafts and rewrites will refuse until it resets or the ceiling is raised.'
+                  : 'ఈ నెల బడ్జెట్ పూర్తయింది. పరిమితి పెంచేవరకు డ్రాఫ్ట్‌లు, రీరైట్‌లు ఆగిపోతాయి.'}
+              </p>
+            ) : null}
           </div>
 
           {/* The key is write-only: the API returns a mask, never the value, so

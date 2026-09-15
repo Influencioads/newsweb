@@ -180,3 +180,46 @@ class AiArticleDraft(PKMixin, TimestampMixin, Base):
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<AiArticleDraft {self.id} {self.status}>"
+
+
+class AiUsage(PKMixin, TimestampMixin, Base):
+    """One row per provider call, so spend can be bounded (§7.1).
+
+    `AI_MONTHLY_BUDGET_INR` and the per-role daily quotas were declared in
+    config from the beginning and read by nothing: there was no table to count
+    against, so the budget and quota errors could never be raised. This is that
+    table.
+
+    Cost is recorded in **paise** as an integer. Floating-point money is a
+    rounding-error generator, and a budget comparison that drifts is worse than
+    no budget because it looks enforced. Providers that report a dollar figure
+    (aimlapi returns `meta.usage.usd_spent`) are converted on the way in.
+
+    A row is written even when the provider reported no cost — an outage that
+    still consumed quota must not become free retries in a loop.
+    """
+
+    __tablename__ = "ai_usage"
+    __table_args__ = (
+        # The two queries this table exists to answer: "what has this month
+        # cost?" and "how many calls has this user made today?".
+        Index("ix_ai_usage_created", "created_at"),
+        Index("ix_ai_usage_actor_created", "actor_id", "created_at"),
+        MYSQL_TABLE_ARGS,
+    )
+
+    #: suggest | draft | rewrite | bulletin_script | tts
+    operation: Mapped[str] = mapped_column(String(40), nullable=False)
+    provider: Mapped[str] = mapped_column(String(60), nullable=False)
+    model: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    #: Null for a scheduled task — the crawl and the nightly discovery pass
+    #: have no user to bill, and must still count against the monthly budget.
+    actor_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    prompt_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    #: Integer paise. See the class docstring.
+    cost_paise: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    ok: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    error: Mapped[str | None] = mapped_column(String(300), nullable=True)

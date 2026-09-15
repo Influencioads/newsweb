@@ -95,6 +95,9 @@ class LlmAi(AiProvider):
         model: str = "",
     ) -> None:
         self.key = key
+        #: Usage reported by the most recent call, normalised across vendors.
+        #: The service layer writes this to the ledger; see ai_usage_service.
+        self.last_usage: dict[str, float | int] = {}
         self._api_key = (api_key or "").strip()
         self._base_url = (base_url or "").strip()
         self._model = (model or "").strip()
@@ -217,6 +220,7 @@ class LlmAi(AiProvider):
                 details={"provider": self.key, "error": str(exc)[:200]}
             ) from exc
 
+        self.last_usage = self._read_usage(body)
         try:
             if self.key == "gemini":
                 return body["candidates"][0]["content"]["parts"][0]["text"]
@@ -227,6 +231,34 @@ class LlmAi(AiProvider):
             raise AiProviderError(
                 details={"provider": self.key, "error": "unexpected response shape"}
             ) from exc
+
+    def _read_usage(self, body: dict) -> dict[str, float | int]:
+        """Pull token counts and cost out of whichever envelope this vendor uses.
+
+        Only aimlapi reports money (`meta.usage.usd_spent`); the direct vendors
+        report tokens and leave pricing to their own dashboards, so a spend
+        ceiling on those is necessarily a token ceiling until per-model prices
+        are configured. Recording zero cost is honest — it is what the provider
+        told us — and the call is still counted against the daily quota.
+        """
+        out: dict[str, float | int] = {}
+        usage = (body or {}).get("usage") or {}
+        if isinstance(usage, dict):
+            out["prompt_tokens"] = int(
+                usage.get("prompt_tokens") or usage.get("input_tokens") or 0
+            )
+            out["completion_tokens"] = int(
+                usage.get("completion_tokens") or usage.get("output_tokens") or 0
+            )
+        meta_usage = ((body or {}).get("meta") or {}).get("usage") or {}
+        if isinstance(meta_usage, dict) and meta_usage.get("usd_spent") is not None:
+            out["usd_spent"] = float(meta_usage["usd_spent"])
+        # Gemini names everything differently.
+        gemini = (body or {}).get("usageMetadata") or {}
+        if isinstance(gemini, dict) and gemini:
+            out["prompt_tokens"] = int(gemini.get("promptTokenCount") or 0)
+            out["completion_tokens"] = int(gemini.get("candidatesTokenCount") or 0)
+        return out
 
     @staticmethod
     def _parse_json(text: str):

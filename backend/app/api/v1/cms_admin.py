@@ -961,7 +961,7 @@ def settings_summary(
 ):
     """Two blocks, because they behave differently: `environment` is read-only
     deployment config, `values` are the editable §18/§20/§35 switches."""
-    from app.services import settings_service, tts_service
+    from app.services import ai_usage_service, settings_service, tts_service
 
     return {
         "environment": {
@@ -984,6 +984,7 @@ def settings_summary(
         "values": settings_service.all_settings(db),
         "specs": settings_service.describe(),
         "voice_usage": tts_service.usage_summary(db),
+        "ai_usage": ai_usage_service.usage_summary(db),
     }
 
 

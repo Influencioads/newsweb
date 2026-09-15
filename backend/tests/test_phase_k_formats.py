@@ -94,6 +94,14 @@ def _purge(db: Session) -> None:
     db.query(Video).delete()
     db.query(AppSetting).delete()
     db.commit()
+    # A bulk delete does not touch the identity map, so the session still holds
+    # the deleted instances. SQLite then reuses the same primary keys, and the
+    # next flush collides with a stale identity — which surfaces as
+    # "'NoneType' object has no attribute '__dict__'" from deep inside the ORM
+    # rather than anything resembling a test-isolation problem. Whether it is
+    # fatal depends on what an earlier module left in the map, so the suite
+    # passed or failed depending on which files ran before this one.
+    db.expunge_all()
     settings_service.invalidate()
 
 

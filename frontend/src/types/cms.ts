@@ -58,6 +58,8 @@ export interface SettingsPayload {
   values:Record<string,unknown>;
   specs:SettingSpec[];
   voice_usage:{chars_this_month:number;monthly_budget:number;percent_used:number;assets_ready:number;assets_failed:number};
+  /** §7.1 spend against AI_MONTHLY_BUDGET_INR. budget_inr 0 means no ceiling. */
+  ai_usage:{spent_inr:number;budget_inr:number;percent_used:number;alert_percent:number;calls_this_month:number;calls_failed:number};
 }
 
 /** §16 / §17 — an AI story idea with its attribution. */

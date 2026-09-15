@@ -40,7 +40,7 @@ from app.models.enums import (
     WorkflowState,
 )
 from app.models.geo import District
-from app.services import settings_service, tiptap
+from app.services import ai_usage_service, settings_service, tiptap
 
 logger = get_logger(__name__)
 
@@ -170,6 +170,9 @@ def generate_suggestions(
 
     raw: list[dict[str, Any]] = []
     if provider.key != "heuristic":
+        # Budget only: discovery runs unattended from the beat as well as from
+        # the button, and a scheduled pass has no user to bill a quota to.
+        ai_usage_service.check_budget(db)
         try:
             for idea in provider.propose_topics(
                 context=_recent_coverage(db), limit=room
@@ -191,9 +194,27 @@ def generate_suggestions(
                         "sources": idea.sources,
                     }
                 )
-        except Exception:  # noqa: BLE001 — a provider outage falls back, never 500s
+            ai_usage_service.record(
+                db,
+                operation="suggest",
+                provider=provider.key,
+                model=getattr(provider, "model_name", None),
+                actor_id=actor_id,
+                usage=getattr(provider, "last_usage", None),
+            )
+        except Exception as exc:  # noqa: BLE001 — an outage falls back, never 500s
             logger.warning(
                 "ai_provider_topics_failed", provider=provider.key, exc_info=True
+            )
+            ai_usage_service.record(
+                db,
+                operation="suggest",
+                provider=provider.key,
+                model=getattr(provider, "model_name", None),
+                actor_id=actor_id,
+                usage=getattr(provider, "last_usage", None),
+                ok=False,
+                error=str(exc)[:300],
             )
 
     if not raw:
@@ -300,12 +321,25 @@ def create_draft(
         raise ConflictError(message_en="That suggestion was rejected.")
 
     provider = get_ai(**settings_service.ai_credentials(db))
+    # A person asked for this one, so both ceilings apply: the newsroom's
+    # money and their own daily allowance.
+    if provider.key != "heuristic":
+        ai_usage_service.guard(db, actor_id)
     sources = [{"publisher": s.publisher, "url": s.url} for s in suggestion.sources]
     text = provider.write_draft(
         topic=suggestion.topic_te,
         notes=notes or suggestion.rationale_te or "",
         sources=sources,
     )
+    if provider.key != "heuristic":
+        ai_usage_service.record(
+            db,
+            operation="draft",
+            provider=provider.key,
+            model=getattr(provider, "model_name", None),
+            actor_id=actor_id,
+            usage=getattr(provider, "last_usage", None),
+        )
 
     body = {
         "type": "doc",

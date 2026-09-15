@@ -63,6 +63,13 @@ celery.conf.beat_schedule = {
     # Identity documents past their retention window. Not optional: this is
     # what makes "we verify contributors" different from "we keep strangers'
     # passport scans forever".
+    # §18 topic discovery. Early morning, before the desk fills up, and once
+    # a day: ai.daily_suggestion_limit is a per-day ceiling, so a tighter
+    # cadence would only spend the same budget earlier.
+    "ai-auto-suggest": {
+        "task": "ai.auto_suggest",
+        "schedule": crontab(minute="30", hour="5"),
+    },
     "kyc-purge": {"task": "kyc.purge", "schedule": crontab(minute="40", hour="3")},
 }
 

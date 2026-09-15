@@ -5,6 +5,6 @@ module per domain. Importing this package registers every task, which is what
 `celery_app` does at the bottom of the file.
 """
 
-from app.workers.tasks import bulletin, crawl, kyc, voice  # noqa: F401
+from app.workers.tasks import ai, bulletin, crawl, kyc, voice  # noqa: F401
 
 __all__ = ["bulletin", "crawl", "kyc", "voice"]

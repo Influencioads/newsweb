@@ -115,7 +115,16 @@ class Settings(BaseSettings):
     AI_QUOTA_STRINGER_PER_DAY: int = 20
     AI_QUOTA_REPORTER_PER_DAY: int = 50
     AI_SIMILARITY_BLOCK_PERCENT: int = 85
-    AI_ENABLED: bool = False
+    #: A deployment-level *kill switch*, not the on switch. False forbids every
+    #: provider call regardless of what an admin does in the CMS.
+    #:
+    #: It defaults True because the on switch now lives where an operator can
+    #: reach it: `ai.enabled` in the settings screen still defaults to False,
+    #: and with no key configured `get_ai` falls back to the keyless heuristic
+    #: provider. So deploying this code still cannot start spending at a
+    #: provider — that needs an admin to switch AI on *and* paste a key — but
+    #: it no longer takes a redeploy to make the settings screen mean anything.
+    AI_ENABLED: bool = True
     #: §17 — the only sources the research pass is permitted to read. Feeds we
     #: are licensed for, or that are published for redistribution (press
     #: releases, government bulletins, publisher RSS). Empty means the pass has

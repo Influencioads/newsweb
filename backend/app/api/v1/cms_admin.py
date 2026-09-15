@@ -998,6 +998,17 @@ def update_settings(
 
     before = settings_service.all_settings(db)
     values = settings_service.set_many(db, payload.values, actor_id=p.id)
+    # `before` is already masked by all_settings; `after` is the admin's raw
+    # input, so a provider key would otherwise be written to the audit log in
+    # clear. Record that the secret changed, never what it changed to.
+    after = {
+        key: (
+            settings_service.masked_value(key, raw)
+            if settings_service.is_secret(key)
+            else raw
+        )
+        for key, raw in payload.values.items()
+    }
     audit_service.record(
         db,
         action=AuditAction.SETTING_CHANGED,
@@ -1005,7 +1016,7 @@ def update_settings(
         entity_id="values",
         actor=p.user,
         before={k: before.get(k) for k in payload.values},
-        after=dict(payload.values),
+        after=after,
         request=request,
     )
     # A ratio or voice change alters what /public/home returns.

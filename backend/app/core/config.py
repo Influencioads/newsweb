@@ -99,6 +99,14 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""
+    #: aimlapi.com — an OpenAI-compatible aggregator. Normally set from the CMS
+    #: settings screen (`ai.api_key`, held encrypted); these env vars are only
+    #: the fallback for installs that prefer deploy-time configuration.
+    AIMLAPI_API_KEY: str = ""
+    #: Either the API root ("https://api.aimlapi.com/v1") or the full
+    #: chat-completions URL — `LlmAi` normalises one into the other.
+    AIMLAPI_BASE_URL: str = ""
+    AIMLAPI_MODEL: str = ""
     REPLICATE_API_TOKEN: str = ""
     AI_DEFAULT_PROVIDER: str = "gemini"
     AI_DEFAULT_TIMEOUT_MS: int = 25_000

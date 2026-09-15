@@ -102,10 +102,17 @@ export default function SettingsPage() {
     const env = payload.environment;
     const usage = payload.voice_usage;
     const aiBlocked = !env.ai_available;
+    // A secret comes back from the API as a mask, never as its value, so the
+    // only thing the screen can honestly say is whether one is stored.
+    const keySet = Boolean(payload.values['ai.api_key']);
+    // aimlapi is ready when a key is stored on this screen — either its own or
+    // the AI one it shares — rather than when the deployment set an env var.
+    const voiceKeySet = Boolean(payload.values['voice.api_key'] || payload.values['ai.api_key']);
     const voiceProviderReady =
       str('voice.provider') === 'local' ||
       (str('voice.provider') === 'google' && env.tts_google_configured) ||
-      (str('voice.provider') === 'bhashini' && env.tts_bhashini_configured);
+      (str('voice.provider') === 'bhashini' && env.tts_bhashini_configured) ||
+      (str('voice.provider') === 'aimlapi' && voiceKeySet);
 
     return (
       <>
@@ -137,6 +144,7 @@ export default function SettingsPage() {
                 <option value="gemini">gemini</option>
                 <option value="openai">openai</option>
                 <option value="anthropic">anthropic</option>
+                <option value="aimlapi">aimlapi</option>
               </Select>
             </Field>
             <Field label={en ? 'Suggestions per day' : 'రోజుకు సూచనలు'}>
@@ -145,6 +153,36 @@ export default function SettingsPage() {
                 onChange={(e) => set('ai.daily_suggestion_limit', Number(e.target.value))} />
             </Field>
           </div>
+
+          {/* The key is write-only: the API returns a mask, never the value, so
+              what lands here is a mask the admin can overwrite but not read. */}
+          {str('ai.provider') !== 'heuristic' ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label={en ? 'API key' : 'API కీ'}
+                hint={keySet
+                  ? (en ? 'A key is saved. Type a new one to replace it, or clear the box to remove it.'
+                        : 'కీ సేవ్ అయ్యింది. మార్చాలంటే కొత్తది టైప్ చేయండి, తీసేయాలంటే ఖాళీ చేయండి.')
+                  : (en ? 'Stored encrypted. Falls back to the deployment environment when empty.'
+                        : 'ఎన్‌క్రిప్ట్ చేసి భద్రపరుస్తాం. ఖాళీగా ఉంటే డిప్లాయ్‌మెంట్ విలువ వాడతాం.')}
+              >
+                <Input script="en" type="password" autoComplete="off" spellCheck={false}
+                  placeholder={keySet ? '••••••••' : 'sk-…'}
+                  value={str('ai.api_key')}
+                  onChange={(e) => set('ai.api_key', e.target.value)} />
+              </Field>
+              <Field
+                label={en ? 'Model' : 'మోడల్'}
+                hint={en ? 'Blank uses the adapter default. aimlapi namespaces models, e.g. openai/gpt-4o-mini.'
+                         : 'ఖాళీ అయితే డిఫాల్ట్. aimlapiలో పేరు ఇలా ఉంటుంది: openai/gpt-4o-mini.'}
+              >
+                <Input script="en" autoComplete="off" spellCheck={false}
+                  placeholder="openai/gpt-4o-mini"
+                  value={str('ai.model')}
+                  onChange={(e) => set('ai.model', e.target.value)} />
+              </Field>
+            </div>
+          ) : null}
         </Section>
 
         {/* ------------------------------------------------ hourly crawl -- */}
@@ -232,6 +270,7 @@ export default function SettingsPage() {
                 <option value="local">local — {en ? 'device voice only' : 'పరికర వాయిస్ మాత్రమే'}</option>
                 <option value="google">google — {keyState(env.tts_google_configured)}</option>
                 <option value="bhashini">bhashini — {keyState(env.tts_bhashini_configured)}</option>
+                <option value="aimlapi">aimlapi — {keyState(voiceKeySet)}</option>
               </Select>
             </Field>
             <Field label={en ? 'Monthly character budget' : 'నెలవారీ అక్షరాల బడ్జెట్'}>
@@ -240,6 +279,56 @@ export default function SettingsPage() {
                 onChange={(e) => set('voice.monthly_char_budget', Number(e.target.value))} />
             </Field>
           </div>
+          {/* aimlapi bills one key for text and speech, so leaving this blank
+              deliberately reuses the AI key rather than demanding it twice. */}
+          {str('voice.provider') === 'aimlapi' ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label={en ? 'Voice API key' : 'వాయిస్ API కీ'}
+                hint={en
+                  ? 'Blank reuses the AI key above. Stored encrypted; never shown again.'
+                  : 'ఖాళీగా ఉంటే పైన ఇచ్చిన AI కీనే వాడుతుంది. ఎన్‌క్రిప్ట్ చేసి భద్రపరుస్తాం.'}
+              >
+                <Input script="en" type="password" autoComplete="off" spellCheck={false}
+                  placeholder={voiceKeySet ? '••••••••' : (en ? 'reuses the AI key' : 'AI కీనే వాడుతుంది')}
+                  value={str('voice.api_key')}
+                  onChange={(e) => set('voice.api_key', e.target.value)} />
+              </Field>
+              <Field
+                label={en ? 'Speech model' : 'స్పీచ్ మోడల్'}
+                hint={en ? 'Blank uses openai/gpt-4o-mini-tts.' : 'ఖాళీ అయితే openai/gpt-4o-mini-tts.'}
+              >
+                <Input script="en" autoComplete="off" spellCheck={false}
+                  placeholder="openai/gpt-4o-mini-tts"
+                  value={str('voice.model')}
+                  onChange={(e) => set('voice.model', e.target.value)} />
+              </Field>
+            </div>
+          ) : null}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label={en ? 'Synthesis language' : 'సంశ్లేషణ భాష'}>
+              <Input script="en" autoComplete="off" placeholder="te-IN"
+                value={str('voice.language')}
+                onChange={(e) => set('voice.language', e.target.value)} />
+            </Field>
+            <Field
+              label={en ? 'Voice name' : 'వాయిస్ పేరు'}
+              hint={en ? 'Provider-specific, e.g. alloy for aimlapi.' : 'ప్రొవైడర్‌ను బట్టి మారుతుంది, ఉదా: alloy.'}
+            >
+              <Input script="en" autoComplete="off" placeholder="alloy"
+                value={str('voice.voice_name')}
+                onChange={(e) => set('voice.voice_name', e.target.value)} />
+            </Field>
+          </div>
+          <Switch checked={bool('voice.article_tts_enabled')} onChange={(v) => set('voice.article_tts_enabled', v)}
+            disabled={!bool('voice.enabled')}
+            label={en ? 'Read full articles aloud' : 'కథనాలను పూర్తిగా చదవండి'} />
+          <Switch checked={bool('voice.backfill_enabled')} onChange={(v) => set('voice.backfill_enabled', v)}
+            disabled={!bool('voice.enabled')}
+            label={en ? 'Nightly backfill of older stories' : 'పాత కథనాలకు రాత్రిపూట ఆడియో'}
+            hint={en
+              ? 'Spends the character budget on the archive. Leave off unless the budget allows it.'
+              : 'ఇది ఆర్కైవ్‌పై బడ్జెట్ ఖర్చు చేస్తుంది. బడ్జెట్ ఉంటేనే ఆన్ చేయండి.'} />
           <Switch checked={bool('voice.auto_generate_on_publish')} onChange={(v) => set('voice.auto_generate_on_publish', v)}
             label={en ? 'Generate audio when a story publishes' : 'ప్రచురణ సమయంలోనే ఆడియో తయారు చేయండి'}
             hint={en
@@ -293,6 +382,45 @@ export default function SettingsPage() {
             {en ? 'Total' : 'మొత్తం'}: {ratioTotal}%
             {ratioTotal === 100 ? <Icon icon={Check} size="xs" /> : <span>— {en ? 'must be 100' : '100 కావాలి'}</span>}
           </p>
+        </Section>
+
+        {/* ----------------------------------------------- audio bulletins -- */}
+        <Section
+          title={en ? 'Audio bulletins' : 'ఆడియో బులెటిన్లు'}
+          subtitle={en
+            ? 'A short spoken round-up built from the top stories, on a schedule.'
+            : 'ప్రధాన వార్తలతో తయారయ్యే చిన్న ఆడియో సమాహారం, నిర్ణీత వేళల్లో.'}
+        >
+          {bool('bulletin.enabled') && str('voice.provider') === 'local' ? (
+            <p className={note}>
+              {en
+                ? 'The voice provider is set to “local”, which cannot synthesise — bulletins will fail until a real TTS provider is chosen above.'
+                : 'వాయిస్ ప్రొవైడర్ “local” — ఇది ఆడియో తయారు చేయలేదు.'}
+            </p>
+          ) : null}
+          <Switch checked={bool('bulletin.enabled')} onChange={(v) => set('bulletin.enabled', v)}
+            label={en ? 'Enable audio bulletins' : 'ఆడియో బులెటిన్లు ఆన్'}
+            hint={en ? 'Off means no bulletin is built or aired.' : 'ఆఫ్ అయితే బులెటిన్ తయారు కాదు.'} />
+          <Switch checked={bool('bulletin.requires_approval')} onChange={(v) => set('bulletin.requires_approval', v)}
+            disabled={!bool('bulletin.enabled')}
+            label={en ? 'An editor must approve before it airs' : 'ప్రసారానికి ముందు ఎడిటర్ ఆమోదం'}
+            hint={en ? 'Recommended while the script is machine-written.' : 'స్క్రిప్ట్ AI రాస్తున్నప్పుడు సిఫారసు.'} />
+          <Switch checked={bool('bulletin.ai_script_enabled')} onChange={(v) => set('bulletin.ai_script_enabled', v)}
+            disabled={!bool('bulletin.enabled') || !bool('ai.enabled')}
+            label={en ? 'Let AI write the linking script' : 'కలిపే స్క్రిప్ట్ను AI రాయనివ్వండి'}
+            hint={en ? 'Needs AI switched on above. Off uses the headlines alone.' : 'పైన AI ఆన్ చేయాలి.'} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label={en ? 'Target length (seconds)' : 'లక్ష్య నిడివి (సెకన్లు)'}>
+              <Input script="en" type="number" min={30} max={900}
+                value={num('bulletin.target_seconds')}
+                onChange={(e) => set('bulletin.target_seconds', Number(e.target.value))} />
+            </Field>
+            <Field label={en ? 'Stories per bulletin' : 'బులెటిన్కు కథనాలు'}>
+              <Input script="en" type="number" min={1} max={30}
+                value={num('bulletin.story_limit')}
+                onChange={(e) => set('bulletin.story_limit', Number(e.target.value))} />
+            </Field>
+          </div>
         </Section>
 
         {/* ------------------------------------------------ §9 / §6 misc -- */}

@@ -24,11 +24,21 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings as env_settings
 from app.core.errors import ValidationError
+from app.core.security import decrypt_secret, encrypt_secret
 from app.models.setting import AppSetting
 
 _CACHE_TTL = 30.0
 _cache: dict[str, Any] = {}
 _cache_at: float = 0.0
+
+#: What a `secret` setting looks like to anyone reading it back — the settings
+#: screen, the audit log, the API response. The plaintext leaves this module
+#: only through `get_secret`, which the provider adapters call.
+_SECRET_MASK = "••••••••"
+
+
+class _Unchanged(Exception):
+    """Raised by `_coerce` for a secret the admin did not actually retype."""
 
 
 class Spec:
@@ -58,7 +68,26 @@ SPECS: dict[str, Spec] = {
     "ai.provider": Spec(
         env_settings.AI_DEFAULT_PROVIDER,
         "str",
-        "Which provider adapter to use: heuristic | gemini | openai | anthropic.",
+        "Which provider adapter to use: heuristic | gemini | openai | anthropic | aimlapi.",
+    ),
+    "ai.api_key": Spec(
+        "",
+        "secret",
+        "API key for the selected provider, held encrypted. Set it here instead "
+        "of in the deploy environment; a value here wins over the env var. "
+        "Write-only: the screen shows whether a key is set, never the key.",
+    ),
+    "ai.base_url": Spec(
+        "",
+        "str_optional",
+        "Override the provider's chat-completions endpoint. Only for the "
+        "OpenAI-compatible adapters (aimlapi, openai). Blank uses the default.",
+    ),
+    "ai.model": Spec(
+        "",
+        "str_optional",
+        "Override the model name sent to the provider. Blank uses the adapter's "
+        "default. aimlapi exposes many models, so this is how you pick one.",
     ),
     "ai.daily_suggestion_limit": Spec(
         20, "int", "Maximum suggestions generated per day — the §18 cost ceiling."
@@ -74,7 +103,21 @@ SPECS: dict[str, Spec] = {
         "on stories that would have been synthesised; audio an editor uploaded "
         "by hand still plays, because it costs nothing to serve.",
     ),
-    "voice.provider": Spec("local", "str", "TTS adapter: local | google | bhashini."),
+    "voice.provider": Spec(
+        "local", "str", "TTS adapter: local | google | bhashini | aimlapi."
+    ),
+    "voice.api_key": Spec(
+        "",
+        "secret",
+        "API key for the TTS provider, held encrypted. Blank falls back to the "
+        "deploy environment. Write-only, like the AI key.",
+    ),
+    "voice.model": Spec(
+        "",
+        "str_optional",
+        "Speech model to use where the provider exposes a choice (aimlapi). "
+        "Blank uses the adapter default.",
+    ),
     "voice.language": Spec("te-IN", "str", "Synthesis language tag."),
     "voice.auto_generate_on_publish": Spec(
         False,
@@ -298,7 +341,53 @@ def invalidate() -> None:
 
 
 def all_settings(db: Session) -> dict[str, Any]:
-    return dict(_load(db))
+    """Every setting, with secrets masked.
+
+    This is what the settings screen renders and what the audit log records, so
+    masking here rather than at each call site is deliberate: a new caller
+    cannot forget to do it and leak a provider key.
+    """
+    values = dict(_load(db))
+    for key, spec in SPECS.items():
+        if spec.kind == "secret":
+            values[key] = _SECRET_MASK if values.get(key) else ""
+    return values
+
+
+def is_secret(key: str) -> bool:
+    """Whether `key` holds a secret — used by callers that log or echo values."""
+    spec = SPECS.get(key)
+    return bool(spec and spec.kind == "secret")
+
+
+def masked_value(key: str, raw: Any) -> str:
+    """What a secret's new value may be recorded as. Never the value itself."""
+    if not is_secret(key):
+        return raw
+    return _SECRET_MASK if str(raw or "").strip() else ""
+
+
+def secret_is_set(db: Session, key: str) -> bool:
+    """Whether a secret has a value, without revealing it."""
+    return bool(_load(db).get(key))
+
+
+def get_secret(db: Session, key: str) -> str:
+    """Decrypt a `secret` setting. Returns "" when unset.
+
+    A stored value that will not decrypt (ENCRYPTION_KEY rotated under it) is
+    treated as unset rather than raised: the caller then falls back to the env
+    var, which is a working system with a stale key rather than a 500.
+    """
+    if SPECS[key].kind != "secret":
+        raise KeyError(key)
+    stored = _load(db).get(key)
+    if not stored:
+        return ""
+    try:
+        return decrypt_secret(str(stored))
+    except RuntimeError:
+        return ""
 
 
 def get(db: Session, key: str) -> Any:
@@ -340,6 +429,27 @@ def _coerce(key: str, value: Any) -> Any:
         if not isinstance(value, str) or not value.strip():
             raise ValidationError(details={key: "must be a non-empty string"})
         return value.strip()[:120]
+    if spec.kind == "str_optional":
+        # Same as `str` but blank is meaningful: it means "use the adapter
+        # default" rather than "the admin forgot to fill this in".
+        if not isinstance(value, str):
+            raise ValidationError(details={key: "must be a string"})
+        return value.strip()[:300]
+    if spec.kind == "secret":
+        # Stored encrypted at rest with the same Fernet key that protects KYC
+        # documents. Blank clears it, which is how an admin revokes a key
+        # without needing a deploy.
+        if not isinstance(value, str):
+            raise ValidationError(details={key: "must be a string"})
+        raw = value.strip()
+        if not raw:
+            return ""
+        if raw == _SECRET_MASK:
+            # The screen round-trips the mask when the admin edits some other
+            # field. Treat that as "leave it alone", never as "set the key to
+            # eight bullet characters".
+            raise _Unchanged()
+        return encrypt_secret(raw[:400])
     if spec.kind == "counts":
         # Shaped like `ratios` but without the sum-to-100 rule: these are
         # absolute hourly counts, and forcing them to total anything would
@@ -395,7 +505,10 @@ def set_many(
         ).all()
     }
     for key, raw in changes.items():
-        value = _coerce(key, raw)
+        try:
+            value = _coerce(key, raw)
+        except _Unchanged:
+            continue
         row = rows.get(key)
         if row is None:
             row = AppSetting(key=key, description=SPECS[key].description)
@@ -423,6 +536,37 @@ def describe() -> list[dict[str, Any]]:
 # --------------------------------------------------------------------------- #
 # Convenience readers used across services
 # --------------------------------------------------------------------------- #
+def ai_credentials(db: Session) -> dict[str, str]:
+    """Everything `get_ai` needs, resolved from the editable settings.
+
+    One place so the four call sites (topics, drafts, bulletin scripts, crawl
+    rewrites) cannot drift apart — a key set in the CMS must reach all of them
+    or an admin sees AI work on one screen and silently fall back on another.
+    """
+    return {
+        "provider": str(get(db, "ai.provider") or "heuristic").lower(),
+        "api_key": get_secret(db, "ai.api_key"),
+        "base_url": str(get(db, "ai.base_url") or ""),
+        "model": str(get(db, "ai.model") or ""),
+    }
+
+
+def tts_credentials(db: Session) -> dict[str, str]:
+    """Everything `get_tts` needs, resolved from the editable settings.
+
+    `voice.api_key` falls back to `ai.api_key` because aimlapi issues one key
+    for both text and speech: an admin who pasted it once on this screen should
+    not have to paste it again three fields further down.
+    """
+    return {
+        "provider": str(get(db, "voice.provider") or "local").lower(),
+        "api_key": get_secret(db, "voice.api_key") or get_secret(db, "ai.api_key"),
+        "base_url": str(get(db, "ai.base_url") or ""),
+        "model": str(get(db, "voice.model") or ""),
+        "voice": str(get(db, "voice.voice_name") or ""),
+    }
+
+
 def ai_enabled(db: Session) -> bool:
     """§18 — the environment must permit AI *and* an admin must have switched
     it on. Either being false means no provider call happens."""

@@ -56,36 +56,104 @@ _RULES = (
 )
 
 
-class LlmAi(AiProvider):
-    """`key` is the provider name: gemini | openai | anthropic."""
+#: Adapters that speak the OpenAI chat-completions dialect — same request body,
+#: same `choices[0].message.content` reply. aimlapi.com is an aggregator in
+#: front of many models, so it is this dialect plus a different base URL.
+_OPENAI_DIALECT = {"openai", "aimlapi"}
 
-    def __init__(self, key: str) -> None:
+_DEFAULT_BASE_URL = {
+    "openai": "https://api.openai.com/v1/chat/completions",
+    "aimlapi": "https://api.aimlapi.com/v1/chat/completions",
+}
+
+_DEFAULT_MODEL = {
+    "openai": "gpt-4o-mini",
+    # aimlapi namespaces every model by its originating vendor, so the bare
+    # OpenAI name is not a valid id there — it 404s at generation time, which
+    # surfaces as a provider timeout rather than an obvious "no such model".
+    "aimlapi": "openai/gpt-4o-mini",
+    "gemini": "gemini-2.0-flash",
+    "anthropic": "claude-sonnet-5",
+}
+
+
+class LlmAi(AiProvider):
+    """`key` is the provider name: gemini | openai | anthropic | aimlapi.
+
+    `api_key`, `base_url` and `model` are passed in by the caller, which reads
+    them from the editable settings so an admin can configure a provider from
+    the CMS without a deploy. Each falls back to the deploy environment when
+    blank, so an existing env-configured install keeps working untouched.
+    """
+
+    def __init__(
+        self,
+        key: str,
+        *,
+        api_key: str = "",
+        base_url: str = "",
+        model: str = "",
+    ) -> None:
         self.key = key
+        self._api_key = (api_key or "").strip()
+        self._base_url = (base_url or "").strip()
+        self._model = (model or "").strip()
 
     # ------------------------------------------------------------------ auth
+    def _resolved_key(self) -> str:
+        """Settings key first, environment second."""
+        if self._api_key:
+            return self._api_key
+        return {
+            "gemini": settings.GEMINI_API_KEY,
+            "openai": settings.OPENAI_API_KEY,
+            "anthropic": settings.ANTHROPIC_API_KEY,
+            "aimlapi": settings.AIMLAPI_API_KEY,
+        }.get(self.key, "")
+
+    def _env_base_url(self) -> str:
+        return settings.AIMLAPI_BASE_URL if self.key == "aimlapi" else ""
+
+    def _env_model(self) -> str:
+        return settings.AIMLAPI_MODEL if self.key == "aimlapi" else ""
+
+    @staticmethod
+    def _chat_endpoint(base: str) -> str:
+        """Accept either the API root or the full chat-completions URL.
+
+        Providers document their base URL as `https://host/v1`, and that is what
+        people paste into a settings field or an env var — but the request goes
+        to `/v1/chat/completions`. Normalising here means neither form is wrong.
+        """
+        trimmed = base.rstrip("/")
+        if trimmed.endswith("/chat/completions"):
+            return trimmed
+        return f"{trimmed}/chat/completions"
+
     def _credentials(self) -> tuple[str, str, dict[str, str]]:
-        if self.key == "gemini":
-            model = "gemini-2.0-flash"
-            url = (
-                f"https://generativelanguage.googleapis.com/v1beta/models/"
-                f"{model}:generateContent?key={settings.GEMINI_API_KEY}"
-            )
-            return url, model, {"Content-Type": "application/json"}
-        if self.key == "openai":
+        if self.key in _OPENAI_DIALECT:
+            base = self._base_url or self._env_base_url()
             return (
-                "https://api.openai.com/v1/chat/completions",
-                "gpt-4o-mini",
+                self._chat_endpoint(base) if base else _DEFAULT_BASE_URL[self.key],
+                self._model or self._env_model() or _DEFAULT_MODEL[self.key],
                 {
-                    "Authorization": f"Bearer {settings.OPENAI_API_KEY}",
+                    "Authorization": f"Bearer {self._resolved_key()}",
                     "Content-Type": "application/json",
                 },
             )
+        if self.key == "gemini":
+            model = self._model or _DEFAULT_MODEL["gemini"]
+            url = self._base_url or (
+                f"https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{model}:generateContent?key={self._resolved_key()}"
+            )
+            return url, model, {"Content-Type": "application/json"}
         if self.key == "anthropic":
             return (
-                "https://api.anthropic.com/v1/messages",
-                "claude-sonnet-5",
+                self._base_url or "https://api.anthropic.com/v1/messages",
+                self._model or _DEFAULT_MODEL["anthropic"],
                 {
-                    "x-api-key": settings.ANTHROPIC_API_KEY,
+                    "x-api-key": self._resolved_key(),
                     "anthropic-version": "2023-06-01",
                     "Content-Type": "application/json",
                 },
@@ -107,13 +175,7 @@ class LlmAi(AiProvider):
             return None
 
     def available(self) -> bool:
-        return bool(
-            {
-                "gemini": settings.GEMINI_API_KEY,
-                "openai": settings.OPENAI_API_KEY,
-                "anthropic": settings.ANTHROPIC_API_KEY,
-            }.get(self.key)
-        )
+        return bool(self._resolved_key())
 
     # ------------------------------------------------------------------ call
     def _complete(self, prompt: str) -> str:
@@ -131,7 +193,7 @@ class LlmAi(AiProvider):
                 "contents": [{"parts": [{"text": full}]}],
                 "generationConfig": {"temperature": 0.4, "maxOutputTokens": 2048},
             }
-        elif self.key == "openai":
+        elif self.key in _OPENAI_DIALECT:
             payload = {
                 "model": model,
                 "temperature": 0.4,
@@ -158,7 +220,7 @@ class LlmAi(AiProvider):
         try:
             if self.key == "gemini":
                 return body["candidates"][0]["content"]["parts"][0]["text"]
-            if self.key == "openai":
+            if self.key in _OPENAI_DIALECT:
                 return body["choices"][0]["message"]["content"]
             return body["content"][0]["text"]
         except (KeyError, IndexError, TypeError) as exc:

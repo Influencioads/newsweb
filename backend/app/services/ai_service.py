@@ -165,8 +165,9 @@ def generate_suggestions(
         )
     room = cap - made_today
 
-    provider_name = str(settings_service.get(db, "ai.provider") or "heuristic")
-    provider = get_ai(provider_name)
+    _creds = settings_service.ai_credentials(db)
+    provider_name = _creds["provider"]
+    provider = get_ai(**_creds)
     min_score = float(settings_service.get(db, "ai.min_score") or 0.0)
 
     raw: list[dict[str, Any]] = []
@@ -294,7 +295,7 @@ def create_draft(
     if suggestion.status == AiSuggestionStatus.REJECTED:
         raise ConflictError(message_en="That suggestion was rejected.")
 
-    provider = get_ai(str(settings_service.get(db, "ai.provider") or "heuristic"))
+    provider = get_ai(**settings_service.ai_credentials(db))
     sources = [{"publisher": s.publisher, "url": s.url} for s in suggestion.sources]
     text = provider.write_draft(
         topic=suggestion.topic_te,

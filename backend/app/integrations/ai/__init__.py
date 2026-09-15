@@ -14,13 +14,26 @@ from app.integrations.ai.llm import LlmAi
 
 __all__ = ["AiProvider", "DraftText", "HeuristicAi", "LlmAi", "TopicIdea", "get_ai"]
 
-_LLM_KEYS = {"gemini", "openai", "anthropic"}
+_LLM_KEYS = {"gemini", "openai", "anthropic", "aimlapi"}
 
 
-def get_ai(provider: str | None = None) -> AiProvider:
+def get_ai(
+    provider: str | None = None,
+    *,
+    api_key: str = "",
+    base_url: str = "",
+    model: str = "",
+) -> AiProvider:
+    """Resolve the configured provider, degrading to the keyless heuristic.
+
+    `api_key`/`base_url`/`model` come from the editable settings (see
+    `settings_service.ai_credentials`) so a provider can be configured from the
+    CMS. Blank means "fall back to the deploy environment", which is what an
+    install that predates the settings-managed key keeps doing.
+    """
     name = (provider or "heuristic").lower()
     if name in _LLM_KEYS:
-        candidate = LlmAi(name)
+        candidate = LlmAi(name, api_key=api_key, base_url=base_url, model=model)
         if candidate.available():
             return candidate
     return HeuristicAi()

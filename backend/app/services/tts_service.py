@@ -376,10 +376,11 @@ def ensure_audio(
         # Do not retry a known failure on every page view.
         return None
 
-    provider_name = str(settings_service.get(db, "voice.provider") or "local")
+    _tts = settings_service.tts_credentials(db)
+    provider_name = _tts["provider"]
     language = str(settings_service.get(db, "voice.language") or "te-IN")
     voice_name = configured_voice(db)
-    provider = get_tts(provider_name)
+    provider = get_tts(**_tts)
     if not provider.available():
         logger.info(
             "tts_provider_unavailable", provider=provider_name, article_id=article.id

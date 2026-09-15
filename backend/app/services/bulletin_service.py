@@ -186,7 +186,7 @@ def _ai_connectives(db: Session, headlines: list[str]) -> list[str] | None:
     ):
         return None
     try:
-        provider = get_ai(str(settings_service.get(db, "ai.provider") or "heuristic"))
+        provider = get_ai(**settings_service.ai_credentials(db))
         draft = provider.write_draft(
             topic="ఈ గంట వార్తల మధ్య కలిపే చిన్న వాక్యాలు",
             notes="\n".join(headlines),
@@ -312,9 +312,10 @@ def render(
         db.flush()
         return bulletin
 
-    provider_name = str(settings_service.get(db, "voice.provider") or "local")
+    _tts = settings_service.tts_credentials(db)
+    provider_name = _tts["provider"]
     language = str(settings_service.get(db, "voice.language") or "te-IN")
-    provider = get_tts(provider_name)
+    provider = get_tts(**_tts)
     if not provider.available():
         bulletin.status = BulletinStatus.FAILED
         bulletin.error = f"tts provider {provider_name} unavailable"

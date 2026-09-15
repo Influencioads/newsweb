@@ -464,8 +464,9 @@ def rewrite_one(
             actor_id=actor_id,
         )
 
-    provider_name = str(settings_service.get(db, "ai.provider") or "heuristic")
-    provider = get_ai(provider_name)
+    _creds = settings_service.ai_credentials(db)
+    provider_name = _creds["provider"]
+    provider = get_ai(**_creds)
     try:
         result = provider.rewrite_item(
             headline=headline,

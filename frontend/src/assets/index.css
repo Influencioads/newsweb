@@ -347,3 +347,128 @@
   /* Momentum scrolling for rails and sheets on iOS. */
   .scroll-touch { -webkit-overflow-scrolling: touch; }
 }
+
+/* ---------------------------------------------------------------------------
+ * E-paper print sheet (features/epaper/EpaperSheet.tsx, geometry in print.ts).
+ *
+ * Canvas-px typography for the fixed 1200 × 1860 broadsheet. The sheet is read
+ * through a 1–4× zoom, so the small sizes are deliberate: 11px body in a 173px
+ * column sets ~30 Telugu characters a line, which is newsprint, not a web card.
+ * Unlayered on purpose: emitted after `.te` / `.th`, so the print line-heights
+ * win, and Tailwind never purges them. Colours are the design tokens only.
+ * ------------------------------------------------------------------------- */
+.ep-sheet {
+  position: relative;
+  width: 1200px;
+  height: 1860px;
+  overflow: hidden;
+  background-color: rgb(var(--tn-paper));
+  color: rgb(var(--tn-ink));
+  /* The print page (Save as PDF) must keep the paper, the rules and the tints. */
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.ep-cell { position: absolute; }
+/* Hairline rules between slots, centred in the 18px gutter. */
+.ep-rule-r::after,
+.ep-rule-b::before {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  background-color: rgb(var(--tn-rule));
+}
+.ep-rule-r::after { top: 0; bottom: 0; right: -9.5px; width: 1px; }
+.ep-rule-b::before { left: 0; right: 0; bottom: -9.5px; height: 1px; }
+/* A story fills its cell (or the rest of the builder's chrome box) and simply ends at the bottom. */
+.ep-story {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 0%;
+  overflow: hidden;
+}
+.ep-fade::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 18px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgb(var(--tn-paper) / 0), rgb(var(--tn-paper)));
+}
+.ep-wordmark { font-size: 72px; line-height: 1.3; }
+.ep-folio { font-size: 10px; line-height: 1.4; }
+.ep-folio-num { font-size: 13px; line-height: 1.2; }
+/* Leading is measured, not chosen by eye. Canvas ink extents over this
+   edition's real copy (41 headlines, 41 decks, 989 paragraphs) peak at 1.35em
+   for Noto Serif Telugu and 1.46em for Noto Sans Telugu: stacked vattulu sit
+   far below the baseline, so anything tighter makes consecutive lines touch.
+   Every value below clears its own worst case, and running text keeps the
+   §4.1 Telugu floor of 1.5. */
+.ep-kicker,
+.ep-byline,
+.ep-caption { font-size: 9.5px; line-height: 1.55; }
+.ep-kicker { font-weight: 700; color: rgb(var(--tn-brand)); }
+.ep-byline,
+.ep-credit { color: rgb(var(--tn-muted)); }
+.ep-head-lead { font-size: 40px; line-height: 1.45; }
+.ep-head-standard { font-size: 26px; line-height: 1.45; }
+.ep-head-brief { font-size: 19px; line-height: 1.45; }
+.ep-deck { font-size: 13px; line-height: 1.55; }
+/* Columns fill top-to-bottom (never balanced): text reads continuously and the
+   overflow columns fall off the right edge, exactly as a cut story does in print. */
+.ep-body {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.6;
+  text-align: justify;
+  column-gap: 18px;
+  column-fill: auto;
+  column-rule: 1px solid rgb(var(--tn-rule));
+}
+.ep-body p { margin: 0; text-indent: 0.6em; }
+/* Thumbnail mode: paragraphs become a line texture, photos neutral blocks. */
+.ep-lines {
+  flex: 1 1 0%;
+  min-height: 0;
+  background-image: repeating-linear-gradient(to bottom, rgb(var(--tn-rule)) 0 8px, transparent 8px 14px);
+}
+/* Reader hotspot over a story. "Show clips" (`showClips`) marks every clickable
+   region at rest with a faint fill and a dashed outline; hover / focus is
+   always stronger, with or without the rest state. */
+.ep-hotspot-rest {
+  background-color: rgb(var(--tn-brand-tint) / 0.18);
+  outline: 1px dashed rgb(var(--tn-muted) / 0.7);
+  outline-offset: -1px;
+}
+.ep-hotspot:hover,
+.ep-hotspot:focus-visible {
+  background-color: rgb(var(--tn-brand-tint) / 0.35);
+  outline: 1.5px dashed rgb(var(--tn-muted));
+  outline-offset: -1px;
+  border-radius: 0;
+}
+/* Rail thumbnail: the whole sheet in a 150 × 232 box (72px wide under md). */
+.ep-thumb {
+  --ep-thumb-scale: 0.125;
+  width: calc(1200px * var(--ep-thumb-scale));
+  height: calc(1860px * var(--ep-thumb-scale));
+  overflow: hidden;
+}
+.ep-thumb > * {
+  width: 1200px;
+  height: 1860px;
+  transform: scale(var(--ep-thumb-scale));
+  transform-origin: top left;
+  pointer-events: none;
+  contain: strict;
+  content-visibility: auto;
+}
+@media (max-width: 767.98px) {
+  .ep-thumb { --ep-thumb-scale: 0.06; }
+}

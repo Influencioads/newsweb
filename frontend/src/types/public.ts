@@ -131,8 +131,6 @@ export interface EpaperTeaser {
   pub_date: string;
   thumb_url: string | null;
   page_count: number;
-  /** Rendered PDF of the current revision; null until it is READY. */
-  pdf_url: string | null;
 }
 
 export interface HomePayload {

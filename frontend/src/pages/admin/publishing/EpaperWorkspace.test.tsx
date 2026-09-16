@@ -77,6 +77,11 @@ const edition = (status: string): EpaperEdition => ({
           slot: 0,
           size: 'lead',
           word_count: 200,
+          byline_te: null,
+          dateline_te: null,
+          body: [],
+          hero_caption_te: null,
+          hero_credit: null,
         },
       ],
       poll_id: null,
@@ -167,7 +172,19 @@ describe('EpaperWorkspace', () => {
     expect(await screen.findByRole('heading', { name: 'నేటి ఎడిషన్' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Stories that fit')).toBeNull();
     expect(api.fetchCandidates).not.toHaveBeenCalled();
-    // View-only: the sheet keeps its public look.
-    expect(screen.getByRole('link', { name: 'ఉంచిన కథనం' })).toBeInTheDocument();
+    // View-only: the story is typeset on the sheet, with no builder chrome and no hotspot.
+    expect(screen.getByRole('heading', { name: 'ఉంచిన కథనం' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add story' })).toBeNull();
+    expect(screen.queryByRole('link', { name: /ఉంచిన కథనం/ })).toBeNull();
+  });
+
+  it('offers the print page and moves a placed story to the next slot', async () => {
+    useAuth.setState({ me: me(['epaper.view', 'epaper.hotspot']), status: 'authenticated' });
+    renderWorkspace();
+    expect(await screen.findByRole('link', { name: 'Print / PDF' })).toHaveAttribute('href', '/admin/epaper/2026-09-15/print');
+    await userEvent.click(screen.getByRole('button', { name: 'Move to the next slot' }));
+    await waitFor(() => expect(api.updatePage).toHaveBeenCalledWith(7, 11, { article_ids: [null, 101, null] }));
+    await userEvent.click(screen.getByRole('button', { name: 'Remove: ఉంచిన కథనం' }));
+    await waitFor(() => expect(api.updatePage).toHaveBeenCalledWith(7, 11, { article_ids: [null, null, null] }));
   });
 });

@@ -12,6 +12,10 @@ export interface EpaperArticle {
   is_breaking:boolean; audio_url:string|null; position:number; display_type:string;
   /** Slot index on the page (`position - 1`). */
   slot:number; size:EpaperSlotSize; word_count:number;
+  byline_te:string|null; dateline_te:string|null;
+  /** Body paragraphs, typeset on the sheet. May be empty or absent — treat absent as `[]`. */
+  body?:string[];
+  hero_caption_te:string|null; hero_credit:string|null;
 }
 export interface EpaperPage {
   id:number; page_number:number; title:string; layout_type:string; template_id:number|null; share_url:string;
@@ -20,7 +24,9 @@ export interface EpaperPage {
 export type PdfStatus = 'PENDING'|'READY'|'FAILED';
 export interface EpaperEdition {
   id:number; title:string; edition_date:string; edition_type:string; status:string; revision:number; page_count:number;
-  pages:EpaperPage[]; pdf_url:string|null; pdf_status:PdfStatus|null; pdf_error:string|null; audio_enabled:boolean; published_at:string|null;
+  pages:EpaperPage[];
+  /** The public never gets a PDF: public payloads carry these as null; admin payloads keep them. */
+  pdf_url:string|null; pdf_status:PdfStatus|null; pdf_error:string|null; audio_enabled:boolean; published_at:string|null;
 }
 /** `POST /admin/epaper/{id}/pdf` — the asset row after queueing. */
 export interface PdfJob { status:string; url:string|null; error:string|null }

@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.v1 import crawler, health
@@ -117,6 +118,11 @@ app = FastAPI(
 # Middleware runs bottom-up: CORS outermost, then security headers, then context.
 app.add_middleware(RequestContextMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
+# An e-paper edition carries every story's body, so its JSON runs to a few
+# hundred kilobytes of Telugu — which compresses about five to one. The edge
+# (nginx, Caddy) also gzips, and both skip responses that already carry
+# Content-Encoding, so this only ever applies where they do not.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,  # allowlist, never "*" (§12.1)

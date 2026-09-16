@@ -151,6 +151,13 @@ and a link) and the e-paper PDF (`epaper_service.generate_pdf` marks the asset
 shows that error on the edition). Fix the image, then press "Render PDF" on
 the edition again.
 
+Neither failure touches public reading. The e-paper is drawn in the browser
+from the edition JSON, not from the PDF, so readers see the paper whatever the
+renderer is doing — and they only ever see it: there is no public PDF route,
+and the printable sheets at `/admin/epaper/{date}/print` sit behind the CMS
+sign-in. That print page is also the fallback way for staff to produce a file
+when Raqm is unavailable, since the browser does the Telugu shaping itself.
+
 The role -> permission matrix lives in the database, so after a deploy that
 changes `ROLE_PERMISSIONS` (for example the desk editor grant for
 `epaper.upload`) re-run the seed from section 6; it adds and revokes grants to

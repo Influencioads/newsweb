@@ -229,7 +229,6 @@ class EpaperTeaserOut(BaseModel):
     pub_date: str
     thumb_url: str | None
     page_count: int
-    pdf_url: str | None = None
 
 
 class HomeOut(BaseModel):

@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, Check, ExternalLink, FileDown, Plus, RefreshCw, Send, Sparkles, Undo2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ExternalLink, FileDown, Plus, Printer, RefreshCw, Send, Sparkles, Undo2, X } from 'lucide-react';
 
 import { AdminPage } from '@/components/admin/AdminPage';
 import { Badge, StatusPill } from '@/components/ui/Badge';
@@ -12,6 +12,7 @@ import { PromptDialog } from '@/components/ui/PromptDialog';
 import { EmptyState, QueryState, SkeletonCard } from '@/components/ui/State';
 import { useToast } from '@/components/ui/Toast';
 import { EpaperSheet } from '@/features/epaper/EpaperSheet';
+import { EpaperSheetViewport } from '@/features/epaper/EpaperSheetViewport';
 import * as api from '@/features/epaper/adminApi';
 import { firstEmptySlot, placeAt, slotIds, swapSlots } from '@/features/epaper/slots';
 import { useI18n } from '@/i18n';
@@ -125,6 +126,11 @@ function Workspace({ edition }: { edition: EpaperEdition }) {
   };
   const slotCount = page?.slots.length ?? 0;
 
+  // The sheet is drawn at canvas scale and fitted to the column, which would
+  // shrink 44px buttons to ~25px; the chrome zooms back by the viewport's
+  // scale so every control keeps its real tap size on screen.
+  const chrome = { zoom: 'calc(1 / var(--ep-scale, 1))' } as const;
+
   const renderSlot = (slot: EpaperSlot, article: EpaperArticle | null, story: ReactNode) => {
     const targeted = targetSlot === slot.index;
     return (
@@ -134,7 +140,7 @@ function Workspace({ edition }: { edition: EpaperEdition }) {
           targeted ? 'border-brand bg-brand-tint' : 'border-rule',
         )}
       >
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2" style={chrome}>
           <Badge tone={SIZE_TONE[slot.size]} size="xs" lang={language}>
             {slot.index + 1} · {SIZE_LABEL[slot.size][language]}
           </Badge>
@@ -164,15 +170,17 @@ function Workspace({ edition }: { edition: EpaperEdition }) {
         {article ? (
           story
         ) : (
-          <Button
-            variant={targeted ? 'primary' : 'secondary'}
-            size="sm"
-            icon={Plus}
-            aria-pressed={targeted}
-            onClick={() => setTargetSlot(targeted ? null : slot.index)}
-          >
-            {L('కథనం జోడించండి', 'Add story')}
-          </Button>
+          <div style={chrome}>
+            <Button
+              variant={targeted ? 'primary' : 'secondary'}
+              size="sm"
+              icon={Plus}
+              aria-pressed={targeted}
+              onClick={() => setTargetSlot(targeted ? null : slot.index)}
+            >
+              {L('కథనం జోడించండి', 'Add story')}
+            </Button>
+          </div>
         )}
       </div>
     );
@@ -252,6 +260,10 @@ function Workspace({ edition }: { edition: EpaperEdition }) {
         </Button>
       ) : null}
       {pdfControl()}
+      {/* The browser's print-to-PDF of every sheet — how staff get a PDF today. */}
+      <ButtonLink size="sm" variant="secondary" icon={Printer} to={`/admin/epaper/${edition.edition_date}/print`} external>
+        {L('ప్రింట్ / PDF', 'Print / PDF')}
+      </ButtonLink>
       {status === 'PUBLISHED' ? (
         <ButtonLink size="sm" variant="secondary" iconRight={ExternalLink} to={`/epaper/${edition.edition_date}`} external>
           {L('పబ్లిక్ రీడర్ తెరవండి', 'Open public reader')}
@@ -311,7 +323,10 @@ function Workspace({ edition }: { edition: EpaperEdition }) {
           <div className={cn('grid gap-6 lg:items-start', canEdit && 'lg:grid-cols-[minmax(0,1fr)_22rem]')}>
             <div className="min-w-0 space-y-4">
               <EpaperPageEditor key={page.id} edition={edition} page={page} locked={!canEdit} />
-              <EpaperSheet page={page} editable={canEdit} renderSlot={renderSlot} />
+              {/* View-only staff get the print layout (no hotspots): the public reader is one button away. */}
+              <EpaperSheetViewport zoom={1} fit="width">
+                <EpaperSheet page={page} edition={edition} mode="print" editable={canEdit} renderSlot={renderSlot} />
+              </EpaperSheetViewport>
             </div>
             {canEdit ? (
               <EpaperCandidates

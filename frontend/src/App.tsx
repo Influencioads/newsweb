@@ -90,6 +90,7 @@ const VideosAdminPage = named(adminDiscovery, 'VideosAdminPage');
 const publishing = () => import('./pages/admin/PublishingPages');
 const AdminEpaperPage = named(publishing, 'AdminEpaperPage');
 const EpaperWorkspace = named(publishing, 'EpaperWorkspace');
+const EpaperPrintPage = named(publishing, 'EpaperPrintPage');
 const AdminPollsPage = named(publishing, 'AdminPollsPage');
 
 // ---------------------------------------------------------------------- QA
@@ -180,6 +181,9 @@ export default function App() {
             {/* ----------------------------------------------------------- admin */}
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route element={<RequireAuth />}>
+              {/* Signed-in but shell-less: the print page is the document the browser prints, and
+                  the CMS sidebar and topbar must not come out of the printer with it. */}
+              <Route path="/admin/epaper/:date/print" element={<EpaperPrintPage />} />
               <Route element={<AdminLayout />}>
                 <Route path="/admin/dashboard" element={<Dashboard />} />
                 <Route path="/admin/articles" element={<Articles />} />

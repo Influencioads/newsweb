@@ -100,7 +100,9 @@ def _start_pdf(
 @router.get("/epaper/today")
 def today(db: Session = Depends(get_db)):
     _require_enabled(db)
-    return epaper_service.serialize(db, epaper_service.load_edition(db, _today()))
+    return epaper_service.serialize(
+        db, epaper_service.load_edition(db, _today()), include_pdf=False
+    )
 
 
 @router.get("/epaper/options")
@@ -158,14 +160,19 @@ def archive(limit: int = Query(30, ge=1, le=365), db: Session = Depends(get_db))
         .limit(limit)
     ).all()
     return {
-        "items": [epaper_service.serialize(db, x, include_pages=False) for x in rows]
+        "items": [
+            epaper_service.serialize(db, x, include_pages=False, include_pdf=False)
+            for x in rows
+        ]
     }
 
 
 @router.get("/epaper/{edition_date}")
 def by_date(edition_date: date, db: Session = Depends(get_db)):
     _require_enabled(db)
-    return epaper_service.serialize(db, epaper_service.load_edition(db, edition_date))
+    return epaper_service.serialize(
+        db, epaper_service.load_edition(db, edition_date), include_pdf=False
+    )
 
 
 @router.get("/epaper/{edition_date}/pages")
@@ -173,7 +180,7 @@ def pages(edition_date: date, db: Session = Depends(get_db)):
     _require_enabled(db)
     return {
         "pages": epaper_service.serialize(
-            db, epaper_service.load_edition(db, edition_date)
+            db, epaper_service.load_edition(db, edition_date), include_pdf=False
         ).pages
     }
 
@@ -182,25 +189,12 @@ def pages(edition_date: date, db: Session = Depends(get_db)):
 def page(edition_date: date, page_number: int, db: Session = Depends(get_db)):
     _require_enabled(db)
     edition = epaper_service.serialize(
-        db, epaper_service.load_edition(db, edition_date)
+        db, epaper_service.load_edition(db, edition_date), include_pdf=False
     )
     found = next((p for p in edition.pages if p.page_number == page_number), None)
     if not found:
         raise NotFoundError()
     return found
-
-
-@router.get("/epaper/{edition_date}/pdf")
-def pdf(edition_date: date, db: Session = Depends(get_db)):
-    """Redirect to the rendered file. Rendering happens at publish, never in a GET."""
-    _require_enabled(db)
-    edition = epaper_service.load_edition(db, edition_date)
-    url = epaper_service.pdf_url(db, edition)
-    if not url:
-        raise ConflictError(
-            message_en="The PDF is not ready yet.", message_te="PDF ఇంకా సిద్ధంగా లేదు."
-        )
-    return RedirectResponse(url, status_code=307)
 
 
 @router.get("/epaper/{edition_date}/audio")
@@ -209,7 +203,7 @@ def audio(edition_date: date, db: Session = Depends(get_db)):
     if not settings_service.get_bool(db, "epaper.audio_enabled"):
         return {"enabled": False, "tracks": []}
     edition = epaper_service.serialize(
-        db, epaper_service.load_edition(db, edition_date)
+        db, epaper_service.load_edition(db, edition_date), include_pdf=False
     )
     tracks = [
         {

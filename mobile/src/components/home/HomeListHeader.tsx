@@ -1,7 +1,6 @@
 import { router } from 'expo-router';
-import { Linking, Share, View } from 'react-native';
+import { Share, View } from 'react-native';
 
-import { API_BASE } from '@/api/client';
 import type { Topic } from '@/api/epaper';
 import type { BreakingItem, HomePayload } from '@/api/types';
 import { SectionHeader } from '@/components/SectionHeader';
@@ -94,12 +93,6 @@ export function HomeListHeader({ breaking, epaper, topics }: HomeListHeaderProps
                   message: `Today's Telugu News\nhttps://telugunews.influencioweb.com/epaper/${epaper.pub_date}/page/1`,
                 })
               }
-            />
-            <IconButton
-              name="download"
-              label={t('epaper.download')}
-              color={color.onOverlay}
-              onPress={() => Linking.openURL(`${API_BASE}/epaper/${epaper.pub_date}/pdf`)}
             />
             <IconButton
               name="newspaper"

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import math
 from datetime import date, datetime, time, timedelta, timezone
-from typing import Any
+from typing import Any, NamedTuple
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import delete, or_, select
@@ -36,6 +36,7 @@ from app.models.epaper import (
     EpaperPageTemplate,
     EpaperUserEdition,
 )
+from app.models.geo import District
 from app.models.media import Media
 from app.schemas.epaper import (
     CandidateOut,
@@ -62,6 +63,8 @@ logger = get_logger(__name__)
 IST = ZoneInfo("Asia/Kolkata")
 
 MAX_PAGES = 24
+#: Body characters a clip carries; the clip view links to the full story.
+BODY_CHARS = 8000
 #: Pages past the section templates take whatever the day still has.
 OVERFLOW_TITLE = "మరిన్ని వార్తలు"
 SHAPING_UNAVAILABLE = "Telugu shaping unavailable: install libfribidi0"
@@ -394,15 +397,49 @@ def plan_preview(db: Session, day: date, actor_id: int | None = None) -> PlanOut
 
 
 # --------------------------------------------------------------- candidates --
-def _hero_urls(db: Session, media_ids: set[int]) -> dict[int, str | None]:
+class _Hero(NamedTuple):
+    url: str | None
+    caption_te: str | None
+    credit: str | None
+
+
+def _hero_urls(db: Session, media_ids: set[int]) -> dict[int, _Hero]:
     if not media_ids:
         return {}
-    rows = db.execute(select(Media.id, Media.cdn_url).where(Media.id.in_(media_ids))).all()
-    return {media_id: url for media_id, url in rows}
+    rows = db.execute(
+        select(Media.id, Media.cdn_url, Media.caption_te, Media.credit).where(
+            Media.id.in_(media_ids)
+        )
+    ).all()
+    return {media_id: _Hero(url, caption, credit) for media_id, url, caption, credit in rows}
 
 
 def _words(article: Article) -> int:
     return article.word_count or len((article.body_plain or "").split())
+
+
+def _paragraphs(text: str | None) -> list[str]:
+    """Body paragraphs for typesetting.
+
+    `body_plain` ends every block with a single newline (tiptap.to_plain_text)
+    and seeded copy uses blank lines, so any line break is a paragraph break.
+    Past BODY_CHARS whole trailing paragraphs are dropped, never cut mid-way.
+    """
+    out: list[str] = []
+    total = 0
+    for line in (text or "").splitlines():
+        para = line.strip()
+        if not para:
+            continue
+        total += len(para)
+        if total > BODY_CHARS:
+            # One paragraph longer than the whole budget would otherwise leave
+            # the story with no body at all; cut that one rather than drop it.
+            if not out:
+                out.append(para[:BODY_CHARS])
+            break
+        out.append(para)
+    return out
 
 
 def candidates(
@@ -436,7 +473,7 @@ def candidates(
             category_name_te=a.category.name_te if a.category else None,
             word_count=_words(a),
             has_hero=a.hero_media_id is not None,
-            hero_url=heroes.get(a.hero_media_id) if a.hero_media_id else None,
+            hero_url=heroes[a.hero_media_id].url if a.hero_media_id in heroes else None,
             size=size_class(a),
             is_breaking=a.is_breaking,
             is_featured=a.is_featured,
@@ -783,11 +820,6 @@ def render_pdf_job(edition_id: int, *, images: bool = True) -> None:
         logger.warning("epaper_pdf_job_failed", edition_id=edition_id, error=str(exc)[:200])
 
 
-def pdf_url(db: Session, edition: EpaperEdition) -> str | None:
-    asset = pdf_asset(db, edition)
-    return asset.public_url if asset is not None and asset.status == "READY" else None
-
-
 # ------------------------------------------------------------- serializing --
 def load_edition(db: Session, day: date, public_only: bool = True) -> EpaperEdition:
     stmt = (
@@ -811,7 +843,8 @@ def load_edition(db: Session, day: date, public_only: bool = True) -> EpaperEdit
 
 def _url_maps(
     db: Session, edition: EpaperEdition
-) -> tuple[dict[int, str | None], dict[int, str | None]]:
+) -> tuple[dict[int, _Hero], dict[int, str | None], dict[int, str]]:
+    """Heroes, ready audio and district names for every story on the edition, one query each."""
     links = [link for page in edition.pages for link in page.articles]
     heroes = _hero_urls(db, {x.article.hero_media_id for x in links if x.article.hero_media_id})
     audio_ids = {x.article.audio_asset_id for x in links if x.article.audio_asset_id}
@@ -823,15 +856,26 @@ def _url_maps(
             )
         ).all()
         audio = {asset_id: url for asset_id, url in rows}
-    return heroes, audio
+    district_ids = {x.article.district_id for x in links if x.article.district_id}
+    districts: dict[int, str] = {}
+    if district_ids:
+        districts = {
+            district_id: name
+            for district_id, name in db.execute(
+                select(District.id, District.name_te).where(District.id.in_(district_ids))
+            )
+        }
+    return heroes, audio, districts
 
 
 def _article_out(
     link: EpaperPageArticle,
-    heroes: dict[int, str | None],
+    heroes: dict[int, _Hero],
     audio: dict[int, str | None],
+    districts: dict[int, str],
 ) -> EpaperArticleOut:
     a = link.article
+    hero = heroes.get(a.hero_media_id) if a.hero_media_id else None
     return EpaperArticleOut(
         id=a.id,
         short_id=a.short_id,
@@ -839,7 +883,12 @@ def _article_out(
         title_te=a.title_te,
         title_en=a.title_en,
         summary_te=a.summary_te,
-        hero_url=heroes.get(a.hero_media_id) if a.hero_media_id else None,
+        byline_te=a.byline_te,
+        dateline_te=districts.get(a.district_id) if a.district_id else None,
+        body=_paragraphs(a.body_plain),
+        hero_url=hero.url if hero else None,
+        hero_caption_te=hero.caption_te if hero else None,
+        hero_credit=hero.credit if hero else None,
         category_slug=a.category.slug if a.category else None,
         category_name_te=a.category.name_te if a.category else None,
         is_breaking=a.is_breaking,
@@ -853,12 +902,18 @@ def _article_out(
 
 
 def serialize(
-    db: Session, edition: EpaperEdition, include_pages: bool = True
+    db: Session,
+    edition: EpaperEdition,
+    include_pages: bool = True,
+    *,
+    include_pdf: bool = True,
 ) -> EpaperEditionOut:
-    asset = pdf_asset(db, edition)
+    """`include_pdf=False` is the public shape: the PDF is staff-only, so its
+    url, status and error are all None and the asset row is not even read."""
+    asset = pdf_asset(db, edition) if include_pdf else None
     pages: list[EpaperPageOut] = []
     if include_pages:
-        heroes, audio = _url_maps(db, edition)
+        heroes, audio, districts = _url_maps(db, edition)
         base = settings.APP_URL.rstrip("/")
         pages = [
             EpaperPageOut(
@@ -872,7 +927,7 @@ def serialize(
                     SlotOut(index=i, x=s.x, y=s.y, w=s.w, h=s.h, size=s.size)
                     for i, s in enumerate(slots_for(p.layout_type))
                 ],
-                articles=[_article_out(x, heroes, audio) for x in p.articles],
+                articles=[_article_out(x, heroes, audio, districts) for x in p.articles],
                 poll_id=p.poll_id,
             )
             for p in edition.pages

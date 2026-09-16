@@ -14,8 +14,9 @@ export const fetchTodayEpaper = async () =>
   (await api.get<EpaperEdition>("/epaper/today")).data;
 export const fetchEpaper = async (date: string) =>
   (await api.get<EpaperEdition>(`/epaper/${date}`)).data;
-export const fetchEpaperArchive = async () =>
-  (await api.get<EpaperArchive>("/epaper/archive")).data;
+/** Published back issues, newest first; `limit` 1–365 (the API default is 30). */
+export const fetchEpaperArchive = async (limit?: number) =>
+  (await api.get<EpaperArchive>("/epaper/archive", { params: limit ? { limit } : undefined })).data;
 export const fetchEpaperAudio = async (date: string) =>
   (await api.get<EpaperAudio>(`/epaper/${date}/audio`)).data;
 export const fetchEpaperOptions = async () =>

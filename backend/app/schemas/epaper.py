@@ -26,7 +26,14 @@ class EpaperArticleOut(BaseModel):
     title_te: str
     title_en: str | None = None
     summary_te: str | None = None
+    byline_te: str | None = None
+    #: The story's district name, for the print dateline.
+    dateline_te: str | None = None
+    #: Body paragraphs for typesetting, capped (see `epaper_service.BODY_CHARS`).
+    body: list[str] = []
     hero_url: str | None = None
+    hero_caption_te: str | None = None
+    hero_credit: str | None = None
     category_slug: str | None = None
     category_name_te: str | None = None
     is_breaking: bool = False

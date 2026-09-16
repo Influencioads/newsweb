@@ -57,9 +57,9 @@ export function EpaperReader({
     });
   };
 
-  const pdf = `${API_BASE}${
-    personal ? `/my-epaper/editions/${edition.id}/pdf` : `/epaper/${edition.edition_date}/pdf`
-  }`;
+  // Only a reader's own edition has a file. Public editions are read on the
+  // page itself; the publisher offers no download of them.
+  const pdf = `${API_BASE}/my-epaper/editions/${edition.id}/pdf`;
 
   const downloadPdf = async () => {
     setDownloading(true);
@@ -115,7 +115,7 @@ export function EpaperReader({
         onZoomIn={zoom.zoomIn}
         onZoomOut={zoom.zoomOut}
         onShare={share}
-        onDownload={() => void downloadPdf()}
+        onDownload={personal ? () => void downloadPdf() : undefined}
         downloading={downloading}
       />
       <ScrollView contentContainerStyle={styles.scroll}>

@@ -27,7 +27,8 @@ export interface EpaperToolbarProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onShare: () => void;
-  onDownload: () => void;
+  /** Absent when the edition has no file: the button is not drawn. */
+  onDownload?: () => void;
   downloading?: boolean;
 }
 
@@ -56,12 +57,14 @@ export function EpaperToolbar({
           {title}
         </T>
         <IconButton name="share2" label={t('epaper.sharePage')} onPress={onShare} />
-        <IconButton
-          name="download"
-          label={t('epaper.download')}
-          onPress={onDownload}
-          disabled={downloading}
-        />
+        {onDownload ? (
+          <IconButton
+            name="download"
+            label={t('epaper.download')}
+            onPress={onDownload}
+            disabled={downloading}
+          />
+        ) : null}
       </View>
       <Divider />
       <View style={styles.row}>

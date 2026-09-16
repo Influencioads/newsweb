@@ -23,6 +23,8 @@ from app.main import app  # noqa: E402
 from app.models.content import Article  # noqa: E402
 from app.models.enums import ArticleStatus, RoleKey, ScopeType, UserStatus, WorkflowState  # noqa: E402
 from app.models.epaper import EpaperAsset, EpaperEdition, EpaperPage, EpaperPageArticle  # noqa: E402
+from app.models.geo import District  # noqa: E402
+from app.models.media import Media  # noqa: E402
 from app.models.setting import AppSetting  # noqa: E402
 from app.models.user import Role, User, UserRole  # noqa: E402
 from app.services import auth_service, epaper_service, settings_service  # noqa: E402
@@ -113,15 +115,87 @@ def today() -> str:
     return datetime.now(epaper_service.IST).date().isoformat()
 
 
-def test_public_pdf_409_when_not_ready(client: TestClient, db: Session) -> None:
-    publish_stories(db, 3)
+def publish_edition(db: Session) -> EpaperEdition:
     edition = epaper_service.generate_daily(db, page_count=1)
     epaper_service.approve(db, edition, 1)
     epaper_service.publish(db, edition, 1)
     db.commit()
-    response = client.get(f"/api/v1/epaper/{today()}/pdf", follow_redirects=False)
-    assert response.status_code == 409
-    assert response.json()["error"]["code"] == "CONFLICT"
+    return edition
+
+
+def test_public_edition_never_carries_pdf_but_admin_does(client: TestClient, db: Session) -> None:
+    publish_stories(db, 3)
+    edition = publish_edition(db)
+    db.add(
+        EpaperAsset(
+            edition_id=edition.id,
+            kind="PDF",
+            revision=edition.revision,
+            status="READY",
+            public_url="https://cdn.example/edition.pdf",
+        )
+    )
+    db.commit()
+    for path in (f"/api/v1/epaper/{today()}", "/api/v1/epaper/today"):
+        body = client.get(path).json()
+        assert (body["pdf_url"], body["pdf_status"], body["pdf_error"]) == (None, None, None)
+    assert client.get("/api/v1/epaper/archive").json()["items"][0]["pdf_url"] is None
+    assert client.get(f"/api/v1/epaper/{today()}/pdf", follow_redirects=False).status_code == 404
+    desk = staff_headers(db, role=RoleKey.DESK_EDITOR, email="desk@example.com")
+    admin = client.get(f"/api/v1/admin/epaper/by-date/{today()}", headers=desk).json()
+    assert admin["pdf_url"] == "https://cdn.example/edition.pdf" and admin["pdf_status"] == "READY"
+
+
+def test_public_article_carries_print_fields(client: TestClient, db: Session) -> None:
+    district = District(state="TS", slug="epaper-warangal", name_te="వరంగల్", name_en="Warangal")
+    hero = Media(
+        filename="hero.jpg",
+        mime="image/jpeg",
+        storage_key="epaper-hero.jpg",
+        cdn_url="https://cdn.example/hero.jpg",
+        caption_te="ఫోటో వివరణ",
+        credit="PTI",
+    )
+    db.add_all([district, hero])
+    db.flush()
+    db.add(
+        Article(
+            short_id="eprint",
+            slug="epaper-print-story",
+            title_te="ముద్రణ వార్త",
+            summary_te="సారాంశం",
+            body_plain="మొదటి పేరా.\nరెండవ పేరా.",
+            byline_te="మా ప్రతినిధి",
+            district_id=district.id,
+            hero_media_id=hero.id,
+            word_count=120,
+            status=ArticleStatus.PUBLISHED,
+            workflow_state=WorkflowState.PUBLISHED,
+            published_at=utcnow(),
+        )
+    )
+    db.commit()
+    publish_edition(db)
+    article = client.get(f"/api/v1/epaper/{today()}").json()["pages"][0]["articles"][0]
+    assert article["body"] == ["మొదటి పేరా.", "రెండవ పేరా."]
+    assert article["byline_te"] == "మా ప్రతినిధి" and article["dateline_te"] == "వరంగల్"
+    assert article["hero_url"] == "https://cdn.example/hero.jpg"
+    assert article["hero_caption_te"] == "ఫోటో వివరణ" and article["hero_credit"] == "PTI"
+
+
+def test_paragraphs_split_on_any_newline_strip_and_cap() -> None:
+    assert epaper_service._paragraphs(None) == []
+    assert epaper_service._paragraphs(" \n \r\n") == []
+    text = " మొదటి పేరా \n\n \n రెండవ పేరా\r\nమూడవ పేరా\nనాలుగవ పేరా\n"
+    assert epaper_service._paragraphs(text) == [
+        "మొదటి పేరా", "రెండవ పేరా", "మూడవ పేరా", "నాలుగవ పేరా"
+    ]
+    big = "అ" * 3000
+    assert epaper_service._paragraphs("\n".join([big] * 4)) == [big, big]
+    # A single paragraph over the whole budget is cut, never dropped — the
+    # story would otherwise reach the page with no body at all.
+    huge = "అ" * (epaper_service.BODY_CHARS + 500)
+    assert epaper_service._paragraphs(huge) == [huge[: epaper_service.BODY_CHARS]]
 
 
 def test_admin_pdf_enqueues_background_job(

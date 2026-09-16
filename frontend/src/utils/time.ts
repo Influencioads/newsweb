@@ -66,6 +66,24 @@ export function formatDate(iso: string | null | undefined, lang: Language = 'te'
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+/** "సెప్టెంబర్ 2026" / "September 2026" — a calendar's month heading. */
+export function formatMonth(d: Date, lang: Language = 'te'): string {
+  const months = lang === 'en' ? EN_MONTHS : TE_MONTHS;
+  return `${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+/** Weekday name alone ("బుధవారం" / "Wednesday"). */
+export function formatWeekday(d: Date, lang: Language = 'te'): string {
+  return (lang === 'en' ? EN_WEEKDAYS : TE_WEEKDAYS)[d.getDay()] ?? '';
+}
+
+/** Local calendar date as the API's `YYYY-MM-DD`. */
+export function isoDate(d: Date): string {
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
 export function formatFullDate(d: Date = new Date(), lang: Language = 'te'): string {
   const weekdays = lang === 'en' ? EN_WEEKDAYS : TE_WEEKDAYS;
   const months = lang === 'en' ? EN_MONTHS : TE_MONTHS;

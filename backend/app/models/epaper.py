@@ -42,7 +42,6 @@ class EpaperPageTemplate(PKMixin, TimestampMixin, ActorMixin, Base):
     title_en: Mapped[str] = mapped_column(String(180), nullable=False)
     sort: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     category_ids: Mapped[list[int]] = mapped_column(JSON, nullable=False, default=list)
-    story_count: Mapped[int] = mapped_column(Integer, nullable=False, default=6)
     layout_type: Mapped[str] = mapped_column(
         String(30), nullable=False, default="lead_grid"
     )

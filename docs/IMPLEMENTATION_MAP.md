@@ -63,7 +63,7 @@ Font switcher `A- / A / A+ / A++` persisted in localStorage — a **required fea
 | `1e` | Video hub | `/videos` | `Tabs` (sliding indicator) `ChipRail` `VideoCard` grid `VideoStrip` `ReactionBar` | `GET /public/videos` · `GET /public/videos/{id}/playback` | videos, video_sources, media |
 | `1f` | Mobile feed | `/` at <768px | same components, responsive. The Expo app ships the native twin: `TabBar` (5 tabs, spring pill) + a sectioned `FlatList` with a collapsing `ScreenHeader` | same | same |
 | `1g` | Mobile article | article route at <768px | `FontSizeSheet` (Sheet on web, `BottomSheet` in the app) | same | same |
-| `1m` | E-paper reader | `/epaper/:edition/:date`, `.../page-:n` | `EditionReader` `EpaperSheet` (transform zoom, sheet-bound swipe) `EpaperRadio` (`AudioPlayer`) `EpaperArchive` (`ChipRail`) `ShareSheet` | `GET /public/epaper/{edition}/{date}` · `.../pages/{n}` | epaper_editions, epaper_pages, epaper_hotspots |
+| `1m` | E-paper reader | `/epaper`, `/epaper/:date`, `/epaper/:date/page/:n` | `EditionReader` (transform zoom, sheet-bound swipe) `EpaperSheet` (6x6 slot grid from the page JSON; lead / standard / brief stories) `EpaperRadio` (`AudioPlayer`) `EpaperArchive` (`ChipRail`) `ShareSheet` | `GET /epaper/today` · `GET /epaper/{date}` · `.../pages/{n}` · `.../pdf` (307 to the rendered file, 409 until it exists) | epaper_editions, epaper_pages, epaper_page_articles, epaper_assets |
 | — | Static / compliance (§12.5) | `/about` `/contact` `/editorial-policy` `/corrections` `/grievance` `/privacy` `/terms` `/ai-disclosure` | `PolicyPage` `GrievanceForm` | `GET /public/pages/{slug}` · `POST /public/grievance` | settings, grievance_tickets |
 
 ### Newsroom CMS
@@ -75,7 +75,7 @@ Font switcher `A- / A / A+ / A++` persisted in localStorage — a **required fea
 | `1i` | AI article writer | `/admin/ai/writer` | `IntakeTabs` (notes / press note / wire / **voice** / WhatsApp) `VoiceRecorder` + waveform `TranscriptPanel` `HeadlineOptions` (5) `TiptapPreview` `SuggestedMeta` `UnverifiedPanel` `SimilarityMeter` `SensitiveTopicNotice` — **no publish button exists on this screen** | `POST /cms/ai/run` · `POST /cms/articles` (DRAFT) · `.../submit` | ai_jobs, ai_task_configs, ai_prompts, articles |
 | `1j` | AI cost dashboard | `/admin/ai/usage` | `BudgetMeter` (80% amber / 100% red markers) `ProviderCard` x3 `TaskRoutingTable` + edit routing | `GET /cms/ai/usage` · `PATCH /cms/ai/task-configs/{id}` | ai_cost_ledger, ai_jobs, ai_providers, ai_models, ai_task_configs |
 | `1l` | Push pipeline | `/admin/notifications` | `PushComposer` (**live 65-char counter**) `TopicChips` `QuietHoursNotice` `PushApprovalCard` (audience, article state, CDN pre-warm) `DevicePreview` `ReaderPrefsPanel` | `POST /cms/push` · `.../approve` · `.../send` | push_campaigns, articles, audit_log |
-| `1n` | Hotspot editor | `/admin/epaper/:editionId/pages/:n` | `PageCanvas` `HotspotRect` (8 handles) `AutoDetectBox` (violet dashed) `HotspotInspector` (normalized x/y/w/h) `ArticleLinkSearch` `KeyboardLegend` (N / Enter / arrows / Tab / A / Del) `PageStatusStrip` `SendToPublishButton` | `GET/POST/PATCH/DELETE /cms/epaper/pages/{id}/hotspots` · `POST /cms/epaper/editions/{id}/submit` | epaper_pages, epaper_hotspots, articles |
+| `1n` | E-paper builder | `/admin/epaper`, `/admin/epaper/:date` | `EpaperGenerateDialog` (date + page count, plan preview) `EpaperWorkspace` (page rail, editable `EpaperSheet` with slot chrome, `EpaperPageEditor` toolbar, `EpaperCandidates` picker with size badges) `EpaperTemplates` (layout + category chips) | `GET /admin/epaper/plan` · `POST /admin/epaper/generate` · `POST .../{id}/regenerate` · `GET .../{id}/candidates` · `POST .../pages/{pid}/fill` · `POST .../{id}/fill` · `PATCH .../pages/{pid}` (slot-aligned `article_ids`) · `POST .../submit|approve|publish|withdraw|pdf` | epaper_editions, epaper_pages, epaper_page_articles, epaper_page_templates, epaper_assets |
 | — | Dashboard | `/admin/dashboard` | `AdminPage` + `StatCard` grid — **every count from the database, never hardcoded** (brief §26) | `GET /cms/dashboard` | aggregate |
 | — | Articles CRUD | `/admin/articles`, `/new`, `/:id/edit` | `DataTable` (stacks to cards < md) + `StatusPill` `WorkflowActions` (Approve hidden on your own story) `TiptapEditor` + Telugu toolbar `MediaPicker` (Dialog) `SeoPanel` | `CRUD /cms/articles` | articles, article_versions, article_tags, article_media |
 | — | Media / Users / Roles / Taxonomy / Audit / Settings | `/admin/media` `/users` `/roles` `/categories` `/districts` `/tags` `/glossary` `/audit` `/settings` | `MediaGrid` + presigned upload, `UserTable`, `RoleMatrix`, `AuditTable` (read-only) | respective `/cms/*` | media, users, roles, permissions, audit_log, settings |
@@ -107,8 +107,8 @@ Hard rules, enforced in the service layer only:
 
 ## E. Background jobs (Celery)
 
-`ai.run` · `epaper.split_render` (PDF -> WebP + DZI tiles + thumb + page PDF) · `epaper.ocr` ·
-`epaper.autodetect` · `video.transcode` (ffmpeg ladder) · `search.index` / `search.deindex` ·
+`ai.run` · `epaper.schedule` (Beat, daily draft edition) · `epaper.audio` (Beat) — the e-paper PDF is
+rendered by a FastAPI background task at publish (Pillow + Raqm, `epaper_pdf`) · `video.transcode` (ffmpeg ladder) · `search.index` / `search.deindex` ·
 `media.derivatives` (WebP/AVIF at 4 widths + blurhash + EXIF strip) · `push.send` (+ CDN pre-warm) ·
 `publish.scheduled` (Beat) · `ai.cost_rollup` (Beat, daily).
 
@@ -125,7 +125,7 @@ Bunny Stream + YouTube oEmbed · Sentry.
 
 P1 setup / docker / MySQL / Redis / FastAPI / React / Alembic · P2 auth + RBAC + sessions + audit ·
 P3 taxonomy + article CRUD + Tiptap · P4 workflow + approval · P5 public site + search + SEO ·
-P6 media · P7 AI gateway + tools + images · P8 e-paper Mode A · P9 video ·
+P6 media · P7 AI gateway + tools + images · P8 e-paper (generated daily edition, slot layouts) · P9 video ·
 P10 notifications + analytics · P11 security + performance + tests + deployment.
 
 

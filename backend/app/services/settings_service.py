@@ -156,6 +156,9 @@ SPECS: dict[str, Spec] = {
     "epaper.personalized_enabled": Spec(
         True, "bool", "Allow readers to save personalized editions."
     ),
+    "epaper.page_count": Spec(
+        8, "int", "Pages in a generated daily edition (1-24)."
+    ),
     "polls.enabled": Spec(True, "bool", "Show active polls and accept votes."),
     "ai.research_enabled": Spec(
         False, "bool", "Allow licensed multi-source AI research."

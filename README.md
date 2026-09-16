@@ -211,7 +211,7 @@ docs/
 | 5 | Public website (search + SEO pending) | Partial |
 | 6 | Media — storage providers, derivatives, blurhash | **Done** |
 | 7 | AI gateway, AI article tools, AI images | Pending |
-| 8 | E-paper Mode A | Pending |
+| 8 | E-paper (generated daily edition, CMS builder with page count and auto-fill) | **Done** |
 | 9 | Video | Pending |
 | 10 | Notifications, analytics, CMS extras | Pending |
 | 11 | Security, performance, testing, deployment | Pending |

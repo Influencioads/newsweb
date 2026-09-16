@@ -401,6 +401,9 @@ export default function SettingsPage() {
           <Field label={en ? 'Generation time (IST)' : 'జనరేషన్ సమయం (IST)'} className="max-w-xs">
             <Input script="en" type="time" value={str('epaper.auto_generate_time')} onChange={(e) => set('epaper.auto_generate_time', e.target.value)} />
           </Field>
+          <Field label={en ? 'Pages per edition' : 'ఎడిషన్‌కు పేజీలు'} hint={en ? '1–24. A generate can override it for the day.' : '1–24. జనరేట్ చేసేటప్పుడు ఆ రోజుకు మార్చవచ్చు.'} className="max-w-xs">
+            <Input script="en" type="number" min={1} max={24} value={num('epaper.page_count')} onChange={(e) => set('epaper.page_count', Number(e.target.value))} />
+          </Field>
           <Switch checked={bool('epaper.audio_enabled')} onChange={(v) => set('epaper.audio_enabled', v)} label={en ? 'Audio edition' : 'ఆడియో ఎడిషన్'} />
           <Switch checked={bool('voice.article_tts_enabled')} onChange={(v) => set('voice.article_tts_enabled', v)} label={en ? 'Article TTS' : 'కథనం TTS'} />
           <Switch checked={bool('epaper.personalized_enabled')} onChange={(v) => set('epaper.personalized_enabled', v)} label={en ? 'Personalized E-Paper' : 'వ్యక్తిగత ఈ-పేపర్'} />

@@ -132,22 +132,29 @@ Coverage tab on the Content Sources screen shows it as a banner.
 per-host throttle are per *process*, so a second replica silently doubles the
 request rate presented to every publisher.
 
-### Pillow needs libraqm, or Telugu share cards are unreadable
+### Pillow needs libraqm, or Telugu share cards and e-paper PDFs are unreadable
 
 Pillow only performs complex text layout — the conjunct formation and mark
-positioning Telugu requires — when built against Raqm. Without it a card is a
-valid PNG full of unshaped, wrongly-ordered glyphs.
+positioning Telugu requires — when it can load Raqm. The PyPI wheel bundles
+Raqm and HarfBuzz and loads FriBiDi at runtime, so `infra/docker/api.Dockerfile`
+installs `libfribidi0 libharfbuzz0b libraqm0`; no Pillow rebuild is needed.
+Check after every image build:
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml \
-  exec api python -c "from PIL import features; print(features.check('raqm'))"
+docker compose --env-file .env.production -f docker-compose.prod.yml   exec api python -c "from PIL import features; print(features.check('raqm'))"
 ```
 
-`False` means share cards switch themselves off: `share_card_service.available()`
-checks this and declines, readers fall back to sharing text and a link, and the
-`telugu_shaping` line on the CMS settings screen says so. To enable them,
-install `libraqm0 libfribidi0 libharfbuzz0b` in the image and build Pillow
-against them.
+`False` means two features switch themselves off rather than ship garbage:
+share cards (`share_card_service.available()` declines and readers share text
+and a link) and the e-paper PDF (`epaper_service.generate_pdf` marks the asset
+`FAILED` with `Telugu shaping unavailable: install libfribidi0`, and the CMS
+shows that error on the edition). Fix the image, then press "Render PDF" on
+the edition again.
+
+The role -> permission matrix lives in the database, so after a deploy that
+changes `ROLE_PERMISSIONS` (for example the desk editor grant for
+`epaper.upload`) re-run the seed from section 6; it adds and revokes grants to
+match the code.
 
 The Telugu and Latin fonts themselves are vendored at
 `backend/app/assets/fonts/` and need no host packages. Both are needed: Noto

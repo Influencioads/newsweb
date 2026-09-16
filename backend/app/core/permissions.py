@@ -127,10 +127,14 @@ PERMISSIONS: tuple[PermissionDef, ...] = (
     # --- e-paper ----------------------------------------------------------
     PermissionDef("epaper.view", "epaper", "View editions", "ఎడిషన్లు చూడటం"),
     PermissionDef(
-        "epaper.upload", "epaper", "Upload edition PDF", "ఎడిషన్ PDF అప్‌లోడ్", scoped=True
+        "epaper.upload",
+        "epaper",
+        "Generate editions and manage templates",
+        "ఎడిషన్లు రూపొందించడం, టెంప్లేట్ల నిర్వహణ",
+        scoped=True,
     ),
     PermissionDef(
-        "epaper.hotspot", "epaper", "Edit hotspots", "హాట్‌స్పాట్‌లు సవరించడం", scoped=True
+        "epaper.hotspot", "epaper", "Edit edition pages", "ఎడిషన్ పేజీలు సవరించడం", scoped=True
     ),
     PermissionDef(
         "epaper.publish",
@@ -280,6 +284,7 @@ ROLE_PERMISSIONS: dict[RoleKey, set[str]] = {
         "media.upload",
         "media.edit",
         "epaper.view",
+        "epaper.upload",
         "epaper.hotspot",
         "epaper.publish",
         "video.view",
@@ -353,7 +358,7 @@ ROLE_PERMISSIONS: dict[RoleKey, set[str]] = {
         "article.view",
         "taxonomy.view",
     },
-    # Upload e-paper PDFs, mark hotspots. Cannot publish the edition.
+    # Generate editions and lay out pages. Cannot publish the edition.
     RoleKey.DTP_OPERATOR: {
         "epaper.view",
         "epaper.upload",

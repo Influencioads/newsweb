@@ -1,6 +1,5 @@
 import { BookOpen, Download, FilePlus2, Newspaper, Radio, Share2 } from 'lucide-react';
 
-import { API_BASE } from '@/api/client';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
@@ -79,16 +78,11 @@ export function EpaperPromo({ epaper }: { epaper: EpaperTeaser }) {
         <Button variant="inverse" icon={Share2} onClick={() => void share()} className={ghost}>
           {t('epaper.sharePage')}
         </Button>
-        <ButtonLink
-          to={`${API_BASE}/epaper/${date}/pdf`}
-          external
-          download
-          variant="inverse"
-          icon={Download}
-          className={ghost}
-        >
-          {t('epaper.download')}
-        </ButtonLink>
+        {epaper.pdf_url ? (
+          <ButtonLink to={epaper.pdf_url} external download variant="inverse" icon={Download} className={ghost}>
+            {t('epaper.download')}
+          </ButtonLink>
+        ) : null}
         <ButtonLink to="/my-epaper" variant="inverse" icon={FilePlus2} className={ghost}>
           {t('epaper.createMine')}
         </ButtonLink>

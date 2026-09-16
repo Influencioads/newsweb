@@ -6,6 +6,7 @@ import { ShareSheet } from '@/components/article/ShareSheet';
 import { IconButton, IconButtonLink } from '@/components/ui/Button';
 import { Chip, ChipRail } from '@/components/ui/Chip';
 import { useToast } from '@/components/ui/Toast';
+import { EpaperSheet } from '@/features/epaper/EpaperSheet';
 import * as epaperApi from '@/features/epaper/api';
 import { useI18n, useScript } from '@/i18n';
 import type { EpaperEdition } from '@/types/epaper';
@@ -14,7 +15,6 @@ import { formatDate } from '@/utils/time';
 
 import { EpaperArchive } from './EpaperArchive';
 import { EpaperRadio } from './EpaperRadio';
-import { EpaperSheet } from './EpaperSheet';
 
 /**
  * One edition, open at one page.
@@ -161,15 +161,10 @@ export function EditionReader({ edition, personalId, requestedPage }: EditionRea
         />
         {personalId ? (
           <IconButton icon={Download} label={pdfLabel} pending={pdfPending} onClick={() => void downloadPdf()} />
-        ) : (
-          <IconButtonLink
-            icon={Download}
-            label={pdfLabel}
-            to={`/api/v1/epaper/${edition.edition_date}/pdf`}
-            external
-            download
-          />
-        )}
+        ) : edition.pdf_url ? (
+          // Only once the render is READY: the API URL would answer 409 before that.
+          <IconButtonLink icon={Download} label={pdfLabel} to={edition.pdf_url} external download />
+        ) : null}
         <IconButton icon={Share2} label={t('epaper.sharePage')} onClick={openShare} />
       </header>
 

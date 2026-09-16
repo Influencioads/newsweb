@@ -142,7 +142,8 @@
   .te-clamp-1,
   .te-clamp-2,
   .te-clamp-3,
-  .te-clamp-4 {
+  .te-clamp-4,
+  .te-clamp-5 {
     display: -webkit-box;
     -webkit-box-orient: vertical;
     overflow: hidden;
@@ -151,6 +152,7 @@
   .te-clamp-2 { -webkit-line-clamp: 2; }
   .te-clamp-3 { -webkit-line-clamp: 3; }
   .te-clamp-4 { -webkit-line-clamp: 4; }
+  .te-clamp-5 { -webkit-line-clamp: 5; }
 
   /* Focus visibility — brief §1 accessibility. */
   :focus-visible {

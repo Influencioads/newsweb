@@ -89,6 +89,7 @@ const VideosAdminPage = named(adminDiscovery, 'VideosAdminPage');
 
 const publishing = () => import('./pages/admin/PublishingPages');
 const AdminEpaperPage = named(publishing, 'AdminEpaperPage');
+const EpaperWorkspace = named(publishing, 'EpaperWorkspace');
 const AdminPollsPage = named(publishing, 'AdminPollsPage');
 
 // ---------------------------------------------------------------------- QA
@@ -206,6 +207,7 @@ export default function App() {
                 <Route path="/admin/kyc" element={<KycPage />} />
                 <Route path="/admin/settings" element={<SettingsPage />} />
                 <Route path="/admin/epaper" element={<AdminEpaperPage />} />
+                <Route path="/admin/epaper/:date" element={<EpaperWorkspace />} />
                 <Route path="/admin/polls" element={<AdminPollsPage />} />
               </Route>
             </Route>

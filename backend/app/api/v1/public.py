@@ -348,7 +348,7 @@ def get_home(
 
     from sqlalchemy import select
     from app.models.epaper import EpaperEdition
-    from app.services import settings_service
+    from app.services import epaper_service, settings_service
 
     published_epaper = None
     if settings_service.get_bool(db, "epaper.enabled"):
@@ -380,6 +380,7 @@ def get_home(
             pub_date=published_epaper.edition_date.isoformat(),
             thumb_url=None,
             page_count=len(published_epaper.pages),
+            pdf_url=epaper_service.pdf_url(db, published_epaper),
         )
         if published_epaper
         else None,

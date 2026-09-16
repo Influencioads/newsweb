@@ -154,7 +154,7 @@ export function EpaperSheet({ page, dateLabel, zoom, onPageDelta }: EpaperSheetP
         </View>
 
         <View style={styles.grid}>
-          {page.articles.map((a, i) => (
+          {page.articles.map((a) => (
             <View key={a.id} style={[styles.cell, { width: `${100 / cols}%` }]}>
               <Card
                 padding="sm"
@@ -166,7 +166,7 @@ export function EpaperSheet({ page, dateLabel, zoom, onPageDelta }: EpaperSheetP
                 {a.hero_url ? (
                   <Image
                     source={{ uri: a.hero_url }}
-                    style={i === 0 ? styles.heroLead : styles.hero}
+                    style={a.display_type === 'lead' ? styles.heroLead : styles.hero}
                     contentFit="cover"
                     transition={m.imageTransition}
                     recyclingKey={a.short_id}
@@ -177,7 +177,7 @@ export function EpaperSheet({ page, dateLabel, zoom, onPageDelta }: EpaperSheetP
                   <Badge tone="breaking" size="xs" label={t('home.breaking')} style={styles.flag} />
                 ) : null}
                 <T
-                  variant={i === 0 ? 'headlineLg' : 'headlineMd'}
+                  variant={a.display_type === 'lead' ? 'headlineLg' : 'headlineMd'}
                   weight="heavy"
                   lang="te"
                   style={styles.headline}

@@ -7,6 +7,7 @@ describe('adminNav', () => {
     expect(findAdminNav('/admin/articles/new')?.item.labelKey).toBe('admin.page.articles');
     expect(findAdminNav('/admin/articles/42/edit')?.item.labelKey).toBe('admin.page.articles');
     expect(findAdminNav('/admin/settings')?.group.key).toBe('settings');
+    expect(findAdminNav('/admin/epaper/2026-09-15')?.item.labelKey).toBe('admin.page.epaper');
     expect(findAdminNav('/admin/nope')).toBeNull();
   });
 

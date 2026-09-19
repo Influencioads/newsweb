@@ -236,6 +236,25 @@ export default function ArticlePage() {
                     </Card>
                   ) : null}
 
+                  {/* The desk's own reading of the story. Deliberately styled
+                      apart from the correction note above: a correction says we
+                      got something wrong, a critic note does not. */}
+                  {data.critic_note_te ? (
+                    <Card
+                      tone="warm"
+                      padding="md"
+                      as="aside"
+                      className="mt-5 border-l-4 border-l-brand"
+                    >
+                      <p className={cn(s.body, 'text-meta font-bold text-brand')}>
+                        {t('article.criticNote')}
+                      </p>
+                      <p lang="te" className="te reader-caption mt-1 text-ink-soft">
+                        {data.critic_note_te}
+                      </p>
+                    </Card>
+                  ) : null}
+
                   <div className="mt-6">
                     <ArticleRenderer doc={data.body} />
                     {/* Renders nothing when the story has no video — no placeholder. */}

@@ -34,6 +34,8 @@ const article: ArticleCard = {
   ai_generated: false,
   published_at: new Date().toISOString(),
   reading_time_sec: 90,
+  like_count: 12,
+  comment_count: 3,
 };
 
 const VARIANTS: Array<[string, ComponentType<{ article: ArticleCard }>]> = [
@@ -72,6 +74,23 @@ describe('ArticleCard variants', () => {
     expect(headline.className).toMatch(/(^|\s)(th|te)(\s|$)/);
     expect(headline.className).not.toMatch(/truncate|line-clamp/);
     expect(headline.closest('a')).toHaveAttribute('href', article.url);
+  });
+
+  it('shows the like and comment counts, and hides a zero', () => {
+    renderCard(LeadCard);
+    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+
+    // A zero is absence, not a number worth printing next to a story.
+    renderCard(LeadCard, { ...article, like_count: 0, comment_count: 0 });
+    expect(screen.queryByText('0')).not.toBeInTheDocument();
+  });
+
+  it('keeps the counts out of the anchor, so the card stays one link', () => {
+    // A <button> inside an <a> is invalid HTML and breaks keyboard order, so
+    // these are text. If someone makes them interactive, this fails.
+    const { container } = renderCard(LeadCard);
+    expect(container.querySelector('a button')).toBeNull();
   });
 
   it('falls back to Telugu in English mode when no English headline exists', () => {

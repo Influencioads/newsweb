@@ -201,6 +201,7 @@ export const STRINGS = {
   'ui.earlier': { te: 'అంతకు ముందు', en: 'Earlier' },
   'ui.comments': { te: 'వ్యాఖ్యలు', en: 'Comments' },
   'ui.like': { te: 'ఇష్టం', en: 'Like' },
+  'article.criticNote': { te: 'సంపాదకుల వ్యాఖ్య', en: "Editor's note" },
   'ui.liked': { te: 'ఇష్టపడ్డారు', en: 'Liked' },
   'ui.follow': { te: 'ఫాలో', en: 'Follow' },
   'ui.following': { te: 'ఫాలో అవుతున్నారు', en: 'Following' },

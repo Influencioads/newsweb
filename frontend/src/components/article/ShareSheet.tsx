@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { ImageDown, Link2, MessageCircle, Share2 } from 'lucide-react';
+import { ImageDown, Link2, Share2 } from 'lucide-react';
 
 import { API_BASE } from '@/api/client';
 import { Button, IconButton } from '@/components/ui/Button';
+import { WhatsAppIcon } from '@/components/ui/glyphs';
 import { Sheet } from '@/components/ui/Dialog';
 import { useToast } from '@/components/ui/Toast';
 import { trackShare } from '@/features/engagement/beacon';
@@ -138,7 +139,9 @@ export function ShareSheet({ open, onClose, shortId, url, title, track, cardAvai
   return (
     <Sheet open={open} onClose={onClose} title={t('ui.share')}>
       <div className="flex flex-col gap-2">
-        <Button variant="secondary" size="lg" full icon={MessageCircle} onClick={run(whatsapp)}>
+        {/* The only filled control in the sheet: WhatsApp is how this
+            product is distributed, so it leads rather than sits in a list. */}
+        <Button variant="primary" size="lg" full icon={WhatsAppIcon} onClick={run(whatsapp)}>
           {t('ui.whatsapp')}
         </Button>
         <Button variant="secondary" size="lg" full icon={Link2} onClick={run(copy)}>

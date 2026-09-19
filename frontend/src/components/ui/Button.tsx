@@ -2,7 +2,7 @@ import { forwardRef, type AnchorHTMLAttributes, type ButtonHTMLAttributes, type 
 import { Link } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
-import { Icon, type LucideIcon } from './Icon';
+import { Icon, type GlyphIcon } from './Icon';
 import { useScript } from '@/i18n';
 import { cn } from '@/utils/cn';
 
@@ -37,8 +37,8 @@ export interface ButtonVisualProps {
   size?: ButtonSize;
   /** aria-busy + disabled + spinner in place of the icon. */
   pending?: boolean;
-  icon?: LucideIcon;
-  iconRight?: LucideIcon;
+  icon?: GlyphIcon;
+  iconRight?: GlyphIcon;
   /** Stretch to the container width. */
   full?: boolean;
 }
@@ -199,7 +199,7 @@ export function ButtonLink({
 // ---------------------------------------------------------------------------
 
 export interface IconButtonVisualProps {
-  icon: LucideIcon;
+  icon: GlyphIcon;
   /** Accessible name — required, there is no visible text. */
   label: string;
   size?: 44 | 48;

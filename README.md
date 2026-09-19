@@ -9,6 +9,21 @@ e-paper, video, and an AI gateway — built to **Build Instructions v1.0** and t
 > auto-publish flag anywhere in this codebase — not for AI drafts, not for
 > scheduled posts, not for API imports. A bypass added "for testing" gets removed
 > before merge.
+>
+> **The one exception, and it is one.** An admin-approved gram-panchayat
+> secretary publishes to their own panchayat without per-article review. It is
+> still not a permission: `FORBIDDEN_PERMISSION_SUBSTRINGS` bans any key naming
+> an approval bypass, and the three tests that assert it — in `test_rbac.py`,
+> `test_phase_k_crawl.py` and `db/seed.py` — are untouched. The exception is a
+> dated grant on one contributor profile, read from the database on every
+> request, and it lives in one function, `panchayat_service.may_self_publish`,
+> under four restrictions: their own copy, their own gram panchayat, a live
+> (unexpired) KYC, and nothing the sensitive-topics screen trips on — plus a
+> three-article probation, so a freshly granted account's first stories still
+> go to the desk. Such a publish leaves `approved_by` NULL on purpose, so
+> `PUBLISHED AND approved_by IS NULL` is the query that finds every story that
+> took this path. Revoking the grant is instant and takes their live copy down
+> with it. **The answer to a second exception is no.**
 
 ## Stack
 

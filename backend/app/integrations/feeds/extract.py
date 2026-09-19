@@ -33,7 +33,7 @@ job and it lives in `ingestion_service`.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from bs4 import BeautifulSoup, Tag
@@ -71,7 +71,11 @@ class PageText:
     title: str | None = None
     text: str = ""
     html: str | None = None
+    #: First candidate — unchanged in meaning, `crawl_service` still reads it.
     image_url: str | None = None
+    #: JSON-LD's lead image and og:image, in that order. og:image is the single
+    #: biggest source of publisher logos, so this is where filtering pays.
+    image_urls: list[str] = field(default_factory=list)
     published_at: datetime | None = None
     #: Which strategy produced `text`, so the queue can show its working.
     method: str = "none"
@@ -197,6 +201,11 @@ def _by_paragraph_density(soup: BeautifulSoup) -> tuple[str, str] | None:
     return None
 
 
+def _images(*candidates: str | None) -> list[str]:
+    """The non-empty candidates, deduplicated, order preserved."""
+    return list(dict.fromkeys(c for c in candidates if c))
+
+
 def extract_from_html(html: str, *, max_chars: int = MAX_EXTRACT_CHARS) -> PageText:
     """Extract without fetching — the unit-testable half."""
     if not (html or "").strip():
@@ -215,11 +224,13 @@ def extract_from_html(html: str, *, max_chars: int = MAX_EXTRACT_CHARS) -> PageT
     if jsonld is not None:
         body, headline, published, image = jsonld
         text = body[:max_chars]
+        images = _images(image, og_image)
         return PageText(
             status="ok",
             title=headline or og_title or html_title,
             text=text,
-            image_url=image or og_image,
+            image_url=(images[0] if images else None),
+            image_urls=images,
             published_at=published,
             method="jsonld",
             word_count=len(text.split()),
@@ -235,6 +246,7 @@ def extract_from_html(html: str, *, max_chars: int = MAX_EXTRACT_CHARS) -> PageT
             title=og_title or html_title,
             text=text,
             image_url=og_image,
+            image_urls=_images(og_image),
             method=method,
             word_count=len(text.split()),
         )
@@ -247,11 +259,17 @@ def extract_from_html(html: str, *, max_chars: int = MAX_EXTRACT_CHARS) -> PageT
             title=og_title or html_title,
             text=description[:max_chars],
             image_url=og_image,
+            image_urls=_images(og_image),
             method="meta_description",
             word_count=len(description.split()),
         )
 
-    return PageText(status="empty", title=og_title or html_title, image_url=og_image)
+    return PageText(
+        status="empty",
+        title=og_title or html_title,
+        image_url=og_image,
+        image_urls=_images(og_image),
+    )
 
 
 def extract_article(url: str, *, max_chars: int = MAX_EXTRACT_CHARS) -> PageText:

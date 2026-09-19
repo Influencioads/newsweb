@@ -345,6 +345,13 @@ SPECS: dict[str, Spec] = {
         "Allow fetching the article page when a feed carries only a stub. The "
         "source must also permit it, and must carry a written licence note.",
     ),
+    "crawl.keep_source_for_review": Spec(
+        True,
+        "bool",
+        "Keep the fetched page text beside a rewrite so the reviewer can read "
+        "the original next to it. Dropped the moment the item is imported or "
+        "rejected. Off means the reviewer compares against the excerpt only.",
+    ),
     "crawl.mandal_autotag": Spec(
         True,
         "bool",

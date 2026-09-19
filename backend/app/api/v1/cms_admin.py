@@ -504,18 +504,62 @@ class CommentModerate(BaseModel):
 @router.get("/moderation/reports")
 def moderation_reports(
     status: str | None = Query(None, pattern="^(open|resolved|dismissed)$"),
+    ugc_only: bool = Query(
+        False, description="Only reports about contributed (user-submitted) articles"
+    ),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
     _p: Principal = Depends(require_permission("comment.moderate")),
 ):
-    from app.models.engagement import Comment
+    """The moderation queue, heaviest first.
+
+    Ordered by how many people reported the same target, because three reports
+    on one article is a different signal from three reports on three. That is
+    all it is: **nothing here unpublishes anything at a threshold.** A
+    coordinated brigade would be the fastest way to take down real journalism,
+    so the count moves a story up a human's list and no further.
+    """
+    from app.models.content import Article
+    from app.models.engagement import Comment, Report
     from app.models.enums import ReportStatus, ReportTargetType
     from app.repositories import engagement_repo
 
-    rows, total = engagement_repo.report_queue(
-        db, status=ReportStatus(status) if status else None, offset=offset, limit=limit
+    where = [Report.status == ReportStatus(status)] if status else []
+    if ugc_only:
+        where += [
+            Report.target_type == ReportTargetType.ARTICLE,
+            Report.target_id.in_(
+                select(Article.id).where(Article.article_source_type == "USER")
+            ),
+        ]
+    # One GROUP BY over open reports, joined back on the target.
+    open_counts = (
+        select(
+            Report.target_type.label("target_type"),
+            Report.target_id.label("target_id"),
+            func.count(Report.id).label("n"),
+        )
+        .where(Report.status == ReportStatus.OPEN)
+        .group_by(Report.target_type, Report.target_id)
+        .subquery()
     )
+    heat = func.coalesce(open_counts.c.n, 0)
+    paged = db.execute(
+        select(Report, heat)
+        .outerjoin(
+            open_counts,
+            (open_counts.c.target_type == Report.target_type)
+            & (open_counts.c.target_id == Report.target_id),
+        )
+        .where(*where)
+        .order_by(heat.desc(), Report.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    ).all()
+    rows = [row[0] for row in paged]
+    counts = {row[0].id: int(row[1] or 0) for row in paged}
+    total = int(db.scalar(select(func.count(Report.id)).where(*where)) or 0)
 
     article_ids = [
         r.target_id for r in rows if r.target_type == ReportTargetType.ARTICLE
@@ -562,6 +606,8 @@ def moderation_reports(
                 "note": r.note,
                 "status": r.status,
                 "reporter_id": r.user_id,
+                #: Open reports against the same target, this one included.
+                "report_count": counts.get(r.id, 0),
                 "created_at": r.created_at,
                 "resolved_at": r.resolved_at,
                 "resolution_note": r.resolution_note,

@@ -63,6 +63,8 @@ class SourceWrite(BaseModel):
     max_items_per_hour: int = Field(default=8, ge=0, le=500)
     allow_html_fallback: bool = False
     rewrite_enabled: bool = False
+    #: Off by default, and left off unless an admin turns it on per source.
+    images_enabled: bool = False
     mandal_autotag: bool = True
 
 
@@ -86,6 +88,7 @@ class SourcePatch(BaseModel):
     max_items_per_hour: int | None = Field(default=None, ge=0, le=500)
     allow_html_fallback: bool | None = None
     rewrite_enabled: bool | None = None
+    images_enabled: bool | None = None
     mandal_autotag: bool | None = None
 
 
@@ -164,6 +167,7 @@ def _source_row(source: ContentSource, pending: int = 0) -> dict:
         "max_items_per_hour": source.max_items_per_hour,
         "allow_html_fallback": source.allow_html_fallback,
         "rewrite_enabled": source.rewrite_enabled,
+        "images_enabled": source.images_enabled,
         "mandal_autotag": source.mandal_autotag,
         "last_fetched_at": source.last_fetched_at,
         "last_status": source.last_status,
@@ -416,6 +420,10 @@ def _rewrite_row(item: IngestedItem) -> dict | None:
         "title_te": rewrite.title_te or None,
         "summary_te": rewrite.summary_te,
         "body_plain": rewrite.body_plain,
+        #: The original, for the side-by-side. NULL for most items — see
+        #: `crawl_service.gather_source_text`. The queue always carries the
+        #: item's own URL, so the reviewer has the publisher's page either way.
+        "source_text": rewrite.source_text,
         "attribution_te": rewrite.attribution_te or None,
         "word_count": rewrite.word_count,
         "engine": rewrite.engine,

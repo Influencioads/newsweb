@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.deps import Principal, require_any_permission, require_permission
 from app.core.errors import NotFoundError
+from app.core.permissions import LEVEL_PIN_PLACEMENT
+from app.core.ratelimit import rate_limit
 from app.db.base import utcnow
 from app.db.session import get_db
 from app.models.audio import AudioAsset
@@ -584,6 +586,13 @@ def change_state(
     if action not in _PERMISSION:
         raise NotFoundError()
     principal.require(_PERMISSION[action])
+    # The panchayat self-publish exception is the only way an account below
+    # desk-editor level reaches `publish`, and the only publish with no editor
+    # in front of it. Five a minute is generous for one panchayat and cheap
+    # enough that a stolen session cannot flood the section. Applied here
+    # rather than as a route dependency so no editor's queue is throttled.
+    if action == "publish" and principal.level < LEVEL_PIN_PLACEMENT:
+        rate_limit("panchayat_publish", 5)(request)
     article = workflow_service.transition(
         db, principal, _get(db, article_id), action, payload.note, payload.scheduled_at
     )

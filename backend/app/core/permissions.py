@@ -412,6 +412,22 @@ ROLE_PERMISSIONS: dict[RoleKey, set[str]] = {
         "article.view_own",
         "taxonomy.view",
     },
+    # The one account that may publish its own copy — and note that nothing
+    # here says so. These are the ordinary write keys a stringer holds plus
+    # `article.publish`, which on its own still demands an APPROVED article
+    # approved by somebody else. What actually skips review is the dated grant
+    # on the contributor profile, read fresh on every request by
+    # `panchayat_service.may_self_publish`. No `article.approve`, so they
+    # cannot manufacture the approval either, and no `article.breaking`.
+    RoleKey.PANCHAYAT_SECRETARY: {
+        "article.view_own",
+        "article.create",
+        "article.edit_own",
+        "article.submit",
+        "article.publish",
+        "media.upload",
+        "taxonomy.view",
+    },
     RoleKey.SUBSCRIBER: set(),
 }
 
@@ -511,6 +527,17 @@ ROLE_DEFINITIONS: dict[RoleKey, dict[str, object]] = {
         # submission quota. They still file through the moderation queue.
         "staff": False,
     },
+    RoleKey.PANCHAYAT_SECRETARY: {
+        "level": 15,
+        # MANDAL, not a new LOCALITY scope: the mandal keeps `_scope` and every
+        # scope test working untouched, and which *panchayat* they may file for
+        # is `ContributorProfile.locality_id`, checked in the publish fork.
+        "scope": ScopeType.MANDAL,
+        "te": "పంచాయతీ కార్యదర్శి",
+        "en": "Panchayat Secretary",
+        # Not staff. They hold no desk, no queue and no other author's copy.
+        "staff": False,
+    },
     RoleKey.SUBSCRIBER: {
         "level": 10,
         "scope": ScopeType.SELF,
@@ -524,3 +551,8 @@ ROLE_DEFINITIONS: dict[RoleKey, dict[str, object]] = {
 LEVEL_BREAKING_NEWS = 80  # §6.3 — is_breaking requires level >= 80
 LEVEL_PUSH_APPROVE = 60  # §11  — every push needs approval from level >= 60
 LEVEL_PUSH_BREAKING = 80  # §11  — a breaking push needs level >= 80
+#: §8 / §9 — choosing what leads the home page or Top trending. Was implied by
+#: `article.publish` alone until a level-15 panchayat secretary came to hold
+#: that key; every other holder is already at 60 or above, so this threshold
+#: changes nothing for anyone who had it before.
+LEVEL_PIN_PLACEMENT = 60

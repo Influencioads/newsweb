@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import Principal
 from app.core.errors import ConflictError, ValidationError
+from app.core.permissions import LEVEL_PIN_PLACEMENT
 from app.db.base import utcnow
 from app.models.content import (
     Article,
@@ -254,6 +255,10 @@ def _guard_flags(
     # not a way around its permission.
     if any(values.get(key) for key in _PIN_INTENT):
         principal.require("article.publish")
+        # `article.publish` used to imply desk seniority. A panchayat
+        # secretary now holds it at level 15, and deciding what leads the
+        # home page for every reader in two states is not theirs to make.
+        principal.require_level(LEVEL_PIN_PLACEMENT, reason="pin")
     if values.get("article_type") in _MACHINE_TYPES:
         raise ValidationError(
             message_en="AI article types are set by the AI pipeline, not by hand.",
@@ -382,6 +387,38 @@ def update(
     return article
 
 
+def _snapshot(db: Session, article: Article, actor_id: int | None) -> None:
+    """Freeze the article as it stands right now.
+
+    Written at approval, and again on the one publish path that has no
+    approval — a story that reached readers unreviewed is precisely the one you
+    want a `before` for when a takedown edit follows.
+    """
+
+    def json_value(value: Any) -> Any:
+        if isinstance(value, datetime):
+            return value.isoformat()
+        if isinstance(value, Enum):
+            return value.value
+        return value
+
+    snapshot = {
+        c.name: json_value(getattr(article, c.name))
+        for c in Article.__table__.columns
+        if c.name not in {"body"}
+    }
+    snapshot["body"] = article.body
+    db.add(
+        ArticleVersion(
+            article_id=article.id,
+            version=article.version,
+            snapshot=snapshot,
+            changed_by=actor_id,
+            created_at=utcnow(),
+        )
+    )
+
+
 def transition(
     db: Session,
     principal: Principal,
@@ -419,6 +456,18 @@ def transition(
         "unpublish": ({WorkflowState.PUBLISHED}, WorkflowState.UNPUBLISHED),
     }
     allowed, target = mapping[action]
+    # The ONE exception to "nothing reaches a reader without a human editor
+    # pressing Approve", and this is the only place it is asked. Everything
+    # that makes it safe lives in `may_self_publish`; if it says no, the rest
+    # of this function is exactly what it has always been.
+    from app.services import panchayat_service
+
+    trusted = action == "publish" and panchayat_service.may_self_publish(
+        db, principal, article
+    )
+    if trusted:
+        # Their copy never passes through APPROVED, because nobody approves it.
+        allowed = allowed | {WorkflowState.DRAFT, WorkflowState.SUBMITTED}
     if old not in allowed:
         raise ConflictError(details={"state": old, "action": action})
     if action == "approve":
@@ -427,57 +476,43 @@ def transition(
                 message_en="Authors cannot approve their own article."
             )
         article.approved_by, article.approved_at = principal.id, utcnow()
-
-        def json_value(value: Any) -> Any:
-            if isinstance(value, datetime):
-                return value.isoformat()
-            if isinstance(value, Enum):
-                return value.value
-            return value
-
-        snapshot = {
-            c.name: json_value(getattr(article, c.name))
-            for c in Article.__table__.columns
-            if c.name not in {"body"}
-        }
-        snapshot["body"] = article.body
-        db.add(
-            ArticleVersion(
-                article_id=article.id,
-                version=article.version,
-                snapshot=snapshot,
-                changed_by=principal.id,
-                created_at=utcnow(),
-            )
-        )
+        _snapshot(db, article, principal.id)
     if action == "review":
         article.reviewed_by = principal.id
     if action == "publish":
-        if not article.approved_by or article.approved_by == article.author_id:
-            raise ValidationError(
-                message_en="A different senior editor must approve before publishing."
-            )
-        # The check above compares the approver against the *author*, which is
-        # the right test for copy a person wrote. Machine-created copy has no
-        # author — a feed import and an AI rewrite both leave `author_id` NULL
-        # — and `approved_by == None` is false, so without this clause one
-        # editor could approve and publish a machine article entirely alone.
-        # Two people are required precisely *because* nobody wrote it.
-        if article.author_id is None and article.approved_by == principal.id:
-            raise ValidationError(
-                message_en=(
-                    "A machine-created article must be approved and published "
-                    "by two different people."
-                ),
-                message_te=(
-                    "యంత్రం రూపొందించిన కథనాన్ని ఇద్దరు వేర్వేరు వ్యక్తులు "
-                    "ఆమోదించి ప్రచురించాలి."
-                ),
-            )
-        if article.source_type != "own" and not article.source_credit:
-            raise ValidationError(
-                message_en="Agency and syndicated stories require source credit."
-            )
+        if trusted:
+            # `approved_by` stays NULL on purpose. Stamping the secretary into
+            # it would make the audit log claim an editor approved this when
+            # none did; PUBLISHED with `approved_by IS NULL` is instead the
+            # signature you query for to find every story that took this path.
+            panchayat_service.stamp_ugc(db, article, principal)
+            _snapshot(db, article, principal.id)
+        else:
+            if not article.approved_by or article.approved_by == article.author_id:
+                raise ValidationError(
+                    message_en="A different senior editor must approve before publishing."
+                )
+            # The check above compares the approver against the *author*, which is
+            # the right test for copy a person wrote. Machine-created copy has no
+            # author — a feed import and an AI rewrite both leave `author_id` NULL
+            # — and `approved_by == None` is false, so without this clause one
+            # editor could approve and publish a machine article entirely alone.
+            # Two people are required precisely *because* nobody wrote it.
+            if article.author_id is None and article.approved_by == principal.id:
+                raise ValidationError(
+                    message_en=(
+                        "A machine-created article must be approved and published "
+                        "by two different people."
+                    ),
+                    message_te=(
+                        "యంత్రం రూపొందించిన కథనాన్ని ఇద్దరు వేర్వేరు వ్యక్తులు "
+                        "ఆమోదించి ప్రచురించాలి."
+                    ),
+                )
+            if article.source_type != "own" and not article.source_credit:
+                raise ValidationError(
+                    message_en="Agency and syndicated stories require source credit."
+                )
 
         # §1 "publish date and time": a future time schedules instead of going
         # live now. The state machine gains SCHEDULED rather than PUBLISHED, so

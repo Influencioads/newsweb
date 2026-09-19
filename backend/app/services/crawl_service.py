@@ -57,6 +57,11 @@ logger = get_logger(__name__)
 #: polite ceiling for an aggregator to present to the wider web.
 DEFAULT_WORKERS = 4
 
+#: Ceiling on the reviewer's copy of the original. Long enough to read a story
+#: against, short enough that the column is never an archive of someone else's
+#: site.
+MAX_SOURCE_TEXT_CHARS = 8_000
+
 #: Subjects where a wrong or careless summary does real harm, and where Indian
 #: reporting norms and the law both expect judgement. A hit here means a person
 #: reads the item and no provider is called at all.
@@ -331,36 +336,49 @@ def _host_allowed(url: str) -> bool:
     return any(netloc == h or netloc.endswith("." + h) for h in hosts)
 
 
-def gather_source_text(db: Session, item: IngestedItem) -> tuple[str, str]:
-    """The text to rewrite from, and how it was obtained.
+def gather_source_text(db: Session, item: IngestedItem) -> tuple[str, str, str | None]:
+    """The text to rewrite from, how it was obtained, and the reviewer's copy.
 
     The licence decides what survives this call:
 
       * a full-text licence means the extracted body is *stored* on the item,
         exactly as feed-supplied content already is;
       * anything else means the text is used to build the prompt and then
-        dropped. Nothing beyond the existing excerpt is ever written. A field
-        that exists is a field that leaks, which is the rule this whole module
-        inherits from `ingestion_service`.
+        dropped. Nothing beyond the existing excerpt is ever written to
+        `IngestedItem`. A field that exists is a field that leaks, which is the
+        rule this whole module inherits from `ingestion_service`.
+
+    The third return value is the one exception, and it is a narrow one. A
+    reviewer cannot honestly verify a Telugu rewrite against forty words of
+    feed stub — the approval becomes theatre — so when a page was actually
+    fetched the working copy is handed back for `IngestedRewrite.source_text`.
+    That column is defensible where `content_html` would not be: it lives on a
+    queue-only table no public serializer touches, whereas `_body_document`
+    *can* publish `content_html` verbatim. It is held inside the newsroom for
+    the duration of one review and NULLed on import or reject. Reaching here
+    at all requires `allow_html_fallback`, which `_guard_licence` only grants
+    against a written `licence_note` — so we only ever hold text for a
+    publisher an admin has recorded a reason for. `crawl.keep_source_for_review`
+    switches it off without a deploy.
     """
     source = item.source
     stored = ingestion_service.strip_html(item.content_html) if item.content_html else ""
     base = "\n\n".join(p for p in (item.title, item.summary or "", stored) if p).strip()
 
     if len(base.split()) >= 45:
-        return base, "feed"
+        return base, "feed", None
 
     if not (source and source.allow_html_fallback):
-        return base, "feed"
+        return base, "feed", None
     if not settings_service.get_bool(db, "crawl.html_fallback_enabled"):
-        return base, "feed"
+        return base, "feed", None
     target = item.canonical_url or item.url
     if not target or not _host_allowed(target):
-        return base, "feed"
+        return base, "feed", None
 
     page = extract_article(target)
     if page.status != "ok" or not page.text:
-        return base, f"page_{page.status}"
+        return base, f"page_{page.status}", None
 
     if source.may_store_full_text:
         item.content_html = ingestion_service.sanitise_body(
@@ -372,7 +390,12 @@ def gather_source_text(db: Session, item: IngestedItem) -> tuple[str, str]:
     # else: page.text stays in this function's locals and is never persisted.
 
     combined = "\n\n".join(p for p in (item.title, page.text) if p).strip()
-    return combined, f"page_{page.method}"
+    keep = (
+        combined[:MAX_SOURCE_TEXT_CHARS]
+        if settings_service.get_bool(db, "crawl.keep_source_for_review")
+        else None
+    )
+    return combined, f"page_{page.method}", keep
 
 
 # --------------------------------------------------------------------------- #
@@ -458,7 +481,7 @@ def rewrite_one(
             actor_id=actor_id,
         )
 
-    body_text, method = gather_source_text(db, item)
+    body_text, method, source_text = gather_source_text(db, item)
     min_words = settings_service.get_int(db, "crawl.rewrite_min_words")
     if len(body_text.split()) < max(10, min_words):
         return _record(
@@ -586,6 +609,7 @@ def rewrite_one(
         summary_te=(normalize_text(result.summary_te) or None),
         body=body,
         body_plain=plain,
+        source_text=source_text,
         attribution_te=credit,
         word_count=words,
         engine=provider.key,

@@ -47,12 +47,15 @@ from app.models.enums import (  # noqa: E402
     ContributorType,
     KycDocumentKind,
     KycStatus,
+    MediaType,
     RoleKey,
     ScopeType,
     UserStatus,
+    Vertical,
     WorkflowState,
 )
 from app.models.kyc import ContributorProfile, KycDocument  # noqa: E402
+from app.models.media import ArticleMedia, Media  # noqa: E402
 from app.models.setting import AppSetting  # noqa: E402
 from app.models.user import Role, User, UserRole  # noqa: E402
 from app.services import (  # noqa: E402
@@ -117,6 +120,8 @@ def _purge(db: Session) -> None:
     db.query(KycDocument).delete()
     db.query(ContributorProfile).delete()
     db.query(CreatorSubmission).delete()
+    db.query(ArticleMedia).delete()
+    db.query(Media).delete()
     db.query(Article).delete()
     db.query(AppSetting).delete()
     db.commit()
@@ -639,6 +644,149 @@ class TestAdminSurface:
         for document in body["documents"]:
             assert "url" not in document
             assert "storage_key" not in document
+
+
+# --------------------------------------------------------------------------- #
+# Verticals — which desk somebody writes for, not what proof they owe
+# --------------------------------------------------------------------------- #
+class TestVerticals:
+    def test_a_vertical_round_trips_through_the_application(
+        self, db: Session, client: TestClient
+    ) -> None:
+        user = make_reader(db, email="kyc-vertical@test.local")
+        _s, access, _r, _e = auth_service.create_session(db, user)
+        db.commit()
+        headers = {"Authorization": f"Bearer {access}"}
+
+        created = client.post(
+            "/api/v1/users/me/contributor",
+            json={
+                "contributor_type": "citizen",
+                "vertical": "citizen_journalism",
+                "display_name_te": "రమేష్ కుమార్",
+            },
+            headers=headers,
+        )
+        assert created.status_code == 200
+        assert created.json()["vertical"] == "citizen_journalism"
+        # The value that does not fit ContributorType's 12-character column is
+        # exactly the one the product asked for, which is why it is its own.
+        fetched = client.get("/api/v1/users/me/contributor", headers=headers).json()
+        assert fetched["vertical"] == "citizen_journalism"
+        assert fetched["contributor_type"] == "citizen"
+
+    def test_medical_demands_a_registration_and_sports_does_not(
+        self, db: Session
+    ) -> None:
+        """Extra proof only where a reviewer can actually look somebody up."""
+        user = make_reader(db, email="kyc-medical@test.local")
+        profile = kyc_service.start_or_update(
+            db,
+            user=user,
+            contributor_type=ContributorType.CITIZEN,
+            vertical=Vertical.MEDICAL,
+            display_name_te="ఒక వైద్యురాలు",
+        )
+        for kind in (KycDocumentKind.PAN, KycDocumentKind.SELFIE):
+            kyc_service.add_document(
+                db, profile=profile, kind=kind, raw=png_bytes(),
+                declared_mime="image/png",
+            )
+        db.commit()
+        assert kyc_service.missing_documents(db, profile) == [["professional_reg"]]
+        with pytest.raises(ValidationError):
+            kyc_service.submit(db, profile=profile, user=user)
+
+        # We cannot verify that somebody follows sport, so we do not pretend to.
+        profile.vertical = Vertical.SPORTS
+        db.flush()
+        assert kyc_service.missing_documents(db, profile) == []
+
+    def test_the_badge_prefers_the_vertical(self, db: Session) -> None:
+        user = make_reader(db, email="kyc-badge@test.local")
+        profile = apply_and_submit(db, user)
+        kyc_service.apply_decision(
+            db, profile, KycDecision(status=KycStatus.APPROVED, provider="manual"),
+            actor_id=None,
+        )
+        db.commit()
+        assert kyc_service.badge_for(db, user.id) == ContributorType.CITIZEN.value
+        profile.vertical = Vertical.PANCHAYAT
+        db.flush()
+        assert kyc_service.badge_for(db, user.id) == "panchayat"
+
+    def test_approving_a_submission_with_photographs_attaches_a_hero(
+        self, db: Session
+    ) -> None:
+        """`may_attach_images` was dead code; this is what spends it."""
+        user = make_reader(db, email="kyc-photo@test.local")
+        photos = [
+            Media(
+                type=MediaType.IMAGE,
+                filename=f"photo-{i}.webp",
+                mime="image/webp",
+                bytes=1024,
+                storage_provider="local",
+                storage_key=f"images/photo-{i}.webp",
+                credit="రమేష్ కుమార్",
+                source_type="contributed",
+            )
+            for i in range(2)
+        ]
+        db.add_all(photos)
+        db.flush()
+
+        submission = submission_service.create_submission(
+            db,
+            user_id=user.id,
+            title_te="ఒక ఫోటోతో కథనం",
+            body_te="ఇది ఒక పరీక్ష కథనం. " * 12,
+            category_id=None,
+            district_id=None,
+            accept_guidelines=True,
+        )
+        for photo in photos:
+            submission_service.attach_media(
+                db, submission=submission, media_id=photo.id
+            )
+        db.commit()
+
+        _sub, article = submission_service.approve_submission(
+            db, submission_id=submission.id, moderator_id=None
+        )
+        db.commit()
+        assert article.hero_media_id == photos[0].id
+        links = {
+            link.media_id: link.role
+            for link in db.scalars(
+                select(ArticleMedia).where(ArticleMedia.article_id == article.id)
+            )
+        }
+        assert links == {photos[0].id: "hero", photos[1].id: "gallery"}
+
+    def test_a_fifth_photograph_is_refused(self, db: Session) -> None:
+        user = make_reader(db, email="kyc-photo-cap@test.local")
+        submission = submission_service.create_submission(
+            db,
+            user_id=user.id,
+            title_te="నాలుగు ఫోటోల కథనం",
+            body_te="ఇది ఒక పరీక్ష కథనం. " * 12,
+            category_id=None,
+            district_id=None,
+            accept_guidelines=True,
+        )
+        for media_id in range(1, submission_service.MAX_MEDIA + 1):
+            submission_service.check_can_attach(
+                db, submission_id=submission.id, user_id=user.id
+            )
+            submission_service.attach_media(
+                db, submission=submission, media_id=media_id
+            )
+        db.commit()
+        with pytest.raises(ValidationError):
+            submission_service.check_can_attach(
+                db, submission_id=submission.id, user_id=user.id
+            )
 
 
 def test_retention_purges_a_rejected_application(db: Session) -> None:

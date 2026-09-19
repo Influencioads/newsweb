@@ -714,6 +714,90 @@ class TestLicenceAndHtmlFallback:
         db.commit()
         assert calls["n"] == 0
 
+    def _fetched(
+        self,
+        db: Session,
+        monkeypatch: pytest.MonkeyPatch,
+        slug: str,
+        *,
+        body: str = "The publisher's full article body. " * 400,
+    ) -> IngestedItem:
+        """An item rewritten from a page the fallback really fetched."""
+        install_ai(monkeypatch, FakeAi())
+        monkeypatch.setattr(
+            "app.services.crawl_service.extract_article",
+            lambda *_a, **_k: PageText(
+                status="ok", text=body, method="jsonld", word_count=2000
+            ),
+        )
+        source = make_source(
+            db, slug=slug, html_fallback=True, note="checked terms"
+        )
+        item = make_item(db, source, guid=f"{slug}-1", summary="stub", language="en")
+        db.commit()
+        crawl_service.rewrite_one(db, item)
+        db.commit()
+        return item
+
+    def test_the_reviewer_gets_the_original_when_a_page_was_fetched(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Without this the reviewer approves Telugu copy against a stub."""
+        configure(db, **{"crawl.html_fallback_enabled": True})
+        item = self._fetched(db, monkeypatch, "sx-on")
+
+        rewrite = item.latest_rewrite
+        assert rewrite is not None and rewrite.status == RewriteStatus.READY
+        assert rewrite.source_text is not None
+        assert "The publisher's full article body." in rewrite.source_text
+        # Capped, so the column never becomes an archive of someone else's site.
+        assert len(rewrite.source_text) == crawl_service.MAX_SOURCE_TEXT_CHARS
+        # And still nothing on the item itself — this source has no licence.
+        db.refresh(item)
+        assert item.content_html is None
+
+    def test_no_original_is_kept_when_the_setting_is_off(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        configure(
+            db,
+            **{
+                "crawl.html_fallback_enabled": True,
+                "crawl.keep_source_for_review": False,
+            },
+        )
+        item = self._fetched(db, monkeypatch, "sx-off")
+
+        rewrite = item.latest_rewrite
+        assert rewrite is not None and rewrite.status == RewriteStatus.READY
+        assert rewrite.source_text is None
+
+    def test_the_original_is_dropped_once_the_item_is_imported(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        configure(db, **{"crawl.html_fallback_enabled": True})
+        item = self._fetched(db, monkeypatch, "sx-import")
+        assert item.latest_rewrite.source_text is not None
+
+        ingestion_service.import_item(db, item, actor_id=None)
+        db.commit()
+        db.refresh(item)
+        assert item.latest_rewrite.source_text is None
+
+    def test_the_original_is_dropped_once_the_item_is_rejected(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The honest half of the bargain: a reject must forget it too."""
+        configure(db, **{"crawl.html_fallback_enabled": True})
+        item = self._fetched(db, monkeypatch, "sx-reject")
+        assert item.latest_rewrite.source_text is not None
+
+        ingestion_service.reject_item(db, item.id, actor_id=None, note="not for us")
+        db.commit()
+        db.refresh(item)
+        assert item.status == IngestStatus.REJECTED
+        assert item.latest_rewrite.source_text is None
+
     def test_html_fallback_requires_a_written_licence_note(
         self, db: Session, client: TestClient
     ) -> None:

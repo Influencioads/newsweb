@@ -185,6 +185,7 @@ const STRINGS = {
   'ui.shareCard': { te: 'కార్డ్‌గా షేర్', en: 'Share as card' },
   'ui.shareNative': { te: 'ఇతర యాప్‌లు…', en: 'Other apps…' },
   'ui.whatsappHint': { te: 'లింక్‌తో పంపండి', en: 'Send with a link' },
+  'comments.pinned': { te: 'పిన్ చేసినది', en: 'Pinned' },
   'engage.reportConfirm': {
     te: 'ఈ కథనాన్ని సమీక్ష కోసం నివేదిస్తారా?',
     en: 'Report this story for review?',

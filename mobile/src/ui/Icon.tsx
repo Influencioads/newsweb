@@ -58,6 +58,7 @@ import {
   Pause,
   Pencil,
   Phone,
+  Pin,
   Play,
   Quote,
   Plus,
@@ -100,6 +101,7 @@ import { CommentGlyph, PlaceGlyph, ShareGlyph, WhatsAppGlyph } from '@/ui/glyphs
 const MAP = {
   home: House,
   mapPin: MapPin,
+  pin: Pin,
   play: Play,
   quote: Quote,
   search: Search,

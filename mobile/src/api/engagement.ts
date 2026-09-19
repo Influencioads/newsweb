@@ -23,6 +23,8 @@ export interface CommentOut {
   author_name_te: string;
   author_name_en: string;
   is_mine: boolean;
+  /** A moderator promoted it to the top of the thread. */
+  is_pinned: boolean;
   created_at: string;
 }
 

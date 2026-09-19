@@ -3,14 +3,14 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.deps import Principal, require_any_permission, require_permission
 from app.core.errors import NotFoundError
 from app.db.base import utcnow
 from app.db.session import get_db
 from app.models.audio import AudioAsset
-from app.models.content import Article
+from app.models.content import Article, ArticleTag
 from app.models.discovery import Pin
 from app.models.enums import ArticleType, AuditAction, WorkflowState
 from app.models.media import ArticleMedia, Media
@@ -59,6 +59,38 @@ _COLUMN_FIELDS = tuple(
 )
 
 
+#: Eager-load for the list endpoints: one extra query for the whole page
+#: instead of two per row, and it is what makes `_list_row` free of DB access.
+_LIST_LOADS = (selectinload(Article.tags).selectinload(ArticleTag.tag),)
+
+
+def _tag_refs(article: Article) -> list[CmsTagRef]:
+    return [
+        CmsTagRef(
+            id=link.tag.id,
+            slug=link.tag.slug,
+            name_te=link.tag.name_te,
+            name_en=link.tag.name_en,
+        )
+        for link in sorted(article.tags, key=lambda x: x.sort)
+        if link.tag
+    ]
+
+
+def _list_row(article: Article) -> CmsArticleOut:
+    """One row of a list response.
+
+    Handing the ORM object straight to `CmsArticleList` looks tempting and is a
+    trap: `Article.tags` holds ArticleTag *links*, the schema's `tags` holds
+    resolved tag references, and pydantic rejects the link objects — so the
+    whole list 500s as soon as any article on the page carries a tag. Columns
+    are copied by name for exactly that reason (see `_COLUMN_FIELDS`).
+    """
+    payload = CmsArticleOut(**{name: getattr(article, name) for name in _COLUMN_FIELDS})
+    payload.tags = _tag_refs(article)
+    return payload
+
+
 def _out(db: Session, article: Article) -> CmsArticleOut:
     """Serialise with the relations the §1 form needs to round-trip.
 
@@ -94,16 +126,7 @@ def _out(db: Session, article: Article) -> CmsArticleOut:
                 title_te=video.title_te,
                 thumbnail_url=video.thumbnail_url,
             )
-    payload.tags = [
-        CmsTagRef(
-            id=link.tag.id,
-            slug=link.tag.slug,
-            name_te=link.tag.name_te,
-            name_en=link.tag.name_en,
-        )
-        for link in sorted(article.tags, key=lambda x: x.sort)
-        if link.tag
-    ]
+    payload.tags = _tag_refs(article)
     if article.audio_asset_id:
         audio = db.get(AudioAsset, article.audio_asset_id)
         if audio is not None:
@@ -137,7 +160,9 @@ def _out(db: Session, article: Article) -> CmsArticleOut:
 
 @router.get("", response_model=CmsArticleList)
 def list_articles(
-    state: str | None = None,
+    # Typed as the enum, not a bare string: an unknown value reached the query
+    # and came back as a 500 instead of a 422 naming the bad parameter.
+    state: WorkflowState | None = None,
     search: str | None = Query(None, max_length=200),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
@@ -163,10 +188,13 @@ def list_articles(
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = list(
         db.execute(
-            stmt.order_by(Article.updated_at.desc()).offset(offset).limit(limit)
+            stmt.options(*_LIST_LOADS)
+            .order_by(Article.updated_at.desc())
+            .offset(offset)
+            .limit(limit)
         ).scalars()
     )
-    return CmsArticleList(articles=rows, total=total)
+    return CmsArticleList(articles=[_list_row(a) for a in rows], total=total)
 
 
 @router.get("/pending", response_model=CmsArticleList)
@@ -221,10 +249,13 @@ def pending_articles(
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = list(
         db.execute(
-            stmt.order_by(Article.updated_at.asc()).offset(offset).limit(limit)
+            stmt.options(*_LIST_LOADS)
+            .order_by(Article.updated_at.asc())
+            .offset(offset)
+            .limit(limit)
         ).scalars()
     )
-    return CmsArticleList(articles=rows, total=total)
+    return CmsArticleList(articles=[_list_row(a) for a in rows], total=total)
 
 
 @router.post("", response_model=CmsArticleOut, status_code=201)

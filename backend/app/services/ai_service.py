@@ -29,6 +29,7 @@ from app.core.config import settings as env_settings
 from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.core.logging import get_logger
 from app.db.base import utcnow
+from app.db.session import session_scope
 from app.integrations.ai import get_ai
 from app.models.ai import AiArticleDraft, AiSource, AiSuggestion
 from app.models.content import Article, Category
@@ -165,7 +166,10 @@ def generate_suggestions(
         )
     room = cap - made_today
 
-    provider = get_ai(**settings_service.ai_credentials(db))
+    # Bulk: a daily sweep of ideas, most of which an editor rejects unread.
+    # Nothing here is published in the model's words, so it buys nothing to run
+    # it on the editorial model.
+    provider = get_ai(**settings_service.ai_credentials(db, bulk=True))
     min_score = float(settings_service.get(db, "ai.min_score") or 0.0)
 
     raw: list[dict[str, Any]] = []
@@ -320,17 +324,39 @@ def create_draft(
     if suggestion.status == AiSuggestionStatus.REJECTED:
         raise ConflictError(message_en="That suggestion was rejected.")
 
+    # Editorial model, deliberately: this one writes the copy an editor files.
     provider = get_ai(**settings_service.ai_credentials(db))
     # A person asked for this one, so both ceilings apply: the newsroom's
     # money and their own daily allowance.
     if provider.key != "heuristic":
         ai_usage_service.guard(db, actor_id)
     sources = [{"publisher": s.publisher, "url": s.url} for s in suggestion.sources]
-    text = provider.write_draft(
-        topic=suggestion.topic_te,
-        notes=notes or suggestion.rationale_te or "",
-        sources=sources,
-    )
+    try:
+        text = provider.write_draft(
+            topic=suggestion.topic_te,
+            notes=notes or suggestion.rationale_te or "",
+            sources=sources,
+        )
+    except Exception as exc:  # noqa: BLE001 — a truncated answer is still billed
+        if provider.key != "heuristic":
+            # A reasoning model that spends its budget on thinking returns cut-off
+            # JSON, and `_parse_json` raises for a call the vendor has charged for.
+            # The re-raise rolls this request's transaction back — `get_db` is one
+            # transaction per request — so the row goes on its own session or it is
+            # never written. Without it `check_quota` never advances and the editor
+            # can press the button again, forever, at the editorial model's price.
+            with session_scope() as ledger:
+                ai_usage_service.record(
+                    ledger,
+                    operation="draft",
+                    provider=provider.key,
+                    model=getattr(provider, "model_name", None),
+                    actor_id=actor_id,
+                    usage=getattr(provider, "last_usage", None),
+                    ok=False,
+                    error=str(getattr(exc, "details", exc))[:300],
+                )
+        raise
     if provider.key != "heuristic":
         ai_usage_service.record(
             db,

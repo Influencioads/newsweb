@@ -3,16 +3,35 @@
 The provider name comes from an editable setting, so like the TTS factory this
 resolves per call. An unknown or unconfigured name degrades to the heuristic
 provider rather than raising: the AI screens must stay usable when a key is
-missing, they simply have less to show.
+missing, they simply have less to show. `get_image` degrades the same way, to
+None — there is no keyless way to draw an illustration, so the screen keeps
+working and loses the button.
 """
 
 from __future__ import annotations
 
 from app.integrations.ai.base import AiProvider, DraftText, TopicIdea
 from app.integrations.ai.heuristic import HeuristicAi
+from app.integrations.ai.image import (
+    AimlapiImage,
+    GeneratedImage,
+    ImageProvider,
+    get_image,
+)
 from app.integrations.ai.llm import LlmAi
 
-__all__ = ["AiProvider", "DraftText", "HeuristicAi", "LlmAi", "TopicIdea", "get_ai"]
+__all__ = [
+    "AiProvider",
+    "AimlapiImage",
+    "DraftText",
+    "GeneratedImage",
+    "HeuristicAi",
+    "ImageProvider",
+    "LlmAi",
+    "TopicIdea",
+    "get_ai",
+    "get_image",
+]
 
 _LLM_KEYS = {"gemini", "openai", "anthropic", "aimlapi"}
 

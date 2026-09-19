@@ -28,7 +28,7 @@ from app.integrations.tts import TtsProvider, get_tts
 from app.models.audio import AudioAsset
 from app.models.content import Article
 from app.models.enums import AudioStatus
-from app.services import audio_concat, settings_service
+from app.services import ai_usage_service, audio_concat, settings_service
 
 logger = get_logger(__name__)
 
@@ -43,10 +43,9 @@ logger = get_logger(__name__)
 #: feature. Splitting fixed both halves.
 MAX_CHARS = 12_000
 
-#: The sentinel `voice.voice_name` carries when no specific voice is chosen.
-#: `settings_service` rejects empty strings for `kind="str"`, so the absence of
-#: a choice has to be spelled.
-DEFAULT_VOICE_SENTINEL = "default"
+#: Re-exported so callers that already import it from here keep working; the
+#: definition lives beside the setting in `settings_service`.
+DEFAULT_VOICE_SENTINEL = settings_service.DEFAULT_VOICE_SENTINEL
 
 
 def spoken_text(article: Article) -> str:
@@ -295,6 +294,12 @@ def synthesise_long(
     `AiProviderError` on the first failing chunk rather than storing partial
     audio: half a news story that stops mid-sentence is worse than no audio,
     because the reader has no way to tell it is incomplete.
+
+    A long article is several paid calls but one ledger row, so the provider's
+    `last_usage` is left holding the **sum** of the segments rather than the
+    last one — anything else under-reports every long article. It is updated as
+    each segment returns, so a chunk that fails halfway still leaves behind what
+    the vendor has already charged for the chunks before it.
     """
     chunks = audio_concat.split_for_tts(text)
     if not chunks:
@@ -304,12 +309,18 @@ def synthesise_long(
     mime = "audio/mpeg"
     estimated = 0
     used_voice = voice or ""
+    billed: dict[str, float | int] = {}
     for chunk in chunks:
         result = provider.synthesise(chunk, language=language, voice=voice)
         segments.append(result.audio)
         mime = result.mime
         estimated += result.duration_sec
         used_voice = result.voice
+        for name, amount in result.usage.items():
+            billed[name] = billed.get(name, 0) + amount
+        # The adapter has just overwritten `last_usage` with this one segment;
+        # put the running total back.
+        provider.last_usage = dict(billed)
 
     audio, measured = audio_concat.concat(segments, mime)
     return audio, mime, measured or estimated, used_voice, len(segments)
@@ -387,6 +398,10 @@ def ensure_audio(
         )
         return None
 
+    # Deliberately no `ai_usage_service.guard` here. Speech already has its own
+    # ceiling — `voice.monthly_char_budget`, metered on the Voice screen — and a
+    # second refusal stacked on top would stop audio for a reason that screen
+    # does not show. Synthesis is recorded in the AI ledger, not gated by it.
     budget = settings_service.get_int(db, "voice.monthly_char_budget")
     if budget and month_chars_used(db) + len(text) > budget:
         logger.warning("tts_budget_exceeded", article_id=article.id, budget=budget)
@@ -411,6 +426,19 @@ def ensure_audio(
         row.status = AudioStatus.FAILED
         row.error = str(getattr(exc, "details", exc))[:500]
         db.flush()
+        # A failed synthesis is usually still charged — a 400 on the voice
+        # field, a segment that timed out after three that did not. Leaving it
+        # out of the ledger is how the meter ends up under the real bill.
+        ai_usage_service.record(
+            db,
+            operation="tts",
+            provider=provider.key,
+            model=getattr(provider, "model_name", None),
+            actor_id=requested_by,
+            usage=getattr(provider, "last_usage", None),
+            ok=False,
+            error=row.error,
+        )
         logger.warning("tts_failed", article_id=article.id, provider=provider.key)
         return None
 
@@ -437,6 +465,15 @@ def ensure_audio(
     row.error = None
     article.audio_asset_id = row.id
     db.flush()
+    # One row for the whole article, however many segments it took.
+    ai_usage_service.record(
+        db,
+        operation="tts",
+        provider=provider.key,
+        model=getattr(provider, "model_name", None),
+        actor_id=requested_by,
+        usage=getattr(provider, "last_usage", None),
+    )
     logger.info(
         "tts_generated",
         article_id=article.id,

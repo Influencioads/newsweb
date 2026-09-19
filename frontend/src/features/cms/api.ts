@@ -56,7 +56,12 @@ export const convertAiDraft=async(id:number)=>(await api.post<{article_id:number
 export const discardAiDraft=async(id:number)=>(await api.post<AiDraft>(`/cms/ai/drafts/${id}/discard`)).data;
 
 // --- §19 voice -------------------------------------------------------------
-export const generateArticleAudio=async(id:number,force=false)=>(await api.post<AudioState&{usage:Record<string,number>}>(`/cms/articles/${id}/generate-audio`,null,{params:{force}})).data;
+export const generateArticleAudio=async(id:number,force=false)=>(await api.post<AudioState&{usage:Record<string,number>;global_voice_enabled:boolean}>(`/cms/articles/${id}/generate-audio`,null,{params:{force}})).data;
+
+// --- §K share card: the same story as a picture ----------------------------
+// `reason` carries the environment limit (no Raqm, no font, switched off) in
+// words, because on a host that cannot shape Telugu no retry will ever work.
+export const generateArticleCard=async(id:number,force=false)=>(await api.post<{available:boolean;url:string|null;reason:string|null}>(`/cms/articles/${id}/generate-card`,null,{params:{force}})).data;
 
 // --- §8 / §9 placement from the article form -------------------------------
 export const setArticlePlacement=async(id:number,payload:{pin_home_minutes?:number|null;pin_trending_minutes?:number|null})=>(await api.post<CmsArticle>(`/cms/articles/${id}/placement`,payload)).data;
@@ -90,3 +95,14 @@ export const pullBulletin=async(id:number)=>(await api.post<BulletinRow>(`/cms/b
 export const fetchKycQueue=async(status:KycStatus)=>(await api.get<{items:KycProfileRow[];total:number}>('/cms/kyc',{params:{status}})).data;
 export const fetchKycApplication=async(id:number)=>(await api.get<KycProfileRow>(`/cms/kyc/${id}`)).data;
 export const decideKyc=async(id:number,action:'approve'|'reject'|'request-more',payload:Record<string,unknown>)=>(await api.post<KycProfileRow>(`/cms/kyc/${id}/${action}`,payload)).data;
+
+// --- §17 an illustration when no photograph exists -------------------------
+// `available:false` with a `reason` is a normal answer, not a failure: the
+// reason is a sentence written for the desk, so the caller shows it verbatim
+// rather than inventing its own wording. A refused sensitive topic arrives as
+// a 422 ApiError instead, carrying its own Telugu message.
+// The illustration carries no credit — nobody photographed it — so the media
+// it returns is a CmsMediaRef minus that field, plus what the desk pressed the
+// button to learn: which model drew it and whether it became the hero.
+type GeneratedImage=Omit<CmsMediaRef,'credit'>&{ai_generated:boolean;ai_model:string|null;is_hero:boolean};
+export const generateArticleImage=async(id:number,brief:string,force=false)=>(await api.post<{available:boolean;reason:string|null;media:GeneratedImage|null}>(`/cms/ai/articles/${id}/image`,{brief:brief||null,force})).data;

@@ -7,6 +7,7 @@
     GET    /cms/ai/drafts                 — AI copy awaiting a decision
     POST   /cms/ai/drafts/{id}/convert    — becomes an Article at SUBMITTED
     POST   /cms/ai/drafts/{id}/discard
+    POST   /cms/ai/articles/{id}/image    — draw an illustration (article.edit)
 
 Note what is missing: there is no publish route here, and `convert` returns an
 article in SUBMITTED. Everything below routes through the same editorial gate
@@ -20,11 +21,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.deps import Principal, require_permission
+from app.core.deps import Principal, require_any_permission, require_permission
+from app.core.errors import NotFoundError
 from app.db.session import get_db
 from app.models.ai import AiArticleDraft, AiSuggestion
+from app.models.content import Article
 from app.models.enums import AiDraftStatus, AiSuggestionStatus, AuditAction
-from app.services import ai_service, audit_service
+from app.services import ai_image_service, ai_service, audit_service
 
 router = APIRouter(prefix="/cms/ai", tags=["ai"])
 
@@ -244,3 +247,70 @@ def discard(
         request=request,
     )
     return _draft_row(row)
+
+
+class ImageIn(BaseModel):
+    brief: str | None = Field(default=None, max_length=500)
+    force: bool = False
+
+
+@router.post("/articles/{article_id}/image")
+def generate_image(
+    article_id: int,
+    payload: ImageIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    p: Principal = Depends(require_any_permission("article.edit", "article.edit_own")),
+):
+    """Draw an illustration for a story that has no picture.
+
+    `article.edit_own` is scoped the way `audio._article` scopes it: the
+    permission says a story may be edited, the scope says which one. Without
+    that check a stringer could spend the newsroom's image budget on somebody
+    else's copy.
+
+    Switched off and no-key answer `available: false` with the reason, exactly
+    as generate-audio does — those are states of the install, not errors an
+    editor caused. A provider failure and a refused topic still raise, because
+    the CMS must show what actually went wrong.
+    """
+    article = db.get(Article, article_id)
+    if article is None or article.deleted_at:
+        raise NotFoundError()
+    p.assert_scope(district_id=article.district_id, mandal_id=article.mandal_id)
+
+    reason = ai_image_service.unavailable_reason(db)
+    media = None
+    if reason is None:
+        media = ai_image_service.generate_for_article(
+            db, article, actor_id=p.id, brief=payload.brief, force=payload.force
+        )
+    audit_service.record(
+        db,
+        action=AuditAction.AI_RUN,
+        entity_type="article",
+        entity_id=article.id,
+        actor=p.user,
+        after={"image_media_id": media.id if media else None, "reason": reason},
+        request=request,
+    )
+    return {
+        "available": reason is None,
+        "media": (
+            {
+                "id": media.id,
+                "url": media.cdn_url,
+                "width": media.width,
+                "height": media.height,
+                "alt_te": media.alt_te,
+                "ai_generated": media.ai_generated,
+                "ai_model": media.ai_model,
+                # Whether it actually became the picture on the story is the
+                # outcome the editor pressed the button for.
+                "is_hero": article.hero_media_id == media.id,
+            }
+            if media
+            else None
+        ),
+        "reason": reason,
+    }

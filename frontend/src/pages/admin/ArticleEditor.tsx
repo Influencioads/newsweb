@@ -17,6 +17,7 @@ import { useI18n } from '@/i18n';
 import { useAuth } from '@/stores/auth';
 
 import { AssistPanel } from './editor/AssistPanel';
+import { ConvertPanel } from './editor/ConvertPanel';
 import { MetaSidebar } from './editor/MetaSidebar';
 import { EMPTY_FORM, fieldError, fromArticle, toPayload, wordCount, type ArticleForm } from './editor/form';
 import { useL } from './useL';
@@ -136,6 +137,13 @@ export default function ArticleEditor() {
               </p>
             </Section>
           </div>
+
+          {/* Voice and share card. Only for a saved story — both endpoints
+              take an article id — and only for someone the endpoints will let
+              through. */}
+          {editing && (can('article.edit') || can('article.edit_own')) ? (
+            <ConvertPanel articleId={Number(id)} voiceEnabled={form.voiceEnabled} />
+          ) : null}
 
           <AssistPanel
             title={form.title}

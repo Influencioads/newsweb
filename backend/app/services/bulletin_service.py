@@ -186,15 +186,43 @@ def _ai_connectives(db: Session, headlines: list[str]) -> list[str] | None:
     ):
         return None
     try:
+        # Editorial model, not the bulk one: eight bulletins a day, and every
+        # sentence it writes is read aloud to a listener who cannot re-read it.
         provider = get_ai(**settings_service.ai_credentials(db))
         if provider.key != "heuristic":
             # Unattended: bills the newsroom, no user to quota.
             ai_usage_service.check_budget(db)
-        draft = provider.write_draft(
-            topic="ఈ గంట వార్తల మధ్య కలిపే చిన్న వాక్యాలు",
-            notes="\n".join(headlines),
-            sources=[],
-        )
+        try:
+            draft = provider.write_draft(
+                topic="ఈ గంట వార్తల మధ్య కలిపే చిన్న వాక్యాలు",
+                notes="\n".join(headlines),
+                sources=[],
+            )
+        except Exception as exc:  # noqa: BLE001 — a failed call is still billed
+            # The inner try is only around the call: a refused budget spent
+            # nothing, and a row for it would make the AI screen's failure
+            # count read as outages that never happened.
+            if provider.key != "heuristic":
+                ai_usage_service.record(
+                    db,
+                    operation="draft",
+                    provider=provider.key,
+                    model=getattr(provider, "model_name", None),
+                    usage=getattr(provider, "last_usage", None),
+                    ok=False,
+                    error=str(getattr(exc, "details", exc))[:300],
+                )
+            raise
+        if provider.key != "heuristic":
+            # `check_budget` above reads a total this surface only contributes
+            # to because of this row.
+            ai_usage_service.record(
+                db,
+                operation="draft",
+                provider=provider.key,
+                model=getattr(provider, "model_name", None),
+                usage=getattr(provider, "last_usage", None),
+            )
     except (AiProviderError, Exception) as exc:  # noqa: BLE001
         logger.info("bulletin_ai_connectives_failed", error=str(exc)[:200])
         return None
@@ -348,6 +376,20 @@ def render(
         bulletin.status = BulletinStatus.FAILED
         bulletin.error = str(getattr(exc, "details", exc))[:500]
         db.flush()
+        # The segments that answered before the failing one are charged, and
+        # `workers/tasks/bulletin.py` retries a FAILED slot until attempts == 3
+        # — so one bad slot can pay for three renders. Unrecorded, the meter
+        # reads zero for all of it.
+        ai_usage_service.record(
+            db,
+            operation="tts",
+            provider=provider.key,
+            model=getattr(provider, "model_name", None),
+            actor_id=requested_by,
+            usage=getattr(provider, "last_usage", None),
+            ok=False,
+            error=bulletin.error,
+        )
         logger.warning("bulletin_render_failed", slot=bulletin.slot)
         return bulletin
 
@@ -380,6 +422,17 @@ def render(
     bulletin.status = BulletinStatus.READY
     bulletin.requested_by = requested_by
     db.flush()
+    # One row for the whole bulletin, however many segments it took — the same
+    # shape `ensure_audio` writes, so six unattended slots a day show up on the
+    # AI meter next to the article audio they share a budget with.
+    ai_usage_service.record(
+        db,
+        operation="tts",
+        provider=provider.key,
+        model=getattr(provider, "model_name", None),
+        actor_id=requested_by,
+        usage=getattr(provider, "last_usage", None),
+    )
     logger.info(
         "bulletin_rendered",
         slot=bulletin.slot,

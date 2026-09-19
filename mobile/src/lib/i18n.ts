@@ -127,6 +127,8 @@ const STRINGS = {
   'library.historyEmpty': { te: 'చదివిన కథనాలు ఇక్కడ కనిపిస్తాయి.', en: 'Articles you read appear here.' },
   'article.exclusive': { te: 'ఎక్స్‌క్లూజివ్', en: 'EXCLUSIVE' },
   'article.aiLabel': { te: 'AI సహాయంతో రూపొందించినది', en: 'AI-assisted' },
+  /** §7.4 — the label on an AI illustration, word for word as the web says it. */
+  'article.aiImage': { te: 'AI రూపొందించిన చిత్రం', en: 'AI-generated image' },
   'time.justNow': { te: 'ఇప్పుడే', en: 'just now' },
   'time.minutes': { te: 'ని. క్రితం', en: 'm ago' },
   'time.hours': { te: 'గం. క్రితం', en: 'h ago' },

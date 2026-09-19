@@ -15,18 +15,20 @@ about on the client than a key that sometimes is not there.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.api.v1.audio import _article
 from app.api.v1.audio import _payload as audio_payload
+from app.core.deps import Principal, require_any_permission
 from app.core.errors import NotFoundError
 from app.db.session import get_db
 from app.models.content import Article
-from app.models.enums import ArticleStatus
+from app.models.enums import ArticleStatus, AuditAction
 from app.models.video import Video
-from app.services import share_card_service, tts_service
+from app.services import audit_service, share_card_service, tts_service
 
 router = APIRouter(tags=["public"])
 
@@ -101,3 +103,35 @@ def share_card(short_id: str, db: Session = Depends(get_db)):
     if not url:
         raise NotFoundError()
     return RedirectResponse(url, status_code=307)
+
+
+@router.post("/cms/articles/{article_id}/generate-card")
+def generate_card(
+    article_id: int,
+    request: Request,
+    force: bool = False,
+    db: Session = Depends(get_db),
+    p: Principal = Depends(require_any_permission("article.edit", "article.edit_own")),
+):
+    """Render the share card now, mirroring generate-audio.
+
+    Like that endpoint it answers rather than raises when the asset cannot be
+    made: `reason` says which of the environment limits applied, because on a
+    host without Raqm no amount of retrying will help and staff need to read
+    that as an environment fact, not a mistake of theirs.
+    """
+    article = _article(db, article_id, p)
+    reason = share_card_service.unavailable_reason(db)
+    url = None if reason else share_card_service.ensure_card(db, article, force=force)
+    if url is None and reason is None:
+        reason = "The card could not be rendered. The server log has the detail."
+    audit_service.record(
+        db,
+        action=AuditAction.UPDATE,
+        entity_type="share_card",
+        entity_id=article.id,
+        actor=p.user,
+        after={"article_id": article.id, "available": url is not None},
+        request=request,
+    )
+    return {"available": url is not None, "url": url, "reason": reason}

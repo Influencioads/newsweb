@@ -469,10 +469,12 @@ def rewrite_one(
             actor_id=actor_id,
         )
 
-    provider = get_ai(**settings_service.ai_credentials(db))
+    provider = get_ai(**settings_service.ai_credentials(db, bulk=True))
     # The rewrite pass is the highest-volume spender: hourly, up to
-    # crawl.hourly_item_cap items a run. It bills to the newsroom, not to the
-    # editor who happened to trigger it, so only the budget is checked here.
+    # crawl.hourly_item_cap items a run — which is the whole reason ai.bulk_model
+    # exists, because the editorial model at this volume costs twice the monthly
+    # budget on its own. It bills to the newsroom, not to the editor who
+    # happened to trigger it, so only the budget is checked here.
     if provider.key != "heuristic":
         ai_usage_service.check_budget(db)
     try:

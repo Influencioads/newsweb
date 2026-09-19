@@ -77,23 +77,32 @@ _HERO_H = 340
 _PAD = 56
 
 
-def available(db) -> bool:
-    """Whether a card can be produced correctly on this host.
+def unavailable_reason(db) -> str | None:
+    """Why a card cannot be produced on this host, or None when it can.
 
     Three separate things, all required: the admin has not switched cards off,
     a Telugu-capable font exists, and Pillow can shape Telugu. The third is the
-    one that silently fails everywhere else.
+    one that silently fails everywhere else, and the one staff hit on a Windows
+    box — so each gets its own sentence rather than a single "unavailable".
     """
     if not settings_service.get_bool(db, "share_card.enabled"):
-        return False
+        return "Share cards are switched off in site settings."
     try:
         telugu_font_path("bold")
     except FontMissingError:
-        return False
+        return "No Telugu font is installed on this server."
     if not telugu_shaping_available():
         logger.warning("share_card_unavailable_no_raqm")
-        return False
-    return True
+        return (
+            "This server's Pillow was built without Raqm, so Telugu cannot be "
+            "shaped. A card made here would be unreadable, so none is made."
+        )
+    return None
+
+
+def available(db) -> bool:
+    """Whether a card can be produced correctly on this host."""
+    return unavailable_reason(db) is None
 
 
 def card_hash(article: Article, hero_url: str | None) -> str:
@@ -282,8 +291,14 @@ def _domain() -> str:
     return (urlparse(settings.APP_URL).netloc or "").replace("www.", "")
 
 
-def ensure_card(db, article: Article) -> str | None:
-    """The card's public URL, rendering it on a miss. Never raises."""
+def ensure_card(db, article: Article, *, force: bool = False) -> str | None:
+    """The card's public URL, rendering it on a miss. Never raises.
+
+    `force` skips the cache hit. The key is content-addressed, so an edit
+    already re-renders; force is for the cases the digest cannot see — a
+    changed template, a hero photo replaced behind the same URL, or a stored
+    object someone wants redrawn.
+    """
     if not available(db):
         return None
     try:
@@ -295,7 +310,7 @@ def ensure_card(db, article: Article) -> str | None:
         # A hit costs one HEAD. The key is content-addressed, so an existing
         # object is by definition the current card.
         try:
-            if storage.exists(key):
+            if not force and storage.exists(key):
                 return storage.url_for(key)
         except Exception:  # noqa: BLE001 — a storage hiccup means re-render
             pass

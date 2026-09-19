@@ -42,6 +42,7 @@ def get_tts(
     base_url: str = "",
     model: str = "",
     voice: str = "",
+    speed: float = 1.0,
 ) -> TtsProvider:
     """An unknown name falls back to `local` rather than raising: a typo in a
     settings row must not take article pages down, it must only mean no audio.
@@ -52,5 +53,11 @@ def get_tts(
     name = (provider or "local").lower()
     chosen = _PROVIDERS.get(name, LocalTts)
     if name in _CONFIGURABLE:
-        return chosen(api_key=api_key, base_url=base_url, model=model, voice=voice)
+        return chosen(
+            api_key=api_key,
+            base_url=base_url,
+            model=model,
+            voice=voice,
+            speed=speed,
+        )
     return chosen()

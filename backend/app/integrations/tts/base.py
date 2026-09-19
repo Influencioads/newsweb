@@ -12,7 +12,7 @@ every provider gets the same caching and cost ceiling for free.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(slots=True)
@@ -21,6 +21,11 @@ class Synthesis:
     mime: str
     duration_sec: int
     voice: str
+    #: What the vendor said this call cost, in its own envelope (aimlapi
+    #: reports `meta.usage.usd_spent`). The service sums it across segments and
+    #: writes one ledger row; see `ai_usage_service.record`. Empty is the honest
+    #: answer for a provider that reports nothing, and for the local no-op.
+    usage: dict[str, float | int] = field(default_factory=dict)
 
 
 class TtsProvider(ABC):
@@ -28,6 +33,10 @@ class TtsProvider(ABC):
     #: False means "this provider cannot produce a file" — the reader falls back
     #: to the on-device voice, which is exactly the pre-§19 behaviour.
     can_synthesise: bool = True
+    #: Usage reported by the most recent synthesis, in the provider's own
+    #: envelope. `synthesise_long` leaves the sum across segments here, and
+    #: `ensure_audio` bills it. Replaced, never mutated in place.
+    last_usage: dict[str, float | int] = {}
 
     @abstractmethod
     def synthesise(

@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings as env_settings
 from app.core.errors import ValidationError
 from app.core.security import decrypt_secret, encrypt_secret
+from app.integrations.ai import catalogue
 from app.models.setting import AppSetting
 
 _CACHE_TTL = 30.0
@@ -49,6 +50,12 @@ class Spec:
     def __init__(self, default: Any, kind: str, description: str) -> None:
         self.default, self.kind, self.description = default, kind, description
 
+
+#: The sentinel `voice.voice_name` carries when no specific voice is chosen.
+#: A `str` setting rejects the empty string, so the absence of a choice has to
+#: be spelled. It lives here, beside the setting it belongs to, because this is
+#: where it must be turned back into "no choice" before an adapter sees it.
+DEFAULT_VOICE_SENTINEL = "default"
 
 #: The complete, closed set of editable settings. A key not listed here cannot
 #: be written — an unknown key is a typo or an injection attempt, never a
@@ -84,16 +91,42 @@ SPECS: dict[str, Spec] = {
         "OpenAI-compatible adapters (aimlapi, openai). Blank uses the default.",
     ),
     "ai.model": Spec(
-        "",
+        catalogue.DEFAULT_TEXT_MODEL,
         "str_optional",
-        "Override the model name sent to the provider. Blank uses the adapter's "
-        "default. aimlapi exposes many models, so this is how you pick one.",
+        "The EDITORIAL model: the one used where a human reads every word "
+        "before a reader does — AI drafts and bulletin scripts. The default is "
+        "deliberately not blank, so the best Telugu we measured is in use "
+        "before an admin opens this screen, and so it beats a stale "
+        "AIMLAPI_MODEL still exported by the deploy environment. Anything that "
+        "runs by the hundred belongs on ai.bulk_model instead.",
+    ),
+    "ai.bulk_model": Spec(
+        catalogue.DEFAULT_BULK_MODEL,
+        "str_optional",
+        "The high-volume model: the hourly crawl rewrite and the daily topic "
+        "pass. It is a separate setting because volume changes the answer — at "
+        "60 rewrites an hour the editorial model runs to about ₹34,000 a month "
+        "against a ₹15,000 budget, and this one to about ₹6,100 for Telugu "
+        "that measured just as correct on the same prompt.",
     ),
     "ai.daily_suggestion_limit": Spec(
         20, "int", "Maximum suggestions generated per day — the §18 cost ceiling."
     ),
     "ai.min_score": Spec(
         0.35, "float", "Suggestions scoring below this are not shown."
+    ),
+    "ai.image_enabled": Spec(
+        False,
+        "bool",
+        "Allow generating an illustration for a story. Off like every other "
+        "spending switch: one image costs about twelve rewrites.",
+    ),
+    "ai.image_model": Spec(
+        catalogue.DEFAULT_IMAGE_MODEL,
+        "str_optional",
+        "Which model draws that illustration. The default is the only one "
+        "measured that left real space for a headline and drew no garbled "
+        "lettering.",
     ),
     # --- §20 / §21 voice ----------------------------------------------------
     "voice.enabled": Spec(
@@ -113,10 +146,12 @@ SPECS: dict[str, Spec] = {
         "deploy environment. Write-only, like the AI key.",
     ),
     "voice.model": Spec(
-        "",
+        catalogue.DEFAULT_TTS_MODEL,
         "str_optional",
         "Speech model to use where the provider exposes a choice (aimlapi). "
-        "Blank uses the adapter default.",
+        "The default is the cheapest one measured that returns a real MP3 — "
+        "sixteen times cheaper than the next that worked. Blank uses the "
+        "adapter default.",
     ),
     "voice.language": Spec("te-IN", "str", "Synthesis language tag."),
     "voice.auto_generate_on_publish": Spec(
@@ -135,6 +170,18 @@ SPECS: dict[str, Spec] = {
         "Provider voice id, or 'default' to let the adapter choose. Changing "
         "this does not re-render existing audio — use the Voice screen's "
         "regenerate, which is the only action that spends again.",
+    ),
+    "voice.speed": Spec(
+        1.0,
+        "float",
+        "Speaking pace, 0.25 to 4.0 (1.0 is the voice's own). This is the only "
+        "tone control aimlapi actually forwards — it silently accepts and "
+        "drops every other field, so a slider for 'style' or 'instructions' "
+        "would be a lie on this screen. A slightly slower pace, around 0.95, "
+        "reads as a news bulletin rather than an advertisement; everything "
+        "else about tone comes from the voice you pick. Ignored by models "
+        "whose schema does not declare it, and clamped into range rather than "
+        "rejected at the provider.",
     ),
     "voice.backfill_enabled": Spec(
         False,
@@ -322,6 +369,27 @@ SPECS: dict[str, Spec] = {
         "Ignore feed entries older than this. A source that republishes its "
         "archive should not fill the queue with last month's news.",
     ),
+}
+
+#: What the settings screen should offer for the keys where free text is a
+#: trap: a model id nobody proof-reads becomes a 25-second timeout with no
+#: message an editor can act on. `_coerce` still accepts any string for these —
+#: the catalogue is a measured shortlist, not a whitelist, and an install that
+#: needs a model we never tried must not be blocked by a dropdown.
+_CHOICES: dict[str, list[Any]] = {
+    "ai.model": catalogue.choices_for("text"),
+    "ai.bulk_model": catalogue.choices_for("text"),
+    "ai.image_model": catalogue.choices_for("image"),
+    "voice.model": catalogue.choices_for("tts"),
+    # Voices belong to a model and this list cannot see which model is
+    # selected, so it offers the default model's. A leftover choice from
+    # another vendor is repaired at call time by `catalogue.valid_voice`, not
+    # here. The sentinel leads because it is the stored default and a screen
+    # whose dropdown omits its own current value looks broken.
+    "voice.voice_name": [
+        DEFAULT_VOICE_SENTINEL,
+        *catalogue.tts_voices(catalogue.DEFAULT_TTS_MODEL),
+    ],
 }
 
 
@@ -524,13 +592,19 @@ def set_many(
 
 
 def describe() -> list[dict[str, Any]]:
-    """Metadata for the admin screen so the UI need not hard-code the list."""
+    """Metadata for the admin screen so the UI need not hard-code the list.
+
+    `choices` is the shortlist to render as a dropdown: measured model objects
+    for the model settings, plain voice ids for `voice.voice_name`, and None
+    wherever the value is genuinely free-form and the screen should show a box.
+    """
     return [
         {
             "key": key,
             "kind": spec.kind,
             "default": spec.default,
             "description": spec.description,
+            "choices": _CHOICES.get(key),
         }
         for key, spec in SPECS.items()
     ]
@@ -539,34 +613,63 @@ def describe() -> list[dict[str, Any]]:
 # --------------------------------------------------------------------------- #
 # Convenience readers used across services
 # --------------------------------------------------------------------------- #
-def ai_credentials(db: Session) -> dict[str, str]:
+def ai_credentials(db: Session, *, bulk: bool = False) -> dict[str, str]:
     """Everything `get_ai` needs, resolved from the editable settings.
 
     One place so the four call sites (topics, drafts, bulletin scripts, crawl
     rewrites) cannot drift apart — a key set in the CMS must reach all of them
     or an admin sees AI work on one screen and silently fall back on another.
+
+    `bulk` is which of the two models that call site gets, and it is the
+    difference between a ₹6,100 month and a ₹34,000 one. Bulk is for the work
+    that runs unattended and by the hundred — the crawl rewrite, up to 60 an
+    hour, and the daily topic pass, most of whose output an editor discards.
+    The other two stay editorial: a draft and a bulletin script are eight or
+    ten a day, and every word of them reaches a reader.
     """
     return {
         "provider": str(get(db, "ai.provider") or "heuristic").lower(),
         "api_key": get_secret(db, "ai.api_key"),
         "base_url": str(get(db, "ai.base_url") or ""),
-        "model": str(get(db, "ai.model") or ""),
+        "model": str(get(db, "ai.bulk_model" if bulk else "ai.model") or ""),
     }
 
 
-def tts_credentials(db: Session) -> dict[str, str]:
+def image_credentials(db: Session) -> dict[str, str]:
+    """The same four fields for `ai.image_model`.
+
+    A separate reader rather than a third flag on `ai_credentials`: an image
+    model is not substitutable for a text one, so a site handed the wrong one
+    fails at the provider, late and billed, instead of at the call.
+    """
+    return {
+        "provider": str(get(db, "ai.provider") or "heuristic").lower(),
+        "api_key": get_secret(db, "ai.api_key"),
+        "base_url": str(get(db, "ai.base_url") or ""),
+        "model": str(get(db, "ai.image_model") or ""),
+    }
+
+
+def tts_credentials(db: Session) -> dict[str, str | float]:
     """Everything `get_tts` needs, resolved from the editable settings.
 
     `voice.api_key` falls back to `ai.api_key` because aimlapi issues one key
     for both text and speech: an admin who pasted it once on this screen should
     not have to paste it again three fields further down.
+
+    `voice.voice_name` is resolved here rather than handed over raw. It carries
+    `DEFAULT_VOICE_SENTINEL` when no voice was chosen, and an adapter falls
+    back to its own default only on an empty string — so passing the sentinel
+    through sent a provider the literal voice id "default" and every synthesis
+    came back 400.
     """
+    voice = str(get(db, "voice.voice_name") or "").strip()
     return {
         "provider": str(get(db, "voice.provider") or "local").lower(),
         "api_key": get_secret(db, "voice.api_key") or get_secret(db, "ai.api_key"),
         "base_url": str(get(db, "ai.base_url") or ""),
         "model": str(get(db, "voice.model") or ""),
-        "voice": str(get(db, "voice.voice_name") or ""),
+        "voice": "" if voice == DEFAULT_VOICE_SENTINEL else voice,
     }
 
 

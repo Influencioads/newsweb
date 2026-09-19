@@ -34,10 +34,17 @@ from app.db.seed_content import seed_categories, seed_tags  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.content import Article, Category  # noqa: E402
-from app.models.enums import ArticleStatus, WorkflowState  # noqa: E402
+from app.models.enums import (  # noqa: E402
+    ArticleStatus,
+    RoleKey,
+    ScopeType,
+    UserStatus,
+    WorkflowState,
+)
 from app.models.setting import AppSetting  # noqa: E402
+from app.models.user import Role, User, UserRole  # noqa: E402
 from app.models.video import Video  # noqa: E402
-from app.services import settings_service, share_card_service  # noqa: E402
+from app.services import auth_service, settings_service, share_card_service  # noqa: E402
 
 engine = create_engine(
     "sqlite://",
@@ -124,6 +131,25 @@ def make_article(db: Session, *, short_id: str = "fmt001", video_id=None) -> Art
     db.add(article)
     db.flush()
     return article
+
+
+def staff_headers(db: Session, *, role: RoleKey, email: str) -> dict[str, str]:
+    user = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+    if user is None:
+        role_row = db.execute(select(Role).where(Role.key == role.value)).scalar_one()
+        user = User(
+            email=email, name_te="సిబ్బంది", name_en="Staff", status=UserStatus.ACTIVE
+        )
+        db.add(user)
+        db.flush()
+        db.add(
+            UserRole(user_id=user.id, role_id=role_row.id, scope_type=ScopeType.GLOBAL)
+        )
+        db.flush()
+    db.refresh(user)
+    _s, access, _r, _e = auth_service.create_session(db, user)
+    db.commit()
+    return {"Authorization": f"Bearer {access}"}
 
 
 def make_video(db: Session, *, published: bool = True) -> Video:
@@ -265,6 +291,94 @@ class TestShareCard:
         assert digest[:16] in key
 
 
+class TestGenerateCardFromTheCms:
+    """The staff button behind "చిత్రంగా మార్చండి".
+
+    It mirrors generate-audio: same permissions, and an answer rather than an
+    error when the host cannot draw the card.
+    """
+
+    def test_it_needs_the_same_permission_generate_audio_does(
+        self, db: Session, client: TestClient
+    ) -> None:
+        article = make_article(db, short_id="gcard1")
+        db.commit()
+        headers = staff_headers(
+            db, role=RoleKey.MODERATOR, email="k-mod@test.example.com"
+        )
+        response = client.post(
+            f"/api/v1/cms/articles/{article.id}/generate-card", headers=headers
+        )
+        assert response.status_code == 403
+
+    def test_an_unavailable_host_says_why_instead_of_failing(
+        self, db: Session, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A Windows desk has no Raqm. That is an environment limit, and the
+        reason has to say so — otherwise staff retry a button that cannot work."""
+        monkeypatch.setattr(
+            "app.services.share_card_service.telugu_shaping_available", lambda: False
+        )
+        article = make_article(db, short_id="gcard2")
+        db.commit()
+        headers = staff_headers(
+            db, role=RoleKey.SUB_EDITOR, email="k-sub@test.example.com"
+        )
+        body = client.post(
+            f"/api/v1/cms/articles/{article.id}/generate-card", headers=headers
+        ).json()
+        assert body["available"] is False
+        assert body["url"] is None
+        assert "Raqm" in body["reason"]
+
+    def test_a_rendered_card_comes_back_with_its_url(
+        self, db: Session, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "app.services.share_card_service.telugu_shaping_available", lambda: True
+        )
+        monkeypatch.setattr(
+            "app.services.share_card_service.ensure_card",
+            lambda *_a, **_k: "https://cdn.example.com/share-cards/gcard3/abc.png",
+        )
+        article = make_article(db, short_id="gcard3")
+        db.commit()
+        headers = staff_headers(
+            db, role=RoleKey.SUB_EDITOR, email="k-sub@test.example.com"
+        )
+        body = client.post(
+            f"/api/v1/cms/articles/{article.id}/generate-card", headers=headers
+        ).json()
+        assert body["available"] is True
+        assert body["url"].endswith("abc.png")
+        assert body["reason"] is None
+
+    def test_force_reaches_the_service(
+        self, db: Session, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Without this the regenerate button is a no-op: the key is content
+        addressed, so an unchanged headline would keep hitting the same object."""
+        seen: dict[str, object] = {}
+        monkeypatch.setattr(
+            "app.services.share_card_service.telugu_shaping_available", lambda: True
+        )
+
+        def _capture(_db, _article, *, force=False):
+            seen["force"] = force
+            return "https://cdn.example.com/card.png"
+
+        monkeypatch.setattr("app.services.share_card_service.ensure_card", _capture)
+        article = make_article(db, short_id="gcard4")
+        db.commit()
+        headers = staff_headers(
+            db, role=RoleKey.SUB_EDITOR, email="k-sub@test.example.com"
+        )
+        client.post(
+            f"/api/v1/cms/articles/{article.id}/generate-card?force=true", headers=headers
+        )
+        assert seen["force"] is True
+
+
 class TestFontFallback:
     def test_the_telugu_face_has_no_latin_letters(self) -> None:
         """Verified, not assumed — this is why a Latin face is bundled too.
@@ -384,3 +498,45 @@ class TestCrawlerSurface:
         assert "Disallow: /_og/" in text
         assert "Disallow: /admin" in text
         assert "Sitemap:" in text
+
+
+class TestTheCmsArticleListSurvivesTags:
+    """`/cms/articles` handed the ORM rows straight to its response model, and
+    `Article.tags` holds ArticleTag *links* while the schema's `tags` holds
+    resolved references. Any article carrying a tag made pydantic reject the
+    whole page, so the list 500s and the CMS shows nothing — a seeded tag was
+    enough to do it."""
+
+    def _tagged(self, db: Session, short_id: str) -> Article:
+        from app.models.content import ArticleTag, Tag
+
+        article = make_article(db, short_id=short_id)
+        tag = db.scalars(select(Tag).limit(1)).first()
+        assert tag is not None, "seed_tags should have run"
+        db.add(ArticleTag(article_id=article.id, tag_id=tag.id, sort=0))
+        db.flush()
+        db.commit()
+        return article
+
+    def test_a_tagged_article_does_not_break_either_list(
+        self, db: Session, client: TestClient
+    ) -> None:
+        article = self._tagged(db, "tagged1")
+        headers = staff_headers(
+            db, role=RoleKey.SUPER_ADMIN, email="listtags@seed.example.com"
+        )
+        response = client.get("/api/v1/cms/articles", headers=headers)
+        assert response.status_code == 200, response.text
+        rows = {row["id"]: row for row in response.json()["articles"]}
+        assert article.id in rows
+        tags = rows[article.id]["tags"]
+        assert tags and isinstance(tags[0], dict)
+        assert set(tags[0]) >= {"id", "slug", "name_te", "name_en"}
+
+        # The review queue builds its rows the same way and broke the same way.
+        article.workflow_state = WorkflowState.SUBMITTED
+        db.commit()
+        pending = client.get("/api/v1/cms/articles/pending", headers=headers)
+        assert pending.status_code == 200, pending.text
+        queued = {row["id"]: row for row in pending.json()["articles"]}
+        assert queued[article.id]["tags"][0]["slug"]

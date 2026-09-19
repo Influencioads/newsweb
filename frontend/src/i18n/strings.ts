@@ -373,6 +373,11 @@ export const STRINGS = {
   'ui.fontStepDefault': { te: 'సాధారణం', en: 'Default' },
   'ui.fontStepLarger': { te: 'పెద్దది', en: 'Larger' },
   'ui.fontStepLargest': { te: 'అతి పెద్దది', en: 'Largest' },
+
+  // --- §17 asking a provider to draw something -----------------------------
+  // Chrome, not domain copy: the picker's own wording stays inline beside it.
+  'ui.generate': { te: 'తయారు చేయండి', en: 'Generate' },
+  'ui.generating': { te: 'తయారవుతోంది…', en: 'Generating…' },
 } as const satisfies Record<string, Record<Language, string>>;
 
 export type StringKey = keyof typeof STRINGS;

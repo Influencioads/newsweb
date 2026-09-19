@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { memo, type ReactNode } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { absoluteMediaUrl } from '@/api/client';
@@ -112,6 +112,8 @@ function useCardLabel(article: ArticleCardType): string {
     article.ai_generated && t('ui.ai'),
     article.category && pick(article.category.name_te, article.category.name_en),
     pick(article.title_te, article.title_en),
+    // The alt text deliberately leaves this out, so the card says it once.
+    article.hero?.ai_generated && t('article.aiImage'),
     article.district && pick(article.district.name_te, article.district.name_en),
     timeAgo(article.published_at, language),
   ]
@@ -119,21 +121,36 @@ function useCardLabel(article: ArticleCardType): string {
     .join(', ');
 }
 
+/**
+ * The picture, and — §7.4, non-optional — the label when it was drawn by a
+ * model. That flag lives on the media, not on the article: a human-written
+ * story illustrated by AI has `article.ai_generated === false`, so the badge
+ * in `Flags` never speaks for it. The label is decorative here because
+ * `useCardLabel` already says it once for the whole card.
+ */
 function Thumb({ article, style }: { article: ArticleCardType; style: object }) {
   const styles = useStyles();
   const m = useMotion();
+  const { t } = useI18n();
   const uri = absoluteMediaUrl(article.hero?.url ?? null);
   if (!uri) return <View style={[style, styles.fallback]} />;
   return (
-    <Image
-      source={{ uri }}
-      style={style}
-      contentFit="cover"
-      placeholder={article.hero?.blurhash ? { blurhash: article.hero.blurhash } : undefined}
-      transition={m.imageTransition}
-      recyclingKey={article.short_id}
-      accessibilityLabel={article.hero?.alt_te ?? ''}
-    />
+    <View style={[style, styles.thumbBox]}>
+      <Image
+        source={{ uri }}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+        placeholder={article.hero?.blurhash ? { blurhash: article.hero.blurhash } : undefined}
+        transition={m.imageTransition}
+        recyclingKey={article.short_id}
+        accessibilityLabel={article.hero?.alt_te ?? ''}
+      />
+      {article.hero?.ai_generated ? (
+        <View style={styles.aiTag} aria-hidden>
+          <Badge tone="ai" icon="sparkles" size="xs" label={t('article.aiImage')} />
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -221,6 +238,12 @@ const useStyles = makeStyles((color) => ({
   card: { marginHorizontal: space.lg, marginTop: space.md },
   topline: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm },
   fallback: { backgroundColor: color.placeholder },
+  /* The image fills this box absolutely so the AI label can sit on top of it. */
+  thumbBox: { overflow: 'hidden' },
+  /* Top of the frame: the foot of the lead image already carries the flag
+     strip. Both insets are set so a narrow row thumb ellipsizes the label
+     instead of clipping it mid-word. */
+  aiTag: { position: 'absolute', top: space.xs, left: space.xs, right: space.xs },
 
   leadImage: {
     width: '100%',

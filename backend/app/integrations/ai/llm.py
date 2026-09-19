@@ -25,6 +25,7 @@ import httpx
 
 from app.core.config import settings
 from app.core.errors import AiProviderError
+from app.integrations.ai import catalogue
 from app.integrations.ai.base import AiProvider, DraftText, RewriteText, TopicIdea
 
 _JSON_BLOCK = re.compile(r"\{.*\}|\[.*\]", re.DOTALL)
@@ -71,7 +72,7 @@ _DEFAULT_MODEL = {
     # aimlapi namespaces every model by its originating vendor, so the bare
     # OpenAI name is not a valid id there — it 404s at generation time, which
     # surfaces as a provider timeout rather than an obvious "no such model".
-    "aimlapi": "openai/gpt-4o-mini",
+    "aimlapi": catalogue.DEFAULT_TEXT_MODEL,
     "gemini": "gemini-2.0-flash",
     "anthropic": "claude-sonnet-5",
 }
@@ -191,22 +192,29 @@ class LlmAi(AiProvider):
         timeout = settings.AI_DEFAULT_TIMEOUT_MS / 1000
         full = f"{_RULES}\n\n{prompt}"
 
+        # Measured 2026-09-18: the old 2048 ceiling was spent on thinking by
+        # every reasoning model, the answer came back cut off mid-JSON, and
+        # `_parse_json` then raised "no JSON in model response" — for a call the
+        # provider had already charged for. See catalogue.MAX_OUTPUT_TOKENS.
         if self.key == "gemini":
             payload = {
                 "contents": [{"parts": [{"text": full}]}],
-                "generationConfig": {"temperature": 0.4, "maxOutputTokens": 2048},
+                "generationConfig": {
+                    "temperature": 0.4,
+                    "maxOutputTokens": catalogue.MAX_OUTPUT_TOKENS,
+                },
             }
         elif self.key in _OPENAI_DIALECT:
             payload = {
                 "model": model,
                 "temperature": 0.4,
-                "max_tokens": 2048,
+                "max_tokens": catalogue.MAX_OUTPUT_TOKENS,
                 "messages": [{"role": "user", "content": full}],
             }
         else:
             payload = {
                 "model": model,
-                "max_tokens": 2048,
+                "max_tokens": catalogue.MAX_OUTPUT_TOKENS,
                 "temperature": 0.4,
                 "messages": [{"role": "user", "content": full}],
             }

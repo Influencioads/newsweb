@@ -14,7 +14,7 @@ import { QueryState, Skeleton } from '@/components/ui/State';
 import { useToast } from '@/components/ui/Toast';
 import * as cmsApi from '@/features/cms/api';
 import { useI18n, useScript } from '@/i18n';
-import type { SettingsPayload } from '@/types/cms';
+import type { SettingSpec, SettingsPayload } from '@/types/cms';
 import { cn } from '@/utils/cn';
 
 /**
@@ -44,6 +44,82 @@ const BEAT_KEYS = [
   { key: 'govt_jobs', te: 'ఉద్యోగాలు', en: 'Government jobs' },
   { key: 'general', te: 'సాధారణం', en: 'General' },
 ] as const;
+
+/**
+ * One entry of the measured shortlist `settings_service.describe()` hangs on a
+ * model setting.
+ *
+ * `usd_per_call` is what one real call cost on the day the catalogue was
+ * measured — not a rate card, and `0` means the vendor reported no spend at
+ * all, which is unknown rather than free.
+ */
+interface ModelChoice {
+  id: string;
+  label: string;
+  tier: string;
+  usd_per_call: number;
+  note: string;
+  /** TTS only: the voices this model accepts. Empty means it takes none. */
+  voices?: string[];
+}
+
+/** `choices` is new and only the model settings carry it, so it is widened
+ *  here rather than pushed onto the `SettingSpec` every other screen shares. */
+type SpecWithChoices = SettingSpec & { choices?: Array<ModelChoice | string> | null };
+
+/** The measured price of one call, in the dollars it actually cost. */
+const usdPerCall = (value: number, en: boolean) =>
+  value > 0
+    ? `$${value.toFixed(value < 0.001 ? 6 : 4)}`
+    : en
+      ? 'cost not reported'
+      : 'ఖర్చు నివేదించలేదు';
+
+/**
+ * One model dropdown, priced.
+ *
+ * The cost sits on the option rather than in a help line because the choice
+ * being made here spans 29x — an admin comparing two models is reading the
+ * list, not the text under it. The note below the field is the catalogue's own
+ * sentence about the selected model, shown verbatim: it was written for
+ * whoever is choosing, and paraphrasing it would lose the measurement.
+ *
+ * A stored model that is not on the shortlist keeps its own option. The
+ * catalogue is a shortlist, not a whitelist, and a screen that quietly showed
+ * "adapter default" for a configured model would change it on the next save.
+ */
+function ModelField({
+  label,
+  hint,
+  choices,
+  value,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  hint?: string;
+  choices: ModelChoice[];
+  value: string;
+  onChange: (id: string) => void;
+  disabled?: boolean;
+}) {
+  const { language } = useI18n();
+  const en = language === 'en';
+  const selected = choices.find((c) => c.id === value);
+  return (
+    <Field label={label} hint={selected ? selected.note : hint}>
+      <Select value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled}>
+        <option value="">{en ? 'Adapter default' : 'అడాప్టర్ డిఫాల్ట్'}</option>
+        {choices.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.label} — {usdPerCall(c.usd_per_call, en)}
+          </option>
+        ))}
+        {value && !selected ? <option value={value}>{value}</option> : null}
+      </Select>
+    </Field>
+  );
+}
 
 function SettingsSkeleton() {
   return (
@@ -114,6 +190,19 @@ export default function SettingsPage() {
       (str('voice.provider') === 'google' && env.tts_google_configured) ||
       (str('voice.provider') === 'bhashini' && env.tts_bhashini_configured) ||
       (str('voice.provider') === 'aimlapi' && voiceKeySet);
+
+    const choicesOf = (key: string) => (payload.specs as SpecWithChoices[]).find((sp) => sp.key === key)?.choices ?? [];
+    const models = (key: string) => choicesOf(key).filter((c): c is ModelChoice => typeof c === 'object' && c !== null);
+    // The voices belong to the chosen model — `alloy` left behind on an
+    // ElevenLabs model is a 400 nobody can read — so the model's own list wins.
+    // The flat `voice.voice_name` list is the default model's and is only the
+    // fallback for an install whose backend does not send per-model voices yet.
+    const voicesFor = (model: string) =>
+      models('voice.model').find((c) => c.id === model)?.voices ??
+      choicesOf('voice.voice_name').filter((c): c is string => typeof c === 'string');
+    // Google and Bhashini name their voices themselves; offering them the
+    // aimlapi catalogue would be confidently wrong, so they keep the text box.
+    const voiceOptions = str('voice.provider') === 'aimlapi' ? voicesFor(str('voice.model')) : null;
 
     return (
       <>
@@ -202,8 +291,9 @@ export default function SettingsPage() {
           {/* The key is write-only: the API returns a mask, never the value, so
               what lands here is a mask the admin can overwrite but not read. */}
           {str('ai.provider') !== 'heuristic' ? (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <>
               <Field
+                className="sm:max-w-md"
                 label={en ? 'API key' : 'API కీ'}
                 hint={keySet
                   ? (en ? 'A key is saved. Type a new one to replace it, or clear the box to remove it.'
@@ -216,16 +306,53 @@ export default function SettingsPage() {
                   value={str('ai.api_key')}
                   onChange={(e) => set('ai.api_key', e.target.value)} />
               </Field>
-              <Field
-                label={en ? 'Model' : 'మోడల్'}
-                hint={en ? 'Blank uses the adapter default. aimlapi namespaces models, e.g. openai/gpt-4o-mini.'
-                         : 'ఖాళీ అయితే డిఫాల్ట్. aimlapiలో పేరు ఇలా ఉంటుంది: openai/gpt-4o-mini.'}
-              >
-                <Input script="en" autoComplete="off" spellCheck={false}
-                  placeholder="openai/gpt-4o-mini"
+
+              {/* The whole reason there are two model settings is the bill.
+                  An admin who cannot see that will set both to the best model
+                  and find out at the end of the month. */}
+              <p className={note}>
+                {en
+                  ? 'Two models, because the volumes are not comparable: the editorial model writes the eight or ten pieces a day a human reads every word of, while the bulk model runs the hourly crawl at sixty rewrites an hour. At crawl volume the cheapest good model costs about ₹6,000 a month and the best one about ₹34,000 — same story, same prompt.'
+                  : 'రెండు మోడల్స్ ఎందుకంటే పని పరిమాణం ఒకటి కాదు: ఎడిటోరియల్ మోడల్ రోజుకు ఎనిమిది–పది కథనాలు రాస్తుంది, ప్రతి పదాన్నీ మనిషి చదువుతాడు. బల్క్ మోడల్ గంటకు అరవై పునర్లేఖనాల క్రాల్‌ను నడుపుతుంది. ఆ స్థాయిలో చవకైన మంచి మోడల్ నెలకు దాదాపు ₹6,000, అత్యుత్తమమైనది దాదాపు ₹34,000 — ఒకే కథనం, ఒకే ప్రాంప్ట్.'}
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <ModelField
+                  label={en ? 'Editorial model — a human reads every word' : 'ఎడిటోరియల్ మోడల్ — ప్రతి పదాన్నీ మనిషి చదువుతాడు'}
+                  hint={en ? 'Drafts and bulletin scripts. Blank uses the adapter default.'
+                           : 'డ్రాఫ్ట్‌లు, బులెటిన్ స్క్రిప్ట్‌లు. ఖాళీ అయితే అడాప్టర్ డిఫాల్ట్.'}
+                  choices={models('ai.model')}
                   value={str('ai.model')}
-                  onChange={(e) => set('ai.model', e.target.value)} />
-              </Field>
+                  onChange={(id) => set('ai.model', id)}
+                />
+                <ModelField
+                  label={en ? 'Bulk model — the hourly crawl, sixty an hour' : 'బల్క్ మోడల్ — గంటవారీ క్రాల్, గంటకు అరవై'}
+                  hint={en ? 'Crawl rewrites and topic discovery. Blank uses the adapter default.'
+                           : 'క్రాల్ పునర్లేఖనాలు, అంశ సూచనలు. ఖాళీ అయితే అడాప్టర్ డిఫాల్ట్.'}
+                  choices={models('ai.bulk_model')}
+                  value={str('ai.bulk_model')}
+                  onChange={(id) => set('ai.bulk_model', id)}
+                />
+              </div>
+            </>
+          ) : null}
+
+          {/* --------------------------------------------- §17 AI images -- */}
+          <Switch checked={bool('ai.image_enabled')} onChange={(v) => set('ai.image_enabled', v)}
+            disabled={!bool('ai.enabled') || !keySet}
+            label={en ? 'Draw an illustration when there is no photograph' : 'ఫోటో లేనప్పుడు చిత్రం గీయండి'}
+            hint={en
+              ? 'Needs AI on and a key saved above. Sensitive stories — communal, sexual violence, a named minor, suicide — are refused before any call is made, and every generated image carries a visible label.'
+              : 'పైన AI ఆన్ కావాలి, కీ సేవ్ కావాలి. సున్నితమైన కథనాలు — మతపరమైనవి, లైంగిక హింస, మైనర్లు, ఆత్మహత్య — కాల్ చేయకముందే తిరస్కరించబడతాయి. తయారైన ప్రతి చిత్రంపై లేబుల్ కనిపిస్తుంది.'} />
+          {bool('ai.image_enabled') ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <ModelField
+                label={en ? 'Image model' : 'ఇమేజ్ మోడల్'}
+                hint={en ? 'Blank uses the adapter default.' : 'ఖాళీ అయితే అడాప్టర్ డిఫాల్ట్.'}
+                choices={models('ai.image_model')}
+                value={str('ai.image_model')}
+                onChange={(id) => set('ai.image_model', id)}
+                disabled={!bool('ai.enabled') || !keySet}
+              />
             </div>
           ) : null}
         </Section>
@@ -339,15 +466,13 @@ export default function SettingsPage() {
                   value={str('voice.api_key')}
                   onChange={(e) => set('voice.api_key', e.target.value)} />
               </Field>
-              <Field
+              <ModelField
                 label={en ? 'Speech model' : 'స్పీచ్ మోడల్'}
                 hint={en ? 'Blank uses openai/gpt-4o-mini-tts.' : 'ఖాళీ అయితే openai/gpt-4o-mini-tts.'}
-              >
-                <Input script="en" autoComplete="off" spellCheck={false}
-                  placeholder="openai/gpt-4o-mini-tts"
-                  value={str('voice.model')}
-                  onChange={(e) => set('voice.model', e.target.value)} />
-              </Field>
+                choices={models('voice.model')}
+                value={str('voice.model')}
+                onChange={(id) => set('voice.model', id)}
+              />
             </div>
           ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
@@ -356,14 +481,32 @@ export default function SettingsPage() {
                 value={str('voice.language')}
                 onChange={(e) => set('voice.language', e.target.value)} />
             </Field>
-            <Field
-              label={en ? 'Voice name' : 'వాయిస్ పేరు'}
-              hint={en ? 'Provider-specific, e.g. alloy for aimlapi.' : 'ప్రొవైడర్‌ను బట్టి మారుతుంది, ఉదా: alloy.'}
-            >
-              <Input script="en" autoComplete="off" placeholder="alloy"
-                value={str('voice.voice_name')}
-                onChange={(e) => set('voice.voice_name', e.target.value)} />
-            </Field>
+            {/* A model that takes no voice — minimax, hume — 400s when sent
+                one, so the field goes away rather than sitting there dead. */}
+            {voiceOptions && voiceOptions.length === 0 ? null : (
+              <Field
+                label={en ? 'Voice name' : 'వాయిస్ పేరు'}
+                hint={voiceOptions
+                  ? (en ? 'Only the voices the chosen speech model accepts. Another vendor’s voice is rejected outright.'
+                        : 'ఎంచుకున్న స్పీచ్ మోడల్ అంగీకరించే వాయిస్‌లు మాత్రమే. వేరే వెండర్ వాయిస్ తిరస్కరించబడుతుంది.')
+                  : (en ? 'Provider-specific, e.g. alloy for aimlapi.' : 'ప్రొవైడర్‌ను బట్టి మారుతుంది, ఉదా: alloy.')}
+              >
+                {voiceOptions ? (
+                  <Select value={str('voice.voice_name')} onChange={(e) => set('voice.voice_name', e.target.value)}>
+                    {voiceOptions.map((v) => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                    {str('voice.voice_name') && !voiceOptions.includes(str('voice.voice_name')) ? (
+                      <option value={str('voice.voice_name')}>{str('voice.voice_name')}</option>
+                    ) : null}
+                  </Select>
+                ) : (
+                  <Input script="en" autoComplete="off" placeholder="alloy"
+                    value={str('voice.voice_name')}
+                    onChange={(e) => set('voice.voice_name', e.target.value)} />
+                )}
+              </Field>
+            )}
           </div>
           <Switch checked={bool('voice.article_tts_enabled')} onChange={(v) => set('voice.article_tts_enabled', v)}
             disabled={!bool('voice.enabled')}

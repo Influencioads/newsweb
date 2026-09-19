@@ -99,6 +99,11 @@ const ShortCard = memo(function ShortCard({
           accessibilityLabel={article.hero?.alt_te ?? ''}
         />
       ) : null}
+      {/* §7.4 — the picture's own flag, not the story's: an AI illustration on
+          human-written copy is still labelled. */}
+      {heroUrl && article.hero?.ai_generated ? (
+        <Badge tone="ai" icon="sparkles" size="xs" label={t('article.aiImage')} style={styles.aiTag} />
+      ) : null}
 
       <View style={styles.body}>
         <View style={styles.kickers}>
@@ -301,6 +306,7 @@ const useStyles = makeStyles((color) => ({
     borderTopRightRadius: radius.lg,
     backgroundColor: color.placeholder,
   },
+  aiTag: { position: 'absolute', top: space.md, left: space.lg },
   // Room at the foot for the swipe hint that floats over the first card.
   body: { flex: 1, padding: space.lg, paddingBottom: space.xxl, gap: space.sm },
   kickers: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm },

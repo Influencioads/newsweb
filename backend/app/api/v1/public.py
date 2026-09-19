@@ -17,19 +17,22 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Response
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.deps import Principal, get_optional_principal
 from app.core.errors import NotFoundError
+from app.core.ratelimit import rate_limit
 from app.core.redis_client import cache_get, cache_set
 from app.db.base import utcnow
 from app.db.session import get_db
 from app.models.content import Article
+from app.models.geo import District, Locality, Mandal
 from app.models.video import Video
 from app.models.enums import HomeSectionKind, PinPlacement, TrendingScope
 from app.repositories import article_repo, discovery_repo, site_repo
-from app.services import trending_service
+from app.services import geocode_service, trending_service
 from app.schemas.public import (
     ArticleCardOut,
     ArticleDetailOut,
@@ -972,4 +975,54 @@ def local_feed(
         locality=LocalityOut.model_validate(locality_row) if locality_row else None,
         articles=_cards(articles, db, _district_map(db)),
         next_offset=offset + limit if has_more else None,
+    )
+
+
+class GeoResolveIn(BaseModel):
+    """A device's position. Never stored, never logged — see geocode_service."""
+
+    lat: float = Field(ge=-90, le=90)
+    lon: float = Field(ge=-180, le=180)
+
+
+class GeoResolveOut(BaseModel):
+    """Ids only. The client prefills the picker with these and the reader
+    confirms before anything is saved, which is the honest UX for a guess."""
+
+    matched: bool = False
+    state_code: str | None = None
+    district: DistrictOut | None = None
+    mandal: MandalOut | None = None
+    locality: LocalityOut | None = None
+
+
+@router.post(
+    "/geo/resolve",
+    response_model=GeoResolveOut,
+    summary="Which district/mandal/locality a GPS fix falls in",
+    description=(
+        "POST rather than GET on purpose: coordinates must never reach a URL, "
+        "an access log or a Referer header. Always 200 — an unmatched point "
+        "returns `matched: false` and the reader uses the manual picker, "
+        "which always works."
+    ),
+)
+def resolve_geo(
+    payload: GeoResolveIn,
+    db: Session = Depends(get_db),
+    _rl: None = Depends(rate_limit("geo_resolve", 6)),
+) -> GeoResolveOut:
+    place = geocode_service.resolve(db, payload.lat, payload.lon)
+    if not place.matched:
+        return GeoResolveOut(matched=False, state_code=place.state_code)
+
+    district = db.get(District, place.district_id)
+    mandal = db.get(Mandal, place.mandal_id) if place.mandal_id else None
+    locality = db.get(Locality, place.locality_id) if place.locality_id else None
+    return GeoResolveOut(
+        matched=True,
+        state_code=place.state_code,
+        district=DistrictOut.model_validate(district) if district else None,
+        mandal=MandalOut.model_validate(mandal) if mandal else None,
+        locality=LocalityOut.model_validate(locality) if locality else None,
     )

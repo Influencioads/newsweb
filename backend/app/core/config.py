@@ -132,6 +132,12 @@ class Settings(BaseSettings):
     AI_ALLOWED_SOURCE_FEEDS: str = ""
 
     # --- TTS (§19–21) -------------------------------------------------------
+    #: Reverse geocoding for "local news near me". Blank disables the GPS path
+    #: entirely and the reader falls back to the manual picker, which always
+    #: works — so this is optional, not required. Restrict the key to the
+    #: Geocoding API and set a daily quota cap in the Google console: that is
+    #: the only thing that actually bounds the bill.
+    GOOGLE_MAPS_API_KEY: str = ""
     GOOGLE_TTS_API_KEY: str = ""
     GOOGLE_TTS_VOICE: str = "te-IN-Standard-A"
     BHASHINI_API_KEY: str = ""

@@ -158,7 +158,10 @@ class Locality(PKMixin, TimestampMixin, Base):
     name_te: Mapped[str] = mapped_column(String(120), nullable=False)
     name_en: Mapped[str] = mapped_column(String(120), nullable=False)
     kind: Mapped[str] = mapped_column(
-        String(10), nullable=False, default="village", doc="city | town | village"
+        String(10),
+        nullable=False,
+        default="village",
+        doc="city | town | village | panchayat (LGD gram panchayat import)",
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 

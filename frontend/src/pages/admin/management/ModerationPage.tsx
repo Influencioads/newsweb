@@ -66,6 +66,18 @@ export function ModerationPage() {
     },
     onError,
   });
+  const pin = useMutation({
+    mutationFn: ({ id, pinned }: { id: number; pinned: boolean }) => cmsApi.pinComment(id, pinned),
+    onSuccess: (_r, v) => {
+      invalidate();
+      toast.success(
+        v.pinned
+          ? L('వ్యాఖ్యను పైన ఉంచారు', 'Comment pinned to the top')
+          : L('పిన్ తీసేశారు', 'Comment unpinned'),
+      );
+    },
+    onError,
+  });
   const approveSub = useMutation({
     mutationFn: (id: number) => cmsApi.approveSubmission(id),
     onSuccess: () => {
@@ -149,6 +161,7 @@ export function ModerationPage() {
                       busy={moderate.isPending && moderate.variables?.id === c.id}
                       onHide={() => void hideComment(c.id)}
                       onRestore={() => moderate.mutate({ id: c.id, hide: false })}
+                      onPin={(pinned) => pin.mutate({ id: c.id, pinned })}
                     />
                   ))}
                 </div>

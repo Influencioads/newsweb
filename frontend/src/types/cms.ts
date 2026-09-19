@@ -27,6 +27,10 @@ export interface CmsArticle {
   breaking_until:string|null; updated_at:string;
   // §8/§9 placement chosen on the form; applied when the story goes live.
   pin_home_minutes:number|null; pin_trending_minutes:number|null;
+  /** The desk's own note on the story. Not a correction. */
+  critic_note_te?:string|null;
+  /** Editorially seeded likes — the control sets this, it does not add to it. */
+  seed_like_count?:number;
   hero_media:CmsMediaRef|null; gallery:CmsMediaRef[]; video:CmsVideoRef|null; tags:CmsTagRef[];
   audio:CmsAudioRef|null; active_pins:CmsActivePin[];
 }

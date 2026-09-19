@@ -666,6 +666,11 @@ def moderation_comments(
                 "article_title_te": parent_of(c)["title_te"],
                 "article_short_id": parent_of(c)["ref"],
                 "created_at": c.created_at,
+                "is_pinned": c.pinned_at is not None,
+                # An editorially seeded comment has no account behind it. The
+                # queue says so rather than showing a moderator a name they
+                # cannot look up.
+                "is_seeded": c.is_seeded,
             }
             for c in rows
         ],

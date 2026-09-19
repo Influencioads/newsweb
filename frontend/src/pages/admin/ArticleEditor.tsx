@@ -18,6 +18,7 @@ import { useAuth } from '@/stores/auth';
 
 import { AssistPanel } from './editor/AssistPanel';
 import { ConvertPanel } from './editor/ConvertPanel';
+import { EngagementPanel } from './editor/EngagementPanel';
 import { MetaSidebar } from './editor/MetaSidebar';
 import { EMPTY_FORM, fieldError, fromArticle, toPayload, wordCount, type ArticleForm } from './editor/form';
 import { useL } from './useL';
@@ -143,6 +144,18 @@ export default function ArticleEditor() {
               through. */}
           {editing && (can('article.edit') || can('article.edit_own')) ? (
             <ConvertPanel articleId={Number(id)} voiceEnabled={form.voiceEnabled} />
+          ) : null}
+
+          {/* The note applies to live stories, so it has its own route and its
+              own panel rather than riding the form's PATCH. Seeding inside it
+              is gated separately — see EngagementPanel. */}
+          {editing && can('article.critic_note') ? (
+            <EngagementPanel
+              articleId={Number(id)}
+              criticNote={existing.data?.critic_note_te ?? null}
+              seedLikeCount={existing.data?.seed_like_count ?? 0}
+              canSeed={can('engagement.seed')}
+            />
           ) : null}
 
           <AssistPanel

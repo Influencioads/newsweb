@@ -34,6 +34,9 @@ export const deleteCmsVideo=async(id:number)=>(await api.delete(`/cms/videos/${i
 export const sendCampaign=async(payload:Record<string,unknown>)=>(await api.post('/cms/notifications',payload)).data;
 export const closeReport=async(id:number,dismiss:boolean,note?:string)=>(await api.post(`/cms/moderation/reports/${id}/close`,{dismiss,note:note||null})).data;
 export const moderateComment=async(id:number,hide:boolean)=>(await api.patch(`/cms/moderation/comments/${id}`,{hide})).data;
+// Pinning rides the moderation route because promoting the best comment *is*
+// moderation — it needs no permission the moderator does not already hold.
+export const pinComment=async(id:number,pinned:boolean)=>(await api.patch<{id:number;status:string;is_pinned:boolean}>(`/cms/moderation/comments/${id}`,{hide:false,pinned})).data;
 
 // --- §1 / §2 editor helpers ------------------------------------------------
 export const fetchEditorMandals=async(districtId:number)=>(await api.get<{items:CmsOption[]}>('/cms/dashboard/mandals',{params:{district_id:districtId}})).data.items;
@@ -62,6 +65,19 @@ export const generateArticleAudio=async(id:number,force=false)=>(await api.post<
 // `reason` carries the environment limit (no Raqm, no font, switched off) in
 // words, because on a host that cannot shape Telugu no retry will ever work.
 export const generateArticleCard=async(id:number,force=false)=>(await api.post<{available:boolean;url:string|null;reason:string|null}>(`/cms/articles/${id}/generate-card`,null,{params:{force}})).data;
+
+// --- the desk's own note on a story ----------------------------------------
+// Its own route rather than a field on PATCH: `workflow_service.update` refuses
+// anything that is not DRAFT or CHANGES_REQUESTED, and a critic note is for
+// stories that are already live. `null` clears it.
+export const setCriticNote=async(id:number,note:string|null)=>(await api.post<CmsArticle>(`/cms/articles/${id}/critic-note`,{note_te:note})).data;
+
+// --- seeded engagement ------------------------------------------------------
+// Fabricated, audit-logged, and gated on `engagement.seed` — a permission only
+// admin and super-admin hold. `count` SETS the offset, so 0 un-seeds.
+export const seedLikes=async(id:number,count:number)=>(await api.post<CmsArticle>(`/cms/articles/${id}/seed-likes`,{count})).data;
+// The name is an index into a fixed pool on the server, never free text.
+export const seedComment=async(id:number,bodyTe:string,nameIndex:number)=>(await api.post<CmsArticle>(`/cms/articles/${id}/seed-comment`,{body_te:bodyTe,name_index:nameIndex})).data;
 
 // --- §8 / §9 placement from the article form -------------------------------
 export const setArticlePlacement=async(id:number,payload:{pin_home_minutes?:number|null;pin_trending_minutes?:number|null})=>(await api.post<CmsArticle>(`/cms/articles/${id}/placement`,payload)).data;

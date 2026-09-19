@@ -210,6 +210,11 @@ class CmsArticleOut(BaseModel):
     breaking_until: datetime | None = None
     pin_home_minutes: int | None = None
     pin_trending_minutes: int | None = None
+    #: The desk's own note, so the editor form can show what is already set.
+    critic_note_te: str | None = None
+    #: Editorially seeded likes. Shown so the control reads as a *setting*
+    #: rather than a blind increment.
+    seed_like_count: int = 0
     updated_at: datetime
 
     # Resolved for the editor form; not columns.

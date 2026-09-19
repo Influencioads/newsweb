@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Check, ExternalLink, Eye, EyeOff, FileText, Flag, MessageSquare, X } from 'lucide-react';
+import { Check, ExternalLink, Eye, EyeOff, FileText, Flag, MessageSquare, Pin, X } from 'lucide-react';
 
 import { Badge, StatusPill } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -43,6 +43,9 @@ export type CommentRow = {
   article_title_te: string | null;
   article_short_id: string | null;
   created_at: string;
+  is_pinned: boolean;
+  /** Editorially seeded: no account behind it, so the name is not a reader. */
+  is_seeded: boolean;
 };
 
 export type SubmissionRow = {
@@ -154,20 +157,34 @@ export function CommentCard({
   busy,
   onHide,
   onRestore,
+  onPin,
 }: {
   comment: CommentRow;
   busy: boolean;
   onHide: () => void;
   onRestore: () => void;
+  /** Promote to the top of the thread. Moderation, so no new permission. */
+  onPin: (pinned: boolean) => void;
 }) {
   const L = useL();
   return (
     <Split
       actions={
         c.status === 'visible' ? (
-          <Button variant="danger" size="sm" icon={EyeOff} pending={busy} onClick={onHide}>
-            {L('దాచండి', 'Hide')}
-          </Button>
+          <>
+            <Button
+              variant={c.is_pinned ? 'primary' : 'secondary'}
+              size="sm"
+              icon={Pin}
+              pending={busy}
+              onClick={() => onPin(!c.is_pinned)}
+            >
+              {c.is_pinned ? L('పిన్ తీయండి', 'Unpin') : L('పిన్ చేయండి', 'Pin')}
+            </Button>
+            <Button variant="danger" size="sm" icon={EyeOff} pending={busy} onClick={onHide}>
+              {L('దాచండి', 'Hide')}
+            </Button>
+          </>
         ) : c.status === 'hidden' ? (
           <Button variant="secondary" size="sm" icon={Eye} pending={busy} onClick={onRestore}>
             {L('పునరుద్ధరించండి', 'Restore')}
@@ -187,6 +204,10 @@ export function CommentCard({
         <span>{c.author ?? '?'}</span>
         <span>{when(c.created_at)}</span>
         <StatusPill status={c.status} />
+        {c.is_pinned ? <Badge tone="brand" size="xs">{L('పిన్ చేసినది', 'Pinned')}</Badge> : null}
+        {/* Say so plainly in the queue: a moderator must never mistake a
+            seeded comment for a reader they could look up. */}
+        {c.is_seeded ? <Badge tone="partial" size="xs">{L('సీడ్', 'Seeded')}</Badge> : null}
       </p>
     </Split>
   );

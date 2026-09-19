@@ -258,6 +258,24 @@ export default function ArticleScreen() {
                 </View>
               ) : null}
 
+              {/* The desk's own reading of the story. Styled apart from the
+                  correction above it on purpose: a correction says we got
+                  something wrong, an editor's note does not, so giving them the
+                  same amber bar would say the wrong thing. */}
+              {data.critic_note_te ? (
+                <View style={styles.criticNote}>
+                  <Icon name="quote" size={20} color={color.brand} />
+                  <View style={styles.criticBody}>
+                    <T variant="meta" weight="bold" color="brand">
+                      {t('article.criticNote')}
+                    </T>
+                    <T variant="bodySmall" scaled color="inkSoft">
+                      {data.critic_note_te}
+                    </T>
+                  </View>
+                </View>
+              ) : null}
+
               <BodyRenderer doc={data.body} />
 
               {data.source_credit ? (
@@ -348,6 +366,17 @@ const useStyles = makeStyles((color) => ({
     marginBottom: space.lg,
   },
   correctionText: { flex: 1 },
+  criticNote: {
+    flexDirection: 'row',
+    gap: space.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: color.brand,
+    backgroundColor: color.brandTint,
+    borderRadius: radius.sm,
+    padding: space.md,
+    marginBottom: space.lg,
+  },
+  criticBody: { flex: 1, gap: space.xs },
   credit: { marginTop: space.sm },
   followRow: {
     flexDirection: 'row',

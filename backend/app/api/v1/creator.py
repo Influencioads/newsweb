@@ -30,6 +30,7 @@ from app.models.content import Article, Category
 from app.models.creator import CreatorSubmission
 from app.models.enums import AuditAction, SubmissionStatus, Vertical
 from app.models.geo import District
+from app.models.media import Media
 from app.models.kyc import ContributorProfile
 from app.repositories import article_repo
 from app.services import (
@@ -247,6 +248,18 @@ def submission_queue(
     rows = list(db.execute(stmt).unique().all())
     categories = {c.id: c for c in db.execute(select(Category)).scalars()}
     districts = {d.id: d for d in db.execute(select(District)).scalars()}
+    # Resolve the ids to URLs here. A moderator cannot look at an integer, and
+    # the whole point of letting a contributor attach a photograph is that
+    # somebody sees it before the story is approved.
+    photo_ids = {mid for s, _v in rows for mid in (s.media_ids or [])}
+    photos = (
+        {
+            m.id: m
+            for m in db.scalars(select(Media).where(Media.id.in_(photo_ids))).all()
+        }
+        if photo_ids
+        else {}
+    )
     return {
         "items": [
             {
@@ -256,7 +269,15 @@ def submission_queue(
                 "creator_name_te": s.user.name_te if s.user else None,
                 "creator_phone": s.user.phone if s.user else None,
                 "vertical": v,
-                "media_ids": s.media_ids or [],
+                "media": [
+                    {
+                        "id": m.id,
+                        "url": m.cdn_url,
+                        "alt_te": m.alt_te,
+                    }
+                    for m in (photos.get(i) for i in (s.media_ids or []))
+                    if m is not None and m.deleted_at is None
+                ],
                 "category_slug": categories[s.category_id].slug
                 if s.category_id in categories
                 else None,

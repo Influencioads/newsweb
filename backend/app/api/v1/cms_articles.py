@@ -598,7 +598,7 @@ def change_state(
     # enough that a stolen session cannot flood the section. Applied here
     # rather than as a route dependency so no editor's queue is throttled.
     if action == "publish" and principal.level < LEVEL_PIN_PLACEMENT:
-        rate_limit("panchayat_publish", 5)(request)
+        rate_limit("panchayat_publish", 5, fail_closed=True)(request)
     article = workflow_service.transition(
         db, principal, _get(db, article_id), action, payload.note, payload.scheduled_at
     )

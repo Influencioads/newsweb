@@ -25,6 +25,33 @@ export async function submitArticle(payload: {
   return data;
 }
 
+export interface SubmissionMedia {
+  id: number;
+  url: string | null;
+  alt_te: string | null;
+}
+
+/**
+ * One photograph onto one pending submission.
+ *
+ * Scoped to `/users/me` like the avatar route rather than the CMS media API:
+ * a verified contributor may add a picture to their own story, which is not
+ * the same thing as write access to the newsroom's media library.
+ */
+export async function attachSubmissionPhoto(
+  submissionId: number,
+  file: File,
+): Promise<{ media_ids: number[] }> {
+  const form = new FormData();
+  form.append('file', file);
+  const { data } = await api.post<{ media_ids: number[] }>(
+    `/users/me/submissions/${submissionId}/media`,
+    form,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  );
+  return data;
+}
+
 export async function fetchMySubmissions(): Promise<Submission[]> {
   const { data } = await api.get<Submission[]>('/users/me/submissions');
   return data;

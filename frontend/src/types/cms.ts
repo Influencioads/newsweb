@@ -116,6 +116,8 @@ export interface ContentSource {
   max_items_per_hour: number;
   allow_html_fallback: boolean;
   rewrite_enabled: boolean;
+  /** Off by default: only a publisher's own images are ever pulled. */
+  images_enabled: boolean;
   mandal_autotag: boolean;
 }
 
@@ -135,6 +137,8 @@ export interface IngestedRewrite {
   title_te: string | null;
   summary_te: string | null;
   body_plain: string | null;
+  /** The original the rewrite was made from. NULL once the item is decided. */
+  source_text: string | null;
   attribution_te: string | null;
   word_count: number;
   engine: string;
@@ -258,6 +262,17 @@ export type KycStatus =
 
 export type ContributorType = 'citizen' | 'freelance' | 'student';
 
+/**
+ * Which desk a contributor writes for — a different question from
+ * `ContributorType`, which is what proof they owe. Mirrors
+ * `backend/app/models/enums.py::Vertical` exactly; `panchayat` is the only one
+ * that can carry a publish-without-review grant.
+ */
+export type Vertical =
+  | 'industry' | 'medical' | 'business' | 'tech' | 'banking' | 'legal'
+  | 'panchayat' | 'real_estate' | 'newsmaker' | 'citizen_journalism'
+  | 'spiritual' | 'sports';
+
 /** Metadata only. There is no url here, and there is none on the server. */
 export interface KycDocumentRow {
   id: number;
@@ -276,6 +291,7 @@ export interface KycProfileRow {
   phone: string | null;
   phone_verified: boolean;
   contributor_type: ContributorType | null;
+  vertical: Vertical | null;
   status: KycStatus;
   display_name_te: string;
   organisation: string | null;
@@ -285,6 +301,8 @@ export interface KycProfileRow {
   reviewed_at: string | null;
   review_note: string | null;
   verified_badge: boolean;
+  /** Non-null means this person's copy goes live with no review (§0 exception). */
+  panchayat_publish_granted_at: string | null;
   expires_at: string | null;
   provider: string;
   document_count: number;

@@ -206,6 +206,12 @@ const STRINGS = {
     en: 'Could not detect your location. Choose below.',
   },
   'article.criticNote': { te: 'సంపాదకుల వ్యాఖ్య', en: "Editor's note" },
+  'article.notPreReviewed': { te: 'ఇది ముందుగా సమీక్షించలేదు', en: 'Not pre-reviewed' },
+  'article.ugcNotice': {
+    te: 'ఈ కథనాన్ని పంచాయతీ కార్యదర్శి నేరుగా ప్రచురించారు; మా ఎడిటర్ దీన్ని ముందుగా చదవలేదు. ఇందులోని విషయానికి రచయితే బాధ్యులు.',
+    en: 'A panchayat secretary published this directly; no editor of ours read it first. The writer is responsible for what it says.',
+  },
+  'article.ugcTerms': { te: 'పాఠకుల కథనాల నిబంధనలు', en: 'Reader content terms' },
   'ui.readNext': { te: 'తర్వాత చదవండి', en: 'Read next' },
   'ui.topTopics': { te: 'ప్రజలు మాట్లాడుకుంటున్న టాప్ 3 అంశాలు', en: 'Top 3 issues people are talking about' },
   'ui.editorSelected': { te: 'ఎడిటర్ ఎంపిక', en: 'Editor selected' },

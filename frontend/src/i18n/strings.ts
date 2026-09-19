@@ -134,6 +134,7 @@ export const STRINGS = {
   'footer.privacy': { te: 'ప్రైవసీ', en: 'Privacy' },
   'footer.terms': { te: 'నిబంధనలు', en: 'Terms' },
   'footer.aiDisclosure': { te: 'AI వినియోగ ప్రకటన', en: 'AI usage disclosure' },
+  'footer.ugcTerms': { te: 'పాఠకుల కథనాల నిబంధనలు', en: 'Reader content terms' },
 
   // --- generic UI chrome (primitives) ---------------------------------------
   'ui.close': { te: 'మూసివేయండి', en: 'Close' },
@@ -314,6 +315,7 @@ export const STRINGS = {
   'page.privacy': { te: 'ప్రైవసీ', en: 'Privacy' },
   'page.terms': { te: 'నిబంధనలు', en: 'Terms' },
   'page.aiDisclosure': { te: 'AI వినియోగ ప్రకటన', en: 'AI usage disclosure' },
+  'page.ugcTerms': { te: 'పాఠకుల కథనాల నిబంధనలు', en: 'Reader content terms' },
   'page.notFound': { te: 'పేజీ కనిపించలేదు', en: 'Page not found' },
   'page.qaStatus': { te: 'సిస్టమ్ స్థితి', en: 'System status' },
   'page.qaTelugu': { te: 'తెలుగు రెండర్ టెస్ట్', en: 'Telugu render test' },

@@ -19,6 +19,7 @@ the audit log never claims an editor approved, and revoking the grant is instant
 from __future__ import annotations
 
 import os
+from types import SimpleNamespace
 from collections.abc import Iterator
 from datetime import timedelta
 
@@ -34,6 +35,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from app.core.deps import Principal, build_principal  # noqa: E402
 from app.core.errors import (  # noqa: E402
     ConflictError,
+    RateLimitedError,
     ScopeDeniedError,
     ValidationError,
 )
@@ -384,6 +386,25 @@ class TestTheHolesTheReviewFound:
         )
         assert not panchayat_service.may_self_publish(
             db, principal_for(db, user), imported
+        )
+
+    def test_the_throttle_refuses_rather_than_vanishes_when_redis_is_down(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """`incr_with_ttl` returns 0 on any Redis error, which normally means
+        "no limiting". On the one path that puts copy in front of readers with
+        nobody in between, that turns the only throttle into nothing — and a
+        Redis outage is routine here, not exotic."""
+        from app.core import ratelimit
+
+        monkeypatch.setattr(ratelimit, "incr_with_ttl", lambda *_a, **_kw: 0)
+        dependency = ratelimit.rate_limit("panchayat_publish", 5, fail_closed=True)
+        with pytest.raises(RateLimitedError):
+            dependency(SimpleNamespace(state=SimpleNamespace(user_id=1), client=None))
+
+        # The engagement surface keeps the opposite default on purpose.
+        ratelimit.rate_limit("comment", 5)(
+            SimpleNamespace(state=SimpleNamespace(user_id=1), client=None)
         )
 
     def test_revoking_leaves_editor_approved_journalism_up(

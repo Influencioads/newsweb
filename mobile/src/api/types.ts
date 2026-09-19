@@ -101,6 +101,12 @@ export interface ArticleDetail extends ArticleCard {
   correction_note_te: string | null;
   /** The desk's own note on the story. Not a correction. */
   critic_note_te: string | null;
+  /**
+   * Verification standing on the byline. `'panchayat'` is what the UGC
+   * disclaimer is derived from, so no story can be published missing it.
+   * Optional because the reader schema does not serialise it yet.
+   */
+  byline_badge?: string | null;
   gallery: MediaOut[];
   related: ArticleCard[];
   poll: import('./epaper').Poll | null;

@@ -1,5 +1,5 @@
 import { api } from '@/api/client';
-import type { AudioAssetRow, BulletinList, BulletinRow, ContentSource, KycProfileRow, KycStatus, CrawlStatus, IngestQueueCounts, IngestedItem, IngestedRewrite, AiDraft, AiSuggestion, AudioState, CmsArticle, CmsArticleList, CmsAudioRef, CmsEditorOptions, CmsMediaRef, CmsOption, DashboardStats, SettingsPayload } from '@/types/cms';
+import type { AudioAssetRow, BulletinList, BulletinRow, ContentSource, KycProfileRow, KycStatus, Vertical, CrawlStatus, IngestQueueCounts, IngestedItem, IngestedRewrite, AiDraft, AiSuggestion, AudioState, CmsArticle, CmsArticleList, CmsAudioRef, CmsEditorOptions, CmsMediaRef, CmsOption, DashboardStats, SettingsPayload } from '@/types/cms';
 export const fetchArticles=async(params?:{state?:string;search?:string;offset?:number;limit?:number})=>(await api.get<CmsArticleList>('/cms/articles',{params})).data;
 export const fetchArticle=async(id:number)=>(await api.get<CmsArticle>(`/cms/articles/${id}`)).data;
 export const createArticle=async(payload:Record<string,unknown>)=>(await api.post<CmsArticle>('/cms/articles',payload)).data;
@@ -108,9 +108,12 @@ export const runBulletin=async(payload:{slot?:number;date?:string})=>(await api.
 export const regenerateBulletin=async(id:number,rescript=true)=>(await api.post<BulletinRow>(`/cms/bulletins/${id}/regenerate`,null,{params:{rescript}})).data;
 export const publishBulletin=async(id:number)=>(await api.post<BulletinRow>(`/cms/bulletins/${id}/publish`)).data;
 export const pullBulletin=async(id:number)=>(await api.post<BulletinRow>(`/cms/bulletins/${id}/pull`)).data;
-export const fetchKycQueue=async(status:KycStatus)=>(await api.get<{items:KycProfileRow[];total:number}>('/cms/kyc',{params:{status}})).data;
+export const fetchKycQueue=async(status:KycStatus,vertical?:Vertical|null)=>(await api.get<{items:KycProfileRow[];total:number}>('/cms/kyc',{params:vertical?{status,vertical}:{status}})).data;
 export const fetchKycApplication=async(id:number)=>(await api.get<KycProfileRow>(`/cms/kyc/${id}`)).data;
 export const decideKyc=async(id:number,action:'approve'|'reject'|'request-more',payload:Record<string,unknown>)=>(await api.post<KycProfileRow>(`/cms/kyc/${id}/${action}`,payload)).data;
+// Level 90, and the revoke takes their live copy down with it — the flag is
+// the server's, not a convenience.
+export const setPanchayatPublish=async(id:number,granted:boolean)=>(await api.post<{id:number;granted_at:string|null;unpublished_article_ids:number[]}>(`/cms/kyc/${id}/panchayat-publish`,{granted,unpublish_live:true})).data;
 
 // --- §17 an illustration when no photograph exists -------------------------
 // `available:false` with a `reason` is a normal answer, not a failure: the

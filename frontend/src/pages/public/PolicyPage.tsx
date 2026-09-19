@@ -235,6 +235,103 @@ const PAGES: Record<string, PolicyEntry> = {
       sections: [{ id: 'use', heading: 'Terms of use', body: ['The terms that apply to your use of this website.'] }],
     },
   },
+  /**
+   * §0 / IT Rules 2021 Rule 3(1)(b)-(d). The one page that has to be blunt:
+   * a panchayat secretary's copy reaches readers unread, so the terms say so
+   * in the second section rather than in a sub-clause, and the takedown clock
+   * is stated in hours next to it.
+   */
+  'ugc-terms': {
+    titleKey: 'page.ugcTerms',
+    te: {
+      title: 'పాఠకుల కథనాల నిబంధనలు',
+      sections: [
+        {
+          id: 'responsibility',
+          heading: 'బాధ్యత ఎవరిది',
+          body: [
+            'పాఠకులు, పౌర విలేకరులు, పంచాయతీ కార్యదర్శులు పంపే కథనాల్లోని వాస్తవాలకు, అభిప్రాయాలకు, చిత్రాలకు ఆ రచయితే పూర్తి బాధ్యులు.',
+            'ఆ కథనాలను సంస్థ తన సొంత ప్రకటనగా స్వీకరించదు. IT Rules 2021 కింద మేము వాటికి మధ్యవర్తి మాత్రమే. ఎవరి కథనమైనా చట్టవిరుద్ధమని తేలితే దాని పర్యవసానాలు ఆ రచయితవే.',
+          ],
+        },
+        {
+          id: 'not-pre-reviewed',
+          heading: 'పంచాయతీ కథనాలు ముందుగా సమీక్షించబడవు',
+          body: [
+            'మా వేదికలో దాదాపు ప్రతి కథనాన్నీ ప్రచురణకు ముందు ఒక ఎడిటర్ చదువుతారు. ఒకే ఒక మినహాయింపు ఉంది: ప్రత్యేక అనుమతి పొందిన పంచాయతీ కార్యదర్శి పంపే కథనాలు ఎడిటర్ చదవకుండానే నేరుగా ప్రచురితమవుతాయి.',
+            'అటువంటి ప్రతి కథనంపై "ఇది ముందుగా సమీక్షించలేదు" అనే గుర్తు కనిపిస్తుంది. ఈ అనుమతిని ఎప్పుడైనా ఉపసంహరించవచ్చు; ఉపసంహరించిన క్షణమే ఆ వ్యక్తి ప్రచురించిన కథనాలు కూడా వెనక్కి తీసుకుంటాం.',
+          ],
+        },
+        {
+          id: 'how-to-report',
+          heading: 'ఒక కథనంపై ఫిర్యాదు ఎలా చేయాలి',
+          body: [
+            'ప్రతి కథనం కింద "నివేదించండి" బటన్ ఉంటుంది. దాన్ని నొక్కి కారణం ఎంచుకోండి — ఫిర్యాదు వెంటనే మోడరేషన్ క్యూకు చేరుతుంది.',
+            'ఖాతా లేకపోయినా ఫిర్యాదు చేయవచ్చు: ఈ పేజీ కింద ఉన్న గ్రీవెన్స్ అధికారి చిరునామాకు కథనం లింక్‌తో రాయండి.',
+          ],
+        },
+        {
+          id: 'takedown',
+          heading: 'తొలగింపు గడువు',
+          body: [
+            'ముందుగా సమీక్షించని కథనంపై ఫిర్యాదు వస్తే 24 గంటల్లోపు ఒక ఎడిటర్ దాన్ని పరిశీలిస్తారు.',
+            'చట్టవిరుద్ధమని తేలిన విషయాన్ని 36 గంటల్లోపు తొలగిస్తాం — IT Rules 2021 నిర్దేశించిన గడువు ఇదే. ఫిర్యాదును 24 గంటల్లో స్వీకరిస్తాం, 15 రోజుల్లో పరిష్కరిస్తాం.',
+          ],
+        },
+        {
+          id: 'officer',
+          heading: 'గ్రీవెన్స్ అధికారి',
+          body: [
+            'IT Rules 2021 ప్రకారం నియమించిన గ్రీవెన్స్ అధికారి వివరాలు, సంప్రదింపు మార్గం ఈ పేజీ కింద ఉన్నాయి.',
+          ],
+        },
+      ],
+    },
+    en: {
+      title: 'Reader content terms',
+      sections: [
+        {
+          id: 'responsibility',
+          heading: 'Who is responsible',
+          body: [
+            'The writer is fully responsible for the facts, the opinions and the pictures in a story they send us — readers, citizen reporters and panchayat secretaries alike.',
+            'The company does not adopt those statements as its own. Under IT Rules 2021 we are an intermediary for them. If a story is found unlawful, the consequences are the writer’s.',
+          ],
+        },
+        {
+          id: 'not-pre-reviewed',
+          heading: 'Panchayat stories are not pre-reviewed',
+          body: [
+            'Almost every story on this platform is read by an editor before it is published. There is exactly one exception: when a panchayat secretary has been granted the publishing exception, their stories go live without an editor reading them first.',
+            'Every such story carries a notice saying it was not pre-reviewed. The grant can be withdrawn at any time, and withdrawing it also pulls back the stories that person has already published.',
+          ],
+        },
+        {
+          id: 'how-to-report',
+          heading: 'How to report a story',
+          body: [
+            'Every story carries a Report control. Press it, pick a reason, and the report reaches the moderation queue immediately.',
+            'You can report without an account: write to the Grievance Officer at the address below, with a link to the story.',
+          ],
+        },
+        {
+          id: 'takedown',
+          heading: 'Takedown times',
+          body: [
+            'A report against a story that was not pre-reviewed is looked at by an editor within 24 hours.',
+            'Content found unlawful is taken down within 36 hours — the deadline IT Rules 2021 sets. We acknowledge every complaint within 24 hours and resolve it within 15 days.',
+          ],
+        },
+        {
+          id: 'officer',
+          heading: 'Grievance Officer',
+          body: [
+            'The Grievance Officer appointed under IT Rules 2021, and the way to reach them, are at the foot of this page.',
+          ],
+        },
+      ],
+    },
+  },
   'ai-disclosure': {
     titleKey: 'page.aiDisclosure',
     te: {

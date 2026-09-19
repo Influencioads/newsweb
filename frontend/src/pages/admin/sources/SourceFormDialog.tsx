@@ -52,6 +52,7 @@ function SourceForm({ id, source, error, onSubmit }: {
   const [beat, setBeat] = useState<SourceBeat>(source?.beat ?? 'general');
   const [perHour, setPerHour] = useState(source?.max_items_per_hour ?? 8);
   const [rewrite, setRewrite] = useState(source?.rewrite_enabled ?? false);
+  const [images, setImages] = useState(source?.images_enabled ?? false);
   const [htmlFallback, setHtmlFallback] = useState(source?.allow_html_fallback ?? false);
 
   const fieldError = (key: string) => {
@@ -66,7 +67,7 @@ function SourceForm({ id, source, error, onSubmit }: {
       slug, name, feed_url: feedUrl, licence, content_policy: policy,
       licence_note: note || null, fetch_interval_minutes: interval,
       beat, max_items_per_hour: perHour,
-      rewrite_enabled: rewrite, allow_html_fallback: htmlFallback,
+      rewrite_enabled: rewrite, images_enabled: images, allow_html_fallback: htmlFallback,
     });
   };
 
@@ -158,6 +159,18 @@ function SourceForm({ id, source, error, onSubmit }: {
         label={L(
           'ఈ మూలాన్ని మన సొంత తెలుగులో రాయండి, ప్రచురణకర్తకు క్రెడిట్ ఇస్తూ. ఫలితం ఎడిటర్ వద్దకే వెళ్తుంది.',
           'Rewrite this source in our own Telugu, crediting the publisher. The result still goes to an editor.',
+        )}
+      />
+      <Checkbox
+        checked={images}
+        onChange={setImages}
+        label={L(
+          'ఈ ప్రచురణకర్త సొంత చిత్రాలను తెచ్చి కథనానికి జోడించండి.',
+          "Pull this publisher's own photographs in with the story.",
+        )}
+        hint={L(
+          'డిఫాల్ట్‌గా ఆఫ్. ఇతర సైట్ల చిత్రాలు ఎప్పుడూ తీసుకోం — ఈ ప్రచురణకర్త డొమైన్‌లో ఉన్నవి, లోగో కానివి, తగినంత పెద్దవి మాత్రమే.',
+          'Off by default. We never take images from anywhere else: only files on this publisher\u2019s own domain, that are not their logo and are large enough to print.',
         )}
       />
       <Checkbox

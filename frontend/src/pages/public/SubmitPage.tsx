@@ -3,11 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Inbox, PenLine, ShieldCheck, Trash2 } from 'lucide-react';
 
+import { api } from '@/api/client';
 import { StatusPill } from '@/components/ui/Badge';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { useConfirm } from '@/components/ui/Dialog';
-import { Checkbox, Field, Input, Select, Textarea } from '@/components/ui/Field';
+import { Checkbox, Field, Input, inputClass, Select, Textarea } from '@/components/ui/Field';
 import { LocationPicker } from '@/components/location/LocationPicker';
 import { Icon } from '@/components/ui/Icon';
 import { PageContainer, PageHeader, SectionHeader } from '@/components/ui/Layout';
@@ -33,6 +34,8 @@ const MIN_TITLE = 10;
 const MAX_TITLE = 200;
 const MIN_BODY = 100;
 const MAX_BODY = 20000;
+/** Mirrors `submission_service.MAX_MEDIA`; the server is the real gate. */
+const MAX_PHOTOS = 4;
 
 /** A reader submission waiting on a moderator reads as "in review", not "pending". */
 const SUBMISSION_STATUS: StatusRegistry = {
@@ -60,6 +63,19 @@ export default function SubmitPage() {
   const [stateCode, setStateCode] = useState<string | null>(null);
   const [districtSlug, setDistrictSlug] = useState('');
   const [accepted, setAccepted] = useState(false);
+  const [photos, setPhotos] = useState<File[]>([]);
+
+  // Photographs are what verification actually buys. The server refuses them
+  // for anyone unapproved, so ask first rather than let somebody pick four
+  // files and be told no afterwards.
+  const contributor = useQuery({
+    queryKey: ['contributor', 'me'],
+    queryFn: async () =>
+      (await api.get<{ kyc_status: string }>('/users/me/contributor')).data,
+    enabled: status === 'authenticated',
+    staleTime: 300_000,
+  });
+  const canAttachPhotos = contributor.data?.kyc_status === 'approved';
   const [tried, setTried] = useState(false);
 
   useEffect(() => {
@@ -78,17 +94,35 @@ export default function SubmitPage() {
   });
 
   const submit = useMutation({
-    mutationFn: () =>
-      creatorApi.submitArticle({
+    mutationFn: async () => {
+      const created = await creatorApi.submitArticle({
         title_te: title.trim(),
         body_te: body.trim(),
         category_slug: categorySlug || null,
         district_slug: districtSlug || null,
         accept_guidelines: accepted,
-      }),
+      });
+      // Photos go up after the submission exists, because the route hangs them
+      // off its id. One at a time and one failure at a time: a picture that
+      // will not upload must not lose somebody the story they just typed.
+      for (const photo of photos) {
+        try {
+          await creatorApi.attachSubmissionPhoto(created.id, photo);
+        } catch {
+          toast.error(
+            L(
+              `${photo.name} అప్‌లోడ్ కాలేదు — కథనం మాత్రం అందింది.`,
+              `${photo.name} could not be uploaded — the story itself was received.`,
+            ),
+          );
+        }
+      }
+      return created;
+    },
     onSuccess: () => {
       setTitle('');
       setBody('');
+      setPhotos([]);
       setAccepted(false);
       setTried(false);
       toast.success(L('అందింది! సమీక్ష తర్వాత తెలియజేస్తాం.', 'Received. We will update you after review.'));
@@ -221,6 +255,41 @@ export default function SubmitPage() {
             />
           </Field>
 
+          {/* The server caps this at four and refuses it outright unless the
+              contributor's KYC is approved — `may_attach_images`. Showing the
+              control to everyone and letting the server answer would mean a
+              reader picks four photos and is told no afterwards. */}
+          {canAttachPhotos ? (
+            <Field
+              label={L('ఫోటోలు', 'Photographs')}
+              optionalLabel
+              hint={L(
+                `మీరే తీసిన ఫోటోలు మాత్రమే. గరిష్ఠంగా ${MAX_PHOTOS}.`,
+                `Only photographs you took yourself. ${MAX_PHOTOS} at most.`,
+              )}
+            >
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                className={inputClass}
+                onChange={(e) => {
+                  setPhotos(Array.from(e.target.files ?? []).slice(0, MAX_PHOTOS));
+                  edit();
+                }}
+              />
+              {photos.length ? (
+                <ul className="mt-2 flex flex-wrap gap-2">
+                  {photos.map((photo) => (
+                    <li key={photo.name} className="text-meta text-muted">
+                      {photo.name}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </Field>
+          ) : null}
+
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={L('విభాగం', 'Section')} optionalLabel>
               <Select value={categorySlug} onChange={(e) => setCategorySlug(e.target.value)}>
@@ -266,9 +335,15 @@ export default function SubmitPage() {
               </p>
             ) : null}
           </fieldset>
-          <ButtonLink to="/editorial-policy" variant="link" size="sm">
-            {L('కంటెంట్ మార్గదర్శకాలు చదవండి', 'Read the content guidelines')}
-          </ButtonLink>
+          <div className="flex flex-wrap items-center gap-x-4">
+            <ButtonLink to="/editorial-policy" variant="link" size="sm">
+              {L('కంటెంట్ మార్గదర్శకాలు చదవండి', 'Read the content guidelines')}
+            </ButtonLink>
+            {/* Who carries the story legally, said before they press send. */}
+            <ButtonLink to="/ugc-terms" variant="link" size="sm">
+              {L('పాఠకుల కథనాల నిబంధనలు', 'Reader content terms')}
+            </ButtonLink>
+          </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <Button type="submit" pending={submit.isPending} disabled={submit.isPending}>

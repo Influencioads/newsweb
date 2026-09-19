@@ -94,6 +94,13 @@ export interface ArticleDetail extends ArticleCard {
   correction_note_te: string | null;
   /** The desk's own note on the story. Not a correction. */
   critic_note_te: string | null;
+  /**
+   * Verification standing printed on the byline — a `ContributorType` or, once
+   * the contributor has one, a `Vertical`. `'panchayat'` is what the UGC
+   * disclaimer is derived from, so no row can be published missing its notice.
+   * Optional because the reader schema does not serialise it yet.
+   */
+  byline_badge?: string | null;
   seo_title: string | null;
   seo_description: string | null;
   canonical_url: string | null;

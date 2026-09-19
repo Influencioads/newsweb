@@ -60,6 +60,7 @@ export const FOOTER_LINKS = [
   ['/privacy', 'footer.privacy'],
   ['/terms', 'footer.terms'],
   ['/ai-disclosure', 'footer.aiDisclosure'],
+  ['/ugc-terms', 'footer.ugcTerms'],
 ] as const;
 
 const ROW =

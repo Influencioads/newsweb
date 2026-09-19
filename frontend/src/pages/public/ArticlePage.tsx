@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Sparkles } from 'lucide-react';
+import { ShieldAlert, Sparkles } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { AdSlot } from '@/components/ads/AdSlot';
@@ -12,8 +12,10 @@ import { AudioPlayer } from '@/components/article/AudioPlayer';
 import { ReaderToolbar, ReadingProgress } from '@/components/article/ReaderToolbar';
 import { ShareSheet } from '@/components/article/ShareSheet';
 import { Badge } from '@/components/ui/Badge';
+import { Button, ButtonLink } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Chip } from '@/components/ui/Chip';
+import { Icon } from '@/components/ui/Icon';
 import { PageContainer } from '@/components/ui/Layout';
 import { QueryState, Skeleton } from '@/components/ui/State';
 import { useToast } from '@/components/ui/Toast';
@@ -104,6 +106,7 @@ export default function ArticlePage() {
 
   const { t, pick, language } = useI18n();
   const s = useScript();
+  const L = (te: string, en: string) => (language === 'te' ? te : en);
   const toast = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -165,6 +168,13 @@ export default function ArticlePage() {
       return;
     }
     bookmark.mutate(!saved);
+  }
+
+  /** Move the reader to the one report control, which lives in EngagementBar. */
+  function openReport(): void {
+    const el = document.getElementById('report-article');
+    el?.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'center' });
+    el?.focus();
   }
 
   function openComments(): void {
@@ -252,6 +262,33 @@ export default function ArticlePage() {
                       <p lang="te" className="te reader-caption mt-1 text-ink-soft">
                         {data.critic_note_te}
                       </p>
+                    </Card>
+                  ) : null}
+
+                  {/* §0 / IT Rules — derived from the byline badge, never a
+                      column of its own: a disclaimer that depends on somebody
+                      remembering to tick a box is a disclaimer that goes
+                      missing on the one story that needed it. */}
+                  {data.byline_badge === 'panchayat' ? (
+                    <Card tone="warm" padding="md" as="aside" className="mt-5 border-l-4 border-l-breaking">
+                      <p className={cn(s.body, 'flex items-center gap-2 text-meta font-bold text-breaking')}>
+                        <Icon icon={ShieldAlert} size="xs" />
+                        {L('ఇది ముందుగా సమీక్షించలేదు', 'Not pre-reviewed')}
+                      </p>
+                      <p lang="te" className="te reader-caption mt-1 text-ink-soft">
+                        {L(
+                          'ఈ కథనాన్ని పంచాయతీ కార్యదర్శి నేరుగా ప్రచురించారు; మా ఎడిటర్ దీన్ని ముందుగా చదవలేదు. ఇందులోని విషయానికి రచయితే బాధ్యులు.',
+                          'A panchayat secretary published this directly; no editor of ours read it first. The writer is responsible for what it says.',
+                        )}
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-4">
+                        <ButtonLink to="/ugc-terms" variant="link" size="sm">
+                          {L('పాఠకుల కథనాల నిబంధనలు', 'Reader content terms')}
+                        </ButtonLink>
+                        <Button variant="link" size="sm" onClick={openReport}>
+                          {L('ఈ కథనాన్ని నివేదించండి', 'Report this story')}
+                        </Button>
+                      </div>
                     </Card>
                   ) : null}
 

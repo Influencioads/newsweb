@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { View, type LayoutChangeEvent, type ScrollView } from 'react-native';
+import { Linking, View, type LayoutChangeEvent, type ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   runOnJS,
@@ -11,7 +11,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 
-import { api } from '@/api/client';
+import { api, API_ORIGIN } from '@/api/client';
 import * as publicApi from '@/api/public';
 import { ArticleAudio } from '@/components/ArticleAudio';
 import { RowCard } from '@/components/ArticleCard';
@@ -34,6 +34,7 @@ import { makeStyles, useColors } from '@/lib/useTheme';
 import { Badge } from '@/ui/Badge';
 import { Divider } from '@/ui/Divider';
 import { Icon } from '@/ui/Icon';
+import { PressableScale } from '@/ui/PressableScale';
 import { Screen } from '@/ui/Screen';
 import { T } from '@/ui/Text';
 
@@ -276,6 +277,32 @@ export default function ArticleScreen() {
                 </View>
               ) : null}
 
+              {/* §0 / IT Rules — derived from the byline badge, never a column
+                  of its own: a disclaimer that depends on somebody remembering
+                  to tick a box goes missing on the one story that needed it. */}
+              {data.byline_badge === 'panchayat' ? (
+                <View style={styles.ugcNotice}>
+                  <Icon name="alertCircle" size={20} color={color.breaking} />
+                  <View style={styles.ugcBody}>
+                    <T variant="meta" weight="bold" color="breaking">
+                      {t('article.notPreReviewed')}
+                    </T>
+                    <T variant="bodySmall" scaled color="inkSoft">
+                      {t('article.ugcNotice')}
+                    </T>
+                    <PressableScale
+                      accessibilityRole="link"
+                      minHeight={44}
+                      onPress={() => void Linking.openURL(`${API_ORIGIN}/ugc-terms`).catch(() => undefined)}
+                    >
+                      <T variant="meta" weight="semibold" color="brand">
+                        {t('article.ugcTerms')}
+                      </T>
+                    </PressableScale>
+                  </View>
+                </View>
+              ) : null}
+
               <BodyRenderer doc={data.body} />
 
               {data.source_credit ? (
@@ -377,6 +404,17 @@ const useStyles = makeStyles((color) => ({
     marginBottom: space.lg,
   },
   criticBody: { flex: 1, gap: space.xs },
+  ugcNotice: {
+    flexDirection: 'row',
+    gap: space.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: color.breaking,
+    backgroundColor: color.breakingTint,
+    borderRadius: radius.sm,
+    padding: space.md,
+    marginBottom: space.lg,
+  },
+  ugcBody: { flex: 1, gap: space.xs },
   credit: { marginTop: space.sm },
   followRow: {
     flexDirection: 'row',

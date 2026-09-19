@@ -169,6 +169,7 @@ export default function App() {
               <Route path="/privacy" element={<PolicyPage />} />
               <Route path="/terms" element={<PolicyPage />} />
               <Route path="/ai-disclosure" element={<PolicyPage />} />
+              <Route path="/ugc-terms" element={<PolicyPage />} />
 
               {/* Article. Must stay last among public routes: `/:category/:slugAndId`
                   is greedy and would otherwise swallow the static paths above. */}

@@ -1,17 +1,20 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { memo, type ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { absoluteMediaUrl } from '@/api/client';
 import type { ArticleCard as ArticleCardType } from '@/api/types';
+import { ArticleActions } from '@/components/ArticleActions';
 import { timeAgo, useI18n } from '@/lib/i18n';
 import { useMotion } from '@/lib/motion';
 import { alpha, radius, space } from '@/lib/theme';
 import { makeStyles } from '@/lib/useTheme';
 import { Badge } from '@/ui/Badge';
 import { Card } from '@/ui/Card';
+import { Divider } from '@/ui/Divider';
+import { PressableScale } from '@/ui/PressableScale';
 import { T } from '@/ui/Text';
 
 /**
@@ -59,13 +62,23 @@ function Flags({ article }: { article: ArticleCardType }) {
   );
 }
 
+/**
+ * The category, as a tinted chip rather than coloured text.
+ *
+ * A chip is what makes a feed scannable at arm's length — it gives the eye
+ * something to sort by before it reads a word. Deliberately one tone for every
+ * category: a hue per section would mean a dozen new colours in `theme.ts`,
+ * which the linter would allow and the identity would not survive.
+ */
 function Kicker({ article }: { article: ArticleCardType }) {
   const { pick } = useI18n();
   if (!article.category) return null;
   return (
-    <T variant="meta" weight="semibold" color="brand" numberOfLines={1}>
-      {pick(article.category.name_te, article.category.name_en)}
-    </T>
+    <Badge
+      tone="brand"
+      size="xs"
+      label={pick(article.category.name_te, article.category.name_en)}
+    />
   );
 }
 
@@ -154,6 +167,45 @@ function Thumb({ article, style }: { article: ArticleCardType; style: object }) 
   );
 }
 
+/**
+ * Card chrome shared by the lead and row variants.
+ *
+ * The content is the press target and the action strip sits *outside* it, as
+ * a sibling. That restructure is not cosmetic: the whole card used to be one
+ * `<Card onPress>`, and buttons nested inside a pressable collapse into it for
+ * TalkBack and double-fire on Android. Two siblings give the reader one focus
+ * stop for "open the story" and one per action.
+ */
+function CardShell({
+  article,
+  a11y,
+  style,
+  actions = true,
+  children,
+}: {
+  article: ArticleCardType;
+  a11y: string;
+  style?: StyleProp<ViewStyle>;
+  actions?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card padding="none" elevated style={style}>
+      <PressableScale onPress={() => openArticle(article)} accessibilityLabel={a11y}>
+        {children}
+      </PressableScale>
+      {actions ? (
+        <>
+          <Divider />
+          {/* `flags="cache"` — a mounted row must never issue its own request,
+              or a 20-card page costs 20 of them on every scroll. */}
+          <ArticleActions article={article} size="card" flags="cache" />
+        </>
+      ) : null}
+    </Card>
+  );
+}
+
 /** Big image-led card: home lead and section leads. */
 export const LeadCard = memo(function LeadCard({ article, index }: ArticleCardProps) {
   const styles = useStyles();
@@ -162,7 +214,7 @@ export const LeadCard = memo(function LeadCard({ article, index }: ArticleCardPr
   const a11y = useCardLabel(article);
   return (
     <Stagger index={index}>
-      <Card padding="none" elevated onPress={() => openArticle(article)} accessibilityLabel={a11y} style={styles.card}>
+      <CardShell article={article} a11y={a11y} style={styles.card}>
         <View>
           <Thumb article={article} style={styles.leadImage} />
           {hasFlags(article) ? (
@@ -183,7 +235,7 @@ export const LeadCard = memo(function LeadCard({ article, index }: ArticleCardPr
           ) : null}
           <MetaLine article={article} />
         </View>
-      </Card>
+      </CardShell>
     </Stagger>
   );
 });
@@ -197,7 +249,7 @@ export const RowCard = memo(function RowCard({ article, index }: ArticleCardProp
   const hasThumb = !!absoluteMediaUrl(article.hero?.url ?? null);
   return (
     <Stagger index={index}>
-      <Card elevated onPress={() => openArticle(article)} accessibilityLabel={a11y} style={styles.card}>
+      <CardShell article={article} a11y={a11y} style={styles.card}>
         <View style={styles.row}>
           <View style={styles.rowText}>
             <Topline article={article} />
@@ -208,7 +260,7 @@ export const RowCard = memo(function RowCard({ article, index }: ArticleCardProp
           </View>
           {hasThumb ? <Thumb article={article} style={styles.rowImage} /> : null}
         </View>
-      </Card>
+      </CardShell>
     </Stagger>
   );
 });
@@ -269,7 +321,9 @@ const useStyles = makeStyles((color) => ({
 
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: space.md },
   rowText: { flex: 1, minWidth: 0, gap: space.xs },
-  rowImage: { width: 96, height: 72, borderRadius: radius.sm, backgroundColor: color.placeholder },
+  // 112x80 rather than 96x72: a denser-reading strip for the same row height,
+  // and it is two numbers.
+  rowImage: { width: 112, height: 80, borderRadius: radius.sm, backgroundColor: color.placeholder },
 
   compact: { gap: space.xs },
 }));

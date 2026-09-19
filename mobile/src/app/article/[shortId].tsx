@@ -19,8 +19,8 @@ import { ArticleActionBar, ACTION_BAR_HEIGHT } from '@/components/article/Articl
 import { ArticleHeader } from '@/components/article/ArticleHeader';
 import { ArticleHero } from '@/components/article/ArticleHero';
 import { BodyRenderer } from '@/components/BodyRenderer';
+import { ArticleGallery } from '@/components/article/ArticleGallery';
 import { Comments } from '@/components/Comments';
-import { EngagementRow } from '@/components/EngagementRow';
 import { ErrorState, LoadingState } from '@/components/Feedback';
 import { FollowChip } from '@/components/FollowChip';
 import { PollCard } from '@/components/PollCard';
@@ -162,6 +162,10 @@ export default function ArticleScreen() {
         subtitle={data ? timeAgo(data.published_at, language) : undefined}
         scrollY={scrollY}
         progress={progress}
+        shortId={shortId}
+        speaking={tts.speaking}
+        onToggleSpeech={tts.toggle}
+        onListen={() => scrollToOffset(audioY.value)}
       />
 
       {article.isLoading ? <LoadingState variant="article" /> : null}
@@ -262,8 +266,8 @@ export default function ArticleScreen() {
                 </T>
               ) : null}
 
-              {/* Like · save · share · report (§5) */}
-              <EngagementRow article={data} cardAvailable={formats.data?.card.available ?? false} />
+              {/* Renders nothing when the story has no extra pictures. */}
+              <ArticleGallery images={data.gallery} />
 
               {/* Follow the threads this story belongs to (§12) */}
               <View style={styles.followRow}>
@@ -315,9 +319,6 @@ export default function ArticleScreen() {
           <ArticleActionBar
             article={data}
             cardAvailable={formats.data?.card.available ?? false}
-            speaking={tts.speaking}
-            onToggleSpeech={tts.toggle}
-            onListen={() => scrollToOffset(audioY.value)}
             hidden={barHidden}
             onComments={() => scrollToOffset(commentsY.value)}
           />

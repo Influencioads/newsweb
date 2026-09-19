@@ -28,6 +28,7 @@ import { timeAgo, useI18n } from '@/lib/i18n';
 import { DUR, useMotion } from '@/lib/motion';
 import { alpha, radius, space } from '@/lib/theme';
 import { makeStyles, useColors } from '@/lib/useTheme';
+import { ArticleActions } from '@/components/ArticleActions';
 import { Badge } from '@/ui/Badge';
 import { Button } from '@/ui/Button';
 import { Icon } from '@/ui/Icon';
@@ -140,6 +141,12 @@ const ShortCard = memo(function ShortCard({
             }
           />
         </View>
+
+        {/* The same row the feed cards and the article carry. `flags="cache"`
+            so a deck of cards never issues a request per card, and no
+            `onComment` — there is no thread on this card to scroll to, so the
+            button routes into the story like everything else here. */}
+        <ArticleActions article={article} size="card" flags="cache" />
       </View>
     </Animated.View>
   );

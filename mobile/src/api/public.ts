@@ -3,8 +3,10 @@ import type {
   ArticleDetail,
   BreakingItem,
   CategoryFeed,
+  DistrictOut,
   HomePayload,
   LocalFeedPayload,
+  LocalityOut,
   MandalOut,
   SearchMeta,
   SearchResults,
@@ -100,9 +102,39 @@ export async function fetchDistrictMandals(districtSlug: string): Promise<Mandal
   return data;
 }
 
+/** Cities, towns and villages under one mandal. Takes the mandal's **id**, not
+ *  its slug — a locality slug is only unique within its mandal. */
+export async function fetchMandalLocalities(mandalId: number): Promise<LocalityOut[]> {
+  const { data } = await api.get<LocalityOut[]>(
+    `/public/locations/mandals/${mandalId}/localities`,
+  );
+  return data;
+}
+
+export interface GeoResolved {
+  matched: boolean;
+  state_code: string | null;
+  district: DistrictOut | null;
+  mandal: MandalOut | null;
+  locality: LocalityOut | null;
+}
+
+/**
+ * Turn a device position into our own places.
+ *
+ * POST, because coordinates must never reach a URL or an access log. The
+ * server never stores them either. Always resolves — an unmatched point comes
+ * back as `matched: false` and the reader picks manually, which always works.
+ */
+export async function resolveGeo(lat: number, lon: number): Promise<GeoResolved> {
+  const { data } = await api.post<GeoResolved>('/public/geo/resolve', { lat, lon });
+  return data;
+}
+
 export async function fetchLocalFeed(params: {
   district: string;
   mandal?: string;
+  locality?: string;
   offset?: number;
   limit?: number;
 }): Promise<LocalFeedPayload> {

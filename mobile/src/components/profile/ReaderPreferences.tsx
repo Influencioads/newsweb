@@ -66,7 +66,7 @@ export function ReaderPreferences({ me }: { me: Me }) {
   const toast = useToast();
   const queryClient = useQueryClient();
   const signOut = useAuth((s) => s.signOut);
-  const { fontStep, setEdition, setMandal, theme, setTheme } = usePrefs();
+  const { fontStep, setPlace, theme, setTheme } = usePrefs();
 
   const [edit, setEdit] = useState<Edit>({});
   const [sheet, setSheet] = useState<'none' | 'font' | 'signOut'>('none');
@@ -117,8 +117,14 @@ export function ReaderPreferences({ me }: { me: Me }) {
     onSuccess: (data) => {
       queryClient.setQueryData(['preferences'], data);
       setLanguage(data.language);
-      setEdition(data.district?.slug ?? null);
-      setMandal(data.mandal?.slug ?? null);
+      // One write, not two. `setEdition` clears the mandal and `setMandal`
+      // clears the locality, so calling them in sequence would throw away the
+      // village the server just told us it kept.
+      setPlace({
+        edition: data.district?.slug ?? null,
+        mandal: data.mandal?.slug ?? null,
+        locality: data.locality?.slug ?? null,
+      });
       // The server document is now the reader's own choice: drop the overlay.
       setEdit({});
       toast.success(t('profile.saved'));

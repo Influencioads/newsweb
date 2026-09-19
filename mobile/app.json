@@ -42,7 +42,13 @@
       "expo-secure-store",
       "expo-font",
       "expo-audio",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "మీ ప్రాంతం వార్తలు చూపించడానికి మాత్రమే మీ లొకేషన్‌ను ఉపయోగిస్తాం."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -65,6 +65,10 @@ export interface ArticleCard {
   ai_generated: boolean;
   published_at: string | null;
   reading_time_sec: number;
+  /** Social proof on the card. `like_count` is the reader-facing total and
+   *  includes any editorial seed; ranking uses a different number server-side. */
+  like_count: number;
+  comment_count: number;
 }
 
 /** Tiptap/ProseMirror node. The body is the source of truth (§1). */
@@ -77,8 +81,7 @@ export interface TiptapNode {
 }
 
 export interface ArticleDetail extends ArticleCard {
-  like_count: number;
-  comment_count: number;
+  /** like_count and comment_count are inherited from ArticleCard. */
   share_count: number;
   sub_title_te: string | null;
   body: TiptapNode | null;
@@ -89,6 +92,8 @@ export interface ArticleDetail extends ArticleCard {
   updated_at: string | null;
   corrected_at: string | null;
   correction_note_te: string | null;
+  /** The desk's own note on the story. Not a correction. */
+  critic_note_te: string | null;
   seo_title: string | null;
   seo_description: string | null;
   canonical_url: string | null;

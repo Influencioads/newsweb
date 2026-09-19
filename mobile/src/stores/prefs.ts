@@ -18,11 +18,20 @@ interface PrefsState {
   /** District slug anchoring the local feed and the home edition. */
   edition: string | null;
   mandal: string | null;
+  /** Village / town / city under the mandal — the finest feed granularity. */
+  locality: string | null;
   fontStep: FontStep;
   setLanguage: (language: 'te' | 'en') => void;
   setTheme: (theme: 'system' | 'light' | 'dark') => void;
   setEdition: (slug: string | null) => void;
   setMandal: (slug: string | null) => void;
+  setLocality: (slug: string | null) => void;
+  /** Set the whole place at once — what the GPS path and the picker both do. */
+  setPlace: (place: {
+    edition: string | null;
+    mandal?: string | null;
+    locality?: string | null;
+  }) => void;
   setFontStep: (step: FontStep) => void;
 }
 
@@ -33,12 +42,19 @@ export const usePrefs = create<PrefsState>()(
       theme: 'system',
       edition: null,
       mandal: null,
+      locality: null,
       fontStep: 'A',
       setLanguage: (language) => set({ language }),
       setTheme: (theme) => set({ theme }),
-      // Changing the district invalidates the mandal beneath it (§4 hierarchy).
-      setEdition: (edition) => set({ edition, mandal: null }),
-      setMandal: (mandal) => set({ mandal }),
+      // Changing a level invalidates every level beneath it (§4 hierarchy):
+      // a mandal belongs to one district and a locality to one mandal, so
+      // keeping the old one would query a pair that cannot match and leave no
+      // chip looking selected.
+      setEdition: (edition) => set({ edition, mandal: null, locality: null }),
+      setMandal: (mandal) => set({ mandal, locality: null }),
+      setLocality: (locality) => set({ locality }),
+      setPlace: ({ edition, mandal = null, locality = null }) =>
+        set({ edition, mandal, locality }),
       setFontStep: (fontStep) => set({ fontStep }),
     }),
     {

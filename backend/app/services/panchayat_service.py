@@ -37,7 +37,13 @@ from app.core.errors import ConflictError
 from app.db.base import utcnow
 from app.integrations.ai.sensitive import is_sensitive
 from app.models.content import Article, Category, WorkflowTransition
-from app.models.enums import ArticleStatus, ArticleType, Vertical, WorkflowState
+from app.models.enums import (
+    ArticleStatus,
+    ArticleType,
+    RoleKey,
+    Vertical,
+    WorkflowState,
+)
 from app.models.geo import Locality
 from app.models.kyc import ContributorProfile
 from app.services import kyc_service
@@ -69,6 +75,24 @@ def _published_count(db: Session, author_id: int) -> int:
     )
 
 
+def _is_sensitive_anywhere(article: Article) -> bool:
+    """Screen the headline, standfirst, summary and body — in that order.
+
+    `body_plain` alone was not enough. A reader meets the headline first, and a
+    push notification or a WhatsApp preview may show nothing else; an empty
+    body passed the old check trivially, and nothing requires a body.
+    """
+    return any(
+        is_sensitive(field or "")
+        for field in (
+            article.title_te,
+            article.sub_title_te,
+            article.summary_te,
+            article.body_plain,
+        )
+    )
+
+
 def may_self_publish(db: Session, principal: Principal, article: Article) -> bool:
     """May this person publish this article with no editor in front of them?
 
@@ -76,6 +100,13 @@ def may_self_publish(db: Session, principal: Principal, article: Article) -> boo
     not a refactor — every clause removed here is a class of story that reaches
     readers unreviewed.
     """
+    # Staff are out, whatever their profile says. A desk editor with a
+    # panchayat profile would otherwise use this to publish their own copy and
+    # walk straight past the two-person rule — and their story would be
+    # rewritten into the panchayat category on the way out. The exception is
+    # documented as one role; enforce that it *is* one role.
+    if not principal.has_role(RoleKey.PANCHAYAT_SECRETARY):
+        return False
     profile = kyc_service.profile_for(db, principal.id)
     return bool(
         profile
@@ -91,8 +122,22 @@ def may_self_publish(db: Session, principal: Principal, article: Article) -> boo
         and profile.locality_id is not None
         and article.locality_id == profile.locality_id
         # A communal clash or a rape case is not panchayat-notice copy, and it
-        # is precisely the story that must not go out unread.
-        and not is_sensitive(article.body_plain or "")
+        # is precisely the story that must not go out unread. Screen every
+        # field a reader meets first: the headline is what a card, a push and a
+        # link preview show, and screening only the body let an innocuous
+        # notice carry any headline at all.
+        and not _is_sensitive_anywhere(article)
+        # Their own words. A secretary also holds `article.create`, which
+        # reaches the crawl-import route, and an imported item takes the
+        # importer as its author — so without this, another outlet's reporting
+        # could be relocated into their panchayat and published unreviewed,
+        # with `stamp_ugc` overwriting the publisher's credit on the way out.
+        # `source_type` and `article_type` are what the import stamps; a story
+        # somebody actually wrote here carries neither.
+        and article.source_type == "own"
+        and article.article_type
+        not in (ArticleType.SYNDICATED, ArticleType.AI_REWRITE, ArticleType.AI_DRAFT)
+        and not article.ai_generated
         and _published_count(db, principal.id) >= PROBATION
     )
 
@@ -156,11 +201,16 @@ def set_publish_grant(
         db.flush()
         return []
 
+    # Only the copy that reached readers *through this exception*. An editor
+    # read, approved and published the rest; withdrawing a trust flag is not a
+    # reason to pull their journalism off the site. `approved_by IS NULL` on a
+    # PUBLISHED row is exactly the signature the trusted path leaves.
     live = list(
         db.scalars(
             select(Article).where(
                 Article.author_id == profile.user_id,
                 Article.status == ArticleStatus.PUBLISHED,
+                Article.approved_by.is_(None),
             )
         ).all()
     )

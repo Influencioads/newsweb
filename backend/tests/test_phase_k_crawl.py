@@ -739,6 +739,78 @@ class TestLicenceAndHtmlFallback:
         db.commit()
         return item
 
+    def test_a_logo_scraped_from_the_page_never_becomes_the_item_image(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """og:image is the single richest source of publisher logos.
+
+        This path used to write whatever the page said straight onto the item,
+        past every rule in `feeds.images`, and `_attach_media` then trusted it —
+        which made the host rule decorative for exactly the sources that trigger
+        the fallback.
+        """
+        configure(db, **{"crawl.html_fallback_enabled": True})
+        install_ai(monkeypatch, FakeAi())
+        monkeypatch.setattr(
+            "app.services.crawl_service.extract_article",
+            lambda *_a, **_k: PageText(
+                status="ok",
+                text="The publisher's full article body. " * 400,
+                method="jsonld",
+                word_count=2000,
+                image_url="https://publisher.example.com/assets/site-logo.png",
+            ),
+        )
+        source = make_source(
+            db,
+            slug="sx-logo",
+            licence=SourceLicence.AGENCY_CONTRACT,
+            policy=ContentPolicy.FULL_TEXT,
+            html_fallback=True,
+            note="checked terms",
+        )
+        item = make_item(db, source, guid="sx-logo-1", summary="stub", language="en")
+        db.commit()
+        crawl_service.rewrite_one(db, item)
+        db.commit()
+        db.refresh(item)
+
+        assert item.image_url is None, (
+            "a logo reached the item, so the download would credit it as news"
+        )
+
+    def test_a_real_photo_scraped_from_the_page_is_kept(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The control: the filter must not simply reject everything."""
+        configure(db, **{"crawl.html_fallback_enabled": True})
+        install_ai(monkeypatch, FakeAi())
+        photo = "https://publisher.example.com/uploads/2026/flood-1600x900.jpg"
+        monkeypatch.setattr(
+            "app.services.crawl_service.extract_article",
+            lambda *_a, **_k: PageText(
+                status="ok",
+                text="The publisher's full article body. " * 400,
+                method="jsonld",
+                word_count=2000,
+                image_url=photo,
+            ),
+        )
+        source = make_source(
+            db,
+            slug="sx-photo",
+            licence=SourceLicence.AGENCY_CONTRACT,
+            policy=ContentPolicy.FULL_TEXT,
+            html_fallback=True,
+            note="checked terms",
+        )
+        item = make_item(db, source, guid="sx-photo-1", summary="stub", language="en")
+        db.commit()
+        crawl_service.rewrite_one(db, item)
+        db.commit()
+        db.refresh(item)
+        assert item.image_url == photo
+
     def test_the_reviewer_gets_the_original_when_a_page_was_fetched(
         self, db: Session, monkeypatch: pytest.MonkeyPatch
     ) -> None:

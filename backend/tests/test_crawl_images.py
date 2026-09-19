@@ -201,6 +201,22 @@ def make_item(db: Session, slug: str, **source_kw: object) -> IngestedItem:
 
 
 @pytest.fixture
+def public_dns(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make the test hosts resolve to a public address.
+
+    `_is_internal` resolves every URL before fetching it and fails closed, so
+    without this the made-up hosts here look like DNS failures and every
+    download is refused for the wrong reason. Stubbing the resolver rather than
+    the guard keeps the guard itself under test.
+    """
+    monkeypatch.setattr(
+        ingestion_service.socket,
+        "getaddrinfo",
+        lambda *_a, **_kw: [(2, 1, 6, "", ("93.184.216.34", 443))],
+    )
+
+
+@pytest.fixture
 def stub_storage(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "app.services.media_service.get_storage", lambda *_a, **_kw: _Storage()
@@ -209,7 +225,7 @@ def stub_storage(monkeypatch: pytest.MonkeyPatch) -> None:
 
 class TestAttachMedia:
     def test_a_hero_is_attached_from_the_source_image(
-        self, db: Session, monkeypatch: pytest.MonkeyPatch, stub_storage: None
+        self, db: Session, monkeypatch: pytest.MonkeyPatch, stub_storage: None, public_dns: None
     ) -> None:
         item = make_item(db, "images-on", images_enabled=True)
         monkeypatch.setattr(
@@ -234,7 +250,7 @@ class TestAttachMedia:
         assert [link.role for link in links] == ["hero"]
 
     def test_a_body_past_the_cap_is_abandoned_mid_stream(
-        self, db: Session, monkeypatch: pytest.MonkeyPatch, stub_storage: None
+        self, db: Session, monkeypatch: pytest.MonkeyPatch, stub_storage: None, public_dns: None
     ) -> None:
         """The box this runs on has ~800 MB free and no swap.
 
@@ -276,7 +292,7 @@ class TestAttachMedia:
         )
 
     def test_a_redirect_records_where_the_bytes_actually_came_from(
-        self, db: Session, monkeypatch: pytest.MonkeyPatch, stub_storage: None
+        self, db: Session, monkeypatch: pytest.MonkeyPatch, stub_storage: None, public_dns: None
     ) -> None:
         """Publishers serve their own images off their own CDN, often on
         another domain. We follow that — the starting URL is always one the
@@ -295,8 +311,69 @@ class TestAttachMedia:
         assert media.meta["origin_url"] == PHOTO
         assert media.meta["fetched_from"] == cdn
 
-    def test_a_failed_fetch_does_not_fail_the_import(
+    def test_an_address_inside_our_own_network_is_never_fetched(
         self, db: Session, monkeypatch: pytest.MonkeyPatch, stub_storage: None
+    ) -> None:
+        """The worker sits in a private network with a metadata endpoint on it.
+
+        Deliberately no `public_dns` here: the real resolver answers, the host
+        does not exist, and the guard must fail closed rather than fetch.
+        """
+        item = make_item(db, "images-internal", images_enabled=True)
+        monkeypatch.setattr(
+            ingestion_service.socket,
+            "getaddrinfo",
+            lambda *_a, **_kw: [(2, 1, 6, "", ("169.254.169.254", 80))],
+        )
+
+        def _never(*_a: object, **_kw: object) -> None:
+            raise AssertionError("an internal address must not be requested at all")
+
+        monkeypatch.setattr("app.services.ingestion_service.httpx.stream", _never)
+        article = ingestion_service.import_item(db, item, actor_id=None)
+        db.flush()
+        assert article.hero_media_id is None
+
+    def test_a_redirect_into_the_network_is_refused(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch, stub_storage: None
+    ) -> None:
+        """Open redirects are ordinary furniture on news CMSes, so passing the
+        first check is not permission to keep whatever the last hop returns."""
+        item = make_item(db, "images-ssrf", images_enabled=True)
+        internal = "http://metadata.internal/latest/meta-data/iam/"
+        calls = {"n": 0}
+
+        def _resolve(host, *_a, **_kw):
+            calls["n"] += 1
+            addr = "169.254.169.254" if host == "metadata.internal" else "93.184.216.34"
+            return [(2, 1, 6, "", (addr, 80))]
+
+        monkeypatch.setattr(ingestion_service.socket, "getaddrinfo", _resolve)
+        monkeypatch.setattr(
+            "app.services.ingestion_service.httpx.stream",
+            lambda *a, **k: _Response(_png(), url=internal),
+        )
+        article = ingestion_service.import_item(db, item, actor_id=None)
+        db.flush()
+        assert article.hero_media_id is None
+        assert calls["n"] >= 2, "the landing address was never resolved"
+
+    def test_a_redirect_onto_a_logo_is_refused(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch, stub_storage: None, public_dns: None
+    ) -> None:
+        item = make_item(db, "images-redirect-logo", images_enabled=True)
+        monkeypatch.setattr(
+            "app.services.ingestion_service.httpx.stream",
+            lambda *a, **k: _Response(
+                _png(), url="https://cdn.example.net/assets/site-logo.png"
+            ),
+        )
+        article = ingestion_service.import_item(db, item, actor_id=None)
+        db.flush()
+        assert article.hero_media_id is None
+
+    def test_a_failed_fetch_does_not_fail_the_import(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch, stub_storage: None, public_dns: None
     ) -> None:
         item = make_item(db, "images-broken", images_enabled=True)
 
@@ -314,7 +391,7 @@ class TestAttachMedia:
         assert article.hero_media_id is None
 
     def test_the_kill_switch_is_off_by_default(
-        self, db: Session, monkeypatch: pytest.MonkeyPatch, stub_storage: None
+        self, db: Session, monkeypatch: pytest.MonkeyPatch, stub_storage: None, public_dns: None
     ) -> None:
         """Forty sources downloading pictures on deploy day is what this stops."""
         item = make_item(db, "images-default")

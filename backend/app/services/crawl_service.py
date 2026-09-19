@@ -40,6 +40,7 @@ from app.core.logging import get_logger
 from app.db.base import utcnow
 from app.integrations.ai import get_ai
 from app.integrations.feeds import FeedResult, extract_article, fetch_feed
+from app.integrations.feeds import images as feed_images
 from app.models.enums import IngestStatus, RewriteStatus, SourceBeat
 from app.models.ingestion import ContentSource, IngestedItem, IngestedRewrite
 from app.services import (
@@ -385,8 +386,22 @@ def gather_source_text(db: Session, item: IngestedItem) -> tuple[str, str, str |
             "".join(f"<p>{p}</p>" for p in page.text.split("\n\n") if p.strip())
         ) or None
         item.word_count = page.word_count
-        if page.image_url and not item.image_url:
-            item.image_url = page.image_url
+        # og:image and the JSON-LD image are the single richest source of
+        # publisher logos, and this path used to write them straight onto the
+        # item — past every rule in `feeds.images`, which `_attach_media` then
+        # trusted. Filter here or the host rule is decorative.
+        if not item.image_url:
+            publisher = feed_images.publisher_url(
+                source.homepage_url, source.feed_url, item.url
+            )
+            usable = feed_images.pick(
+                page.image_urls or ([page.image_url] if page.image_url else []),
+                article_url=publisher,
+                logo_url=source.logo_url,
+            )
+            if usable:
+                item.image_url = usable[0]
+                item.image_urls = usable
     # else: page.text stays in this function's locals and is never persisted.
 
     combined = "\n\n".join(p for p in (item.title, page.text) if p).strip()

@@ -25,12 +25,15 @@ from __future__ import annotations
 
 import hashlib
 import io
+import socket
+import ipaddress
 import re
 from datetime import timedelta
 from typing import Any
 
 import bleach
 import httpx
+from urllib.parse import urlsplit
 from PIL import Image
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -213,9 +216,14 @@ def _store_entry(
 
     mandal_id, method, confidence = _resolve_mandal(db, source, entry.title, summary)
 
+    # The host to measure candidates against is the one an admin configured,
+    # not the one this feed claims for itself — see `images.publisher_url`.
+    publisher = feed_images.publisher_url(
+        source.homepage_url, source.feed_url, entry.url
+    )
     picked = feed_images.pick(
         entry.image_urls or ([entry.image_url] if entry.image_url else []),
-        article_url=entry.url,
+        article_url=publisher,
         logo_url=source.logo_url,
     )
 
@@ -447,6 +455,42 @@ def _body_document(item: IngestedItem, source: ContentSource) -> dict[str, Any]:
     }
 
 
+def _is_internal(url: str) -> bool:
+    """Does this URL point somewhere inside our own network?
+
+    The crawl worker sits in a private network with a cloud metadata endpoint
+    on it, and a publisher CMS with an open redirect (`/out?url=`, a click
+    tracker — ordinary furniture) turns "fetch this image" into "fetch whatever
+    the query string says". Resolving first is the point: a hostname under the
+    attacker's control can answer with 169.254.169.254 whatever it looks like.
+
+    Fails closed. A name that will not resolve is not one we were going to
+    download a photograph from anyway.
+    """
+    host = urlsplit(url).hostname
+    if not host:
+        return True
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except OSError:
+        return True
+    for info in infos:
+        try:
+            ip = ipaddress.ip_address(info[4][0])
+        except ValueError:
+            return True
+        if (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_reserved
+            or ip.is_multicast
+            or ip.is_unspecified
+        ):
+            return True
+    return False
+
+
 def _download_image(url: str) -> tuple[bytes, str, str] | None:
     """`(bytes, mime, final_url)` for a URL that really is a usable photograph.
 
@@ -467,6 +511,9 @@ def _download_image(url: str) -> tuple[bytes, str, str] | None:
     go looking for an image anywhere; the final host is recorded on the media
     row so an auditor can see where each one actually came from.
     """
+    if _is_internal(url):
+        logger.warning("ingest_image_internal_address", url=url[:200])
+        return None
     with httpx.stream(
         "GET",
         url,
@@ -475,6 +522,16 @@ def _download_image(url: str) -> tuple[bytes, str, str] | None:
         follow_redirects=True,
     ) as response:
         if response.status_code != 200:
+            return None
+        # Where a redirect LANDED is not where we checked. A publisher serving
+        # its own pictures off a CDN on another domain is normal and stays
+        # allowed; an address inside the network, or a URL the cheap rules
+        # reject, is not.
+        final = str(response.url)
+        if final != url and (
+            _is_internal(final) or not feed_images.survives_redirect(final)
+        ):
+            logger.warning("ingest_image_redirect_refused", url=url[:120], final=final[:120])
             return None
         if not response.headers.get("content-type", "").lower().startswith("image/"):
             return None

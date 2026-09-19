@@ -31,8 +31,12 @@ os.environ.setdefault("APP_ENV", "test")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.core.deps import Principal  # noqa: E402
-from app.core.errors import ConflictError, ScopeDeniedError  # noqa: E402
+from app.core.deps import Principal, build_principal  # noqa: E402
+from app.core.errors import (  # noqa: E402
+    ConflictError,
+    ScopeDeniedError,
+    ValidationError,
+)
 from app.core.permissions import ROLE_DEFINITIONS, ROLE_PERMISSIONS  # noqa: E402
 from app.db.base import Base, utcnow  # noqa: E402
 from app.db.seed import (  # noqa: E402
@@ -158,7 +162,9 @@ def _locality(db: Session, slug: str) -> Locality:
     return db.scalars(select(Locality).where(Locality.slug == slug)).one()
 
 
-def _user(db: Session, email: str, role: RoleKey) -> User:
+def _user(
+    db: Session, email: str, role: RoleKey, *, scope_id: int | None = None
+) -> User:
     user = db.scalar(select(User).where(User.email == email))
     if user is not None:
         return user
@@ -173,9 +179,14 @@ def _user(db: Session, email: str, role: RoleKey) -> User:
         UserRole(
             user_id=user.id,
             role_id=role_row.id,
+            # A real secretary account is scoped to one mandal, and
+            # `build_principal` reads `scope_id` to know which. Leaving it NULL
+            # gives an empty scope set and every transition is refused before
+            # the exception is ever consulted.
             scope_type=ScopeType.MANDAL
             if role is RoleKey.PANCHAYAT_SECRETARY
             else ScopeType.GLOBAL,
+            scope_id=scope_id if role is RoleKey.PANCHAYAT_SECRETARY else None,
         )
     )
     db.flush()
@@ -188,13 +199,16 @@ def secretary(
     granted: bool = True, approved: bool = True,
 ) -> tuple[User, ContributorProfile]:
     """A verified PANCHAYAT contributor who is also a CMS secretary account."""
-    user = _user(db, email, RoleKey.PANCHAYAT_SECRETARY)
+    locality = _locality(db, locality_slug)
+    user = _user(
+        db, email, RoleKey.PANCHAYAT_SECRETARY, scope_id=locality.mandal_id
+    )
     profile = ContributorProfile(
         user_id=user.id,
         contributor_type=ContributorType.CITIZEN,
         vertical=Vertical.PANCHAYAT,
         display_name_te="రమేష్ కుమార్",
-        locality_id=_locality(db, locality_slug).id,
+        locality_id=locality.id,
     )
     db.add(profile)
     db.flush()
@@ -210,14 +224,15 @@ def secretary(
 
 
 def principal_for(db: Session, user: User) -> Principal:
-    mandal = db.scalars(select(Mandal)).first()
-    return Principal(
-        user=user,
-        session_key="test",
-        permissions=frozenset(ROLE_PERMISSIONS[RoleKey.PANCHAYAT_SECRETARY]),
-        level=int(ROLE_DEFINITIONS[RoleKey.PANCHAYAT_SECRETARY]["level"]),
-        mandal_ids=frozenset({mandal.id}),
-    )
+    """The real thing, built from the user's actual role assignments.
+
+    It used to hand-assemble a Principal with the secretary's permissions baked
+    in, which meant a test could hand it a desk editor and still get a
+    secretary's authority — the exact confusion the exception has to be immune
+    to. `build_principal` is what the API uses, so use it.
+    """
+    db.refresh(user)
+    return build_principal(user, "test")
 
 
 def make_article(
@@ -228,13 +243,22 @@ def make_article(
     body: str = "గ్రామ పంచాయతీ సర్వసభ్య సమావేశం సోమవారం జరిగింది.",
     status: ArticleStatus = ArticleStatus.DRAFT,
     state: WorkflowState = WorkflowState.DRAFT,
+    title: str = "పంచాయతీ సమావేశం",
+    summary: str | None = None,
+    source_type: str = "own",
+    article_type: ArticleType = ArticleType.NORMAL,
+    approved_by: int | None = None,
 ) -> Article:
     locality = _locality(db, locality_slug) if locality_slug else None
     article = Article(
         short_id=f"a{db.query(Article).count():05d}",
         slug=f"kathanam-{db.query(Article).count()}",
-        title_te="పంచాయతీ సమావేశం",
+        title_te=title,
+        summary_te=summary,
         body_plain=body,
+        source_type=source_type,
+        article_type=article_type,
+        approved_by=approved_by,
         author_id=author_id,
         locality_id=locality.id if locality else None,
         mandal_id=locality.mandal_id if locality else None,
@@ -266,6 +290,132 @@ def publish(db: Session, user: User, article: Article) -> Article:
 # --------------------------------------------------------------------------- #
 # The six refusals
 # --------------------------------------------------------------------------- #
+class TestTheHolesTheReviewFound:
+    """Six ways in that the first implementation left open.
+
+    Every one of these was reachable with a real account and a real token, and
+    each is the kind of hole that only shows up when somebody is actively
+    looking for it rather than checking the happy path.
+    """
+
+    def test_a_sensitive_headline_is_screened_even_over_an_innocent_body(
+        self, db: Session
+    ) -> None:
+        """The headline is what a card, a push and a WhatsApp preview show.
+
+        Screening `body_plain` alone let an ordinary meeting notice carry any
+        headline at all — and an empty body passed the check trivially.
+        """
+        user, _p = secretary(db)
+        serve_probation(db, user.id)
+        article = make_article(
+            db,
+            author_id=user.id,
+            title="గ్రామంలో అత్యాచారం",
+            body="గ్రామ పంచాయతీ సర్వసభ్య సమావేశం సోమవారం జరిగింది.",
+        )
+        assert not panchayat_service.may_self_publish(
+            db, principal_for(db, user), article
+        )
+
+    def test_an_empty_body_does_not_pass_the_screen_by_default(
+        self, db: Session
+    ) -> None:
+        user, _p = secretary(db)
+        serve_probation(db, user.id)
+        article = make_article(
+            db, author_id=user.id, title="మతపరమైన ఘర్షణ", body=""
+        )
+        assert not panchayat_service.may_self_publish(
+            db, principal_for(db, user), article
+        )
+
+    def test_a_desk_editor_holding_the_same_grant_still_needs_an_approver(
+        self, db: Session
+    ) -> None:
+        """The exception is documented as one role. It was implemented as a
+        column, so anyone carrying it skipped the two-person rule — including
+        staff who are specifically not allowed to publish their own copy."""
+        editor = _user(db, "desk@test.local", RoleKey.DESK_EDITOR)
+        profile = ContributorProfile(
+            user_id=editor.id,
+            contributor_type=ContributorType.CITIZEN,
+            vertical=Vertical.PANCHAYAT,
+            display_name_te="డెస్క్",
+            locality_id=_locality(db, "gollapalem").id,
+        )
+        db.add(profile)
+        db.flush()
+        kyc_service.apply_decision(
+            db, profile,
+            KycDecision(status=KycStatus.APPROVED, provider="manual"),
+            actor_id=None,
+        )
+        panchayat_service.set_publish_grant(db, profile, granted=True, actor_id=1)
+        db.commit()
+        serve_probation(db, editor.id)
+
+        article = make_article(db, author_id=editor.id)
+        assert not panchayat_service.may_self_publish(
+            db, principal_for(db, editor), article
+        )
+        # Untrusted, so the ordinary state machine answers first: a DRAFT does
+        # not go straight to PUBLISHED for anybody. Either refusal is the right
+        # one; what matters is that the story does not reach readers.
+        with pytest.raises((ConflictError, ValidationError)):
+            publish(db, editor, article)
+        db.refresh(article)
+        assert article.status == ArticleStatus.DRAFT
+
+    def test_another_outlets_reporting_cannot_be_relocated_and_self_published(
+        self, db: Session
+    ) -> None:
+        """A secretary holds `article.create`, which reaches the crawl import,
+        and an imported item takes the importer as its author. Without a
+        provenance check that made somebody else's journalism 'their own copy',
+        and `stamp_ugc` would then overwrite the publisher's credit."""
+        user, _p = secretary(db)
+        serve_probation(db, user.id)
+        imported = make_article(
+            db,
+            author_id=user.id,
+            source_type="syndicated",
+            article_type=ArticleType.SYNDICATED,
+        )
+        assert not panchayat_service.may_self_publish(
+            db, principal_for(db, user), imported
+        )
+
+    def test_revoking_leaves_editor_approved_journalism_up(
+        self, db: Session
+    ) -> None:
+        """Withdrawing a trust flag is not a reason to unpublish stories a real
+        editor read and approved."""
+        user, profile = secretary(db)
+        reviewed = make_article(
+            db,
+            author_id=user.id,
+            status=ArticleStatus.PUBLISHED,
+            state=WorkflowState.PUBLISHED,
+            approved_by=1,
+        )
+        unreviewed = make_article(
+            db,
+            author_id=user.id,
+            status=ArticleStatus.PUBLISHED,
+            state=WorkflowState.PUBLISHED,
+        )
+        taken = panchayat_service.set_publish_grant(
+            db, profile, granted=False, actor_id=1
+        )
+        db.commit()
+        ids = {a.id for a in taken}
+        assert unreviewed.id in ids
+        assert reviewed.id not in ids, "an editor's approved story was taken down"
+        db.refresh(reviewed)
+        assert reviewed.status == ArticleStatus.PUBLISHED
+
+
 class TestTheExceptionRefuses:
     def test_without_a_grant_a_draft_cannot_be_published(self, db: Session) -> None:
         user, _p = secretary(db, granted=False)

@@ -343,7 +343,13 @@ def set_placement(
     payload: PlacementIn,
     request: Request,
     db: Session = Depends(get_db),
-    principal: Principal = Depends(require_permission("article.publish")),
+    principal: Principal = Depends(
+        # Deciding what leads the front page for two states is desk
+        # seniority, and `article.publish` stopped implying it the moment a
+        # level-15 panchayat secretary was given it. The same gate is on
+        # `_guard_flags` and on every route in cms_discovery.
+        require_permission("article.publish", min_level=LEVEL_PIN_PLACEMENT)
+    ),
 ):
     """§8 / §9 — "pin to home page" and "show in Top trending" from the article
     form.

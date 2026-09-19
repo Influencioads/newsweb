@@ -158,15 +158,15 @@ export function ShareOptionsSheet({
     try {
       const directory = new Directory(Paths.cache, 'cards');
       directory.create({ idempotent: true });
-      const destination = new File(directory, `${shortId}.png`);
+      const destination = new File(directory, `${shortId}.jpg`);
       const file = await File.downloadFileAsync(
-        `${API_BASE}/public/articles/${shortId}/card.png`,
+        `${API_BASE}/public/articles/${shortId}/card.jpg`,
         destination,
         { idempotent: true },
       );
       if (await Sharing.isAvailableAsync()) {
         onClose();
-        await Sharing.shareAsync(file.uri, { mimeType: 'image/png', dialogTitle: title });
+        await Sharing.shareAsync(file.uri, { mimeType: 'image/jpeg', dialogTitle: title });
         trackShare(shortId);
       } else {
         // No share provider on the device: say so instead of ending the tap in

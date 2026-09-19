@@ -92,13 +92,13 @@ export function useShareActions(shortId: string, url: string, title: string, tra
   async function download(): Promise<boolean> {
     setDownloading(true);
     try {
-      const response = await fetch(`${API_BASE}/public/articles/${shortId}/card.png`);
+      const response = await fetch(`${API_BASE}/public/articles/${shortId}/card.jpg`);
       if (!response.ok) throw new Error(String(response.status));
       const blob = await response.blob();
       const objectUrl = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = objectUrl;
-      anchor.download = `${shortId}.png`;
+      anchor.download = `${shortId}.jpg`;
       anchor.click();
       URL.revokeObjectURL(objectUrl);
       report();

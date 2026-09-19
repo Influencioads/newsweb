@@ -48,6 +48,10 @@ router = APIRouter(include_in_schema=False)
 
 #: Stories older than this are not in the news sitemap; Google News ignores
 #: anything past two days anyway.
+#: The share card's fixed dimensions, declared to crawlers so a preview can be
+#: laid out before the image finishes downloading.
+CARD_SIZE = (1200, 630)
+
 _NEWS_WINDOW_DAYS = 2
 _SITEMAP_LIMIT = 5_000
 
@@ -66,17 +70,23 @@ def _head(
     description: str,
     url: str,
     image: str | None,
+    image_size: tuple[int, int] | None = None,
     og_type: str = "website",
     extra: str = "",
 ) -> str:
+    # Only declare dimensions we actually know. The share card is always
+    # 1200x630, but the fallback is the hero photograph at whatever shape it
+    # was uploaded — and a crawler told the wrong size either crops badly or
+    # rejects the image. Omitting the tags lets it measure for itself.
     image_tags = ""
     if image:
-        image_tags = (
-            f'<meta property="og:image" content="{escape(image)}">'
-            '<meta property="og:image:width" content="1200">'
-            '<meta property="og:image:height" content="630">'
-            f'<meta name="twitter:image" content="{escape(image)}">'
-        )
+        image_tags = f'<meta property="og:image" content="{escape(image)}">'
+        if image_size:
+            image_tags += (
+                f'<meta property="og:image:width" content="{image_size[0]}">'
+                f'<meta property="og:image:height" content="{image_size[1]}">'
+            )
+        image_tags += f'<meta name="twitter:image" content="{escape(image)}">'
     return (
         '<meta charset="utf-8">'
         f"<title>{escape(title)}</title>"
@@ -105,6 +115,12 @@ def _page(head: str, body: str) -> HTMLResponse:
         headers={
             "Cache-Control": "public, max-age=300",
             "CDN-Cache-Control": "public, s-maxage=600",
+            # The edge serves this stub to crawlers and the SPA to humans off
+            # the SAME url, so any shared cache in front must key on the agent.
+            # nginx did this with $is_link_crawler in proxy_cache_key; Caddy has
+            # no response cache at all. Declaring it here is the portable
+            # version, and it protects a CDN nobody has added yet.
+            "Vary": "User-Agent",
         },
     )
 
@@ -139,10 +155,11 @@ def og_article(slug_and_id: str, db: Session = Depends(get_db)):
     title = article.seo_title or article.title_te or ""
     description = (article.seo_description or article.summary_te or "")[:300]
     image = share_card_service.ensure_card(db, article)
-    hero = None
-    media = getattr(article, "hero_media", None)
-    if media is not None:
-        hero = getattr(media, "cdn_url", None) or getattr(media, "url", None)
+    # Load the hero by id. `Article` has no `hero_media` relationship, so the
+    # getattr this replaced always returned None and the photo never reached
+    # og:image — see share_card_service.hero_media_url.
+    hero = share_card_service.hero_media_url(db, article)
+    hero_size = share_card_service.hero_media_size(db, article) if hero else None
 
     extra = ""
     if article.published_at:
@@ -198,6 +215,9 @@ def og_article(slug_and_id: str, db: Session = Depends(get_db)):
             description=description,
             url=url,
             image=image or hero,
+            # The card is always 1200x630; the hero fallback is whatever shape
+            # the desk uploaded, so send its real size or none at all.
+            image_size=CARD_SIZE if image else hero_size,
             og_type="article",
             extra=extra,
         ),

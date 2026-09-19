@@ -91,12 +91,18 @@ def story_formats(short_id: str, response: Response, db: Session = Depends(get_d
     }
 
 
+@router.get("/public/articles/{short_id}/card.jpg")
 @router.get("/public/articles/{short_id}/card.png")
 def share_card(short_id: str, db: Session = Depends(get_db)):
     """Redirect to the stored card, mirroring how the e-paper serves its PDF.
 
     404 rather than 500 when cards are unavailable on this host — a reader
     sharing text and a link is the documented fallback, not an error.
+
+    Two spellings on purpose. The card became a JPEG (a photographic PNG is
+    ~870 KB and WhatsApp drops a preview that large), so `.jpg` is the honest
+    name — but app builds already in readers' hands ask for `card.png`, and
+    this is a redirect either way, so both keep working.
     """
     article = _published(db, short_id)
     url = share_card_service.ensure_card(db, article)

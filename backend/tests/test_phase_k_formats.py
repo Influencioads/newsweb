@@ -34,6 +34,7 @@ from app.db.seed_content import seed_categories, seed_tags  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.content import Article, Category  # noqa: E402
+from app.models.media import Media  # noqa: E402
 from app.models.enums import (  # noqa: E402
     ArticleStatus,
     RoleKey,
@@ -279,6 +280,69 @@ class TestShareCard:
         article.title_te = "పూర్తిగా వేరే శీర్షిక"
         db.flush()
         assert share_card_service.card_hash(article, None) != first
+
+    def test_the_hero_photograph_reaches_the_card(self, db: Session) -> None:
+        """The regression guard for the defect that shipped.
+
+        `Article` has no `hero_media` relationship, so the old
+        `getattr(article, "hero_media", None)` evaluated to None forever: every
+        card drew a flat brand band instead of the photo, and og:image never
+        carried it. Nothing asserted the photo, which is exactly why nobody
+        noticed. Assert the URL and assert it changes the digest.
+        """
+        article = make_article(db, short_id="card05")
+        media = Media(
+            type="image",
+            filename="hero.jpg",
+            mime="image/jpeg",
+            bytes=1234,
+            storage_provider="local",
+            storage_key="media/hero.jpg",
+            cdn_url="https://cdn.example/hero.jpg",
+            width=1600,
+            height=900,
+        )
+        db.add(media)
+        db.flush()
+
+        assert share_card_service.hero_media_url(db, article) is None
+        without = share_card_service.card_hash(article, None)
+
+        article.hero_media_id = media.id
+        db.flush()
+
+        assert (
+            share_card_service.hero_media_url(db, article)
+            == "https://cdn.example/hero.jpg"
+        )
+        assert (
+            share_card_service.card_hash(article, "https://cdn.example/hero.jpg")
+            != without
+        )
+
+    def test_a_soft_deleted_hero_does_not_come_back_through_a_preview(
+        self, db: Session
+    ) -> None:
+        """An editor removing a photo must remove it from the link preview too."""
+        article = make_article(db, short_id="card06")
+        media = Media(
+            type="image",
+            filename="pulled.jpg",
+            mime="image/jpeg",
+            bytes=99,
+            storage_provider="local",
+            storage_key="media/pulled.jpg",
+            cdn_url="https://cdn.example/pulled.jpg",
+        )
+        db.add(media)
+        db.flush()
+        article.hero_media_id = media.id
+        db.flush()
+        assert share_card_service.hero_media_url(db, article) is not None
+
+        media.deleted_at = utcnow()
+        db.flush()
+        assert share_card_service.hero_media_url(db, article) is None
 
     def test_the_key_is_content_addressed(self, db: Session) -> None:
         """No database column and no invalidation logic: the bucket is the

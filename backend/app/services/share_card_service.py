@@ -123,14 +123,48 @@ def card_hash(article: Article, hero_url: str | None) -> str:
 
 
 def storage_key(article: Article, digest: str) -> str:
-    return f"share-cards/{article.short_id}/{digest[:16]}.png"
+    return f"share-cards/{article.short_id}/{digest[:16]}.jpg"
 
 
-def _hero_url(article: Article) -> str | None:
-    media = getattr(article, "hero_media", None)
-    if media is None:
+def hero_media_url(db, article: Article) -> str | None:
+    """The article's hero photograph, or None.
+
+    `Article` deliberately has no `hero_media` relationship — the FK crosses
+    module boundaries (see `app.models.__init__`) and every other consumer
+    loads the row by id. This used to read `getattr(article, "hero_media")`,
+    which silently evaluated to None forever, so every card drew a flat brand
+    band where the photo belongs and og:image never carried the real picture.
+
+    Soft-deleted media is skipped: a photo an editor removed must not come
+    back through a link preview.
+    """
+    if not article.hero_media_id:
         return None
-    return getattr(media, "cdn_url", None) or getattr(media, "url", None)
+    from app.models.media import Media
+
+    media = db.get(Media, article.hero_media_id)
+    if media is None or media.deleted_at is not None:
+        return None
+    return media.cdn_url or None
+
+
+def hero_media_size(db, article: Article) -> tuple[int, int] | None:
+    """The hero's real pixel size, when it is recorded.
+
+    Only used when the share card is unavailable and the raw photograph
+    becomes og:image: a crawler told the wrong dimensions crops badly or
+    declines the image outright.
+    """
+    if not article.hero_media_id:
+        return None
+    from app.models.media import Media
+
+    media = db.get(Media, article.hero_media_id)
+    if media is None or media.deleted_at is not None:
+        return None
+    if not media.width or not media.height:
+        return None
+    return (media.width, media.height)
 
 
 @lru_cache(maxsize=8)
@@ -281,7 +315,13 @@ def render(article: Article, hero_url: str | None) -> bytes:
         x += draw.textlength(run, font=run_font, language="te")
 
     out = io.BytesIO()
-    canvas.save(out, format="PNG", optimize=True)
+    # JPEG, not PNG. Measured on a 1200x630 card whose top band is a
+    # photograph: PNG 869 KB, JPEG q82 106 KB. WhatsApp silently drops a link
+    # preview whose og:image is large (~300 KB is the safe number), so a
+    # lossless card with a real photo in it would produce no preview at all —
+    # which is exactly the bug that appears the moment the hero starts working.
+    # Text stays crisp at q82; the card is a photo-led image, not line art.
+    canvas.save(out, format="JPEG", quality=82, optimize=True, progressive=True)
     return out.getvalue()
 
 
@@ -302,8 +342,8 @@ def ensure_card(db, article: Article, *, force: bool = False) -> str | None:
     if not available(db):
         return None
     try:
-        hero_url = _hero_url(article)
-        digest = card_hash(article, hero_url)
+        hero = hero_media_url(db, article)
+        digest = card_hash(article, hero)
         key = storage_key(article, digest)
         storage = get_storage()
 
@@ -316,7 +356,7 @@ def ensure_card(db, article: Article, *, force: bool = False) -> str | None:
             pass
 
         stored = storage.put(
-            key, render(article, hero_url), content_type="image/png",
+            key, render(article, hero), content_type="image/jpeg",
             cache_control=CACHE_CONTROL,
         )
         logger.info("share_card_rendered", short_id=article.short_id, key=key)

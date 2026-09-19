@@ -27,7 +27,7 @@ from app.schemas.cms import (
     PlacementIn,
     TransitionIn,
 )
-from app.services import audit_service, workflow_service
+from app.services import audit_service, seed_engagement_service, workflow_service
 
 router = APIRouter(prefix="/cms/articles", tags=["articles"])
 
@@ -442,6 +442,124 @@ def breaking_control(
 
     cache_delete_prefix("home:")
     cache_delete_prefix("breaking")
+    return _out(db, article)
+
+
+class CriticNoteIn(BaseModel):
+    """The desk's own note on a story. `null` clears it."""
+
+    note_te: str | None = Field(default=None, max_length=4000)
+
+
+@router.post("/{article_id}/critic-note", response_model=CmsArticleOut)
+def critic_note(
+    article_id: int,
+    payload: CriticNoteIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("article.critic_note")),
+):
+    """Attach or clear the editorial note shown beside a story.
+
+    Its own route rather than a field on PATCH, because `workflow_service.update`
+    refuses any article that is not DRAFT or CHANGES_REQUESTED — and a critic
+    note is by definition something you add to a story that is already live.
+    `set_placement` exists for the same reason.
+    """
+    article = _get(db, article_id)
+    workflow_service._scope(principal, article)
+
+    note = (payload.note_te or "").strip() or None
+    article.critic_note_te = note
+    db.flush()
+
+    audit_service.record(
+        db,
+        action=AuditAction.UPDATE,
+        entity_type="article",
+        entity_id=article.id,
+        actor=principal.user,
+        after={"critic_note_te": note},
+        request=request,
+    )
+    from app.core.redis_client import cache_delete_prefix
+
+    cache_delete_prefix("home:")
+    return _out(db, article)
+
+
+class SeedLikesIn(BaseModel):
+    """Set the seeded-like offset. Setting it to 0 un-seeds."""
+
+    count: int = Field(ge=0, le=seed_engagement_service.MAX_SEED_LIKES)
+
+
+class SeedCommentIn(BaseModel):
+    """One seeded comment. The name is an index into a fixed pool, never text —
+    see `seed_engagement_service.SEED_NAMES`."""
+
+    body_te: str = Field(min_length=1, max_length=2000)
+    name_index: int = Field(ge=0)
+
+
+@router.post("/{article_id}/seed-likes", response_model=CmsArticleOut)
+def seed_likes(
+    article_id: int,
+    payload: SeedLikesIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("engagement.seed")),
+):
+    """Fabricated engagement, audit-logged. See `seed_engagement_service`."""
+    article = _get(db, article_id)
+    before = article.seed_like_count
+    total = seed_engagement_service.seed_likes(db, article=article, count=payload.count)
+    audit_service.record(
+        db,
+        action=AuditAction.CREATE,
+        entity_type="seeded_like",
+        entity_id=article.id,
+        actor=principal.user,
+        before={"seed_like_count": before},
+        after={"seed_like_count": payload.count, "reader_total": total},
+        request=request,
+    )
+    from app.core.redis_client import cache_delete_prefix
+
+    cache_delete_prefix("home:")
+    return _out(db, article)
+
+
+@router.post("/{article_id}/seed-comment", response_model=CmsArticleOut)
+def seed_comment(
+    article_id: int,
+    payload: SeedCommentIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("engagement.seed")),
+):
+    """Fabricated engagement, audit-logged with the exact text and name.
+
+    Separate from seed-likes on purpose: one audit row per action reads better
+    in the log than one row describing two different things.
+    """
+    article = _get(db, article_id)
+    comment = seed_engagement_service.seed_comment(
+        db, article=article, body=payload.body_te, name_index=payload.name_index
+    )
+    audit_service.record(
+        db,
+        action=AuditAction.CREATE,
+        entity_type="seeded_comment",
+        entity_id=comment.id,
+        actor=principal.user,
+        after={
+            "article_id": article.id,
+            "body": comment.body,
+            "seed_author_name": comment.seed_author_name,
+        },
+        request=request,
+    )
     return _out(db, article)
 
 

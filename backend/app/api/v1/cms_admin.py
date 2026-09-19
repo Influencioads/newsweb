@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.core.deps import Principal, require_permission
 from app.core.errors import NotFoundError, ValidationError
 from app.core.redis_client import cache_delete_prefix
+from app.db.base import utcnow
 from app.db.session import get_db
 from app.models.audit import AuditLog
 from app.models.content import Category, Tag
@@ -493,7 +494,11 @@ class ReportClose(BaseModel):
 
 
 class CommentModerate(BaseModel):
+    """`hide` stays required for every existing caller; `pinned` is optional so
+    a client that only hides is unchanged."""
+
     hide: bool
+    pinned: bool | None = None
 
 
 @router.get("/moderation/reports")
@@ -681,16 +686,28 @@ def moderate_comment(
     comment = engagement_service.moderate_comment(
         db, comment_id=comment_id, moderator_id=p.id, hide=payload.hide
     )
+    if payload.pinned is not None:
+        # Promoting the best comment to the top of the thread is moderation,
+        # so it reuses `comment.moderate` rather than inventing a permission.
+        comment.pinned_at = utcnow() if payload.pinned else None
+        db.flush()
     audit_service.record(
         db,
         action=AuditAction.UPDATE,
         entity_type="comment",
         entity_id=comment.id,
         actor=p.user,
-        after={"status": comment.status},
+        after={
+            "status": comment.status,
+            "pinned_at": comment.pinned_at.isoformat() if comment.pinned_at else None,
+        },
         request=request,
     )
-    return {"id": comment.id, "status": comment.status}
+    return {
+        "id": comment.id,
+        "status": comment.status,
+        "is_pinned": comment.pinned_at is not None,
+    }
 
 
 # --------------------------------------------------------------------------- #

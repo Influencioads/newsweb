@@ -16,6 +16,7 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     Date,
     Enum,
     ForeignKey,
@@ -176,8 +177,12 @@ class Comment(PKMixin, TimestampMixin, Base):
     video_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("videos.id", ondelete="CASCADE"), nullable=True
     )
-    user_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    #: Nullable only so an editorially seeded comment can exist without an
+    #: account behind it. That is the point: a seeded comment structurally
+    #: *cannot* be attributed to a real registered reader, by construction
+    #: rather than by convention. Every genuine comment still has a user.
+    user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=True
     )
     parent_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("comments.id", ondelete="CASCADE"), nullable=True
@@ -195,6 +200,19 @@ class Comment(PKMixin, TimestampMixin, Base):
     moderated_by: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    #: When a moderator pinned it. One nullable timestamp is the flag, the sort
+    #: key and the record of when it happened, so there is no bool to drift.
+    pinned_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    #: Editorially seeded rather than written by a reader. Read by trending so
+    #: seeded discussion cannot score, and by analytics, which must filter on
+    #: this rather than trust `articles.comment_count`.
+    is_seeded: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
+    #: The display name of a seeded comment, chosen from a fixed pool of Telugu
+    #: given names with no surnames. Never free text: a bare first name cannot
+    #: name a public figure, and the pool cannot collide with a real account.
+    seed_author_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
 
     user = relationship("User", foreign_keys=[user_id], lazy="joined")
 

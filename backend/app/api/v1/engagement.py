@@ -186,9 +186,19 @@ def _comment_out(comment, me_id: int | None) -> CommentOut:
         id=comment.id,
         parent_id=comment.parent_id,
         body=comment.body,
-        author_name_te=comment.user.name_te if comment.user else "పాఠకుడు",
-        author_name_en=comment.user.name_en if comment.user else "Reader",
+        # A seeded comment has no account, so its name comes from the fixed
+        # pool rather than a user row. `is_mine` stays False for it either way,
+        # because `comment.user_id` is NULL and `me_id` never is.
+        author_name_te=(
+            comment.seed_author_name
+            or (comment.user.name_te if comment.user else "పాఠకుడు")
+        ),
+        author_name_en=(
+            comment.seed_author_name
+            or (comment.user.name_en if comment.user else "Reader")
+        ),
         is_mine=me_id is not None and comment.user_id == me_id,
+        is_pinned=comment.pinned_at is not None,
         created_at=comment.created_at,
     )
 

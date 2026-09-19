@@ -64,6 +64,7 @@ class CommentOut(BaseModel):
     author_name_te: str
     author_name_en: str
     is_mine: bool = False
+    is_pinned: bool = False
     created_at: datetime
 
 

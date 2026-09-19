@@ -111,7 +111,11 @@ def comments_for_target(
             Comment.parent_id.is_(None),
             Comment.status == CommentStatus.VISIBLE,
         )
-        .order_by(Comment.created_at.desc())
+        # Pinned first, then newest. `pinned_at IS NULL` sorts False (0) before
+        # True (1), so pinned rows lead.
+        # ponytail: no (target, pinned_at) index — threads are two digits long.
+        # Add one if a single article ever passes ~1k comments.
+        .order_by(Comment.pinned_at.is_(None), Comment.created_at.desc())
         .limit(limit)
         .offset(offset)
     )

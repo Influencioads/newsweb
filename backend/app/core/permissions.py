@@ -110,6 +110,13 @@ PERMISSIONS: tuple[PermissionDef, ...] = (
     PermissionDef(
         "article.assign", "article", "Assign work", "పని కేటాయించడం", scoped=True
     ),
+    PermissionDef(
+        "article.critic_note",
+        "article",
+        "Attach an editorial note",
+        "సంపాదకీయ వ్యాఖ్య జోడించడం",
+        scoped=True,
+    ),
     # --- taxonomy ---------------------------------------------------------
     PermissionDef("taxonomy.view", "taxonomy", "View taxonomy", "వర్గీకరణ చూడటం"),
     PermissionDef(
@@ -213,6 +220,17 @@ PERMISSIONS: tuple[PermissionDef, ...] = (
     ),
     # --- comments ---------------------------------------------------------
     PermissionDef("comment.moderate", "comment", "Moderate comments", "వ్యాఖ్యల నియంత్రణ"),
+    # --- seeded engagement ------------------------------------------------
+    # Its own group on purpose, so it does NOT arrive through the
+    # `_keys("article", ..., "comment")` bundle the editor-in-chief holds.
+    # Fabricating engagement is an owner's decision about the product, not an
+    # editorial one, so it reaches only the roles that take the whole set.
+    PermissionDef(
+        "engagement.seed",
+        "engagement",
+        "Seed likes and comments",
+        "లైక్‌లు, వ్యాఖ్యలు సీడ్ చేయడం",
+    ),
     # --- users & admin ----------------------------------------------------
     PermissionDef("user.view", "user", "View users", "వినియోగదారులను చూడటం"),
     PermissionDef("user.manage", "user", "Create and edit users", "వినియోగదారుల నిర్వహణ"),

@@ -123,6 +123,10 @@ def _card(article: Article) -> ArticleCardOut:
         ai_generated=article.ai_generated,
         published_at=article.published_at,
         reading_time_sec=article.reading_time_sec,
+        # Readers see genuine likes plus any editorial seed; ranking and
+        # analytics read `like_count` alone, so a seed cannot reach trending.
+        like_count=article.like_count + article.seed_like_count,
+        comment_count=article.comment_count,
     )
 
 
@@ -558,9 +562,10 @@ def get_article(
             author = AuthorOut.model_validate(user)
 
     return ArticleDetailOut(
+        # like_count and comment_count now ride on the card, which is also
+        # where the seeded-like offset is applied — passing them again here
+        # would be a duplicate keyword and would drop the seed.
         **card.model_dump(),
-        like_count=article.like_count,
-        comment_count=article.comment_count,
         share_count=article.share_count,
         sub_title_te=article.sub_title_te,
         body=article.body,
@@ -571,6 +576,7 @@ def get_article(
         updated_at=article.updated_at,
         corrected_at=article.corrected_at,
         correction_note_te=article.correction_note_te,
+        critic_note_te=article.critic_note_te,
         seo_title=article.seo_title,
         seo_description=article.seo_description,
         canonical_url=article.canonical_url,

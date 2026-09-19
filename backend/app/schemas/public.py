@@ -156,6 +156,12 @@ class ArticleCardOut(BaseModel):
     ai_generated: bool
     published_at: datetime | None
     reading_time_sec: int
+    #: Social proof on the card. Two small ints against the §12.2 "< 60 KB per
+    #: 20 items" budget, read off columns the row already carries — no extra
+    #: query. `like_count` is the reader-facing total, so it includes any
+    #: editorially seeded offset; ranking reads the raw column instead.
+    like_count: int = 0
+    comment_count: int = 0
 
 
 class VideoRefOut(BaseModel):
@@ -171,10 +177,13 @@ class VideoRefOut(BaseModel):
 
 
 class ArticleDetailOut(ArticleCardOut):
-    """Full article for the reader page (mockup 1c)."""
+    """Full article for the reader page (mockup 1c).
 
-    like_count: int = 0
-    comment_count: int = 0
+    `like_count` and `comment_count` are inherited from the card now that every
+    card carries them; only `share_count` is detail-only, because readers never
+    see it on a card.
+    """
+
     share_count: int = 0
     sub_title_te: str | None
     body: dict[str, Any] | None = Field(
@@ -189,6 +198,10 @@ class ArticleDetailOut(ArticleCardOut):
         default=None, description="Drives the 'సవరించబడింది: {date}' line (§12.5)"
     )
     correction_note_te: str | None = None
+    critic_note_te: str | None = Field(
+        default=None,
+        description="The desk's own note on the story. Not a correction.",
+    )
     seo_title: str | None
     seo_description: str | None
     canonical_url: str | None

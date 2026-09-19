@@ -33,6 +33,7 @@ export function NotificationsAdminPage() {
   const [body, setBody] = useState('');
   const [audience, setAudience] = useState('all');
   const [audienceSlug, setAudienceSlug] = useState('');
+  const [shortId, setShortId] = useState('');
   const [confirming, setConfirming] = useState(false);
   const log = useQuery({ queryKey: ['cms', 'campaigns'], queryFn: () => cmsApi.fetchCampaigns<{ items: CampaignRow[] }>() });
   const send = useMutation({
@@ -41,10 +42,15 @@ export function NotificationsAdminPage() {
         title_te: title,
         body_te: body || null,
         audience: audience === 'all' ? 'all' : `${audience}:${audienceSlug}`,
+        // Without this the push is a dead end: it says something happened and
+        // gives the reader nowhere to read it. The server resolves the short id
+        // to the story's url for the notification inbox.
+        short_id: shortId.trim() || null,
       }),
     onSuccess: () => {
       setTitle('');
       setBody('');
+      setShortId('');
       setConfirming(false);
       void queryClient.invalidateQueries({ queryKey: ['cms', 'campaigns'] });
       toast.success(L('పంపబడింది.', 'Sent.'));
@@ -100,6 +106,21 @@ export function NotificationsAdminPage() {
                   />
                 </Field>
               ) : null}
+              <Field
+                label={L('కథనం (షార్ట్ ఐడీ)', 'Story (short id)')}
+                optionalLabel
+                hint={L(
+                  'ఇచ్చినట్టయితే నోటిఫికేషన్ ఆ కథనాన్ని తెరుస్తుంది.',
+                  'Given one, the notification opens that story.',
+                )}
+              >
+                <Input
+                  script="en"
+                  value={shortId}
+                  onChange={(e) => setShortId(e.target.value)}
+                  placeholder="bd3Mn1"
+                />
+              </Field>
             </div>
           </div>
           <div className="mt-4 flex justify-end">

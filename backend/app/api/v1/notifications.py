@@ -16,9 +16,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.deps import Principal, get_current_principal, require_permission
+from app.core.errors import ValidationError
 from app.db.session import get_db
 from app.models.content import Article
-from app.models.enums import AuditAction, NotificationKind, SessionPlatform
+from app.models.enums import (
+    ArticleStatus,
+    AuditAction,
+    NotificationKind,
+    SessionPlatform,
+)
 from app.models.notify import Notification, NotificationCampaign
 from app.services import audit_service, notification_service
 
@@ -131,6 +137,9 @@ class CampaignIn(BaseModel):
     title_te: str = Field(min_length=3, max_length=400)
     body_te: str | None = Field(default=None, max_length=1000)
     article_id: int | None = None
+    #: The id an editor actually has — it is in the story's url. Resolved to
+    #: `article_id` below, so a caller can send either.
+    short_id: str | None = Field(default=None, max_length=12)
     audience: str = Field(
         default="all", description="all | district:<slug> | category:<slug>"
     )
@@ -175,11 +184,27 @@ def send_campaign(
     db: Session = Depends(get_db),
     p: Principal = Depends(require_permission("push.approve")),
 ) -> dict:
+    article_id = payload.article_id
+    if article_id is None and payload.short_id:
+        article = db.scalar(
+            select(Article).where(
+                Article.short_id == payload.short_id,
+                Article.deleted_at.is_(None),
+            )
+        )
+        if article is None:
+            raise ValidationError(details={"short_id": "unknown story"})
+        # A push that deep-links to a story nobody can open is worse than one
+        # that only carries text, so refuse rather than silently drop the link.
+        if article.status != ArticleStatus.PUBLISHED:
+            raise ValidationError(details={"short_id": "story is not published"})
+        article_id = article.id
+
     campaign = notification_service.send_campaign(
         db,
         title_te=payload.title_te,
         body_te=payload.body_te,
-        article_id=payload.article_id,
+        article_id=article_id,
         audience=payload.audience,
         created_by=p.id,
     )
@@ -189,7 +214,11 @@ def send_campaign(
         entity_type="notification_campaign",
         entity_id=campaign.id,
         actor=p.user,
-        after={"audience": payload.audience, "sent_count": campaign.sent_count},
+        after={
+            "audience": payload.audience,
+            "sent_count": campaign.sent_count,
+            "article_id": article_id,
+        },
         request=request,
     )
     return {"id": campaign.id, "sent_count": campaign.sent_count}

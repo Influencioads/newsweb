@@ -351,6 +351,58 @@ class TestPinnedComments:
         assert r.json()["is_pinned"] is False
 
 
+class TestPushWithAStory:
+    """A push that deep-links to a story the reader cannot open is worse than
+    one that carries only text, so the short id is resolved and checked."""
+
+    def test_a_short_id_reaches_the_campaign_as_an_article_id(
+        self, db: Session, client: TestClient
+    ) -> None:
+        from app.models.notify import NotificationCampaign
+
+        article = make_article(db)
+        db.commit()
+        headers = staff_headers(db, role=RoleKey.ADMIN)
+        r = client.post(
+            "/api/v1/cms/notifications",
+            json={
+                "title_te": "ముఖ్య ప్రకటన",
+                "body_te": "వివరాలు",
+                "short_id": article.short_id,
+                "audience": "all",
+            },
+            headers=headers,
+        )
+        assert r.status_code == 201, r.text
+        campaign = db.get(NotificationCampaign, r.json()["id"])
+        assert campaign.article_id == article.id
+
+    def test_an_unknown_story_is_refused_rather_than_dropped(
+        self, db: Session, client: TestClient
+    ) -> None:
+        headers = staff_headers(db, role=RoleKey.ADMIN)
+        r = client.post(
+            "/api/v1/cms/notifications",
+            json={"title_te": "ప్రకటన", "short_id": "zzzzzz", "audience": "all"},
+            headers=headers,
+        )
+        assert r.status_code == 422, r.text
+
+    def test_an_unpublished_story_is_refused(
+        self, db: Session, client: TestClient
+    ) -> None:
+        article = make_article(db)
+        article.status = ArticleStatus.DRAFT
+        db.commit()
+        headers = staff_headers(db, role=RoleKey.ADMIN)
+        r = client.post(
+            "/api/v1/cms/notifications",
+            json={"title_te": "ప్రకటన", "short_id": article.short_id, "audience": "all"},
+            headers=headers,
+        )
+        assert r.status_code == 422, r.text
+
+
 class TestCriticNote:
     def test_it_reaches_the_reader_and_clears(
         self, db: Session, client: TestClient

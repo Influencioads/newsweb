@@ -63,15 +63,15 @@ CARD_W, CARD_H = 1200, 630
 
 #: Bump to re-render every card. Cheaper than a migration and the old objects
 #: simply stop being referenced.
-CARD_VERSION = 1
+CARD_VERSION = 2
 
 CACHE_CONTROL = "public, max-age=31536000, immutable"
 
 #: Brand tokens from docs/IMPLEMENTATION_MAP.md §A.
-BRAND = (166, 28, 36)
-INK = (26, 23, 20)
-PAPER = (250, 247, 242)
-MUTED = (138, 127, 112)
+BRAND = (13, 71, 161)
+INK = (23, 25, 30)
+PAPER = (255, 255, 255)
+MUTED = (102, 107, 117)
 
 _HERO_H = 340
 _PAD = 56
@@ -137,6 +137,12 @@ def hero_media_url(db, article: Article) -> str | None:
 
     Soft-deleted media is skipped: a photo an editor removed must not come
     back through a link preview.
+
+    So is a **representative stand-in**. The card is hero plus headline and
+    draws no caption, and og:image has nowhere to put one either, so a library
+    photo would travel WhatsApp and Twitter reading as a picture of the event
+    with nothing to correct it — and a shared card cannot be corrected after
+    the fact. The brand band this falls back to is the honest version.
     """
     if not article.hero_media_id:
         return None
@@ -144,6 +150,8 @@ def hero_media_url(db, article: Article) -> str | None:
 
     media = db.get(Media, article.hero_media_id)
     if media is None or media.deleted_at is not None:
+        return None
+    if (media.meta or {}).get("representative"):
         return None
     return media.cdn_url or None
 

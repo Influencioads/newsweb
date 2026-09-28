@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.core import security
 from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.core.logging import get_logger
-from app.db.base import utcnow
+from app.db.base import desc_nulls_last, utcnow
 from app.integrations.kyc import KycDocumentRef, KycSubmission, get_kyc
 from app.integrations.kyc.base import KycDecision
 from app.models.enums import (
@@ -437,7 +437,7 @@ def queue(
     total = int(db.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
     rows = list(
         db.scalars(
-            stmt.order_by(ContributorProfile.submitted_at.desc().nullslast())
+            stmt.order_by(*desc_nulls_last(ContributorProfile.submitted_at))
             .offset(offset)
             .limit(limit)
         ).all()

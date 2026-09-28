@@ -18,13 +18,15 @@ import { relativeTime } from '@/utils/time';
 
 /**
  * Short news (§14): one quick-read card per viewport, scroll-snap giving the
- * swipe feel on touch. Headline + image + the 2–5 line editorial standfirst;
- * the card links into the full story.
+ * swipe feel on touch. Headline + image + the editor's short text; the card
+ * links into the full story only when there is one (a body-less short item
+ * has reading_time_sec 0).
  *
  * The deck is exactly `100dvh - var(--header-h)` tall — the shell publishes that
  * variable, so the deck never has to guess a header height — and each slide is
- * `min-h-full`, never `h-full`: a long Telugu standfirst clamps by lines
- * (te-clamp-4) and the card grows rather than hiding text behind overflow.
+ * `min-h-full`, never `h-full`: the card grows rather than hiding text behind
+ * overflow. The short text clamps by lines (te-clamp-5) only when "Read the
+ * full story" is there to carry the rest; a body-less item shows all of it.
  */
 
 /** How many progress dots can sit on a phone without becoming a grey smear. */
@@ -72,19 +74,24 @@ function QuickCard({
             {pick(article.title_te, article.title_en)}
           </h2>
           {article.summary_te && (
-            <p lang="te" className="te te-clamp-4 mt-3 text-te-body-xs text-ink-soft">
+            <p
+              lang="te"
+              className={cn('te mt-3 text-te-body-xs text-ink-soft', article.reading_time_sec > 0 && 'te-clamp-5')}
+            >
               {article.summary_te}
             </p>
           )}
-          <ButtonLink
-            to={article.url}
-            variant="secondary"
-            size="sm"
-            iconRight={ChevronRight}
-            className="mt-4 self-start"
-          >
-            {L('పూర్తి కథనం చదవండి', 'Read the full story')}
-          </ButtonLink>
+          {article.reading_time_sec > 0 && (
+            <ButtonLink
+              to={article.url}
+              variant="secondary"
+              size="sm"
+              iconRight={ChevronRight}
+              className="mt-4 self-start"
+            >
+              {L('పూర్తి కథనం చదవండి', 'Read the full story')}
+            </ButtonLink>
+          )}
         </div>
         {index < total - 1 && (
           <p aria-hidden className="pb-2 text-center text-muted">
@@ -159,7 +166,11 @@ export default function ShortNewsPage() {
   return (
     // dvh, not vh: mobile browser chrome would otherwise push the progress dots
     // below the fold. Sticky under the nav so the window itself does not scroll.
-    <PageContainer width="form" className="sticky top-header flex h-[calc(100dvh-var(--header-h))] flex-col">
+    // Stops short of the audio player dock, which body padding cannot clear here.
+    <PageContainer
+      width="form"
+      className="sticky top-header flex h-[calc(100dvh-var(--header-h)-var(--player-dock-h,0px))] flex-col"
+    >
       {/* Sub-header bleeds across the container gutters so nothing scrolls past its edges. */}
       <div className="glass sticky top-header z-30 -mx-4 flex shrink-0 items-center justify-between gap-3 border-b border-rule px-4 py-2 md:-mx-6 md:px-6">
         <h1 className={cn(s.head, 'flex items-center gap-1.5 text-headline-xs font-extrabold text-brand')}>

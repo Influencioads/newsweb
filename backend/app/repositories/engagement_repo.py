@@ -207,6 +207,7 @@ def following_feed(
     predicates = []
     if ids := by_type.get(FollowTargetType.CATEGORY):
         predicates.append(Article.category_id.in_(ids))
+        predicates.append(Article.subcategory_id.in_(ids))  # a followed sub-section
     if ids := by_type.get(FollowTargetType.DISTRICT):
         predicates.append(Article.district_id.in_(ids))
     if ids := by_type.get(FollowTargetType.MANDAL):

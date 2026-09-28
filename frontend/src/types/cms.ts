@@ -1,4 +1,6 @@
-export interface CmsMediaRef { id:number; url:string; alt_te:string|null; credit:string|null; width:number|null; height:number|null }
+/** The three optional fields are the approver's provenance line: the article
+ *  API always sends them, the media-library and AI-image responses do not. */
+export interface CmsMediaRef { id:number; url:string; alt_te:string|null; caption_te?:string|null; credit:string|null; source_type?:string|null; licence?:string|null; width:number|null; height:number|null }
 export interface CmsVideoRef { id:number; youtube_id:string; title_te:string; thumbnail_url:string }
 export interface CmsTagRef { id:number; slug:string; name_te:string; name_en:string }
 /** §19 — the rendition the article uses. `provider:'upload'` is an editor's own file. */
@@ -7,7 +9,9 @@ export interface CmsAudioRef { id:number; url:string|null; mime:string; duration
 export interface CmsActivePin { placement:'home'|'category'|'local'|'breaking'|'trending'; ends_at:string; seconds_remaining:number }
 
 /** §23 — where the article came from, distinct from `source_type`'s copyright origin. */
-export type ArticleType = 'NORMAL'|'REPORTER'|'USER_SUBMITTED'|'AI_SUGGESTED'|'AI_DRAFT'|'BREAKING_NEWS';
+// SYNDICATED / AI_REWRITE are the crawler's two: the only ones with a
+// publisher's original behind them (see ArticleOrigin).
+export type ArticleType = 'NORMAL'|'REPORTER'|'USER_SUBMITTED'|'AI_SUGGESTED'|'AI_DRAFT'|'BREAKING_NEWS'|'SYNDICATED'|'AI_REWRITE';
 
 export interface CmsArticle {
   id:number; short_id:string; slug:string;
@@ -18,7 +22,7 @@ export interface CmsArticle {
   author_id:number|null; byline_te:string|null;
   source_type:string; source_credit:string|null; article_type:ArticleType;
   status:string; workflow_state:string;
-  is_breaking:boolean; is_exclusive:boolean; is_featured:boolean; voice_enabled:boolean;
+  is_breaking:boolean; is_exclusive:boolean; is_featured:boolean; is_short:boolean; voice_enabled:boolean;
   ai_generated:boolean;
   hero_media_id:number|null; video_id:number|null; audio_asset_id:number|null;
   seo_title:string|null; seo_description:string|null; canonical_url:string|null;
@@ -56,7 +60,8 @@ export interface CmsEditorOptions {
 }
 
 /** §18 / §20 / §35 — the editable half of the settings screen. */
-export interface SettingSpec { key:string; kind:string; default:unknown; description:string }
+/** `min`/`max` are set only for the keys the server bounds; `choices` only where it offers a list. */
+export interface SettingSpec { key:string; kind:string; default:unknown; description:string; choices?:unknown[]|null; min?:number|null; max?:number|null }
 export interface SettingsPayload {
   environment:Record<string,unknown>;
   values:Record<string,unknown>;
@@ -165,8 +170,16 @@ export interface CrawlBeatStatus {
 export interface CrawlStatus {
   enabled: boolean;
   rewrite_enabled: boolean;
+  /** Inside the IST crawl hours right now. */
+  active_now: boolean;
   hourly_cap: number;
   used_this_hour: number;
+  /** 0 means no daily ceiling. */
+  daily_cap: number;
+  used_today: number;
+  /** Active sources at `failure_limit` consecutive failures — no longer polled. */
+  failing_sources: number;
+  failure_limit: number;
   beats: CrawlBeatStatus[];
   last_fetch_at: string | null;
   /** No successful fetch for over two hours — usually a missing worker-ingest. */
@@ -188,6 +201,40 @@ export interface IngestedItem {
   requires_human: boolean;
   rewrite_status: RewriteStatus;
   rewrite: IngestedRewrite | null;
+}
+
+/**
+ * §17 — the publisher's original beside our words, for the person approving it.
+ * Only crawled articles have one; anything else 404s.
+ *
+ * `original.text` is one of three things, and the pair of flags says which:
+ * the copy held from rewrite time (`held`), the publisher's page read live just
+ * now (`fetched_live` — it may have changed since we rewrote it), or nothing.
+ */
+export interface ArticleOrigin {
+  article_id: number;
+  item_id: number;
+  source: {
+    name: string | null; slug: string | null;
+    licence: SourceLicence | null; content_policy: ContentPolicy | null;
+    url: string | null;
+  };
+  original: {
+    title: string; summary: string | null; author: string | null;
+    published_at: string | null; image_url: string | null;
+    text: string | null; held: boolean; fetched_live: boolean;
+  };
+  /** The article as it stands now, not as the model first wrote it. */
+  ours: {
+    title_te: string; summary_te: string | null; body_plain: string | null;
+    word_count: number; edited_since_import: boolean;
+  };
+  /** Null for SYNDICATED — republished, never rewritten. */
+  rewrite: Pick<
+    IngestedRewrite,
+    'title_te' | 'summary_te' | 'body_plain' | 'attribution_te' | 'similarity_percent'
+    | 'confidence' | 'unverified' | 'engine' | 'model' | 'word_count' | 'created_at'
+  > | null;
 }
 
 export type IngestQueueCounts = Record<IngestStatus, number>;
@@ -254,6 +301,8 @@ export interface BulletinList {
   items: BulletinRow[];
   /** Slots not yet produced, so the desk can offer "Run now". */
   missing_slots: number[];
+  /** Every slot's Telugu name, keyed by hour (JSON keys arrive as strings). */
+  slot_labels: Record<string, string>;
 }
 
 export type KycStatus =

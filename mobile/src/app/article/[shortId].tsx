@@ -11,7 +11,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 
-import { api, API_ORIGIN } from '@/api/client';
+import { absoluteMediaUrl, api, API_ORIGIN } from '@/api/client';
 import * as publicApi from '@/api/public';
 import { ArticleAudio } from '@/components/ArticleAudio';
 import { RowCard } from '@/components/ArticleCard';
@@ -155,6 +155,30 @@ export default function ArticleScreen() {
     ? pick(data.category.name_te, data.category.name_en)
     : t('screen.article');
 
+  // §16/§19 listen, directly under the photo — under the headline when there
+  // is none, as on the web. Always a direct child of the scroll, so its layout
+  // y is what the header's headphones button jumps to, and it keeps playing
+  // while the reader reads.
+  const listenBlock = data ? (
+    <View style={styles.audio} onLayout={onAudioLayout}>
+      <ArticleAudio
+        shortId={data.short_id}
+        deviceSpeaking={tts.speaking}
+        onToggleDevice={tts.toggle}
+        listenLabel={t('article.listen')}
+        stopLabel={t('article.stopListening')}
+        meta={{
+          title: data.title_te,
+          subtitle: data.category
+            ? `${t('player.kindArticle')} · ${pick(data.category.name_te, data.category.name_en)}`
+            : t('player.kindArticle'),
+          href: { pathname: '/article/[shortId]', params: { shortId: data.short_id } },
+          artwork: absoluteMediaUrl(data.hero?.url ?? null),
+        }}
+      />
+    </View>
+  ) : null;
+
   return (
     <Screen edges={['top']} background="paper" keyboard>
       <Stack.Screen options={{ headerShown: false, title: t('screen.article') }} />
@@ -189,6 +213,7 @@ export default function ArticleScreen() {
             contentContainerStyle={{ paddingBottom: ACTION_BAR_HEIGHT + insets.bottom + space.xl }}
           >
             {data.hero?.url ? <ArticleHero media={data.hero} scrollY={scrollY} /> : null}
+            {data.hero?.url ? listenBlock : null}
 
             <View style={styles.head}>
               {data.is_breaking || data.is_exclusive || data.ai_generated ? (
@@ -234,19 +259,7 @@ export default function ArticleScreen() {
                 </T>
               </View>
             </View>
-
-            {/* §16/§19 listen — a direct child of the scroll, so its layout y is
-                what the action bar's headphones button jumps to, and it keeps
-                playing while the reader reads. */}
-            <View style={styles.audio} onLayout={onAudioLayout}>
-              <ArticleAudio
-                shortId={data.short_id}
-                deviceSpeaking={tts.speaking}
-                onToggleDevice={tts.toggle}
-                listenLabel={t('article.listen')}
-                stopLabel={t('article.stopListening')}
-              />
-            </View>
+            {data.hero?.url ? null : listenBlock}
 
             <View style={styles.body}>
               {/* §7 corrections — the note travels with the story, never silently. */}
@@ -303,7 +316,14 @@ export default function ArticleScreen() {
                 </View>
               ) : null}
 
-              <BodyRenderer doc={data.body} />
+              {/* A body-less short item: its short text is the story. */}
+              <BodyRenderer
+                doc={
+                  data.reading_time_sec === 0 && data.summary_te
+                    ? { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: data.summary_te }] }] }
+                    : data.body
+                }
+              />
 
               {data.source_credit ? (
                 <T variant="meta" scaled color="muted" style={styles.credit}>

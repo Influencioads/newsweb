@@ -18,7 +18,7 @@ import {
 
 import { FontSizeGroup } from '@/components/article/ReaderToolbar';
 import { LanguageToggle } from '@/components/layout/LanguageToggle';
-import { LocationPicker, type LocationValue } from '@/components/location/LocationPicker';
+import { LocationPicker, useReaderPlace } from '@/components/location/LocationPicker';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Chip } from '@/components/ui/Chip';
@@ -40,13 +40,13 @@ import { useDocumentTitle } from '@/utils/motion';
 /**
  * Reader profile & preferences (updated doc §11, onboarding of §32).
  *
- * Saving the location here also updates the local `readerPrefs` store so the
- * edition selector, the Local tab and the personalized feed all follow the
- * same choice immediately — server for durability, store for reactivity.
+ * The location is the same `useReaderPlace` binding the masthead uses: each
+ * pick applies at once and is mirrored to the server, so it is not part of the
+ * Save — a form loaded once would otherwise overwrite a newer masthead pick.
  *
  * Grouped into one Card per concern: identity, library, reading, location,
- * interests, notifications — with a single Save at the end for the four
- * server-side groups (reading settings are device-local and save themselves).
+ * interests, notifications — with a single Save at the end for the server-side
+ * groups (reading settings and location apply on change).
  */
 
 const THEMES: { value: Theme; icon: LucideIcon; key: StringKey }[] = [
@@ -73,8 +73,7 @@ export default function ProfilePage() {
   const routeState = (useLocation().state ?? {}) as { welcome?: boolean };
   const { me, status, signOut } = useAuth();
   const queryClient = useQueryClient();
-  const setEdition = useReaderPrefs((p) => p.setEdition);
-  const setLocalLevels = useReaderPrefs((p) => p.setLocalLevels);
+  const place = useReaderPlace();
   const theme = useReaderPrefs((p) => p.theme);
   const setTheme = useReaderPrefs((p) => p.setTheme);
   const fontId = useId();
@@ -97,7 +96,6 @@ export default function ProfilePage() {
     enabled: status === 'authenticated',
   });
 
-  const [place, setPlace] = useState<LocationValue>({});
   const [interests, setInterests] = useState<string[]>([]);
   const [notify, setNotify] = useState<Record<NotifyKey, boolean>>({ breaking: true, local: true, topics: true });
   const [hydrated, setHydrated] = useState(false);
@@ -105,11 +103,6 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (prefs.data && !hydrated) {
-      setPlace({
-        state: prefs.data.state?.code ?? null,
-        district: prefs.data.district?.slug ?? null,
-        mandal: prefs.data.mandal?.slug ?? null,
-      });
       setInterests(prefs.data.category_slugs);
       setNotify({
         breaking: prefs.data.notify_breaking,
@@ -124,9 +117,6 @@ export default function ProfilePage() {
     mutationFn: () =>
       readerApi.updatePreferences({
         language,
-        state_code: place.state || null,
-        district_slug: place.district || null,
-        mandal_slug: place.district ? place.mandal || null : null,
         category_slugs: interests,
         notify_breaking: notify.breaking,
         notify_local: notify.local,
@@ -134,8 +124,6 @@ export default function ProfilePage() {
       }),
     onSuccess: (data) => {
       queryClient.setQueryData(['reader', 'preferences'], data);
-      setEdition(data.district?.slug ?? null);
-      setLocalLevels(data.mandal?.slug ?? null, data.locality?.slug ?? null);
       toast.success(t('ui.saved'));
     },
     onError: (error) => toast.error(error),
@@ -260,7 +248,7 @@ export default function ProfilePage() {
                       'The Local feed follows this choice — village/mandal stories rank first.',
                     )}
                   </p>
-                  <LocationPicker levels="mandal" value={place} onChange={setPlace} />
+                  <LocationPicker levels="locality" {...place} />
                 </Card>
               </section>
 
@@ -330,8 +318,8 @@ export default function ProfilePage() {
         <p className={cn(s.body, 'flex items-center gap-1.5 text-meta text-muted')}>
           <Icon icon={Bell} size="xs" />
           {L(
-            'నోటిఫికేషన్లు, ప్రాంతం, ఆసక్తులు — సేవ్ చేసిన తర్వాతే వర్తిస్తాయి.',
-            'Location, interests and notifications apply once you save.',
+            'నోటిఫికేషన్లు, ఆసక్తులు — సేవ్ చేసిన తర్వాతే వర్తిస్తాయి. ప్రాంతం వెంటనే వర్తిస్తుంది.',
+            'Interests and notifications apply once you save; your location applies at once.',
           )}
         </p>
       </div>

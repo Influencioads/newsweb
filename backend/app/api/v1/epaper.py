@@ -16,7 +16,7 @@ from app.core.deps import (
 from app.core.errors import ConflictError, NotFoundError
 from app.core.redis_client import cache_delete_prefix
 from app.db.session import get_db
-from app.models.content import Category, Tag
+from app.models.content import Article, Category, Tag
 from app.models.enums import AuditAction
 from app.models.epaper import (
     EpaperEdition,
@@ -37,7 +37,7 @@ from app.schemas.epaper import (
     RegenerateIn,
     UserEditionIn,
 )
-from app.services import audit_service, epaper_service, settings_service
+from app.services import audit_service, epaper_service, settings_service, tts_service
 
 router = APIRouter(tags=["epaper"])
 
@@ -215,7 +215,10 @@ def audio(edition_date: date, db: Session = Depends(get_db)):
         }
         for p in edition.pages
         for a in p.articles
-        if a.audio_url
+        # §20: turning a story's voice off does not clear its audio_asset_id,
+        # so the playlist asks the same switch /audio does. db.get is an
+        # identity-map hit — load_edition already loaded every article.
+        if a.audio_url and tts_service.is_enabled(db, db.get(Article, a.id))
     ]
     return {"enabled": True, "tracks": tracks}
 

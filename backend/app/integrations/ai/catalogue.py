@@ -44,18 +44,26 @@ from dataclasses import asdict, dataclass
 
 __all__ = [
     "Choice",
+    "VoicePreset",
     "DEFAULT_BULK_MODEL",
     "DEFAULT_IMAGE_MODEL",
     "DEFAULT_TEXT_MODEL",
+    "DEFAULT_SARVAM_MODEL",
     "DEFAULT_TTS_MODEL",
     "IMAGE",
     "IMAGE_SIZE_ARG",
     "MAX_OUTPUT_TOKENS",
     "TEXT",
+    "SARVAM_MAX_CHARS",
+    "SARVAM_NEWS_PRESETS",
+    "SARVAM_TTS",
     "TTS",
     "TTS_SPEED_RANGE",
     "choices_for",
     "image_size_args",
+    "sarvam_model",
+    "sarvam_pace_range",
+    "voice_presets",
     "tts_accepts_speed",
     "tts_voices",
     "valid_voice",
@@ -76,6 +84,21 @@ class Choice:
     label: str
     tier: str
     usd_per_call: float
+    note: str
+
+
+@dataclass(frozen=True, slots=True)
+class VoicePreset:
+    """One named starting point for a TTS voice: who reads, and how fast.
+
+    `pace` is the claim worth trusting — it is the measurable difference
+    between one channel's bulletin read and another's. `speaker` is a first
+    pick to audition, not a likeness. See `SARVAM_NEWS_PRESETS`.
+    """
+
+    label: str
+    speaker: str
+    pace: float
     note: str
 
 
@@ -132,6 +155,24 @@ TEXT: tuple[Choice, ...] = (
 # --------------------------------------------------------------------------- #
 IMAGE: tuple[Choice, ...] = (
     Choice(
+        id="openai/gpt-image-2.5-flare",
+        label="GPT Image 2.5 Flare",
+        tier="best",
+        usd_per_call=0.0066,
+        note="Measured 2026-09-23: a third of the price of 1.5 at quality low, "
+        "~15 s, clean flat illustration. It can even letter Telugu — but in "
+        "the same test it invented price boards the story never mentioned, "
+        "which is why news cards typeset their text themselves.",
+    ),
+    Choice(
+        id="openai/gpt-image-2.5-sunburst",
+        label="GPT Image 2.5 Sunburst",
+        tier="best",
+        usd_per_call=0.0066,
+        note="Same price and speed as Flare; a textured, painterly finish "
+        "instead of flat colour.",
+    ),
+    Choice(
         id="openai/gpt-image-1.5",
         label="GPT Image 1.5",
         tier="best",
@@ -183,8 +224,143 @@ TTS: tuple[Choice, ...] = (
 
 DEFAULT_TEXT_MODEL = "google/gemini-3-8-flash"
 DEFAULT_BULK_MODEL = "google/gemini-3-5-flash-lite"
-DEFAULT_IMAGE_MODEL = "openai/gpt-image-1.5"
+DEFAULT_IMAGE_MODEL = "openai/gpt-image-2.5-flare"
 DEFAULT_TTS_MODEL = "openai/gpt-4o-mini-tts"
+
+# --------------------------------------------------------------------------- #
+# Text-to-speech — Sarvam AI
+# --------------------------------------------------------------------------- #
+# A separate account and a separate list, on purpose. Everything above was
+# measured through aimlapi and priced from what aimlapi charged; Sarvam bills
+# direct and reports no spend in its response, so `usd_per_call=0.0` here means
+# what it means for ElevenLabs — unknown, not free. Check the Sarvam dashboard.
+#
+# The ids carry a `sarvam/` prefix the API never sees: `voice.model` is one
+# settings row shared by both providers, and the prefix is how the screen and
+# `valid_voice` tell whose model is selected. `sarvam_model` strips it again.
+SARVAM_TTS: tuple[Choice, ...] = (
+    Choice(
+        id="sarvam/bulbul:v3",
+        label="Bulbul v3",
+        tier="best",
+        usd_per_call=0.0,
+        note="37 Indic voices and 2500 characters a call. Pace is the only "
+        "tone control this project sends it — v3 replaced v2's pitch and "
+        "loudness with a temperature, which is not a news-reading lever.",
+    ),
+)
+
+#: `bulbul:v2` is NOT here because it no longer works. Measured 2026-09-19 with
+#: this project's own key: it answers 400 `"Model 'bulbul:v2' has been
+#: deprecated. Please use 'bulbul:v3' instead."` Listing it would sell an
+#: editor a model that cannot speak.
+_SARVAM_DEPRECATED = frozenset({"bulbul:v2", "bulbul:v1"})
+
+DEFAULT_SARVAM_MODEL = "bulbul:v3"
+
+#: The per-request text ceiling, in characters. v3 documents 2500; 1500 is kept
+#: as the working figure because it is the number that was actually exercised,
+#: and an extra request costs less than a 422 on a long article.
+SARVAM_MAX_CHARS = 1500
+
+#: `pace` range per model, from the published reference. They differ, and a
+#: value outside the range is a 422 on a call that was about to cost money.
+_SARVAM_PACE: dict[str, tuple[float, float]] = {
+    "bulbul:v3": (0.5, 2.0),
+}
+
+
+def sarvam_model(model: str) -> str:
+    """The bare model name Sarvam's API wants, out of whatever is configured.
+
+    Tolerates the `sarvam/` prefix the settings dropdown stores, a bare name
+    typed by hand, and blank. An unknown name is passed through rather than
+    replaced: Sarvam ships models faster than this list is updated, and a 422
+    naming the model an admin typed is a better error than silently speaking
+    in a voice they did not choose.
+
+    The one name that is *not* passed through is another vendor's. `voice.model`
+    is a single settings row shared with aimlapi, so switching the provider
+    leaves `openai/gpt-4o-mini-tts` sitting in it — and every Sarvam model name
+    is slash-free, which makes "has a slash" a reliable test for "this belongs
+    to the other provider" and the default the right answer.
+
+    A retired model is redirected the same way. A settings row saved before
+    Sarvam dropped `bulbul:v2` would otherwise 400 on every article, and the
+    current model is unambiguously what that admin meant.
+    """
+    name = (model or "").strip().removeprefix("sarvam/")
+    if "/" in name or name in _SARVAM_DEPRECATED:
+        return DEFAULT_SARVAM_MODEL
+    return name or DEFAULT_SARVAM_MODEL
+
+
+def sarvam_pace_range(model: str) -> tuple[float, float]:
+    """The `pace` range `model` accepts. The narrower of the two for anything
+    unknown, so a clamp is never the thing that causes the 422."""
+    return _SARVAM_PACE.get(sarvam_model(model), (0.5, 2.0))
+
+
+# --------------------------------------------------------------------------- #
+# Telugu bulletin presets — a starting point, not a likeness
+# --------------------------------------------------------------------------- #
+# What an editor actually asks is "make it sound like the news", and the answer
+# is two numbers and a speaker they would otherwise find by auditioning seven
+# voices one at a time. These presets are the shortcut.
+#
+# Read what they claim carefully, because it is narrow on purpose. Telugu
+# channels have recognisably different house reads — ETV is the formal,
+# measured, near-literary bulletin; TV9 is faster and headline-driven; NTV
+# sits between them — and the PACE here is that difference, which is a
+# property of the delivery and is the part worth copying.
+#
+# The SPEAKER attached to each was chosen by measurement on 2026-09-19, not by
+# ear: every v3 voice was rendered and its pitch analysed (median F0, spread
+# in semitones, loudness range). Among the women, priya is the lowest and
+# flattest (214 Hz, 2.3 st) — the calm formal read; ritu (223 Hz, 3.3 st)
+# and kavya (248 Hz, 3.0 st) sit brighter. Among the men, aditya is the
+# deepest (96 Hz), rahul the highest (149 Hz), and varun the most animated
+# (96 Hz, 4.75 st — the widest pitch swing of the six). That is still a
+# match to a *register*, not to any person: nobody here has compared these
+# against a broadcast recording, and the pace numbers are judged from on-air
+# reads rather than measured against a reference clip.
+#
+# Deliberately absent: any attempt to reproduce a named journalist's voice.
+# These are house-style references, and the individual anchors at those
+# channels have not agreed to read our copy.
+#
+# ponytail: pace and speaker are tuned by signal statistics, not by a listener
+# with a reference clip. Hand this a 30 s ETV/NTV/TV9 recording and the same
+# analysis can match rate and pitch range to it directly.
+SARVAM_NEWS_PRESETS: dict[str, tuple[VoicePreset, ...]] = {
+    "sarvam/bulbul:v3": (
+        VoicePreset("ETV-style — female", "priya", 0.92,
+                    "Formal, unhurried bulletin read. The lowest, steadiest "
+                    "female voice measured (214 Hz, 2.3 st spread)."),
+        VoicePreset("ETV-style — male", "aditya", 0.90,
+                    "Measured male read for heavier copy. The deepest voice "
+                    "measured (96 Hz)."),
+        VoicePreset("NTV-style — female", "ritu", 1.00,
+                    "Studio pace, formal but conversational (223 Hz)."),
+        VoicePreset("NTV-style — male", "rahul", 1.00,
+                    "Mid-pace male bulletin read; the higher male voice (149 Hz)."),
+        VoicePreset("TV9-style — female", "kavya", 1.12,
+                    "Faster, headline-driven read; the brightest female voice (248 Hz)."),
+        VoicePreset("TV9-style — male", "varun", 1.15,
+                    "The most animated of the six — widest pitch swing measured "
+                    "(4.75 st). Breaking news and short items."),
+    ),
+}
+
+
+def voice_presets(model: str) -> tuple[VoicePreset, ...]:
+    """Bulletin presets for `model`, or empty where there are none.
+
+    Empty is the honest answer for every aimlapi model: those voices are not
+    Telugu-first, so a preset claiming an ETV read would be a label with
+    nothing behind it.
+    """
+    return SARVAM_NEWS_PRESETS.get((model or "").strip(), ())
 
 #: A reasoning model spends its output budget on thinking before it writes, so
 #: 2048 came back truncated and `_parse_json` raised "no JSON in model
@@ -208,17 +384,46 @@ IMAGE_SIZE_ARG: dict[str, dict[str, str]] = {
 }
 
 
-def image_size_args(model: str) -> dict[str, str]:
+#: The same three shapes in each family's spelling. gpt-image-* accepts only
+#: these three sizes (published schema, checked 2026-09-23 for 1.5, 2 and 2.5),
+#: so 4:5 and 9:16 are drawn 2:3 and cover-cropped by the caller.
+_SHAPE_ARG: dict[str, dict[str, str]] = {
+    "openai/gpt-image": {"landscape": "1536x1024", "square": "1024x1024", "portrait": "1024x1536"},
+    "blackforestlabs/": {"landscape": "landscape_16_9", "square": "square_hd", "portrait": "portrait_16_9"},
+    "alibaba/": {"landscape": "landscape_16_9", "square": "square_hd", "portrait": "portrait_16_9"},
+}
+
+
+def _shape(aspect: str) -> str:
+    try:
+        w, h = (float(x) for x in aspect.split(":"))
+    except ValueError:
+        return "landscape"
+    if abs(w - h) < 1e-6:
+        return "square"
+    return "landscape" if w > h else "portrait"
+
+
+def image_size_args(model: str, aspect: str = "16:9") -> dict[str, str]:
     """The size fields to merge into an image request for `model`.
 
     Empty for a model that matches no family: send no size argument at all and
     accept the model's own default shape. That is what `bytedance/seedream-*`
     needs — it takes none of the three and returns a square — and no size is a
     smaller wrong than the wrong size, which is a 400 an editor cannot act on.
+
+    `aspect` picks the nearest shape the family can draw; google takes the
+    ratio itself.
     """
     for prefix, args in IMAGE_SIZE_ARG.items():
         if model.startswith(prefix):
-            return dict(args)
+            out = dict(args)
+            if "aspect_ratio" in out:
+                out["aspect_ratio"] = aspect
+            elif prefix in _SHAPE_ARG:
+                field = "size" if "size" in out else "image_size"
+                out[field] = _SHAPE_ARG[prefix][_shape(aspect)]
+            return out
     return {}
 
 
@@ -253,6 +458,17 @@ _TTS_VOICES: dict[str, tuple[str, ...]] = {
     # all. Either one rejects a plain `voice` field.
     "minimax/": (),
     "hume/": (),
+    # Sarvam calls this a `speaker`, and the two models share not one name, so
+    # these are keyed by exact id — a v2 speaker sent to v3 is a 422. Female
+    # names lead each tuple because a female anchor is the Telugu news default
+    # and the first entry is what an unset `voice.voice_name` gets.
+    "sarvam/bulbul:v3": (
+        "ritu", "priya", "neha", "pooja", "simran", "kavya", "ishita",
+        "shreya", "roopa", "tanya", "shruti", "suhani", "kavitha", "rupali",
+        "shubh", "aditya", "rahul", "rohan", "amit", "dev", "ratan", "varun",
+        "manan", "sumit", "kabir", "aayan", "ashutosh", "advait", "anand",
+        "tarun", "sunny", "mani", "gokul", "vijay", "mohit", "rehan", "soham",
+    ),
 }
 
 
@@ -318,6 +534,7 @@ _BY_KIND: dict[str, tuple[Choice, ...]] = {
     "text": TEXT,
     "image": IMAGE,
     "tts": TTS,
+    "tts_sarvam": SARVAM_TTS,
 }
 
 

@@ -207,6 +207,40 @@ time, watching `/cms/crawl/status` and the voice usage meter.
 For the crawl, switch on government, press-release and job-notification sources
 first: those are published *for* redistribution, which the others are not.
 
+### Push notifications setup
+
+The server sends pushes through Expo's push service; the `beat` and `worker`
+containers deliver them (`notify.dispatch`, every 30 s). Nothing is configured
+on the server. What Android needs is done once, outside the code:
+
+1. In the [Firebase console](https://console.firebase.google.com), create a
+   project and add an Android app with the package
+   `com.influencioweb.toptelugunews`. Download `google-services.json` into
+   `mobile/` (next to `app.json`). The repo is public, so the file is
+   gitignored and EAS never sees it on its own; hand it over once as a file
+   variable:
+   `cd mobile && npx eas-cli env:create --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json --visibility secret --environment production --environment preview`.
+   `mobile/app.config.js` uses that variable on EAS and the local file for
+   local builds; with neither, builds still work, just without push.
+2. In Firebase → Project settings → Service accounts, generate a private key
+   (the FCM V1 service-account JSON). Give it to Expo, not to our server, and
+   do not keep it in the repo (`*-firebase-adminsdk-*.json` is gitignored):
+   `cd mobile && npx eas-cli credentials` → Android → `apk` profile →
+   Google Service Account → "Manage your Google Service Account Key for Push
+   Notifications (FCM V1)" → upload the JSON.
+3. Rebuild and reinstall the APK: `npx eas-cli build -p android --profile apk`.
+   Expo Go cannot receive remote pushes on Android, so test on the built APK.
+4. Open the app once on a phone and allow notifications. **Notifications** in
+   the CMS then shows it under "Registered phones"; send a test to *Everyone*
+   and watch Phones / Delivered / Failed fill in within a minute.
+
+Optional: if "Enhanced push security" is switched on for the Expo project,
+create an access token at expo.dev and paste it into **Settings → Push
+notifications**. **Settings → Push notifications → Send push notifications**
+is the kill switch: off, alerts still reach the in-app inbox but no phone.
+iOS needs an APNs key through `eas credentials` and an iOS build profile, which
+this project does not have yet.
+
 ## 6. Seed reference data and create the first administrator
 
 Reference data is safe for production; demo accounts are forbidden:

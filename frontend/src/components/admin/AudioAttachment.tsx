@@ -11,6 +11,7 @@ import { useToast } from '@/components/ui/Toast';
 import * as cmsApi from '@/features/cms/api';
 import { useTts } from '@/features/reader/tts';
 import { useI18n, useScript } from '@/i18n';
+import { selectTrack, usePlayer } from '@/stores/player';
 import type { CmsAudioRef } from '@/types/cms';
 import { cn } from '@/utils/cn';
 
@@ -115,6 +116,9 @@ export function AudioAttachment({ articleId, shortId, published, audio, onChange
     mutationFn: () => cmsApi.deleteArticleAudio(articleId!),
     onSuccess: () => {
       onChange(null);
+      // The removed file must not keep playing in the dock.
+      const player = usePlayer.getState();
+      if (endpoint && selectTrack(player)?.id === endpoint) player.close();
       refreshPlayer();
       toast.success(t('state.deleted'));
     },
@@ -153,7 +157,13 @@ export function AudioAttachment({ articleId, shortId, published, audio, onChange
       {uploaded ? (
         <Card padding="sm" tone="paper" className="space-y-3">
           {endpoint && shortId ? (
-            <AudioPlayer shortId={shortId} readingLabel="" deviceTts={deviceTts} endpoint={endpoint} />
+            <AudioPlayer
+              shortId={shortId}
+              readingLabel=""
+              deviceTts={deviceTts}
+              endpoint={endpoint}
+              track={{ kind: 'article', title: L('జోడించిన ఆడియో', 'Attached audio') }}
+            />
           ) : audio!.url ? (
             <audio src={audio!.url} controls preload="metadata" className="min-h-tap w-full" />
           ) : null}

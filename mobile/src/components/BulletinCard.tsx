@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
-import { useAudioPlayerStatus, type AudioPlayer } from 'expo-audio';
 import { router } from 'expo-router';
 import { View } from 'react-native';
 
-import { api } from '@/api/client';
+import { absoluteMediaUrl, api } from '@/api/client';
+import { Equalizer } from '@/components/player/PlayerVisuals';
 import { useI18n } from '@/lib/i18n';
 import { radius, space, type } from '@/lib/theme';
 import { makeStyles, useColors } from '@/lib/useTheme';
+import { formatTime, usePlayer, useTrackStatus, type Track } from '@/stores/player';
 import { Badge } from '@/ui/Badge';
 import { IconButton } from '@/ui/Button';
 import { Card } from '@/ui/Card';
@@ -15,23 +16,26 @@ import { PressableScale } from '@/ui/PressableScale';
 import { T } from '@/ui/Text';
 
 /**
- * The latest three-hourly audio bulletin, in the home feed.
+ * The latest audio bulletin, in the home feed.
  *
  * Not a sixth tab — the bar is already at five, which is as many as a bottom
- * bar carries, and six items a day does not earn a permanent slot.
+ * bar carries, and seven items a day does not earn a permanent slot.
  *
- * The card is a virtualised FlatList row, so it does not own the player: the
- * screen calls `useBulletin()` + `useAudioPlayer` (released only when the
- * screen unmounts) and hands both down, and audio keeps playing while the row
- * is scrolled out of the render window. The screen renders no row at all when
- * nothing is on air — the ordinary between-slots case and the kill switch
- * (an admin turned bulletins off) both arrive as `available: false`.
+ * The card owns no audio: play loads the bulletin into the app's global
+ * player, so it keeps going when the row scrolls out of the render window or
+ * the reader leaves home — the dock carries it from there. The card is only a
+ * trigger plus live status (equalizer, elapsed / length) while its bulletin
+ * is the one playing. The screen renders no row at all when nothing is on
+ * air — the ordinary between-slots case and the kill switch (an admin turned
+ * bulletins off) both arrive as `available: false`.
  */
 
 export interface BulletinSummary {
   available: boolean;
   url: string | null;
   duration_sec: number;
+  date: string | null;
+  slot: number | null;
   slot_label_te: string | null;
   items: { position: number; headline_te: string }[];
 }
@@ -45,20 +49,37 @@ export function useBulletin() {
   });
 }
 
+/** The player id every bulletin surface agrees on (the bulletin screen's controls use it too). */
+export const bulletinId = (date: string, slot: number) => `bulletin-${date}-${slot}`;
+
+/** A bulletin as a player track; null when it has no file to play. */
+export function bulletinTrack(
+  b: Pick<BulletinSummary, 'url' | 'duration_sec' | 'date' | 'slot' | 'slot_label_te'>,
+  kindLabel: string,
+): Track | null {
+  const url = absoluteMediaUrl(b.url);
+  if (!url || b.date == null || b.slot == null) return null;
+  return {
+    id: bulletinId(b.date, b.slot),
+    kind: 'bulletin',
+    title: b.slot_label_te || kindLabel,
+    subtitle: `${kindLabel} · ${String(b.slot).padStart(2, '0')}:00`,
+    url,
+    durationSec: b.duration_sec || undefined,
+    href: '/bulletin',
+  };
+}
+
 // ponytail: no i18n key yet for these — see neededStrings.
 const L = (te: string, en: string, telugu: boolean) => (telugu ? te : en);
-
-function clock(seconds: number): string {
-  const s = Math.max(0, Math.floor(seconds));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-}
 
 const DOT = 6;
 
 const useStyles = makeStyles((color) => ({
   card: { marginHorizontal: space.lg, marginTop: space.md, gap: space.sm },
-  head: { flexDirection: 'row', alignItems: 'center' },
+  head: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   controls: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  time: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   more: {
     marginLeft: 'auto',
     flexDirection: 'row',
@@ -81,19 +102,32 @@ const useStyles = makeStyles((color) => ({
   headline: { flex: 1 },
 }));
 
-export function BulletinCard({ bulletin, player }: { bulletin: BulletinSummary; player: AudioPlayer }) {
+export function BulletinCard({ bulletin }: { bulletin: BulletinSummary }) {
   const styles = useStyles();
   const color = useColors();
   const { t, isTelugu } = useI18n();
-  const status = useAudioPlayerStatus(player);
+  const id = bulletin.date != null && bulletin.slot != null ? bulletinId(bulletin.date, bulletin.slot) : '';
+  const status = useTrackStatus(id);
+  const { toggle, playTrack } = usePlayer.getState();
 
-  const playing = status?.playing ?? false;
-  const total = status?.duration || bulletin.duration_sec;
+  const playing = status.playing;
+  const total = status.duration || bulletin.duration_sec;
+
+  function onPlay() {
+    if (status.current) return toggle();
+    const track = bulletinTrack(bulletin, t('player.kindBulletin'));
+    if (track) playTrack(track);
+  }
 
   return (
     <Card tone="ink" style={styles.card}>
       <View style={styles.head}>
         <Badge tone="breaking" icon="radio" size="xs" label={L('ప్రసారంలో', 'On air', isTelugu)} />
+        {bulletin.slot != null ? (
+          <T variant="meta" weight="bold" color="onOverlay" lang="en">
+            {`${String(bulletin.slot).padStart(2, '0')}:00`}
+          </T>
+        ) : null}
       </View>
 
       {bulletin.slot_label_te ? (
@@ -108,11 +142,14 @@ export function BulletinCard({ bulletin, player }: { bulletin: BulletinSummary; 
           label={playing ? t('ui.pause') : t('ui.listen')}
           size={48}
           variant="inverse"
-          onPress={() => (playing ? player.pause() : player.play())}
+          onPress={onPlay}
         />
-        <T variant="meta" weight="medium" color="onOverlay" lang="en" style={styles.soft}>
-          {clock(status?.currentTime ?? 0)} / {clock(total)}
-        </T>
+        <View style={styles.time}>
+          {status.current ? <Equalizer playing={playing && !status.buffering} color={color.exclusive} /> : null}
+          <T variant="meta" weight="medium" color="onOverlay" lang="en" style={styles.soft}>
+            {status.current ? `${formatTime(status.elapsed)} / ${formatTime(total)}` : formatTime(total)}
+          </T>
+        </View>
         <PressableScale
           onPress={() => router.push('/bulletin')}
           haptic="select"

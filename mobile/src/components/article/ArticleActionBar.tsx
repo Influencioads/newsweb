@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { fetchSiteConfig } from '@/api/public';
 import type { ArticleDetail } from '@/api/types';
@@ -10,6 +9,7 @@ import { LocationSheet } from '@/components/LocationSheet';
 import { useI18n } from '@/lib/i18n';
 import { space, TAP } from '@/lib/theme';
 import { makeStyles } from '@/lib/useTheme';
+import { useBottomInset } from '@/stores/player';
 import { usePrefs } from '@/stores/prefs';
 import { Button } from '@/ui/Button';
 import { Divider } from '@/ui/Divider';
@@ -29,6 +29,9 @@ import { useQuery } from '@tanstack/react-query';
  * The bar slides away on a scroll down and returns on a scroll up (the screen
  * drives `hidden` 0 → 1 with a spring), so the story owns the screen while the
  * controls stay one flick away.
+ *
+ * With audio loaded, the dock under the stack carries the home-indicator
+ * inset, so the bar stops padding it.
  *
  * The location button is here rather than on the home screen because it has to
  * be reachable from *every* story — a reader who has just read something from
@@ -57,7 +60,7 @@ export function ArticleActionBar({
   onComments,
 }: ArticleActionBarProps) {
   const styles = useStyles();
-  const insets = useSafeAreaInsets();
+  const bottom = useBottomInset();
   const { t, pick } = useI18n();
   const [locationOpen, setLocationOpen] = useState(false);
   const edition = usePrefs((s) => s.edition);
@@ -73,12 +76,12 @@ export function ArticleActionBar({
     : t('local.choosePlace');
 
   const slide = useAnimatedStyle(() => ({
-    transform: [{ translateY: hidden.value * (ACTION_BAR_HEIGHT + insets.bottom) }],
+    transform: [{ translateY: hidden.value * (ACTION_BAR_HEIGHT + bottom) }],
   }));
 
   return (
     <>
-      <Animated.View style={[styles.bar, { paddingBottom: insets.bottom }, slide]}>
+      <Animated.View style={[styles.bar, { paddingBottom: bottom }, slide]}>
         <Divider />
         <ArticleActions
           article={article}

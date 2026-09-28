@@ -52,6 +52,7 @@ function thumbnail(video: VideoOut): MediaOut {
     caption_te: null,
     credit: null,
     license_label: null,
+    representative: false,
     source_url: null,
     width: null,
     height: null,

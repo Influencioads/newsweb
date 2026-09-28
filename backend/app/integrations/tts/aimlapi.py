@@ -26,7 +26,7 @@ import httpx
 from app.core.config import settings
 from app.core.errors import AiProviderError
 from app.integrations.ai import catalogue
-from app.integrations.tts.base import Synthesis, TtsProvider
+from app.integrations.tts.base import Synthesis, TtsProvider, sniff_mime
 
 #: Telugu speech runs slower than English prose. The service only uses this to
 #: show a duration before the file is measured properly, so an approximation
@@ -38,32 +38,6 @@ _CHARS_PER_SECOND = 13.0
 #: enough to matter; see `_fetch_envelope`.
 _FETCH_ATTEMPTS = 3
 _FETCH_BACKOFF_SEC = 0.5
-
-
-def _sniff_mime(audio: bytes) -> str:
-    """The container these bytes actually are, or "" for neither.
-
-    The response's own `content-type` is deliberately not consulted, because it
-    is a measured lie rather than a theoretical risk: `elevenlabs/*` declares
-    `audio/wav` and sends MP3, while qwen, hume and deepgram send real WAV. A
-    WAV stored as `audio/mpeg` is a silent player failure on the reader's
-    device, so the magic bytes are the only thing worth trusting.
-
-    Refusing everything else is the same guard the old code spelled as "did the
-    body start with JSON or HTML": an error page the transport accepted must
-    never reach the audio column.
-    """
-    if audio[:4] == b"RIFF" and audio[8:12] == b"WAVE":
-        return "audio/wav"
-    if audio[:3] == b"ID3":
-        return "audio/mpeg"
-    if len(audio) >= 2 and audio[0] == 0xFF and audio[1] & 0xE0 == 0xE0:
-        # MPEG frame sync, i.e. an MP3 with no ID3 tag. The sync word is
-        # ELEVEN bits, so the mask is 0xE0: 0xF0 would only match 0xEn, which
-        # is MPEG-2.5, and would refuse the FF FB / FF FA / FF F3 that
-        # `elevenlabs/*` mp3_44100_* actually returns — after it was billed.
-        return "audio/mpeg"
-    return ""
 
 
 class AimlapiTts(TtsProvider):
@@ -98,7 +72,14 @@ class AimlapiTts(TtsProvider):
     @property
     def model_name(self) -> str:
         """Which model actually answers, for the ledger row. Resolved here so
-        it can never drift from the model the request is sent to."""
+        it can never drift from the model the request is sent to.
+
+        A `sarvam/` id means `voice.model` still holds the other provider's
+        choice — the row is shared — and sending it here is a 400. The default
+        is what an admin who just switched providers meant.
+        """
+        if self._model.startswith("sarvam/"):
+            return catalogue.DEFAULT_TTS_MODEL
         return self._model or catalogue.DEFAULT_TTS_MODEL
 
     def _endpoint(self) -> str:
@@ -169,7 +150,7 @@ class AimlapiTts(TtsProvider):
         else:
             audio = response.content
 
-        mime = _sniff_mime(audio)
+        mime = sniff_mime(audio)
         if not mime:
             raise AiProviderError(
                 details={

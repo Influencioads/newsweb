@@ -23,7 +23,8 @@ export type { ToastKind, ToastOptions } from '@/stores/toast';
  *     toast.info(msg, { action: { label, onClick } });
  *
  * At most three are visible; each auto-dismisses (4 s, errors 6 s) and the
- * timer pauses while hovered or focused.
+ * timer pauses while hovered or focused. The stack sits above the audio
+ * player dock and any fixed bottom bar (`--player-dock-h`, `--bottom-bar-h`).
  */
 
 // The toast is a constant-dark panel, so the status colours (deep in light
@@ -125,7 +126,8 @@ export function Toaster() {
       role="region"
       aria-live="polite"
       aria-label={t('ui.toastRegion')}
-      className="pointer-events-none fixed inset-x-4 bottom-4 z-toast flex flex-col gap-2 md:left-auto md:right-6 md:w-96"
+      className="pointer-events-none fixed inset-x-4 z-toast flex flex-col gap-2 md:left-auto md:right-6 md:w-96"
+      style={{ bottom: 'calc(1rem + var(--player-dock-h, 0px) + var(--bottom-bar-h, 0px))' }}
     >
       {toasts.map((toast) => (
         <ToastCard key={toast.id} toast={toast} />

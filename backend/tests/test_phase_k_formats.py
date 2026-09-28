@@ -32,11 +32,13 @@ from app.db.seed import (  # noqa: E402
 )
 from app.db.seed_content import seed_categories, seed_tags  # noqa: E402
 from app.db.session import get_db  # noqa: E402
+from app.models.audio import AudioAsset  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.content import Article, Category  # noqa: E402
 from app.models.media import Media  # noqa: E402
 from app.models.enums import (  # noqa: E402
     ArticleStatus,
+    AudioStatus,
     RoleKey,
     ScopeType,
     UserStatus,
@@ -45,7 +47,12 @@ from app.models.enums import (  # noqa: E402
 from app.models.setting import AppSetting  # noqa: E402
 from app.models.user import Role, User, UserRole  # noqa: E402
 from app.models.video import Video  # noqa: E402
-from app.services import auth_service, settings_service, share_card_service  # noqa: E402
+from app.services import (  # noqa: E402
+    auth_service,
+    settings_service,
+    share_card_service,
+    tts_service,
+)
 
 engine = create_engine(
     "sqlite://",
@@ -98,6 +105,7 @@ def _isolate(db: Session) -> Iterator[None]:
 
 
 def _purge(db: Session) -> None:
+    db.query(AudioAsset).delete()
     db.query(Article).delete()
     db.query(Video).delete()
     db.query(AppSetting).delete()
@@ -208,6 +216,58 @@ class TestFormats:
         body = client.get(f"/api/v1/public/articles/{article.short_id}/formats").json()
         for key in ("available", "url", "duration_sec", "voice_enabled", "fallback"):
             assert key in body["audio"], key
+
+    def _ready_audio(self, db: Session, article: Article, *, upload: bool) -> None:
+        """A READY rendition `existing_ready` will find: an editor's upload, or
+        a generated file whose hash matches the story as it reads now."""
+        db.add(
+            AudioAsset(
+                article_id=article.id,
+                content_hash="upload-1"
+                if upload
+                else tts_service.content_hash(tts_service.spoken_text(article)),
+                status=AudioStatus.READY,
+                provider=tts_service.UPLOAD_PROVIDER if upload else "local",
+                url=f"https://cdn.example/audio/{article.short_id}.mp3",
+            )
+        )
+        db.commit()
+
+    def test_a_story_whose_voice_is_off_advertises_no_audio(
+        self, db: Session, client: TestClient
+    ) -> None:
+        """§20. Switching a story's voice off clears neither its upload nor its
+        cached rendition, so /formats has to ask the switch itself — otherwise
+        the reader's headphones play a file /audio refuses to hand out."""
+        article = make_article(db, short_id="fmt007")
+        self._ready_audio(db, article, upload=True)
+        url = f"/api/v1/public/articles/{article.short_id}/formats"
+        assert client.get(url).json()["audio"]["url"].endswith("fmt007.mp3")
+
+        article.voice_enabled = False
+        db.commit()
+        audio = client.get(url).json()["audio"]
+        public = client.get(f"/api/v1/public/articles/{article.short_id}/audio").json()
+        assert audio == public
+        assert (audio["available"], audio["url"], audio["voice_enabled"]) == (
+            False,
+            None,
+            False,
+        )
+
+    def test_the_site_wide_switch_hides_generated_audio(
+        self, db: Session, client: TestClient
+    ) -> None:
+        """The other half of §20: `voice.enabled` governs generated audio even
+        when a rendition for the current text is already sitting in storage."""
+        article = make_article(db, short_id="fmt008")
+        self._ready_audio(db, article, upload=False)
+        url = f"/api/v1/public/articles/{article.short_id}/formats"
+        assert client.get(url).json()["audio"]["url"] is None  # off by default
+
+        settings_service.set_many(db, {"voice.enabled": True}, actor_id=None)
+        db.commit()
+        assert client.get(url).json()["audio"]["url"].endswith("fmt008.mp3")
 
     def test_a_draft_story_has_no_formats(self, db: Session, client: TestClient) -> None:
         article = make_article(db, short_id="fmt005")
@@ -510,6 +570,16 @@ class TestCrawlerSurface:
         html = client.get(f"/_og/article/{article.slug}-{article.short_id}").text
         assert 'type="application/ld+json"' in html
         assert "NewsArticle" in html
+
+    def test_a_short_id_with_a_hyphen_still_resolves(
+        self, db: Session, client: TestClient
+    ) -> None:
+        """nanoid's alphabet includes '-': the id is the last six characters,
+        not the last hyphen-separated segment."""
+        article = make_article(db, short_id="og-0_3")
+        db.commit()
+        html = client.get(f"/_og/article/{article.slug}-{article.short_id}").text
+        assert article.title_te in html
 
     def test_an_unknown_story_still_returns_a_valid_preview(
         self, client: TestClient

@@ -17,22 +17,19 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Response
-from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
+from app.core.config import SITE_NAME_EN, SITE_NAME_TE, settings
 from app.core.deps import Principal, get_optional_principal
 from app.core.errors import NotFoundError
-from app.core.ratelimit import rate_limit
 from app.core.redis_client import cache_get, cache_set
 from app.db.base import utcnow
 from app.db.session import get_db
 from app.models.content import Article
-from app.models.geo import District, Locality, Mandal
 from app.models.video import Video
 from app.models.enums import HomeSectionKind, PinPlacement, TrendingScope
 from app.repositories import article_repo, discovery_repo, site_repo
-from app.services import geocode_service, trending_service
+from app.services import settings_service, trending_service
 from app.schemas.public import (
     ArticleCardOut,
     ArticleDetailOut,
@@ -98,6 +95,7 @@ def _media_out(media: Any) -> MediaOut | None:
         credit=media.credit,
         license_label=media.copyright,
         source_url=(media.meta or {}).get("landing_url"),
+        representative=bool((media.meta or {}).get("representative")),
         width=media.width,
         height=media.height,
         blurhash=media.blurhash,
@@ -123,7 +121,10 @@ def _card(article: Article) -> ArticleCardOut:
         byline_te=article.byline_te,
         is_breaking=article.is_breaking,
         is_exclusive=article.is_exclusive,
-        ai_generated=article.ai_generated,
+        # Editorial decision: readers never see that AI drafted a story. The
+        # column still drives the CMS review flow; only the public API hides it.
+        # (AI-made *pictures* keep their label — see _media_out.)
+        ai_generated=False,
         published_at=article.published_at,
         reading_time_sec=article.reading_time_sec,
         # Readers see genuine likes plus any editorial seed; ranking and
@@ -191,8 +192,8 @@ def _decode_cursor(cursor: str | None) -> datetime | None:
 def get_config(response: Response, db: Session = Depends(get_db)) -> SiteConfigOut:
     _cache_headers(response, ttl=300)
     return SiteConfigOut(
-        site_name_te="టాప్ తెలుగు న్యూస్",
-        site_name_en="Top Telugu News",
+        site_name_te=SITE_NAME_TE,
+        site_name_en=SITE_NAME_EN,
         categories=[
             NavCategoryOut.model_validate(c) for c in article_repo.nav_categories(db)
         ],
@@ -200,6 +201,7 @@ def get_config(response: Response, db: Session = Depends(get_db)) -> SiteConfigO
         districts=[
             DistrictOut.model_validate(d) for d in article_repo.active_districts(db)
         ],
+        brand=settings_service.brand_colors(db),
     )
 
 
@@ -698,9 +700,10 @@ def get_trending(
     response_model=CategoryFeedOut,
     summary="Quick-read cards — headline, image, 2–5 line summary",
     description=(
-        "The §14 swipe feed. Cards are articles whose editorial standfirst "
-        "(`summary_te`) exists; each opens the full story. `next_cursor` "
-        "carries the offset for the next page."
+        "The §14 swipe feed. Cards are articles an editor marked as short news "
+        "(`is_short`: hero photo + `summary_te`); one opens the full story only "
+        "when it has a body (`reading_time_sec > 0`). `next_cursor` carries the "
+        "offset for the next page."
     ),
 )
 def get_short_news(
@@ -975,54 +978,4 @@ def local_feed(
         locality=LocalityOut.model_validate(locality_row) if locality_row else None,
         articles=_cards(articles, db, _district_map(db)),
         next_offset=offset + limit if has_more else None,
-    )
-
-
-class GeoResolveIn(BaseModel):
-    """A device's position. Never stored, never logged — see geocode_service."""
-
-    lat: float = Field(ge=-90, le=90)
-    lon: float = Field(ge=-180, le=180)
-
-
-class GeoResolveOut(BaseModel):
-    """Ids only. The client prefills the picker with these and the reader
-    confirms before anything is saved, which is the honest UX for a guess."""
-
-    matched: bool = False
-    state_code: str | None = None
-    district: DistrictOut | None = None
-    mandal: MandalOut | None = None
-    locality: LocalityOut | None = None
-
-
-@router.post(
-    "/geo/resolve",
-    response_model=GeoResolveOut,
-    summary="Which district/mandal/locality a GPS fix falls in",
-    description=(
-        "POST rather than GET on purpose: coordinates must never reach a URL, "
-        "an access log or a Referer header. Always 200 — an unmatched point "
-        "returns `matched: false` and the reader uses the manual picker, "
-        "which always works."
-    ),
-)
-def resolve_geo(
-    payload: GeoResolveIn,
-    db: Session = Depends(get_db),
-    _rl: None = Depends(rate_limit("geo_resolve", 6)),
-) -> GeoResolveOut:
-    place = geocode_service.resolve(db, payload.lat, payload.lon)
-    if not place.matched:
-        return GeoResolveOut(matched=False, state_code=place.state_code)
-
-    district = db.get(District, place.district_id)
-    mandal = db.get(Mandal, place.mandal_id) if place.mandal_id else None
-    locality = db.get(Locality, place.locality_id) if place.locality_id else None
-    return GeoResolveOut(
-        matched=True,
-        state_code=place.state_code,
-        district=DistrictOut.model_validate(district) if district else None,
-        mandal=MandalOut.model_validate(mandal) if mandal else None,
-        locality=LocalityOut.model_validate(locality) if locality else None,
     )

@@ -319,7 +319,9 @@ const useStyles = makeStyles((color) => ({
   },
   leadBody: { padding: space.lg, gap: space.xs },
 
-  row: { flexDirection: 'row', alignItems: 'flex-start', gap: space.md },
+  /* CardShell is padding="none" for the lead's edge-to-edge image, so the
+     row brings its own — same inset as leadBody. */
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: space.md, padding: space.lg },
   rowText: { flex: 1, minWidth: 0, gap: space.xs },
   // 112x80 rather than 96x72: a denser-reading strip for the same row height,
   // and it is two numbers.

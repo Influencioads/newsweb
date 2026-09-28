@@ -11,16 +11,16 @@ import { useTts } from '@/features/reader/tts';
 import { useI18n } from '@/i18n';
 
 /**
- * The latest three-hourly bulletin, on the home page.
+ * The latest audio bulletin, on the home page.
  *
  * Not a sixth tab: the mobile bar is already at five, which is as many as a
- * bottom bar carries well, and six items a day does not earn a permanent slot.
+ * bottom bar carries well, and seven items a day does not earn a permanent slot.
  * A card above the fold gets it in front of readers without pushing anything
  * else out.
  *
- * Playback goes through the shared `AudioPlayer` (seek, speed, one pill in
- * every state) pointed at this slot's public audio route, rather than a native
- * `<audio controls>` whose chrome is a different colour in every browser.
+ * Playback goes through the shared `AudioPlayer` pointed at this slot's public
+ * audio route: a trigger for the global player, so the bulletin keeps playing
+ * in the dock while the reader carries on down the home page or into a story.
  *
  * Renders nothing at all when there is no live bulletin — including when an
  * admin has flipped the kill switch, which arrives here as `available: false`.
@@ -55,6 +55,7 @@ export function BulletinCard() {
 
   if (!data?.available || !data.url) return null;
 
+  const clock = `${String(data.slot ?? 0).padStart(2, '0')}:00`;
   const minutes = Math.floor(data.duration_sec / 60);
   const seconds = String(data.duration_sec % 60).padStart(2, '0');
   const length = `${minutes}:${seconds}`;
@@ -65,6 +66,9 @@ export function BulletinCard() {
         <Badge tone="breaking" size="xs" icon={Radio} lang={language}>
           {L('ఆన్ ఎయిర్', 'On air')}
         </Badge>
+        <span lang="en" className="font-sans text-ui-sm font-bold tabular-nums text-ink-soft">
+          {clock}
+        </span>
         {data.slot_label_te ? (
           <h2 lang="te" className="th text-headline-xs font-bold text-ink">
             {data.slot_label_te}
@@ -79,6 +83,7 @@ export function BulletinCard() {
           readingLabel={length}
           deviceTts={tts}
           endpoint={`/public/bulletins/${data.date}/${data.slot}`}
+          track={{ kind: 'bulletin', title: data.slot_label_te || clock, subtitle: clock }}
         />
       </div>
 

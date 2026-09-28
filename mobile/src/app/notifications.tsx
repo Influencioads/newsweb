@@ -59,8 +59,9 @@ function NotificationRow({ item }: { item: NotificationItem }) {
   const { language, isTelugu } = useI18n();
   const look = KIND[item.kind];
   const read = item.read_at != null;
-  // The inbox stores a full article URL; its trailing segment is the short id.
-  const shortId = item.article_url?.split('-').pop();
+  // The server sends the short id itself: parsing the url's last '-' segment
+  // broke on the ~9% of ids that contain '-'.
+  const shortId = item.short_id;
   // Unread belongs in the label: the dot is decorative, and `selected` would
   // announce a selection state the row does not have.
   const label = [

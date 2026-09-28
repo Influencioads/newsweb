@@ -403,3 +403,39 @@ class TestAttachMedia:
         monkeypatch.setattr("app.services.ingestion_service.httpx.stream", _never)
         article = ingestion_service.import_item(db, item, actor_id=None)
         assert article.hero_media_id is None
+
+
+class TestTheFeedDialects:
+    """Where a Telugu WordPress feed actually puts its photograph.
+
+    Not media:content, not enclosure — inside `content:encoded`. Every live
+    source in this deployment (ntvtelugu, tv9telugu, 10tv, v6velugu) ships the
+    story picture only there, so a parser reading the four structured dialects
+    alone returns nothing for all of them.
+    """
+
+    def test_an_inline_img_in_the_content_is_found(self) -> None:
+        from app.integrations.feeds.fetcher import _entry_images
+
+        entry = {
+            "content": [{"value": f'<p>వార్త</p><img src="{PHOTO}" alt="x" />'}],
+            "summary": "సారాంశం",
+        }
+        assert _entry_images(_Entry(entry)) == [PHOTO]
+
+    def test_structured_dialects_still_come_first(self) -> None:
+        from app.integrations.feeds.fetcher import _entry_images
+
+        explicit = "https://publisher.example.com/media/explicit-1200x675.jpg"
+        entry = {
+            "media_content": [{"url": explicit}],
+            "content": [{"value": f'<img src="{PHOTO}">'}],
+        }
+        assert _entry_images(_Entry(entry)) == [explicit, PHOTO]
+
+
+class _Entry:
+    """feedparser entries answer to attribute access; dicts do not."""
+
+    def __init__(self, data: dict[str, object]) -> None:
+        self.__dict__.update(data)

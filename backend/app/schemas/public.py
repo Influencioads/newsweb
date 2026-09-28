@@ -33,7 +33,19 @@ class MediaOut(BaseModel):
         description="Attribution line, e.g. 'Creator / Wikimedia (CC BY 4.0)' (§12.5)",
     )
     license_label: str | None = Field(
-        default=None, description="Licence under which the image is reused"
+        default=None,
+        description=(
+            "Licence code under which the image is reused. Never the provider's "
+            "name: nothing in this payload carries another company's name."
+        ),
+    )
+    representative: bool = Field(
+        default=False,
+        description=(
+            "A stand-in, not a picture of the event. `caption_te` says so in "
+            "Telugu, but only the article page renders captions — cards, "
+            "listings and share previews need the flag to badge it."
+        ),
     )
     source_url: str | None = Field(
         default=None,
@@ -299,6 +311,10 @@ class SiteConfigOut(BaseModel):
     categories: list[NavCategoryOut]
     states: list[StateOut] = Field(default_factory=list)
     districts: list[DistrictOut]
+    brand: dict[str, str] = Field(
+        default_factory=dict,
+        description="Brand colours changed from the default, as #rrggbb: primary, breaking, accent",
+    )
 
 
 class SearchResultsOut(BaseModel):

@@ -1,14 +1,15 @@
 import { Suspense, useEffect, useState, type FormEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { ChevronRight, LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun } from 'lucide-react';
+import { ChevronRight, Keyboard, LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun } from 'lucide-react';
 
 import { RouteFallback, SkipLink } from '@/components/app';
 import { LanguageToggle } from '@/components/layout/LanguageToggle';
 import { Badge } from '@/components/ui/Badge';
+import { Chip } from '@/components/ui/Chip';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Sheet } from '@/components/ui/Dialog';
-import { Input } from '@/components/ui/Field';
+import { Input, TeluguTypingContext } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
 import { useToast } from '@/components/ui/Toast';
 import { useI18n, useScript } from '@/i18n';
@@ -24,6 +25,9 @@ import { findAdminNav, visibleAdminNav, type AdminNavGroup } from './adminNav';
  * breadcrumb / search / language / theme / user chip / sign-out, and a left
  * Sheet carrying the same grouped nav under lg. The shell owns the one
  * `<main id="main">` landmark; pages render as PageContainer roots inside it.
+ *
+ * The sticky sidebar stops short of the audio player dock (`--player-dock-h`)
+ * when an editor is previewing audio, so its footer control stays reachable.
  */
 
 const COLLAPSED_KEY = 'tn.admin-nav-collapsed';
@@ -41,6 +45,17 @@ function writeCollapsed(value: boolean): void {
     localStorage.setItem(COLLAPSED_KEY, value ? '1' : '0');
   } catch {
     // Private mode / quota: the choice simply does not persist.
+  }
+}
+
+const TE_TYPING_KEY = 'tn.admin-te-typing';
+
+/** Phonetic Telugu typing defaults on: editors write Telugu. */
+function readTeTyping(): boolean {
+  try {
+    return localStorage.getItem(TE_TYPING_KEY) !== '0';
+  } catch {
+    return true;
   }
 }
 
@@ -133,9 +148,11 @@ function Wordmark({ collapsed }: { collapsed: boolean }) {
         collapsed && 'items-center px-0',
       )}
     >
-      <span lang="te" className="th text-headline-xs font-extrabold text-on-ink">
-        {collapsed ? 'టా' : 'టాప్ తెలుగు'}
-      </span>
+      {collapsed ? (
+        <img src="/logo-mark.webp" alt="టాప్ తెలుగు న్యూస్" width={192} height={97} className="h-6 w-auto" />
+      ) : (
+        <img src="/logo.webp" alt="టాప్ తెలుగు న్యూస్" width={720} height={205} className="h-9 w-auto self-start" />
+      )}
       <span
         className={cn(
           'text-muted-inverse',
@@ -162,6 +179,7 @@ export default function AdminLayout() {
   const toggleTheme = useReaderPrefs((p) => p.toggleTheme);
   const scrolled = useScrolled(8);
   const [collapsed, setCollapsed] = useState(readCollapsed);
+  const [teTyping, setTeTyping] = useState(readTeTyping);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [q, setQ] = useState('');
 
@@ -188,6 +206,15 @@ export default function AdminLayout() {
     });
   }
 
+  function setTyping(on: boolean) {
+    setTeTyping(on);
+    try {
+      localStorage.setItem(TE_TYPING_KEY, on ? '1' : '0');
+    } catch {
+      // Not persisted; the choice still holds for this visit.
+    }
+  }
+
   function onSearch(e: FormEvent) {
     e.preventDefault();
     navigate(`/admin/articles?q=${encodeURIComponent(q.trim())}`);
@@ -209,7 +236,7 @@ export default function AdminLayout() {
 
       <aside
         className={cn(
-          'sticky top-0 hidden h-screen shrink-0 flex-col bg-ink text-on-ink transition-[width] duration-base ease-standard lg:flex',
+          'sticky top-0 hidden h-[calc(100vh-var(--player-dock-h,0px))] shrink-0 flex-col bg-ink text-on-ink transition-[width] duration-base ease-standard lg:flex',
           collapsed ? 'w-20' : 'w-72',
         )}
       >
@@ -287,6 +314,17 @@ export default function AdminLayout() {
 
             <LanguageToggle />
 
+            {/* Typing script, not interface language — hence the keyboard glyph beside it. */}
+            <div role="group" aria-label={t('admin.teluguTyping')} title={t('admin.teluguTyping')} className="inline-flex items-center gap-1">
+              <Icon icon={Keyboard} size="sm" className="text-muted" />
+              <Chip as="button" lang="te" selected={teTyping} onClick={() => setTyping(true)}>
+                తెలుగు
+              </Chip>
+              <Chip as="button" lang="en" selected={!teTyping} onClick={() => setTyping(false)}>
+                English
+              </Chip>
+            </div>
+
             <IconButton
               icon={resolvedTheme === 'dark' ? Sun : Moon}
               label={t('ui.darkMode')}
@@ -307,9 +345,11 @@ export default function AdminLayout() {
         </header>
 
         <main id="main" tabIndex={-1} className="flex-1 outline-none">
-          <Suspense fallback={<RouteFallback />}>
-            <Outlet />
-          </Suspense>
+          <TeluguTypingContext.Provider value={teTyping}>
+            <Suspense fallback={<RouteFallback />}>
+              <Outlet />
+            </Suspense>
+          </TeluguTypingContext.Provider>
         </main>
       </div>
 

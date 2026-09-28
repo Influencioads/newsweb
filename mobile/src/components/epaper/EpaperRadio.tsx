@@ -8,6 +8,7 @@ import { ErrorState, LoadingState } from '@/components/Feedback';
 import { useI18n } from '@/lib/i18n';
 import { space } from '@/lib/theme';
 import { makeStyles } from '@/lib/useTheme';
+import { usePlayer, type Track } from '@/stores/player';
 import { Badge } from '@/ui/Badge';
 import { Card } from '@/ui/Card';
 import { Chip, ChipRail } from '@/ui/Chip';
@@ -16,16 +17,25 @@ import { T } from '@/ui/Text';
 /**
  * EpaperRadio — the edition read aloud, one story at a time.
  *
- * The playlist is still `/epaper/{date}/audio`; playback is `ArticleAudio`,
+ * The playlist is still `/epaper/{date}/audio`; the control is `ArticleAudio`,
  * handed the track's own `url` so it plays the file the playlist already
  * resolved rather than re-asking the article's audio route (which answers for
- * the article's own voice setting, not the edition's). The rail is the track
- * picker; the scrubber, the four speeds and the 15s skip come with the player.
+ * the article's own voice setting, not the edition's). It is also handed the
+ * whole edition as a queue, so play runs the radio through the global player
+ * from the chosen story onward — on past the last page turned, and on after
+ * the reader leaves the e-paper.
+ *
+ * The rail is the track picker. While this edition is on the player the rail
+ * follows it, and picking a story jumps the player there; otherwise picking
+ * only chooses where play will start. Scrubber, speeds and skips are in Now
+ * Playing and the dock.
  */
 export function EpaperRadio({ date }: { date: string }) {
   const styles = useStyles();
   const { t } = useI18n();
   const [track, setTrack] = useState(0);
+  const currentId = usePlayer((s) => s.queue[s.index]?.id);
+  const { playQueue } = usePlayer.getState();
 
   const playlist = useQuery({
     queryKey: ['epaper-audio', date],
@@ -42,7 +52,16 @@ export function EpaperRadio({ date }: { date: string }) {
   const tracks = playlist.data?.tracks ?? [];
   if (tracks.length === 0) return null;
 
-  const index = Math.min(track, tracks.length - 1);
+  const queue: Track[] = tracks.map((x) => ({
+    id: x.short_id,
+    kind: 'epaper',
+    title: x.title_te,
+    subtitle: `${t('player.kindEpaper')} · ${t('epaper.page')} ${x.page_number}`,
+    url: x.url,
+    href: { pathname: '/article/[shortId]', params: { shortId: x.short_id } },
+  }));
+  const playingHere = tracks.findIndex((x) => x.short_id === currentId);
+  const index = playingHere >= 0 ? playingHere : Math.min(track, tracks.length - 1);
   const current = tracks[index];
 
   return (
@@ -63,6 +82,7 @@ export function EpaperRadio({ date }: { date: string }) {
         url={current.url}
         listenLabel={t('epaper.listen')}
         stopLabel={t('article.stopListening')}
+        queue={queue}
       />
 
       <View accessibilityRole="radiogroup" accessibilityLabel={t('epaper.radio')}>
@@ -75,7 +95,10 @@ export function EpaperRadio({ date }: { date: string }) {
               label={x.title_te}
               selected={i === index}
               accessibilityLabel={`${t('epaper.page')} ${x.page_number}: ${x.title_te}`}
-              onPress={() => setTrack(i)}
+              onPress={() => {
+                setTrack(i);
+                if (playingHere >= 0 && i !== playingHere) playQueue(queue, i);
+              }}
               style={styles.chip}
             />
           ))}

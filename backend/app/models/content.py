@@ -281,6 +281,13 @@ class Article(PKMixin, TimestampMixin, SoftDeleteMixin, ActorMixin, Base):
         server_default="0",
         doc="Editor's pick — eligible for the featured rail (§1)",
     )
+    is_short: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="0",
+        doc="Short news — photo + short text, served by the swipe feed",
+    )
     article_type: Mapped[ArticleType] = mapped_column(
         Enum(ArticleType, native_enum=False, length=20, validate_strings=True),
         nullable=False,

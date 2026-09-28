@@ -129,10 +129,11 @@ def _page(head: str, body: str) -> HTMLResponse:
 def og_article(slug_and_id: str, db: Session = Depends(get_db)):
     """The head a link-preview crawler gets for one story.
 
-    The short id is the final hyphen-separated segment of the slug, mirroring
-    how the reader app parses the same URL.
+    The short id is the last six characters, mirroring how the reader app
+    parses the same URL — not the last hyphen-separated segment: the id is a
+    nanoid whose alphabet includes '-'.
     """
-    short_id = slug_and_id.rsplit("-", 1)[-1]
+    short_id = slug_and_id[-6:]
     article = db.scalar(
         select(Article).where(
             Article.short_id == short_id,

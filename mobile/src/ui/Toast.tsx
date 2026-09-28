@@ -1,13 +1,16 @@
+import { useSegments } from 'expo-router';
 import { useEffect } from 'react';
 import { AccessibilityInfo, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ApiError } from '@/api/client';
+import { DOCK_HEIGHT } from '@/components/player/MiniPlayer';
 import { useI18n } from '@/lib/i18n';
 import { useMotion } from '@/lib/motion';
 import { alpha, radius, shadow, space } from '@/lib/theme';
 import { makeStyles, useColors } from '@/lib/useTheme';
+import { usePlayer } from '@/stores/player';
 import { useToastStore, type ToastKind, type ToastOptions } from '@/stores/toast';
 import { IconButton } from '@/ui/Button';
 import { Icon, type IconName } from '@/ui/Icon';
@@ -66,6 +69,10 @@ export function ToastHost() {
   const color = useColors();
   const { t } = useI18n();
   const last = toasts[toasts.length - 1];
+  // On tab routes the audio dock sits on top of the tab bar, so clear both;
+  // on stack routes the dock is shorter than ABOVE_TAB_BAR already.
+  const root: string | undefined = useSegments()[0];
+  const docked = usePlayer((s) => s.queue.length > 0) && root === '(tabs)';
 
   useEffect(() => {
     // accessibilityLiveRegion is Android-only; VoiceOver needs an explicit announcement.
@@ -75,7 +82,7 @@ export function ToastHost() {
   if (toasts.length === 0) return null;
 
   return (
-    <View pointerEvents="box-none" style={[styles.host, { bottom: insets.bottom + ABOVE_TAB_BAR }]}>
+    <View pointerEvents="box-none" style={[styles.host, { bottom: insets.bottom + ABOVE_TAB_BAR + (docked ? DOCK_HEIGHT : 0) }]}>
       {toasts.map((toast, i) => (
         <Animated.View
           key={toast.id}

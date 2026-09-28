@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Bookmark, BookmarkCheck, Headphones, MessageCircle, Share2, Type } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Bookmark, BookmarkCheck, Headphones, Loader2, MessageCircle, Share2, Type } from 'lucide-react';
 
 import { IconButton } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
@@ -25,6 +25,10 @@ import { useHideOnScroll } from '@/utils/motion';
  *
  * The bottom bar overlays content: the article page must reserve `pb-tap-lg`
  * (plus safe-area) under md so the last paragraph is not covered.
+ *
+ * While shown, the bar publishes its height as `--bottom-bar-h` on <html> (0
+ * from md up, where it is display:none, and while it is slid away). The audio
+ * player dock rides on that value, so it sits above the bar, never on it.
  */
 export interface ReadingProgressProps {
   /** 0..1 fraction of the article scrolled. */
@@ -108,6 +112,8 @@ export interface ReaderToolbarProps {
   onShare: () => void;
   onComments?: () => void;
   listening?: boolean;
+  /** Listen is fetching its audio: the headphones spin (busy, not disabled). */
+  listenPending?: boolean;
   saved?: boolean;
   onSave?: () => void;
   /** Overrides `article.comment_count` for the badge. */
@@ -121,13 +127,34 @@ export function ReaderToolbar({
   onShare,
   onComments,
   listening,
+  listenPending,
   saved,
   onSave,
   commentCount,
 }: ReaderToolbarProps) {
   const { t } = useI18n();
-  const hidden = useHideOnScroll();
+  const scrolledAway = useHideOnScroll();
+  // Focus inside keeps the bar on screen — and a tap focuses a button too, so
+  // this is every reader who just pressed listen, not only keyboard users.
+  const [focusWithin, setFocusWithin] = useState(false);
+  const hidden = scrolledAway && !focusWithin;
   const [fontOpen, setFontOpen] = useState(false);
+  const barRef = useRef<HTMLDivElement>(null);
+
+  // What is published is what is on screen, so the dock never sits under the bar.
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+    const root = document.documentElement.style;
+    const publish = () => root.setProperty('--bottom-bar-h', hidden ? '0px' : `${el.offsetHeight}px`);
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      root.removeProperty('--bottom-bar-h');
+    };
+  }, [hidden]);
 
   // Only a real handler or a confirmed audio format earns the control (§40: no fake buttons).
   const showListen = Boolean(onListen) || formats?.audio.available === true;
@@ -137,10 +164,12 @@ export function ReaderToolbar({
     <>
       {showListen && (
         <IconButton
-          icon={Headphones}
+          icon={listenPending ? Loader2 : Headphones}
           label={t('reader.listen')}
           pressed={listening}
           disabled={!onListen}
+          aria-busy={listenPending || undefined}
+          className={cn(listenPending && '[&>svg]:animate-spin')}
           onClick={onListen}
         />
       )}
@@ -155,12 +184,17 @@ export function ReaderToolbar({
   return (
     <>
       {/* Under md: fixed bottom bar, slides away while scrolling down. It only
-          translates off-screen, so focus-within brings it back the moment a
+          translates off-screen, so focus inside brings it back the moment a
           keyboard user tabs into it. */}
       <div
+        ref={barRef}
+        onFocus={() => setFocusWithin(true)}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocusWithin(false);
+        }}
         className={cn(
           'glass fixed inset-x-0 bottom-0 z-header border-t border-rule md:hidden',
-          'transition-transform duration-base ease-standard focus-within:translate-y-0',
+          'transition-transform duration-base ease-standard',
           hidden && 'translate-y-full',
         )}
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}

@@ -21,7 +21,7 @@ from app.models.epaper import (
     EpaperPageArticle,
     EpaperUserEdition,
 )
-from app.services import epaper_service, settings_service, tts_service
+from app.services import bulletin_service, epaper_service, settings_service, tts_service
 
 celery = Celery(
     "telugu_news",
@@ -41,22 +41,36 @@ celery.conf.task_routes = {"crawl.*": {"queue": "ingest"}}
 celery.conf.beat_schedule = {
     "epaper-scheduler": {"task": "epaper.schedule", "schedule": 300.0},
     "epaper-audio": {"task": "epaper.audio", "schedule": 600.0},
-    # Fetch at :05, rewrite at :20 — two independent entries, not a chain.
-    "crawl-hourly": {"task": "crawl.hourly", "schedule": crontab(minute="5")},
-    "crawl-rewrite": {"task": "crawl.rewrite_pass", "schedule": crontab(minute="20")},
+    # Push delivery and scheduled campaigns: a sent alert reaches phones on
+    # the next tick the default worker is free for. The tick is a cheap
+    # indexed query when idle; one still waiting behind a long bulletin or TTS
+    # job expires rather than piling up, since the next tick does the same work.
+    "notify-dispatch": {
+        "task": "notify.dispatch",
+        "schedule": 30.0,
+        "options": {"expires": 25},
+    },
+    # Two independent entries, not a chain. Both tick every five minutes and
+    # the task decides whether the tick is due (crawl.fetch_every_minutes,
+    # crawl.rewrite_every_minutes, the IST crawl hours); hourly is :05 / :20.
+    "crawl-hourly": {"task": "crawl.hourly", "schedule": crontab(minute="*/5")},
+    "crawl-rewrite": {"task": "crawl.rewrite_pass", "schedule": crontab(minute="*/5")},
     "crawl-breaking": {"task": "crawl.breaking", "schedule": 300.0},
-    # Six slots a day, on the IST hour. A real crontab rather than the
+    # bulletin_service.SLOTS, on the IST hour. A real crontab rather than the
     # e-paper's tick-and-compare, because these times are a product decision
     # and not an admin setting.
     "bulletin-slots": {
         "task": "bulletin.run_slot",
-        "schedule": crontab(minute="0", hour="6,9,12,15,18,21"),
+        "schedule": crontab(minute="0", hour=",".join(map(str, bulletin_service.SLOTS))),
     },
-    # A provider blip at 06:00 becomes a fifteen-minute delay, not a missing
-    # morning bulletin.
+    # A provider blip at 07:00 becomes a fifteen-minute delay, not a missing
+    # morning bulletin. First slot's hour through the hour after the last (7-22).
     "bulletin-retry": {
         "task": "bulletin.retry",
-        "schedule": crontab(minute="15,45", hour="6-22"),
+        "schedule": crontab(
+            minute="15,45",
+            hour=f"{bulletin_service.SLOTS[0]}-{bulletin_service.SLOTS[-1] + 1}",
+        ),
     },
     # Overnight, when nobody is generating audio by hand.
     "voice-backfill": {"task": "voice.backfill", "schedule": crontab(minute="20", hour="2")},

@@ -6,6 +6,7 @@ import { Button, ButtonLink } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { REWRITE_STATUS } from '@/features/cms/status';
+import { useScript } from '@/i18n';
 import type { ContentPolicy, IngestedItem, SourceLicence } from '@/types/cms';
 import { cn } from '@/utils/cn';
 
@@ -31,9 +32,15 @@ export function LicenceBadge({ source }: { source: { licence: SourceLicence; con
   );
 }
 
-/** Heading for one side of the comparison. */
-function ColumnHead({ children }: { children: ReactNode }) {
-  return <h4 className="font-sans text-meta font-bold uppercase tracking-wide text-muted">{children}</h4>;
+/** Heading for one side of the comparison. Shared with the editor's OriginCompare,
+ *  which is this same comparison one screen later. */
+export function ColumnHead({ children }: { children: ReactNode }) {
+  const s = useScript();
+  return (
+    <h4 lang={s.language} className={cn(s.body, 'text-meta font-bold uppercase tracking-wide text-muted')}>
+      {children}
+    </h4>
+  );
 }
 
 /** The rewrite, the refusal, or nothing — whichever actually happened.

@@ -19,7 +19,9 @@ import { cn } from '@/utils/cn';
 import { useReveal } from '@/utils/motion';
 
 /**
- * The bulletin desk — six slots a day, 06:00 to 21:00 IST.
+ * The bulletin desk — seven named slots a day, 07:00 to 21:00 IST. The names
+ * ("గరం చాయ్ న్యూస్" at 07:00 and so on) live in `bulletin_service._LABELS_TE`
+ * and arrive on each row as `slot_label_te`.
  *
  * Bulletins publish on schedule because everything in them is already
  * published: a human approved each story and a second human put it live. The
@@ -37,10 +39,7 @@ import { useReveal } from '@/utils/motion';
  * off — gets a plain link to the file instead.
  */
 
-const SLOT_LABEL: Record<number, string> = {
-  6: '06:00', 9: '09:00', 12: '12:00', 15: '15:00', 18: '18:00', 21: '21:00',
-};
-const slotLabel = (slot: number) => SLOT_LABEL[slot] ?? `${slot}:00`;
+const slotLabel = (slot: number) => `${String(slot).padStart(2, '0')}:00`;
 
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 
@@ -162,8 +161,13 @@ function BulletinCard({ bulletin, live, onChanged }: { bulletin: BulletinRow; li
   return (
     <Card as="article" aria-labelledby={`${id}-slot`}>
       <div className="flex flex-wrap items-center gap-2">
-        <h2 id={`${id}-slot`} className="font-sans text-headline-sm font-extrabold tabular-nums text-ink">
+        <h2 id={`${id}-slot`} className="flex flex-wrap items-baseline gap-x-2 font-sans text-headline-sm font-extrabold tabular-nums text-ink">
           {slotLabel(bulletin.slot)}
+          {bulletin.slot_label_te ? (
+            <span lang="te" className="th font-bold text-ink-soft">
+              {bulletin.slot_label_te}
+            </span>
+          ) : null}
         </h2>
         <BulletinPill status={bulletin.status} />
         {duration ? <span className="font-sans text-meta tabular-nums text-muted">{duration}</span> : null}
@@ -193,6 +197,11 @@ function BulletinCard({ bulletin, live, onChanged }: { bulletin: BulletinRow; li
               readingLabel={duration ?? ''}
               deviceTts={tts}
               endpoint={`/public/bulletins/${bulletin.date}/${bulletin.slot}`}
+              track={{
+                kind: 'bulletin',
+                title: bulletin.slot_label_te || slotLabel(bulletin.slot),
+                subtitle: slotLabel(bulletin.slot),
+              }}
             />
           ) : (
             <ButtonLink to={bulletin.url} external variant="secondary" size="sm" icon={Play} iconRight={ExternalLink}>
@@ -307,7 +316,8 @@ function Desk({ data, date, onChanged }: { data: BulletinList; date: string; onC
               disabled={!data.enabled || run.isPending}
               onClick={() => run.mutate(slot)}
             >
-              {slotLabel(slot)}
+              {slotLabel(slot)}{' '}
+              <span lang="te">{data.slot_labels[slot]}</span>
             </Button>
           ))}
         </div>
@@ -348,8 +358,8 @@ export default function BulletinsPage() {
       title={t('admin.page.bulletins')}
       width="page"
       subtitle={L(
-        'రోజుకు ఆరు, ఉదయం 6 నుంచి రాత్రి 9 వరకు. అన్నీ ఇప్పటికే ప్రచురించిన వార్తలే కాబట్టి దానంతట ప్రసారమవుతాయి — పేరు తప్పు పలికితే స్క్రిప్ట్ మార్చండి, తప్పుంటే ఆపండి.',
-        'Six a day, 06:00 to 21:00. Each one reads stories that are already published, so it goes on air automatically — edit a script when a name is mispronounced, or pull one if something is wrong.',
+        'రోజుకు ఏడు, ఉదయం 7 నుంచి రాత్రి 9 వరకు. అన్నీ ఇప్పటికే ప్రచురించిన వార్తలే కాబట్టి దానంతట ప్రసారమవుతాయి — పేరు తప్పు పలికితే స్క్రిప్ట్ మార్చండి, తప్పుంటే ఆపండి.',
+        'Seven a day, 07:00 to 21:00. Each one reads stories that are already published, so it goes on air automatically — edit a script when a name is mispronounced, or pull one if something is wrong.',
       )}
     >
       <Field label={L('తేదీ', 'Date')} className="max-w-xs">

@@ -47,6 +47,7 @@ class HeuristicAi(AiProvider):
         source_url: str,
         language_in: str = "te",
         target_words: int = 220,
+        credit_source: bool = True,
     ) -> RewriteText:
         """Degrade to an excerpt and a credit — never invent reporting.
 
@@ -61,9 +62,11 @@ class HeuristicAi(AiProvider):
         checked anything.
         """
         excerpt = " ".join((body_text or "").split())[:400]
-        credit = f"మూలం: {publisher}"
-        if source_url:
-            credit = f"{credit} — {source_url}"
+        credit = ""
+        if credit_source:
+            credit = f"మూలం: {publisher}"
+            if source_url:
+                credit = f"{credit} — {source_url}"
         return RewriteText(
             title_te=(headline or "")[:400],
             summary_te=excerpt[:300],

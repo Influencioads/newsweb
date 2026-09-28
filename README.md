@@ -152,11 +152,11 @@ duration is picked from the system rather than invented:
 | Motion | `frontend/src/utils/motion.ts` (+ CSS keyframes) | `mobile/src/lib/motion.ts` (`useMotion`) |
 | Primitives | `frontend/src/components/ui/*` | `mobile/src/ui/*` |
 
-**Identity.** Peacock teal (`#0F5F57`) as the brand, champagne gold as the
-accent, ivory paper and charcoal ink, with urgency carried by a burnished
-amber — there is no red anywhere in the system, deliberately unlike the rest of
-the Telugu news market. Headlines and the wordmark are set in **Noto Serif
-Telugu**, body copy in **Noto Sans Telugu** (the most legible face at 19px on
+**Identity.** Taken from the logo (`frontend/public/logo.webp`, app
+`mobile/assets/images/logo.png`): its blue (`#0D47A1`) is the brand — buttons,
+links, active tabs — and its red (`#D0101A`) the accent, with breaking news in
+a deeper red, on a clean white page and cool neutral greys. Headlines are set
+in **Noto Serif Telugu**, body copy in **Noto Sans Telugu** (the most legible face at 19px on
 a mid-range Android), Latin display in **Fraunces** and Latin chrome in
 **Manrope**. All four are self-hosted variable WOFF2 files in
 `frontend/public/fonts` (the Telugu subsets keep U+200C–200D) and the same

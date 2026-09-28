@@ -28,7 +28,7 @@ from app.integrations.tts import TtsProvider, get_tts
 from app.models.audio import AudioAsset
 from app.models.content import Article
 from app.models.enums import AudioStatus
-from app.services import ai_usage_service, audio_concat, settings_service
+from app.services import ai_usage_service, audio_concat, settings_service, tts_text
 
 logger = get_logger(__name__)
 
@@ -49,20 +49,27 @@ DEFAULT_VOICE_SENTINEL = settings_service.DEFAULT_VOICE_SENTINEL
 
 
 def spoken_text(article: Article) -> str:
-    """What the listener actually hears: headline, then standfirst, then body.
+    """What the listener actually hears: headline, then standfirst, then body —
+    each once, and as read copy rather than print copy.
 
     Built from `body_plain` (already derived on every save) rather than from
     the Tiptap JSON, so captions, embed URLs and pull-quote duplication never
-    reach the synthesiser.
+    reach the synthesiser. `tts_text.assemble` then drops the summary when it
+    is the body's own first sentence, and rewrites the things a synthesiser
+    was measured to misread — the rupee sign, percentages, decimal lakhs,
+    ungrouped years, Latin abbreviations, and print breaks that buy no pause.
+
+    This is what `content_hash` is taken over, so a change to those rules
+    re-renders (and re-bills) every article the next time it is opened. That
+    is correct — the words changed — but it is why the rules are tied to
+    measured failures and not to taste.
     """
-    parts = [article.title_te or ""]
-    if article.sub_title_te:
-        parts.append(article.sub_title_te)
-    if article.summary_te:
-        parts.append(article.summary_te)
-    if article.body_plain:
-        parts.append(article.body_plain)
-    text = "\n\n".join(p.strip() for p in parts if p and p.strip())
+    text = tts_text.assemble(
+        article.title_te or "",
+        article.sub_title_te or "",
+        article.summary_te or "",
+        article.body_plain or "",
+    )
     if len(text) <= MAX_CHARS:
         return text
     clipped = text[:MAX_CHARS]
@@ -301,7 +308,7 @@ def synthesise_long(
     each segment returns, so a chunk that fails halfway still leaves behind what
     the vendor has already charged for the chunks before it.
     """
-    chunks = audio_concat.split_for_tts(text)
+    chunks = audio_concat.split_for_tts(text, max_chars=provider.max_chars)
     if not chunks:
         raise AiProviderError(details={"tts": "nothing to synthesise"})
 

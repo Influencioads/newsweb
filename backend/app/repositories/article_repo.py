@@ -42,6 +42,13 @@ def published_query() -> Select:
     return _with_relations(select(Article).where(and_(*published_filter())))
 
 
+def in_category(category_id: int):
+    """A section's stories: filed under it, or under it as their sub-section
+    (a sub-section's page otherwise lists nothing — stories carry the parent
+    in `category_id`)."""
+    return or_(Article.category_id == category_id, Article.subcategory_id == category_id)
+
+
 def latest(
     db: Session,
     *,
@@ -60,7 +67,7 @@ def latest(
 ) -> list[Article]:
     stmt = published_query()
     if category_id is not None:
-        stmt = stmt.where(Article.category_id == category_id)
+        stmt = stmt.where(in_category(category_id))
     if district_id is not None:
         stmt = stmt.where(Article.district_id == district_id)
     if mandal_id is not None:
@@ -328,7 +335,7 @@ def search(
 
     filters = [predicate]
     if category_id is not None:
-        filters.append(Article.category_id == category_id)
+        filters.append(in_category(category_id))
     if district_id is not None:
         filters.append(Article.district_id == district_id)
     if author_id is not None:
@@ -352,18 +359,22 @@ def search(
 def short_news(
     db: Session, *, limit: int = 20, offset: int = 0, category_id: int | None = None
 ) -> list[Article]:
-    """Quick-read feed (updated doc §14): stories carrying the ~40-word
-    standfirst (`summary_te`), newest first. The summary is written or reviewed
-    in the newsroom, so this feed inherits editorial approval by construction."""
+    """Short-news feed: items an editor marked `is_short` (a photo and a few
+    lines in `summary_te`), newest first. Publishing a short item requires both,
+    so the summary check only guards rows edited after going live."""
     stmt = (
         published_query()
-        .where(Article.summary_te.is_not(None), Article.summary_te != "")
+        .where(
+            Article.is_short.is_(True),
+            Article.summary_te.is_not(None),
+            Article.summary_te != "",
+        )
         .order_by(Article.published_at.desc(), Article.id.desc())
         .limit(limit)
         .offset(offset)
     )
     if category_id is not None:
-        stmt = stmt.where(Article.category_id == category_id)
+        stmt = stmt.where(in_category(category_id))
     return list(db.execute(stmt).unique().scalars())
 
 

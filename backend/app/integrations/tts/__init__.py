@@ -12,12 +12,14 @@ from app.integrations.tts.base import Synthesis, TtsProvider
 from app.integrations.tts.bhashini import BhashiniTts
 from app.integrations.tts.google import GoogleTts
 from app.integrations.tts.local import LocalTts
+from app.integrations.tts.sarvam import SarvamTts
 
 __all__ = [
     "AimlapiTts",
     "BhashiniTts",
     "GoogleTts",
     "LocalTts",
+    "SarvamTts",
     "Synthesis",
     "TtsProvider",
     "get_tts",
@@ -28,11 +30,12 @@ _PROVIDERS: dict[str, type[TtsProvider]] = {
     "google": GoogleTts,
     "bhashini": BhashiniTts,
     "aimlapi": AimlapiTts,
+    "sarvam": SarvamTts,
 }
 
 #: Adapters that take their credentials from the caller (the editable settings)
 #: rather than reading the environment themselves.
-_CONFIGURABLE = {"aimlapi"}
+_CONFIGURABLE = {"aimlapi", "sarvam"}
 
 
 def get_tts(

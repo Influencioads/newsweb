@@ -20,14 +20,22 @@ from app.db.seed import seed_permissions, seed_roles  # noqa: E402
 from app.db.seed_content import seed_categories  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.main import app  # noqa: E402
+from app.models.audio import AudioAsset  # noqa: E402
 from app.models.content import Article  # noqa: E402
-from app.models.enums import ArticleStatus, RoleKey, ScopeType, UserStatus, WorkflowState  # noqa: E402
+from app.models.enums import (  # noqa: E402
+    ArticleStatus,
+    AudioStatus,
+    RoleKey,
+    ScopeType,
+    UserStatus,
+    WorkflowState,
+)
 from app.models.epaper import EpaperAsset, EpaperEdition, EpaperPage, EpaperPageArticle  # noqa: E402
 from app.models.geo import District  # noqa: E402
 from app.models.media import Media  # noqa: E402
 from app.models.setting import AppSetting  # noqa: E402
 from app.models.user import Role, User, UserRole  # noqa: E402
-from app.services import auth_service, epaper_service, settings_service  # noqa: E402
+from app.services import auth_service, epaper_service, settings_service, tts_service  # noqa: E402
 
 engine = create_engine(
     "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool, future=True
@@ -72,7 +80,9 @@ def _isolate(db: Session) -> Iterator[None]:
 
 
 def _purge(db: Session) -> None:
-    for model in (EpaperPageArticle, EpaperPage, EpaperAsset, EpaperEdition, Article, AppSetting):
+    for model in (
+        EpaperPageArticle, EpaperPage, EpaperAsset, EpaperEdition, AudioAsset, Article, AppSetting
+    ):
         db.query(model).delete()
     db.commit()
     db.expunge_all()
@@ -181,6 +191,36 @@ def test_public_article_carries_print_fields(client: TestClient, db: Session) ->
     assert article["byline_te"] == "మా ప్రతినిధి" and article["dateline_te"] == "వరంగల్"
     assert article["hero_url"] == "https://cdn.example/hero.jpg"
     assert article["hero_caption_te"] == "ఫోటో వివరణ" and article["hero_credit"] == "PTI"
+
+
+def test_audio_playlist_skips_a_story_whose_voice_is_off(client: TestClient, db: Session) -> None:
+    """§20. Turning a story's voice off leaves its audio_asset_id in place, so
+    the edition queue must ask the switch too — otherwise the radio advances
+    straight into a file the story's own /audio route refuses to play."""
+    publish_stories(db, 2)
+    publish_edition(db)
+    settings_service.set_many(db, {"epaper.audio_enabled": True}, actor_id=None)
+    stories = db.scalars(select(Article).order_by(Article.short_id)).all()
+    for story in stories:
+        asset = AudioAsset(
+            article_id=story.id,
+            content_hash="upload-1",
+            status=AudioStatus.READY,
+            provider=tts_service.UPLOAD_PROVIDER,
+            url=f"https://cdn.example/{story.short_id}.mp3",
+        )
+        db.add(asset)
+        db.flush()
+        story.audio_asset_id = asset.id
+    db.commit()
+    playlist = f"/api/v1/epaper/{today()}/audio"
+    both = {t["short_id"] for t in client.get(playlist).json()["tracks"]}
+    assert both == {s.short_id for s in stories}
+
+    stories[1].voice_enabled = False
+    db.commit()
+    tracks = client.get(playlist).json()["tracks"]
+    assert [t["short_id"] for t in tracks] == [stories[0].short_id]
 
 
 def test_paragraphs_split_on_any_newline_strip_and_cap() -> None:

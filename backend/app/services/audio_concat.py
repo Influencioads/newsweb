@@ -52,9 +52,15 @@ def _byte_len(text: str) -> int:
 
 
 def split_for_tts(
-    text: str, *, max_bytes: int = MAX_UTF8_BYTES_PER_CALL
+    text: str, *, max_bytes: int = MAX_UTF8_BYTES_PER_CALL, max_chars: int = 0
 ) -> list[str]:
-    """Split `text` so every chunk fits `max_bytes` when UTF-8 encoded.
+    """Split `text` so every chunk fits `max_bytes` when UTF-8 encoded, and
+    `max_chars` characters where a provider declares one (0 means it does not).
+
+    Two units because the vendors use two: Google caps the request in bytes,
+    Sarvam caps it in characters, and for Telugu at three bytes a character
+    those are a factor of three apart. Enforcing only bytes passed Telugu and
+    then 422'd the first chunk that happened to be English.
 
     Breaks at the latest sentence boundary that still fits. A run of text with
     no boundary at all — which should not happen in real copy — is cut on a
@@ -64,19 +70,20 @@ def split_for_tts(
     text = (text or "").strip()
     if not text:
         return []
-    if _byte_len(text) <= max_bytes:
+    chars = max_chars if max_chars > 0 else len(text) + 1
+    if _byte_len(text) <= max_bytes and len(text) <= chars:
         return [text]
 
     chunks: list[str] = []
     rest = text
     while rest:
-        if _byte_len(rest) <= max_bytes:
+        if _byte_len(rest) <= max_bytes and len(rest) <= chars:
             chunks.append(rest.strip())
             break
 
         # Walk back from a generous character estimate until the slice fits.
         # 1 byte/char is the floor, so this cut is never past the limit.
-        window = rest[:max_bytes]
+        window = rest[: min(max_bytes, chars)]
         while _byte_len(window) > max_bytes:
             window = window[: int(len(window) * max_bytes / _byte_len(window))]
 

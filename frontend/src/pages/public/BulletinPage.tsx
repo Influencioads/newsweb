@@ -1,23 +1,34 @@
+import { useId } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Radio } from 'lucide-react';
+import { Play, Radio } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { AudioPlayer } from '@/components/article/AudioPlayer';
+import { Equalizer, PAUSED } from '@/components/player/parts';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { PageContainer, PageHeader } from '@/components/ui/Layout';
 import { EmptyState, QueryState, Skeleton } from '@/components/ui/State';
 import { useI18n, useScript } from '@/i18n';
+import { usePlayer, type Track } from '@/stores/player';
 import { cn } from '@/utils/cn';
 import { useDocumentTitle, useReveal } from '@/utils/motion';
 
 /**
- * Today's audio bulletins — six a day, 06:00 to 21:00.
+ * Today's audio bulletins — seven a day, 07:00 to 21:00, each with its own
+ * name (`slot_label_te`, set on the server).
  *
  * Only slots that are actually on air appear. A slot that has not been
  * produced yet, or one an editor pulled, simply is not in the list: a reader
  * has no use for the distinction between "not made yet" and "taken down".
+ *
+ * The on-air bulletins are one running order for the global player: "Play
+ * all", a tap on the radio dial, or any card's own listen control starts the
+ * day's queue at that bulletin, and the player carries on to the next. The
+ * dial shows all seven slots — off-air ones inert — with a needle that glides to
+ * the bulletin on air, or rests on the latest one when nothing plays.
  */
 
 interface BulletinSummary {
@@ -47,15 +58,141 @@ const NO_DEVICE_TTS = {
   stop: () => undefined,
 };
 
+/** The day's slots, in hours IST (`bulletin_service.SLOTS`); the dial spans the first to the last. */
+const SLOTS = [7, 9, 13, 15, 17, 19, 21];
+const FIRST = SLOTS[0]!;
+const SPAN = SLOTS[SLOTS.length - 1]! - FIRST;
+/** A tick every half hour; the ones on a slot's hour are drawn long. */
+const TICKS = SPAN * 2 + 1;
+
+const slotClock = (slot: number) => `${String(slot).padStart(2, '0')}:00`;
+const bulletinId = (date: string, slot: number) => `/public/bulletins/${date}/${slot}`;
+const dialLeft = (slot: number) => `${((slot - FIRST) / SPAN) * 100}%`;
+
 function clock(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
+/** The on-air bulletins, in running order, as player tracks. */
+function dayQueue(items: BulletinSummary[]): Track[] {
+  return items
+    .filter((b) => b.available && b.url && b.date != null && b.slot != null)
+    .sort((a, b) => a.slot! - b.slot!)
+    .map((b): Track => ({
+      id: bulletinId(b.date!, b.slot!),
+      kind: 'bulletin',
+      title: b.slot_label_te || slotClock(b.slot!),
+      subtitle: slotClock(b.slot!),
+      url: b.url!,
+      durationSec: b.duration_sec,
+    }));
+}
+
+function RadioDial({ date, queue }: { date: string; queue: Track[] }) {
+  const { t } = useI18n();
+  const s = useScript();
+  const headingId = useId();
+  const currentId = usePlayer((p) => p.queue[p.index]?.id);
+  const playing = usePlayer((p) => p.playing);
+  const { playQueue, toggle } = usePlayer.getState();
+
+  const slots = SLOTS.map((slot) => ({ slot, index: queue.findIndex((track) => track.id === bulletinId(date, slot)) }));
+  const onAir = slots.filter((entry) => entry.index >= 0);
+  const live = slots.find((entry) => entry.index >= 0 && queue[entry.index]?.id === currentId);
+  const needle = live?.slot ?? onAir[onAir.length - 1]?.slot ?? FIRST;
+
+  return (
+    <section
+      aria-labelledby={headingId}
+      className="-mx-4 mb-6 bg-ink px-4 py-3 text-on-ink shadow-raised sm:mx-0 sm:rounded-2xl sm:p-5"
+    >
+      <div className="flex flex-wrap items-center gap-3">
+        <span
+          aria-hidden
+          className={cn(
+            'h-2.5 w-2.5 shrink-0 rounded-pill',
+            live ? 'bg-exclusive animate-pulse' : 'bg-on-ink/30',
+            live && !playing && PAUSED,
+          )}
+        />
+        <h2 id={headingId} className={cn(s.body, 'min-w-0 flex-1 text-ui font-bold')}>
+          {t('player.dial')}
+        </h2>
+        <Button variant="inverse" icon={Play} disabled={!queue.length} onClick={() => playQueue(queue, 0)}>
+          {t('player.playAll')}
+        </Button>
+      </div>
+
+      {/* Edge slots centre on the ends of the scale, so the scale is inset by half a button.
+          Pixel math: the closest slots are 2h apart and each is a 44px (min-w-tap) target
+          centred on its hour, so the 14h scale needs ≥ 22px/h = 308px, plus 22px past each
+          end. Inside a 375px phone's gutters there is only 343 − 44 = 299px, hence the
+          edge-to-edge band: 375 − 44 = 331px, a 47px step (45px at 360). Labels drop the
+          ":00" there too ("07" is ~17px). From `sm` up the scale has 75px+ per step. */}
+      <div className="relative mx-1.5 mt-4 h-24 sm:mx-5">
+        <div aria-hidden className="absolute inset-x-0 top-0 flex h-5 items-start justify-between">
+          {Array.from({ length: TICKS }, (_, i) => (
+            <span
+              key={i}
+              className={cn(
+                'w-px',
+                SLOTS.includes(FIRST + i / 2) ? 'h-5 bg-on-ink/70' : i % 2 === 0 ? 'h-3 bg-on-ink/40' : 'h-2 bg-on-ink/25',
+              )}
+            />
+          ))}
+        </div>
+        <span
+          aria-hidden
+          className="absolute top-0 h-9 w-0.5 -translate-x-1/2 rounded-pill bg-exclusive transition-[left] duration-slow ease-emphasized"
+          style={{ left: dialLeft(needle) }}
+        />
+        <ol className="absolute inset-x-0 top-9">
+          {slots.map(({ slot, index }) => {
+            const available = index >= 0;
+            const current = available && queue[index]?.id === currentId;
+            return (
+              <li key={slot} className="absolute -translate-x-1/2" style={{ left: dialLeft(slot) }}>
+                <button
+                  type="button"
+                  disabled={!available}
+                  aria-current={current || undefined}
+                  // The one on air pauses and resumes, like Now Playing's queue; a restart would lose the place.
+                  onClick={() => (current ? toggle() : playQueue(queue, index))}
+                  className={cn(
+                    'flex min-h-tap min-w-tap flex-col items-center justify-center gap-0.5 rounded-xl px-1 font-sans text-ui-sm font-bold tabular-nums',
+                    'transition-colors duration-base ease-standard',
+                    available ? 'hover:bg-on-ink/10' : 'cursor-default opacity-40',
+                    current ? 'text-exclusive' : available ? 'text-on-ink' : 'text-muted-inverse',
+                  )}
+                >
+                  {/* The phone label drops ":00", so screen readers get the whole time, and the name, below. */}
+                  <span aria-hidden>
+                    {String(slot).padStart(2, '0')}
+                    <span className="hidden sm:inline">:00</span>
+                  </span>
+                  {current ? <Equalizer playing={playing} /> : <span aria-hidden className="h-3.5" />}
+                  <span className="sr-only">
+                    {slotClock(slot)}
+                    {' · '}
+                    {available ? <span lang="te">{queue[index]!.title}</span> : t('player.offAir')}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+    </section>
+  );
+}
+
 function BulletinCard({
   bulletin,
+  queue,
   revealRef,
 }: {
   bulletin: BulletinSummary;
+  queue: Track[];
   /** The page's single reveal observer — one per card means a batch of one. */
   revealRef: (el: HTMLElement | null) => void;
 }) {
@@ -71,6 +208,9 @@ function BulletinCard({
   return (
     <Card as="li" ref={revealRef} padding="md" className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
+        <span lang="en" className="font-sans text-ui-sm font-bold tabular-nums text-ink-soft">
+          {slotClock(bulletin.slot)}
+        </span>
         <h2 lang="te" className="th text-headline-sm font-bold text-ink">
           {bulletin.slot_label_te}
         </h2>
@@ -79,12 +219,19 @@ function BulletinCard({
         </Badge>
       </div>
 
-      {/* Same payload shape as an article's audio, so the one player fits. */}
+      {/* Same payload shape as an article's audio, so the one player fits; it
+          starts the day's running order here. */}
       <AudioPlayer
         shortId={`${bulletin.date}-${bulletin.slot}`}
         readingLabel={duration}
         deviceTts={NO_DEVICE_TTS}
-        endpoint={`/public/bulletins/${bulletin.date}/${bulletin.slot}`}
+        endpoint={bulletinId(bulletin.date, bulletin.slot)}
+        track={{
+          kind: 'bulletin',
+          title: bulletin.slot_label_te || slotClock(bulletin.slot),
+          subtitle: slotClock(bulletin.slot),
+        }}
+        queue={queue}
       />
 
       {/* The headlines below are the transcript. */}
@@ -140,8 +287,8 @@ export default function BulletinPage() {
         icon={Radio}
         title={L('ఆడియో వార్తలు', 'Audio news')}
         subtitle={L(
-          'ప్రతి మూడు గంటలకు మూడు నిమిషాల బులెటిన్ — ఉదయం ఆరు నుంచి రాత్రి తొమ్మిది వరకు.',
-          'A three-minute bulletin every three hours, from six in the morning to nine at night.',
+          'రోజుకు ఏడు బులెటిన్లు, ఒక్కొక్కటి మూడు నిమిషాలు — ఉదయం 7 నుంచి రాత్రి 9 వరకు.',
+          'Seven three-minute bulletins a day, from 7am to 9pm.',
         )}
       />
 
@@ -159,25 +306,33 @@ export default function BulletinPage() {
             icon={Radio}
             title={L('ప్రస్తుతం బులెటిన్ లేదు', 'No bulletin on air')}
             body={L(
-              'తదుపరిది మూడు గంటల స్లాట్ మొదట్లో వస్తుంది.',
-              'The next one is at the top of the next three-hour slot.',
+              'బులెటిన్లు ఉదయం 7, 9, మధ్యాహ్నం 1, 3, సాయంత్రం 5, రాత్రి 7, 9 గంటలకు వస్తాయి.',
+              'Bulletins go out at 7am, 9am, 1pm, 3pm, 5pm, 7pm and 9pm.',
             )}
           />
         }
       >
-        {(data) => (
-          <ul className="flex flex-col gap-4">
-            {data.items
-              .filter((bulletin) => bulletin.available)
-              .map((bulletin) => (
-                <BulletinCard
-                  key={`${bulletin.date}-${bulletin.slot}`}
-                  bulletin={bulletin}
-                  revealRef={reveal}
-                />
-              ))}
-          </ul>
-        )}
+        {(data) => {
+          const queue = dayQueue(data.items);
+          const date = data.date ?? data.items.find((b) => b.date)?.date ?? '';
+          return (
+            <>
+              <RadioDial date={date} queue={queue} />
+              <ul className="flex flex-col gap-4">
+                {data.items
+                  .filter((bulletin) => bulletin.available)
+                  .map((bulletin) => (
+                    <BulletinCard
+                      key={`${bulletin.date}-${bulletin.slot}`}
+                      bulletin={bulletin}
+                      queue={queue}
+                      revealRef={reveal}
+                    />
+                  ))}
+              </ul>
+            </>
+          );
+        }}
       </QueryState>
     </PageContainer>
   );

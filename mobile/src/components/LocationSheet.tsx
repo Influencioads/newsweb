@@ -1,39 +1,30 @@
 import { useQuery } from '@tanstack/react-query';
-import * as Location from 'expo-location';
 import { useMemo, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 
 import * as publicApi from '@/api/public';
+import * as readerApi from '@/api/reader';
 import { useI18n } from '@/lib/i18n';
 import { space } from '@/lib/theme';
 import { makeStyles } from '@/lib/useTheme';
+import { useAuth } from '@/stores/auth';
 import { usePrefs } from '@/stores/prefs';
 import { BottomSheet } from '@/ui/BottomSheet';
 import { Button } from '@/ui/Button';
 import { Chip, ChipRail } from '@/ui/Chip';
 import { T } from '@/ui/Text';
-import { useToast } from '@/ui/Toast';
 
 /**
  * Where the reader wants their news from: state → district → mandal → village.
  *
- * **One cascade, three places.** The local tab and the profile screen each had
- * their own copy of these rails, neither of them offering the village level
- * even though the server has stored and served it all along. This is the only
- * one now, and the article bar mounts it too, so a reader can change where
- * their news comes from from any story rather than only from one tab.
+ * **One cascade, every place.** The local tab mounts the rails inline; the
+ * home header, the article bar and the profile screen open them in a sheet.
+ * There is no second copy to keep in step.
  *
- * **The GPS button is a prefill, not a decision.** It resolves a position to
- * our own places and drops them into the rails; the reader still sees what was
- * picked and can change it before anything is saved. That is the honest UX for
- * a guess, and it means a wrong match costs a tap rather than a wrong feed.
- * Nothing about the position is stored or sent anywhere else — the server
- * exchanges it for ids and discards it.
- *
- * Permission refused, no key configured, a point outside the two states, a
- * mandal nobody has seeded yet: every one of those ends with the rails still
- * sitting there, which is why the manual path is the primary one and the
- * button is the shortcut.
+ * **The reader chooses; nothing is guessed.** There is no GPS path and no
+ * geocoding — every level is a chip the reader tapped. A signed-in reader's
+ * choice is also written to their server preferences, because local push
+ * targets the district stored there.
  */
 
 export type LocationLevels = 'district' | 'mandal' | 'locality';
@@ -47,8 +38,7 @@ const useStyles = makeStyles(() => ({
   pickers: { gap: space.md, paddingVertical: space.sm },
   picker: { gap: space.xs },
   label: { paddingHorizontal: space.lg },
-  locate: { paddingHorizontal: space.lg, paddingTop: space.xs },
-  hint: { paddingHorizontal: space.lg },
+  done: { paddingHorizontal: space.lg, paddingTop: space.sm },
 }));
 
 /** One labelled single-select rail. */
@@ -67,16 +57,26 @@ function Picker({ label, children }: { label: string; children: ReactNode }) {
 export function LocationRails({ levels = 'locality' }: LocationRailsProps) {
   const styles = useStyles();
   const { t, pick } = useI18n();
-  const toast = useToast();
+  const authed = useAuth((s) => s.status === 'authenticated');
   const edition = usePrefs((s) => s.edition);
   const mandal = usePrefs((s) => s.mandal);
   const locality = usePrefs((s) => s.locality);
   const setEdition = usePrefs((s) => s.setEdition);
   const setMandal = usePrefs((s) => s.setMandal);
   const setLocality = usePrefs((s) => s.setLocality);
-  const setPlace = usePrefs((s) => s.setPlace);
   const [stateCode, setStateCode] = useState('');
-  const [locating, setLocating] = useState(false);
+
+  // Apply locally first (the feeds follow at once), then mirror a signed-in
+  // reader's place to the server. Fire and forget: a failed write only costs
+  // local push until the next choice.
+  function choose(change: () => void) {
+    change();
+    if (!authed) return;
+    const p = usePrefs.getState();
+    readerApi
+      .updatePreferences({ district_slug: p.edition, mandal_slug: p.mandal, locality_slug: p.locality })
+      .catch(() => undefined);
+  }
 
   const config = useQuery({
     queryKey: ['config'],
@@ -84,10 +84,12 @@ export function LocationRails({ levels = 'locality' }: LocationRailsProps) {
     staleTime: 300_000,
   });
 
-  const effectiveState = useMemo(() => {
-    if (stateCode) return stateCode;
-    return config.data?.districts.find((d) => d.slug === edition)?.state ?? 'AP';
-  }, [stateCode, config.data, edition]);
+  // A chosen district's state wins over the tapped one: another rail (the home
+  // sheet, the local tab) may have moved the district since this one's tap.
+  const effectiveState = useMemo(
+    () => config.data?.districts.find((d) => d.slug === edition)?.state || stateCode || 'AP',
+    [stateCode, config.data, edition],
+  );
 
   const districts = useMemo(
     () => (config.data?.districts ?? []).filter((d) => d.state === effectiveState),
@@ -109,51 +111,8 @@ export function LocationRails({ levels = 'locality' }: LocationRailsProps) {
     staleTime: 3_600_000,
   });
 
-  async function locate() {
-    setLocating(true);
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        toast.error(t('local.locationDenied'));
-        return;
-      }
-      const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      const place = await publicApi.resolveGeo(
-        position.coords.latitude,
-        position.coords.longitude,
-      );
-      if (!place.matched || !place.district) {
-        toast.error(t('local.locationFailed'));
-        return;
-      }
-      setStateCode(place.state_code ?? '');
-      setPlace({
-        edition: place.district.slug,
-        mandal: place.mandal?.slug ?? null,
-        locality: place.locality?.slug ?? null,
-      });
-    } catch {
-      toast.error(t('local.locationFailed'));
-    } finally {
-      setLocating(false);
-    }
-  }
-
   return (
     <View style={styles.pickers}>
-      <View style={styles.locate}>
-        <Button
-          variant="secondary"
-          icon="place"
-          label={locating ? t('local.locating') : t('local.useMyLocation')}
-          pending={locating}
-          full
-          onPress={() => void locate()}
-        />
-      </View>
-
       <Picker label={t('local.state')}>
         {(config.data?.states ?? []).map((s) => (
           <Chip
@@ -163,7 +122,8 @@ export function LocationRails({ levels = 'locality' }: LocationRailsProps) {
             selected={effectiveState === s.code}
             onPress={() => {
               setStateCode(s.code);
-              setEdition(null);
+              // Re-tapping the district's own state keeps the place.
+              if (edition && effectiveState !== s.code) choose(() => setEdition(null));
             }}
           />
         ))}
@@ -177,7 +137,7 @@ export function LocationRails({ levels = 'locality' }: LocationRailsProps) {
               role="radio"
               label={pick(d.name_te, d.name_en)}
               selected={edition === d.slug}
-              onPress={() => setEdition(edition === d.slug ? null : d.slug)}
+              onPress={() => choose(() => setEdition(edition === d.slug ? null : d.slug))}
             />
           ))}
         </Picker>
@@ -189,7 +149,7 @@ export function LocationRails({ levels = 'locality' }: LocationRailsProps) {
             role="radio"
             label={t('local.all')}
             selected={!mandal}
-            onPress={() => setMandal(null)}
+            onPress={() => choose(() => setMandal(null))}
           />
           {mandals.data.map((m) => (
             <Chip
@@ -197,7 +157,7 @@ export function LocationRails({ levels = 'locality' }: LocationRailsProps) {
               role="radio"
               label={pick(m.name_te, m.name_en)}
               selected={mandal === m.slug}
-              onPress={() => setMandal(mandal === m.slug ? null : m.slug)}
+              onPress={() => choose(() => setMandal(mandal === m.slug ? null : m.slug))}
             />
           ))}
         </Picker>
@@ -209,7 +169,7 @@ export function LocationRails({ levels = 'locality' }: LocationRailsProps) {
             role="radio"
             label={t('local.all')}
             selected={!locality}
-            onPress={() => setLocality(null)}
+            onPress={() => choose(() => setLocality(null))}
           />
           {localities.data.map((l) => (
             <Chip
@@ -217,7 +177,7 @@ export function LocationRails({ levels = 'locality' }: LocationRailsProps) {
               role="radio"
               label={pick(l.name_te, l.name_en)}
               selected={locality === l.slug}
-              onPress={() => setLocality(locality === l.slug ? null : l.slug)}
+              onPress={() => choose(() => setLocality(locality === l.slug ? null : l.slug))}
             />
           ))}
         </Picker>
@@ -227,10 +187,51 @@ export function LocationRails({ levels = 'locality' }: LocationRailsProps) {
 }
 
 export function LocationSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const styles = useStyles();
   const { t } = useI18n();
   return (
     <BottomSheet open={open} onClose={onClose} title={t('local.choosePlace')}>
       <LocationRails levels="locality" />
+      <View style={styles.done}>
+        <Button label={t('ui.done')} icon="check" full onPress={onClose} />
+      </View>
     </BottomSheet>
   );
+}
+
+/**
+ * The finest place the reader has chosen, in their language — what a button
+ * that opens the sheet says. Shares the rails' query keys, and only asks for
+ * the mandal/village lists when those levels are actually set.
+ */
+export function usePlaceName(): string | null {
+  const { pick } = useI18n();
+  const edition = usePrefs((s) => s.edition);
+  const mandal = usePrefs((s) => s.mandal);
+  const locality = usePrefs((s) => s.locality);
+
+  const config = useQuery({
+    queryKey: ['config'],
+    queryFn: publicApi.fetchSiteConfig,
+    staleTime: 300_000,
+  });
+  const mandals = useQuery({
+    queryKey: ['mandals', edition],
+    queryFn: () => publicApi.fetchDistrictMandals(edition!),
+    enabled: Boolean(edition && mandal),
+    staleTime: 3_600_000,
+  });
+  const mandalRow = mandals.data?.find((m) => m.slug === mandal);
+  const localities = useQuery({
+    queryKey: ['localities', mandalRow?.id],
+    queryFn: () => publicApi.fetchMandalLocalities(mandalRow!.id),
+    enabled: Boolean(mandalRow && locality),
+    staleTime: 3_600_000,
+  });
+
+  const place =
+    localities.data?.find((l) => l.slug === locality) ??
+    mandalRow ??
+    config.data?.districts.find((d) => d.slug === edition);
+  return place ? pick(place.name_te, place.name_en) : null;
 }

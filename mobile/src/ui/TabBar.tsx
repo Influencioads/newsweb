@@ -1,8 +1,9 @@
 import type { BottomTabBarProps } from 'expo-router/build/react-navigation/bottom-tabs';
 import { useEffect, useRef, useState } from 'react';
-import { Keyboard, Platform, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
+import { MiniPlayer, useKeyboardShown } from '@/components/player/MiniPlayer';
 import { SPRING, useMotion } from '@/lib/motion';
 import { radius, space } from '@/lib/theme';
 import { makeStyles, useColors } from '@/lib/useTheme';
@@ -17,6 +18,10 @@ import { T } from '@/ui/Text';
  * icon comes from each screen's `tabBarIcon` option (a `<TabIcon>`), the
  * label from its `title` (already localised by the layout) and the badge from
  * `tabBarBadge`. Hidden while the keyboard is up.
+ *
+ * While audio is loaded, the global player's dock (MiniPlayer) rides on top
+ * of the tab row, in flow — so the tab screens shrink to make room for it
+ * rather than being covered by it.
  */
 export const TAB_BAR_HEIGHT = 56;
 
@@ -25,21 +30,10 @@ export function TabBar({ state, descriptors, navigation, insets }: BottomTabBarP
   const color = useColors();
   const m = useMotion();
   const [width, setWidth] = useState(0);
-  const [keyboard, setKeyboard] = useState(false);
+  const keyboard = useKeyboardShown();
   const x = useSharedValue(0);
   const settled = useRef(false);
   const tabWidth = state.routes.length ? width / state.routes.length : 0;
-
-  useEffect(() => {
-    // iOS announces the slide-in ahead of time; Android only has the Did* pair.
-    const ios = Platform.OS === 'ios';
-    const show = Keyboard.addListener(ios ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboard(true));
-    const hide = Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboard(false));
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
 
   useEffect(() => {
     if (!tabWidth) return;
@@ -54,60 +48,63 @@ export function TabBar({ state, descriptors, navigation, insets }: BottomTabBarP
   if (keyboard) return null;
 
   return (
-    <View
-      style={[styles.bar, { height: TAB_BAR_HEIGHT + insets.bottom, paddingBottom: insets.bottom }]}
-      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
-    >
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.pill, { width: Math.max(0, tabWidth - space.lg) }, pill]}
-      />
-      <View style={styles.row} accessibilityRole="tablist">
-        {state.routes.map((route, index) => {
-          const focused = index === state.index;
-          const { options } = descriptors[route.key];
-          const label =
-            typeof options.tabBarLabel === 'string'
-              ? options.tabBarLabel
-              : (options.title ?? route.name);
-          const tint = focused ? color.brand : color.muted;
-          const badge = options.tabBarBadge;
-          const hasBadge = badge !== undefined && badge !== null && badge !== '';
-          return (
-            <PressableScale
-              key={route.key}
-              haptic="select"
-              accessibilityRole="tab"
-              accessibilityLabel={options.tabBarAccessibilityLabel ?? (hasBadge ? `${label}, ${badge}` : label)}
-              accessibilityState={{ selected: focused }}
-              testID={options.tabBarButtonTestID}
-              style={styles.tab}
-              onPress={() => {
-                const event = navigation.emit({
-                  type: 'tabPress',
-                  target: route.key,
-                  canPreventDefault: true,
-                });
-                if (!focused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
-              }}
-              onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
-            >
-              <View style={styles.icon}>
-                {options.tabBarIcon?.({ focused, color: tint, size: 24 })}
-                {hasBadge ? (
-                  <View style={styles.badge}>
-                    <T variant="meta" weight="semibold" color="onBrand" lang="en">
-                      {String(badge)}
-                    </T>
-                  </View>
-                ) : null}
-              </View>
-              <T variant="meta" weight="semibold" color={focused ? 'brand' : 'muted'} numberOfLines={1}>
-                {label}
-              </T>
-            </PressableScale>
-          );
-        })}
+    <View>
+      <MiniPlayer placement="tabs" />
+      <View
+        style={[styles.bar, { height: TAB_BAR_HEIGHT + insets.bottom, paddingBottom: insets.bottom }]}
+        onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      >
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.pill, { width: Math.max(0, tabWidth - space.lg) }, pill]}
+        />
+        <View style={styles.row} accessibilityRole="tablist">
+          {state.routes.map((route, index) => {
+            const focused = index === state.index;
+            const { options } = descriptors[route.key];
+            const label =
+              typeof options.tabBarLabel === 'string'
+                ? options.tabBarLabel
+                : (options.title ?? route.name);
+            const tint = focused ? color.brand : color.muted;
+            const badge = options.tabBarBadge;
+            const hasBadge = badge !== undefined && badge !== null && badge !== '';
+            return (
+              <PressableScale
+                key={route.key}
+                haptic="select"
+                accessibilityRole="tab"
+                accessibilityLabel={options.tabBarAccessibilityLabel ?? (hasBadge ? `${label}, ${badge}` : label)}
+                accessibilityState={{ selected: focused }}
+                testID={options.tabBarButtonTestID}
+                style={styles.tab}
+                onPress={() => {
+                  const event = navigation.emit({
+                    type: 'tabPress',
+                    target: route.key,
+                    canPreventDefault: true,
+                  });
+                  if (!focused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
+                }}
+                onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
+              >
+                <View style={styles.icon}>
+                  {options.tabBarIcon?.({ focused, color: tint, size: 24 })}
+                  {hasBadge ? (
+                    <View style={styles.badge}>
+                      <T variant="meta" weight="semibold" color="onBrand" lang="en">
+                        {String(badge)}
+                      </T>
+                    </View>
+                  ) : null}
+                </View>
+                <T variant="meta" weight="semibold" color={focused ? 'brand' : 'muted'} numberOfLines={1}>
+                  {label}
+                </T>
+              </PressableScale>
+            );
+          })}
+        </View>
       </View>
     </View>
   );

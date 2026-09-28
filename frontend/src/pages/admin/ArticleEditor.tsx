@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Save, X } from 'lucide-react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { ImagePlus, Save, X } from 'lucide-react';
 
 import { ApiError } from '@/api/client';
 import { AdminPage } from '@/components/admin/AdminPage';
 import { Section } from '@/components/admin/FormControls';
+import { SocialCardDialog } from '@/components/admin/SocialCardDialog';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useConfirm } from '@/components/ui/Dialog';
@@ -20,6 +21,7 @@ import { AssistPanel } from './editor/AssistPanel';
 import { ConvertPanel } from './editor/ConvertPanel';
 import { EngagementPanel } from './editor/EngagementPanel';
 import { MetaSidebar } from './editor/MetaSidebar';
+import { OriginCompare } from './editor/OriginCompare';
 import { EMPTY_FORM, fieldError, fromArticle, toPayload, wordCount, type ArticleForm } from './editor/form';
 import { useL } from './useL';
 
@@ -48,6 +50,9 @@ function EditorSkeleton() {
 export default function ArticleEditor() {
   const { id } = useParams();
   const editing = Boolean(id);
+  // /admin/articles/new?short=1 — the Articles list's "New short news" button.
+  const [params] = useSearchParams();
+  const startShort = !editing && params.get('short') === '1';
   const nav = useNavigate();
   const { t } = useI18n();
   const L = useL();
@@ -56,6 +61,9 @@ export default function ArticleEditor() {
   const can = useAuth((st) => st.can);
   // Choosing what leads the home page is publish authority, not edit authority.
   const canPin = can('article.publish');
+  // The card endpoints bill and gate like the §17 image: edit or edit_own.
+  const canCard = editing && (can('article.edit') || can('article.edit_own'));
+  const [cardOpen, setCardOpen] = useState(false);
 
   const existing = useQuery({
     queryKey: ['cms', 'article', id],
@@ -69,10 +77,11 @@ export default function ArticleEditor() {
   const set = (patch: Partial<ArticleForm>) => setForm((f) => ({ ...f, ...patch }));
 
   useEffect(() => {
-    const next = existing.data ? fromArticle(existing.data) : EMPTY_FORM;
+    // Preset on both, so a fresh short form does not count as unsaved.
+    const next = existing.data ? fromArticle(existing.data) : { ...EMPTY_FORM, isShort: startShort };
     setForm(next);
     setBaseline(next);
-  }, [existing.data]);
+  }, [existing.data, startShort]);
 
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(baseline), [form, baseline]);
 
@@ -108,9 +117,10 @@ export default function ArticleEditor() {
     }
   }
 
-  const title = editing ? t('admin.page.editArticle') : t('admin.page.newArticle');
+  const title = editing ? t('admin.page.editArticle') : form.isShort ? t('admin.page.newShort') : t('admin.page.newArticle');
   const categories = options.data?.categories ?? [];
   const words = wordCount(form.body);
+  const shortWords = wordCount(form.summary);
 
   const editor = (
     <form onSubmit={submit} className="space-y-7 md:space-y-10">
@@ -127,17 +137,51 @@ export default function ArticleEditor() {
               <Field label={L('ఉప శీర్షిక', 'Sub-headline')} optionalLabel error={errors('sub_title_te')}>
                 <Input script="te" value={form.subTitle} onChange={(e) => set({ subTitle: e.target.value })} />
               </Field>
-              <Field label={L('సారాంశం', 'Standfirst')} hint={L('సుమారు 40 పదాలు', 'About 40 words')} error={errors('summary_te')}>
-                <Textarea script="te" autoGrow rows={3} value={form.summary} onChange={(e) => set({ summary: e.target.value })} />
-              </Field>
-              <Field label={L('కథనం', 'Body')} required error={errors('body')}>
-                <Textarea script="te" required rows={16} value={form.body} onChange={(e) => set({ body: e.target.value })} />
+              {/* A short item is its photo and this text; the body is optional
+                  and, when present, gives the swipe card its "Read full" button.
+                  ~40 words is what the app card holds beside its photo on a
+                  390pt phone; past that the card ends in an ellipsis. */}
+              {form.isShort ? (
+                <Field
+                  label={L('చిన్న వార్త', 'Short text')}
+                  required
+                  hint={`${shortWords} / ~40 ${t('admin.wordCount')} · ${L('ప్రచురణకు ప్రధాన ఫోటో తప్పనిసరి', 'A hero photo is required to publish')}`}
+                  error={errors('summary_te')}
+                >
+                  <Textarea script="te" required autoGrow rows={5} value={form.summary} onChange={(e) => set({ summary: e.target.value })} />
+                </Field>
+              ) : (
+                <Field label={L('సారాంశం', 'Standfirst')} hint={L('సుమారు 40 పదాలు', 'About 40 words')} error={errors('summary_te')}>
+                  <Textarea script="te" autoGrow rows={3} value={form.summary} onChange={(e) => set({ summary: e.target.value })} />
+                </Field>
+              )}
+              <Field
+                label={L('కథనం', 'Body')}
+                required={!form.isShort}
+                optionalLabel
+                hint={form.isShort ? L('ఉంటే "పూర్తి కథనం" బటన్ కనిపిస్తుంది', 'If filled, readers get a "Read full" button') : undefined}
+                error={errors('body')}
+              >
+                <Textarea script="te" required={!form.isShort} rows={form.isShort ? 6 : 16} value={form.body} onChange={(e) => set({ body: e.target.value })} />
               </Field>
               <p className="font-sans text-meta tabular-nums text-muted">
                 {words} {t('admin.wordCount')}
               </p>
             </Section>
           </div>
+
+          {/* §17 — the publisher's original beside ours, for the person about
+              to approve it. Only the crawler's two types have an original
+              behind them; for anything else the endpoint 404s. Its permission
+              is review-or-view, which view_own alone does not satisfy. */}
+          {editing
+          && (existing.data?.article_type === 'AI_REWRITE' || existing.data?.article_type === 'SYNDICATED')
+          && (can('article.review') || can('article.view')) ? (
+            <OriginCompare
+              articleId={Number(id)}
+              ours={{ title: form.title, summary: form.summary, body: form.body }}
+            />
+          ) : null}
 
           {/* Voice and share card. Only for a saved story — both endpoints
               take an article id — and only for someone the endpoints will let
@@ -228,13 +272,18 @@ export default function ArticleEditor() {
 
       {save.isError ? <ErrorState compact error={save.error} /> : null}
 
-      <div className="glass sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-rule px-4 py-3 md:-mx-6 md:px-6">
+      <div className="glass sticky bottom-dock z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-rule px-4 py-3 md:-mx-6 md:px-6">
         <Button type="submit" icon={Save} pending={save.isPending}>
           {save.isPending ? t('ui.saving') : L('డ్రాఫ్ట్ సేవ్ చేయండి', 'Save draft')}
         </Button>
         <Button variant="secondary" icon={X} onClick={() => void cancel()} disabled={save.isPending}>
           {t('ui.cancel')}
         </Button>
+        {canCard ? (
+          <Button variant="secondary" icon={ImagePlus} onClick={() => setCardOpen(true)}>
+            {L('న్యూస్ కార్డ్', 'News card')}
+          </Button>
+        ) : null}
         {dirty ? <Badge tone="partial">{t('admin.unsaved')}</Badge> : null}
         <span className="ml-auto font-sans text-meta tabular-nums text-muted">
           {words} {t('admin.wordCount')}
@@ -253,6 +302,18 @@ export default function ArticleEditor() {
         editor
       )}
       {dialog}
+      {canCard ? (
+        <SocialCardDialog
+          open={cardOpen}
+          onClose={() => setCardOpen(false)}
+          articleId={Number(id)}
+          title={form.title}
+          summary={form.summary || null}
+          // The server draws the SAVED hero, not an unsaved pick in the form.
+          hasHero={Boolean(existing.data?.hero_media)}
+          categoryName={categories.find((c) => c.id === form.categoryId)?.name_te ?? null}
+        />
+      ) : null}
     </AdminPage>
   );
 }

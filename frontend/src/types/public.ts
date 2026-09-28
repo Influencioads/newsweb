@@ -10,6 +10,8 @@ export interface MediaOut {
   /** Attribution line, e.g. "Creator / Wikimedia Commons (CC BY 4.0)" (§12.5). */
   credit: string | null;
   license_label: string | null;
+  /** A stand-in, not a picture of the event — cards must badge it. */
+  representative: boolean;
   /** Original landing page — CC-BY requires a link back where practical. */
   source_url: string | null;
   width: number | null;
@@ -288,6 +290,8 @@ export interface SiteConfig {
   categories: NavCategoryOut[];
   states: StateOut[];
   districts: DistrictOut[];
+  /** Admin-set #rrggbb colours; see utils/brand.ts. */
+  brand?: { primary?: string; breaking?: string; accent?: string };
 }
 
 /** What `GET /public/articles/{short_id}/formats` reports. */

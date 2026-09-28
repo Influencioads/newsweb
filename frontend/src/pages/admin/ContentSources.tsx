@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { Pause, Pencil, Play, Plus, RefreshCw, Rss, Trash2 } from 'lucide-react';
 
 import { AdminPage } from '@/components/admin/AdminPage';
 import { DataTable, type DataTableColumn } from '@/components/admin/DataTable';
 import { StatusPill } from '@/components/admin/StatusPill';
+import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Chip, ChipRail } from '@/components/ui/Chip';
@@ -15,11 +17,13 @@ import { useToast } from '@/components/ui/Toast';
 import * as cmsApi from '@/features/cms/api';
 import { statusEntry } from '@/features/cms/status';
 import { useI18n } from '@/i18n';
+import { useAuth } from '@/stores/auth';
 import type { ContentSource, IngestStatus, IngestedItem } from '@/types/cms';
 import { useReveal } from '@/utils/motion';
 
 import { CoverageTab } from './sources/CoverageTab';
-import { LICENCES } from './sources/labels';
+import { CrawlSettingsTab } from './sources/CrawlSettingsTab';
+import { BEATS, LICENCES } from './sources/labels';
 import { LicenceBadge, QueueItem } from './sources/QueueItem';
 import { SourceFormDialog } from './sources/SourceFormDialog';
 
@@ -38,7 +42,7 @@ import { SourceFormDialog } from './sources/SourceFormDialog';
  * and there must not be one.
  */
 
-type View = 'queue' | 'sources' | 'coverage';
+type View = 'queue' | 'sources' | 'coverage' | 'crawl';
 const QUEUE_STATUSES: IngestStatus[] = ['new', 'imported', 'rejected', 'duplicate'];
 
 export default function ContentSourcesPage() {
@@ -48,11 +52,19 @@ export default function ContentSourcesPage() {
   const queryClient = useQueryClient();
   const { confirm, dialog } = useConfirm();
   const reveal = useReveal<HTMLLIElement>();
-  const [view, setView] = useState<View>('queue');
+  // `?tab=crawl` is how the Settings page links straight to the crawl settings.
+  const [params] = useSearchParams();
+  const [view, setView] = useState<View>(() => {
+    const tab = params.get('tab');
+    return tab === 'sources' || tab === 'coverage' || tab === 'crawl' ? tab : 'queue';
+  });
   const [queueStatus, setQueueStatus] = useState<IngestStatus>('new');
   const [form, setForm] = useState<{ open: boolean; source: ContentSource | null }>({ open: false, source: null });
 
+  const canSeeSettings = useAuth((s) => s.can)('settings.view');
   const sources = useQuery({ queryKey: ['cms', 'sources'], queryFn: cmsApi.fetchSources });
+  // District names for the table; the source form reads the same cache.
+  const options = useQuery({ queryKey: ['cms', 'editor-options'], queryFn: cmsApi.fetchEditorOptions });
   const queue = useQuery({
     queryKey: ['cms', 'ingest-queue', queueStatus],
     queryFn: () => cmsApi.fetchIngestQueue(queueStatus),
@@ -164,6 +176,33 @@ export default function ContentSourcesPage() {
     },
     { key: 'keeps', header: L('భద్రపరచేది', 'Keeps'), render: (source) => <LicenceBadge source={source} /> },
     {
+      key: 'beat',
+      header: L('బీట్', 'Beat'),
+      hideBelow: 'md',
+      render: (source) => {
+        const beat = BEATS.find((b) => b.value === source.beat);
+        return beat ? L(beat.te, beat.en) : source.beat;
+      },
+    },
+    {
+      key: 'district',
+      header: L('జిల్లా', 'District'),
+      hideBelow: 'lg',
+      render: (source) => {
+        const district = options.data?.districts.find((d) => d.id === source.default_district_id);
+        return district ? L(district.name_te, district.name_en) : '—';
+      },
+    },
+    {
+      key: 'interval',
+      header: L('విరామం', 'Interval'),
+      hideBelow: 'lg',
+      align: 'right',
+      render: (source) => (
+        <span className="font-sans tabular-nums">{L(`${source.fetch_interval_minutes} ని.`, `${source.fetch_interval_minutes} min`)}</span>
+      ),
+    },
+    {
       key: 'checked',
       header: L('చివరి తనిఖీ', 'Last checked'),
       hideBelow: 'lg',
@@ -183,7 +222,27 @@ export default function ContentSourcesPage() {
     {
       key: 'active',
       header: L('స్థితి', 'Status'),
-      render: (source) => <StatusPill status={source.is_active ? 'active' : 'paused'} />,
+      render: (source) => {
+        const limit = sources.data?.failure_limit ?? 8;
+        return (
+          <>
+            <StatusPill status={source.is_active ? 'active' : 'paused'} />
+            {source.is_active && source.consecutive_failures >= limit ? (
+              <span
+                className="mt-1 block"
+                title={L(
+                  'వరుస వైఫల్యాల వల్ల క్రాల్ ఈ మూలాన్ని తనిఖీ చేయడం ఆపింది. "ఇప్పుడే తెండి" (↻) నొక్కండి — ఫీడ్ స్పందిస్తే లెక్క సున్నా అయి మళ్లీ మొదలవుతుంది.',
+                  'The crawl stopped polling this source after repeated failures. Press Fetch now (↻) — once the feed answers, the count resets and polling resumes.',
+                )}
+              >
+                <Badge tone="breaking" size="xs">
+                  {L(`${source.consecutive_failures} వైఫల్యాల తర్వాత ఆగింది`, `Stopped after ${source.consecutive_failures} failures`)}
+                </Badge>
+              </span>
+            ) : null}
+          </>
+        );
+      },
     },
   ];
   const rowKey = (source: ContentSource) => source.id;
@@ -213,6 +272,7 @@ export default function ContentSourcesPage() {
           { key: 'queue', label: L('క్యూ', 'Queue'), count: counts?.new ?? 0 },
           { key: 'sources', label: L('మూలాలు', 'Sources'), count: sources.data?.total ?? 0 },
           { key: 'coverage', label: L('కవరేజ్', 'Coverage') },
+          ...(canSeeSettings ? [{ key: 'crawl', label: t('admin.page.crawlSettings') }] : []),
         ]}
         value={view}
         onChange={(key) => setView(key as View)}
@@ -283,6 +343,10 @@ export default function ContentSourcesPage() {
       ) : view === 'coverage' ? (
         <div role="tabpanel" aria-label={L('కవరేజ్', 'Coverage')}>
           <CoverageTab />
+        </div>
+      ) : view === 'crawl' && canSeeSettings ? (
+        <div role="tabpanel" aria-label={t('admin.page.crawlSettings')}>
+          <CrawlSettingsTab />
         </div>
       ) : (
         <div role="tabpanel" aria-label={L('మూలాలు', 'Sources')}>

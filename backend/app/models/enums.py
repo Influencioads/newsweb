@@ -488,7 +488,7 @@ class JobState(StrEnum):
 
 
 class BulletinStatus(StrEnum):
-    """Where a three-hourly audio bulletin has got to.
+    """Where an audio bulletin has got to.
 
     `SKIPPED` is a real outcome, not a failure: a slot with no published
     stories in its window should produce nothing rather than a bulletin that

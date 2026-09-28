@@ -194,6 +194,20 @@ export function MediaPicker({ heroId, hero, gallery, onHeroChange, onGalleryChan
                   {L('క్రెడిట్:', 'Credit:')} {hero.credit}
                 </p>
               ) : null}
+              {/* Where an imported photo came from and what the page will
+                  print under it. Without this an open-licence Commons photo
+                  looks exactly like a staff photograph to the approver. */}
+              {hero?.licence ? (
+                <p className={cn(s.body, 'text-meta text-muted')}>
+                  {L('లైసెన్స్:', 'Licence:')} {hero.licence}
+                  {hero.source_type ? ` · ${hero.source_type}` : ''}
+                </p>
+              ) : null}
+              {hero?.caption_te ? (
+                <p lang="te" className={cn(s.body, 'te text-meta text-muted')}>
+                  {L('శీర్షిక:', 'Caption:')} {hero.caption_te}
+                </p>
+              ) : null}
               <Button variant="secondary" size="sm" icon={Trash2} onClick={() => onHeroChange(null)}>
                 {t('ui.remove')}
               </Button>

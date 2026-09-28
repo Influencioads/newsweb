@@ -29,6 +29,7 @@ export interface ArticleForm {
   isBreaking: boolean;
   isExclusive: boolean;
   isFeatured: boolean;
+  isShort: boolean;
   voiceEnabled: boolean;
   pinHome: number | null;
   pinTrending: number | null;
@@ -59,6 +60,7 @@ export const EMPTY_FORM: ArticleForm = {
   isBreaking: false,
   isExclusive: false,
   isFeatured: false,
+  isShort: false,
   voiceEnabled: true,
   pinHome: null,
   pinTrending: null,
@@ -120,6 +122,7 @@ export function fromArticle(a: CmsArticle): ArticleForm {
     isBreaking: a.is_breaking,
     isExclusive: a.is_exclusive,
     isFeatured: a.is_featured,
+    isShort: a.is_short,
     voiceEnabled: a.voice_enabled,
     pinHome: a.pin_home_minutes,
     pinTrending: a.pin_trending_minutes,
@@ -155,6 +158,7 @@ export function toPayload(f: ArticleForm, canPin: boolean): Record<string, unkno
     is_breaking: f.isBreaking,
     is_exclusive: f.isExclusive,
     is_featured: f.isFeatured,
+    is_short: f.isShort,
     voice_enabled: f.voiceEnabled,
     slug: f.slug || null,
     seo_title: f.seoTitle || null,

@@ -60,7 +60,8 @@ from app.integrations.ai.llm import LlmAi  # noqa: E402
 from app.integrations.ai.sensitive import is_sensitive  # noqa: E402
 from app.integrations.storage import StoredObject  # noqa: E402
 from app.integrations.tts import get_tts  # noqa: E402
-from app.integrations.tts.aimlapi import AimlapiTts, _sniff_mime  # noqa: E402
+from app.integrations.tts.aimlapi import AimlapiTts  # noqa: E402
+from app.integrations.tts.base import sniff_mime  # noqa: E402
 from app.integrations.tts.base import Synthesis, TtsProvider  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.ai import AiSuggestion, AiUsage  # noqa: E402
@@ -631,7 +632,7 @@ class TestSniffMime:
     @pytest.mark.parametrize("header", [b"\xff\xfb", b"\xff\xfa", b"\xff\xf3"])
     def test_an_untagged_mpeg1_frame_is_accepted_as_mp3(self, header: bytes) -> None:
         frame = header + b"\x90\x64" + b"\x00" * 64
-        assert _sniff_mime(frame) == "audio/mpeg"
+        assert sniff_mime(frame) == "audio/mpeg"
         # Spelled out rather than described: this is the comparison that was
         # wrong, and it is False for all three of these.
         assert (frame[1] & 0xF0) != 0xE0
@@ -640,8 +641,8 @@ class TestSniffMime:
         assert (0xE3 & 0xF0) == 0xE0
 
     def test_the_two_tagged_containers_are_unchanged(self) -> None:
-        assert _sniff_mime(MP3) == "audio/mpeg"
-        assert _sniff_mime(WAV) == "audio/wav"
+        assert sniff_mime(MP3) == "audio/mpeg"
+        assert sniff_mime(WAV) == "audio/wav"
 
     @pytest.mark.parametrize(
         "raw",
@@ -655,7 +656,7 @@ class TestSniffMime:
         ],
     )
     def test_everything_else_is_refused(self, raw: bytes) -> None:
-        assert _sniff_mime(raw) == ""
+        assert sniff_mime(raw) == ""
 
     def test_the_adapter_keeps_an_untagged_frame_elevenlabs_returned(
         self, monkeypatch: pytest.MonkeyPatch
@@ -1421,8 +1422,8 @@ def _scripted_bulletin(db: Session, *, script: str = "") -> AudioBulletin:
     text = script or TELUGU_BODY
     row = AudioBulletin(
         bulletin_date=date(2026, 9, 18),
-        slot=6,
-        slot_label_te=bulletin_service.slot_label_te(6),
+        slot=7,
+        slot_label_te=bulletin_service.slot_label_te(7),
         script_te=text,
         script_hash="0" * 64,
         char_count=len(text),

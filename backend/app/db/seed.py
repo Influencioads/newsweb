@@ -158,17 +158,20 @@ def seed_panchayat_category(db: Session, categories: dict[str, "Category"]) -> N
     `categories` dict is all the homepage section needs: the loop below already
     creates one per nav category, and its `min_items=3` floor keeps the section
     hidden until three panchayat stories exist, which is right for launch.
+    Insert-only, like `seed_categories`: an admin's rename or reorder survives.
     """
-    cat = categories.get(panchayat_service.PANCHAYAT_CATEGORY_SLUG)
-    if cat is None:
-        cat = Category(slug=panchayat_service.PANCHAYAT_CATEGORY_SLUG)
-        db.add(cat)
-        categories[cat.slug] = cat
-    cat.name_te = "పంచాయతీ వార్తలు"
-    cat.name_en = "Panchayat News"
-    cat.sort = len(CATEGORIES)
-    cat.is_active = True
-    cat.show_in_nav = True
+    if panchayat_service.PANCHAYAT_CATEGORY_SLUG in categories:
+        return
+    cat = Category(
+        slug=panchayat_service.PANCHAYAT_CATEGORY_SLUG,
+        name_te="పంచాయతీ వార్తలు",
+        name_en="Panchayat News",
+        sort=len(CATEGORIES),
+        is_active=True,
+        show_in_nav=True,
+    )
+    db.add(cat)
+    categories[cat.slug] = cat
     db.flush()
 
 
@@ -179,6 +182,10 @@ def seed_homepage_sections(db: Session, categories: dict[str, "Category"]) -> in
     only backfills sections for categories that have none yet.
     """
     existing_keys = {s.key for s in db.execute(select(HomepageSection)).scalars()}
+    # A category whose block the admin re-keyed still has one.
+    has_section = {
+        s.category_id for s in db.execute(select(HomepageSection)).scalars()
+    }
     next_sort = (
         max((s.sort for s in db.execute(select(HomepageSection)).scalars()), default=-1)
         + 1
@@ -202,7 +209,13 @@ def seed_homepage_sections(db: Session, categories: dict[str, "Category"]) -> in
         next_sort += 1
         created += 1
     for cat in sorted(categories.values(), key=lambda c: c.sort):
-        if not cat.show_in_nav or cat.slug in existing_keys:
+        # Sub-sections get no block of their own (as on the Taxonomy page).
+        if (
+            not cat.show_in_nav
+            or cat.parent_id is not None
+            or cat.slug in existing_keys
+            or cat.id in has_section
+        ):
             continue
         db.add(
             HomepageSection(

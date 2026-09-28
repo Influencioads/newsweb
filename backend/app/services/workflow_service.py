@@ -43,6 +43,7 @@ _SCALARS = (
     "is_breaking",
     "is_exclusive",
     "is_featured",
+    "is_short",
     "voice_enabled",
     "article_type",
     "hero_media_id",
@@ -480,6 +481,14 @@ def transition(
     if action == "review":
         article.reviewed_by = principal.id
     if action == "publish":
+        # A short-news card is its photo and its few lines of text; the swipe
+        # feed has nothing else to show, and the body is optional.
+        if article.is_short and not (article.hero_media_id and (article.summary_te or "").strip()):
+            raise ValidationError(
+                message_en="Short news needs a hero photo and short text before publishing.",
+                message_te="షార్ట్ న్యూస్ ప్రచురించే ముందు ఫోటో మరియు చిన్న వార్త తప్పనిసరి.",
+                details={"is_short": "hero_media_id and summary required"},
+            )
         if trusted:
             # `approved_by` stays NULL on purpose. Stamping the secretary into
             # it would make the audit log claim an editor approved this when
@@ -591,6 +600,8 @@ def transition(
     elif target == WorkflowState.REJECTED:
         article.status = ArticleStatus.REJECTED
     article.workflow_state = target
+    if target in {WorkflowState.PUBLISHED, WorkflowState.REJECTED}:
+        _release_source_text(db, article)
     db.add(
         WorkflowTransition(
             article_id=article.id,
@@ -602,3 +613,31 @@ def transition(
         )
     )
     return article
+
+
+def _release_source_text(db: Session, article: Article) -> None:
+    """Forget the publisher's text now this article's review has resolved.
+
+    `IngestedRewrite.source_text` is the copy the reviewer reads beside our
+    rewrite. It used to be dropped at import, which meant the comparison was
+    gone before the person who has to approve the article ever saw it — the
+    review it exists for happens *here*, not in the ingest queue. Published or
+    rejected, the decision has landed and the reason to hold it is over.
+
+    Never fatal: a story must not fail to publish because a cleanup failed.
+    """
+    from app.models.ingestion import IngestedItem
+    from app.services.ingestion_service import drop_source_text
+
+    try:
+        item = db.scalar(
+            select(IngestedItem).where(IngestedItem.article_id == article.id)
+        )
+        if item is not None:
+            drop_source_text(item)
+    except Exception:  # noqa: BLE001 — same reasoning as the fan-out above
+        from app.core.logging import get_logger
+
+        get_logger(__name__).exception(
+            "source_text_release_failed", article_id=article.id
+        )

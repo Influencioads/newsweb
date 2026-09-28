@@ -81,9 +81,7 @@ export function PolicyFooter() {
         </nav>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-on-ink/10 py-6">
-          <span lang="te" className="th text-headline-xs font-bold text-exclusive">
-            టాప్ తెలుగు న్యూస్
-          </span>
+          <img src="/logo.webp" alt="టాప్ తెలుగు న్యూస్" width={720} height={205} loading="lazy" className="h-10 w-auto" />
           <p lang="en" className="font-sans text-meta text-muted-inverse">
             © {new Date().getFullYear()} Top Telugu News
           </p>

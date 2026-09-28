@@ -1,5 +1,5 @@
 import { api } from '@/api/client';
-import type { AudioAssetRow, BulletinList, BulletinRow, ContentSource, KycProfileRow, KycStatus, Vertical, CrawlStatus, IngestQueueCounts, IngestedItem, IngestedRewrite, AiDraft, AiSuggestion, AudioState, CmsArticle, CmsArticleList, CmsAudioRef, CmsEditorOptions, CmsMediaRef, CmsOption, DashboardStats, SettingsPayload } from '@/types/cms';
+import type { ArticleOrigin, AudioAssetRow, BulletinList, BulletinRow, ContentSource, KycProfileRow, KycStatus, Vertical, CrawlStatus, IngestQueueCounts, IngestedItem, IngestedRewrite, AiDraft, AiSuggestion, AudioState, CmsArticle, CmsArticleList, CmsAudioRef, CmsEditorOptions, CmsMediaRef, CmsOption, DashboardStats, SettingsPayload } from '@/types/cms';
 export const fetchArticles=async(params?:{state?:string;search?:string;offset?:number;limit?:number})=>(await api.get<CmsArticleList>('/cms/articles',{params})).data;
 export const fetchArticle=async(id:number)=>(await api.get<CmsArticle>(`/cms/articles/${id}`)).data;
 export const createArticle=async(payload:Record<string,unknown>)=>(await api.post<CmsArticle>('/cms/articles',payload)).data;
@@ -18,7 +18,7 @@ export const removePin=async(id:number)=>(await api.delete(`/cms/pins/${id}`)).d
 export const fetchTrendingScores=async<T>()=>(await api.get<T>('/cms/trending')).data;
 export const recomputeTrending=async()=>(await api.post('/cms/trending/recompute')).data;
 export const fetchAnalytics=async<T>()=>(await api.get<T>('/cms/analytics')).data;
-export const fetchCampaigns=async<T>()=>(await api.get<T>('/cms/notifications')).data;
+export const fetchCampaigns=async<T>(params?:{source?:'manual'|'auto';offset?:number;limit?:number})=>(await api.get<T>('/cms/notifications',{params})).data;
 export const fetchCmsVideos=async<T>()=>(await api.get<T>('/cms/videos')).data;
 export const fetchSubmissions=async<T>(status='pending')=>(await api.get<T>('/cms/moderation/submissions',{params:{status}})).data;
 export const approveSubmission=async(id:number)=>(await api.post(`/cms/moderation/submissions/${id}/approve`)).data;
@@ -87,7 +87,7 @@ export const uploadArticleAudio=async(id:number,file:File,durationSec=0)=>{const
 export const deleteArticleAudio=async(id:number)=>(await api.delete<{removed:boolean}>(`/cms/articles/${id}/audio`)).data;
 
 // --- §17 content ingestion -------------------------------------------------
-export const fetchSources=async()=>(await api.get<{items:ContentSource[];total:number;queue:IngestQueueCounts}>('/cms/sources')).data;
+export const fetchSources=async()=>(await api.get<{items:ContentSource[];total:number;queue:IngestQueueCounts;failure_limit:number}>('/cms/sources')).data;
 export const createSource=async(payload:Record<string,unknown>)=>(await api.post<ContentSource>('/cms/sources',payload)).data;
 export const patchSource=async(id:number,payload:Record<string,unknown>)=>(await api.patch<ContentSource>(`/cms/sources/${id}`,payload)).data;
 export const deleteSource=async(id:number)=>(await api.delete(`/cms/sources/${id}`)).data;
@@ -98,6 +98,13 @@ export const importIngestedItem=async(id:number,payload?:Record<string,unknown>)
 export const rejectIngestedItem=async(id:number,note?:string)=>(await api.post(`/cms/ingestion/${id}/reject`,{note:note||null})).data;
 export const fetchCrawlStatus=async()=>(await api.get<CrawlStatus>('/cms/crawl/status')).data;
 export const runCrawl=async(payload:Record<string,unknown>={})=>(await api.post<Record<string,unknown>>('/cms/crawl/run',{fetch:true,rewrite:true,...payload})).data;
+// The publisher's original beside ours, at the point of approval. 404s for an
+// article that was never crawled, and may fetch the publisher's page live —
+// so ask only for AI_REWRITE / SYNDICATED, and only when the panel is opened.
+// Its own budget: the global 20s is a client-side timeout on a call whose
+// backend hop is itself 20s per redirect, so a slow publisher would abort here
+// before the server ever answered.
+export const fetchArticleOrigin=async(id:number)=>(await api.get<ArticleOrigin>(`/cms/articles/${id}/origin`,{timeout:45_000})).data;
 export const rewriteIngestedItem=async(id:number,force=false)=>(await api.post<{item_id:number;rewrite:IngestedRewrite|null}>(`/cms/ingestion/${id}/rewrite`,null,{params:{force}})).data;
 export const fetchAudioAssets=async(params:Record<string,unknown>={})=>(await api.get<{items:AudioAssetRow[];total:number;usage:Record<string,number>}>('/cms/audio/assets',{params})).data;
 export const retryAudioAsset=async(id:number)=>(await api.post<{asset:AudioAssetRow;usage:Record<string,number>}>(`/cms/audio/assets/${id}/retry`)).data;
@@ -125,3 +132,38 @@ export const setPanchayatPublish=async(id:number,granted:boolean)=>(await api.po
 // button to learn: which model drew it and whether it became the hero.
 type GeneratedImage=Omit<CmsMediaRef,'credit'>&{ai_generated:boolean;ai_model:string|null;is_hero:boolean};
 export const generateArticleImage=async(id:number,brief:string,force=false)=>(await api.post<{available:boolean;reason:string|null;media:GeneratedImage|null}>(`/cms/ai/articles/${id}/image`,{brief:brief||null,force})).data;
+
+// --- news card: the story's glimpse as a social image in a chosen size -----
+// Both calls cost money, so the dialog only makes them on a button press. With
+// photo:"ai" the response's `card.photo.media_id` is the drawn picture; sending
+// it back as `photo_media_id` re-renders over the same picture for free.
+// `available:false` + `reason` and a 422 refusal behave as generateArticleImage.
+export type SocialCardAspect='1:1'|'4:5'|'16:9'|'9:16';
+export type SocialCardTemplate='panel'|'overlay'|'frame';
+export type SocialCardPhoto='story'|'ai'|'none';
+// The creative studio's extras: `width`/`height` replace `aspect`; a design
+// backdrop is drawn (`use_ai_backdrop`, paid) or reused (`backdrop_media_id`,
+// free — the card's `backdrop.media_id`); `save` also files the card in the
+// media library (`card.media_id`).
+export interface SocialCardBody{aspect:SocialCardAspect;template:SocialCardTemplate;headline:string;summary:string;tag:string|null;photo:SocialCardPhoto;photo_media_id:number|null;brief:string|null;width?:number;height?:number;use_ai_backdrop?:boolean;reference_media_ids?:number[];backdrop_media_id?:number|null;backdrop_brief?:string|null;save?:boolean}
+export interface SocialCard{url:string;width:number;height:number;aspect:string;template:string;filename:string;warnings:string[];photo:{media_id:number;url:string|null;ai_generated:boolean}|null;backdrop?:{media_id:number;url:string|null}|null;media_id?:number|null}
+export const socialCardText=async(id:number)=>(await api.post<{headline:string;summary:string;tag:string;engine:'ai'|'heuristic';warnings?:string[]}>(`/cms/ai/articles/${id}/social-card/text`,{},{timeout:45_000})).data; // past the server's 25 s model ceiling: an abort here is a billed call the editor never sees
+export const makeSocialCard=async(id:number,body:SocialCardBody)=>(await api.post<{available:boolean;reason:string|null;card:SocialCard|null}>(`/cms/ai/articles/${id}/social-card`,body,{timeout:200_000})).data; // a fresh GPT Image 2.5 drawing is usually ~20 s, but one took 132 s on 2026-09-23 (the server timeout is per read, not total)
+// Design references for the creative studio: read for style only, kept out
+// of the media library list (`GET /cms/media`) so they are never a story's picture.
+export interface CreativeReference{id:number;url:string;width:number|null;height:number|null;filename:string;created_at:string}
+export const fetchCreativeRefs=async()=>(await api.get<{items:CreativeReference[]}>('/cms/ai/creative/references')).data.items;
+export const uploadCreativeRef=async(file:File)=>{const fd=new FormData();fd.append('file',file);return (await api.post<CreativeReference>('/cms/ai/creative/references',fd,{headers:{'Content-Type':'multipart/form-data'}})).data};
+export const deleteCreativeRef=async(id:number)=>(await api.delete<{removed:boolean}>(`/cms/ai/creative/references/${id}`)).data;
+
+// --- categories (Taxonomy page) --------------------------------------------
+// A delete of a category that still holds content is a 409 whose
+// details.counts says what; retrying with moveTo moves it all there first.
+export const createCategory=async(payload:Record<string,unknown>)=>(await api.post<{id:number;slug:string}>('/cms/taxonomy/categories',payload)).data;
+export const patchCategory=async(id:number,payload:Record<string,unknown>)=>(await api.patch(`/cms/taxonomy/categories/${id}`,payload)).data;
+export const deleteCategory=async(id:number,moveTo?:number)=>(await api.delete(`/cms/taxonomy/categories/${id}`,{params:moveTo==null?{}:{move_to:moveTo}})).data;
+export const reorderCategories=async(orderedIds:number[])=>(await api.put('/cms/taxonomy/categories/order',{ordered_ids:orderedIds})).data;
+
+// --- §13 push campaigns ------------------------------------------------------
+// Only a `scheduled` campaign cancels; anything already sent is a 409.
+export const cancelCampaign=async(id:number)=>(await api.delete<{id:number;status:string}>(`/cms/notifications/${id}`)).data;

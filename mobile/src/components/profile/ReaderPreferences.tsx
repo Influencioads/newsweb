@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import { router, type Href } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Linking, View } from 'react-native';
 
 import { API_ORIGIN } from '@/api/client';
@@ -9,6 +9,7 @@ import * as publicApi from '@/api/public';
 import * as readerApi from '@/api/reader';
 import type { Me } from '@/api/types';
 import { ErrorState, LoadingState } from '@/components/Feedback';
+import { LocationSheet, usePlaceName } from '@/components/LocationSheet';
 import { Group, NavRow, RowDivider, SwitchRow } from '@/components/profile/SettingsRows';
 import { useI18n } from '@/lib/i18n';
 import { radius, space, TAP_LG } from '@/lib/theme';
@@ -26,8 +27,9 @@ import { useToast } from '@/ui/Toast';
 
 /**
  * Reader preferences (§4) — language, theme, text size, location, interests
- * and notifications, grouped into Cards and mirrored to the server plus the
- * local prefs store, so Home and Local follow the moment a save lands.
+ * and notifications, grouped into Cards and mirrored to the server. Location
+ * is the shared `LocationSheet` (down to the village), which applies each tap
+ * at once and syncs it itself, so it is not part of this form's save.
  *
  * The form is *derived*, not hydrated: `edit` holds only what the reader
  * touched and falls through to the server document underneath it. That keeps
@@ -38,9 +40,6 @@ type Notify = { breaking: boolean; local: boolean; topics: boolean };
 
 interface Edit {
   language?: 'te' | 'en';
-  stateCode?: string;
-  districtSlug?: string;
-  mandalSlug?: string;
   interests?: string[];
   notify?: Notify;
 }
@@ -66,10 +65,11 @@ export function ReaderPreferences({ me }: { me: Me }) {
   const toast = useToast();
   const queryClient = useQueryClient();
   const signOut = useAuth((s) => s.signOut);
-  const { fontStep, setPlace, theme, setTheme } = usePrefs();
+  const { fontStep, theme, setTheme } = usePrefs();
+  const placeName = usePlaceName();
 
   const [edit, setEdit] = useState<Edit>({});
-  const [sheet, setSheet] = useState<'none' | 'font' | 'signOut'>('none');
+  const [sheet, setSheet] = useState<'none' | 'font' | 'location' | 'signOut'>('none');
 
   const config = useQuery({
     queryKey: ['config'],
@@ -80,9 +80,6 @@ export function ReaderPreferences({ me }: { me: Me }) {
 
   const server = prefs.data;
   const language = edit.language ?? server?.language ?? (isTelugu ? 'te' : 'en');
-  const stateCode = edit.stateCode ?? server?.state?.code ?? '';
-  const districtSlug = edit.districtSlug ?? server?.district?.slug ?? '';
-  const mandalSlug = edit.mandalSlug ?? server?.mandal?.slug ?? '';
   const interests = edit.interests ?? server?.category_slugs ?? [];
   const notify: Notify = edit.notify ?? {
     breaking: server?.notify_breaking ?? true,
@@ -90,25 +87,10 @@ export function ReaderPreferences({ me }: { me: Me }) {
     topics: server?.notify_topics ?? true,
   };
 
-  const districts = useMemo(
-    () => (config.data?.districts ?? []).filter((d) => !stateCode || d.state === stateCode),
-    [config.data, stateCode],
-  );
-
-  const mandals = useQuery({
-    queryKey: ['mandals', districtSlug],
-    queryFn: () => publicApi.fetchDistrictMandals(districtSlug),
-    enabled: Boolean(districtSlug),
-    staleTime: 3_600_000,
-  });
-
   const save = useMutation({
     mutationFn: () =>
       readerApi.updatePreferences({
         language,
-        state_code: stateCode || null,
-        district_slug: districtSlug || null,
-        mandal_slug: districtSlug ? mandalSlug || null : null,
         category_slugs: interests,
         notify_breaking: notify.breaking,
         notify_local: notify.local,
@@ -117,14 +99,6 @@ export function ReaderPreferences({ me }: { me: Me }) {
     onSuccess: (data) => {
       queryClient.setQueryData(['preferences'], data);
       setLanguage(data.language);
-      // One write, not two. `setEdition` clears the mandal and `setMandal`
-      // clears the locality, so calling them in sequence would throw away the
-      // village the server just told us it kept.
-      setPlace({
-        edition: data.district?.slug ?? null,
-        mandal: data.mandal?.slug ?? null,
-        locality: data.locality?.slug ?? null,
-      });
       // The server document is now the reader's own choice: drop the overlay.
       setEdit({});
       toast.success(t('profile.saved'));
@@ -216,70 +190,12 @@ export function ReaderPreferences({ me }: { me: Me }) {
 
       {/* location ------------------------------------------------------ */}
       <Group title={t('profile.location')} hint={t('profile.locationHint')}>
-        <View style={styles.block} accessibilityRole="radiogroup" accessibilityLabel={t('local.state')}>
-          <T variant="ui" weight="semibold" color="muted">
-            {t('local.state')}
-          </T>
-          <View style={styles.chips}>
-            {(config.data?.states ?? []).map((s) => (
-              <Chip
-                key={s.code}
-                label={pick(s.name_te, s.name_en)}
-                role="radio"
-                selected={stateCode === s.code}
-                onPress={() =>
-                  setEdit((e) => ({ ...e, stateCode: s.code, districtSlug: '', mandalSlug: '' }))
-                }
-              />
-            ))}
-          </View>
-        </View>
-
-        {stateCode ? (
-          <View style={styles.block} accessibilityRole="radiogroup" accessibilityLabel={t('local.district')}>
-            <T variant="ui" weight="semibold" color="muted">
-              {t('local.district')}
-            </T>
-            <View style={styles.chips}>
-              {districts.map((d) => (
-                <Chip
-                  key={d.slug}
-                  label={pick(d.name_te, d.name_en)}
-                  role="radio"
-                  selected={districtSlug === d.slug}
-                  onPress={() =>
-                    setEdit((e) => ({
-                      ...e,
-                      districtSlug: districtSlug === d.slug ? '' : d.slug,
-                      mandalSlug: '',
-                    }))
-                  }
-                />
-              ))}
-            </View>
-          </View>
-        ) : null}
-
-        {districtSlug && mandals.data?.length ? (
-          <View style={styles.block} accessibilityRole="radiogroup" accessibilityLabel={t('local.mandal')}>
-            <T variant="ui" weight="semibold" color="muted">
-              {t('local.mandal')}
-            </T>
-            <View style={styles.chips}>
-              {mandals.data.map((m) => (
-                <Chip
-                  key={m.slug}
-                  label={pick(m.name_te, m.name_en)}
-                  role="radio"
-                  selected={mandalSlug === m.slug}
-                  onPress={() =>
-                    setEdit((e) => ({ ...e, mandalSlug: mandalSlug === m.slug ? '' : m.slug }))
-                  }
-                />
-              ))}
-            </View>
-          </View>
-        ) : null}
+        <NavRow
+          label={t('local.change')}
+          icon="mapPin"
+          value={placeName ?? t('local.choosePlace')}
+          onPress={() => setSheet('location')}
+        />
       </Group>
 
       {/* interests ----------------------------------------------------- */}
@@ -370,6 +286,7 @@ export function ReaderPreferences({ me }: { me: Me }) {
       </T>
 
       <FontSizeSheet open={sheet === 'font'} onClose={() => setSheet('none')} />
+      <LocationSheet open={sheet === 'location'} onClose={() => setSheet('none')} />
       <ConfirmSheet
         open={sheet === 'signOut'}
         onClose={() => setSheet('none')}

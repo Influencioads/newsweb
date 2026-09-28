@@ -1,6 +1,7 @@
-"""Assembling and speaking the three-hourly audio newspaper.
+"""Assembling and speaking the audio newspaper.
 
-Six slots a day at 06, 09, 12, 15, 18 and 21 IST, about three minutes each.
+Seven named slots a day at 07, 09, 13, 15, 17, 19 and 21 IST, about three
+minutes each.
 
 **Why this can go live without an editor pressing Approve.** Everything spoken
 is drawn from stories that a human already approved and a *second* human
@@ -45,10 +46,11 @@ logger = get_logger(__name__)
 
 IST = epaper_service.IST
 
-#: The six slots, as IST hours. A product decision, not a setting — which is
-#: why the schedule is a real crontab rather than the e-paper's
-#: "tick every five minutes and compare the clock to a configured string".
-SLOTS: tuple[int, ...] = (6, 9, 12, 15, 18, 21)
+#: The seven slots, as IST hours. A product decision, not a setting — which is
+#: why the schedule is a real crontab (built from this tuple in
+#: `workers/celery_app.py`) rather than the e-paper's "tick every five minutes
+#: and compare the clock to a configured string".
+SLOTS: tuple[int, ...] = (7, 9, 13, 15, 17, 19, 21)
 
 #: Both TTS adapters estimate duration at this rate, so the script is sized by
 #: it. If that constant ever changes, this must follow — a bulletin that is
@@ -59,7 +61,8 @@ CHARS_PER_SECOND = 12.0
 MAX_SCRIPT_CHARS = 2_400
 
 #: How late a slot may still be produced. Past this, a worker that was down
-#: declines rather than publishing a stale "12 o'clock bulletin" at two.
+#: declines rather than publishing a stale "1 o'clock bulletin" at three. Must
+#: stay under the shortest gap between SLOTS (two hours).
 CATCH_UP_MINUTES = 90
 
 #: Below this, a story gets a headline mention only.
@@ -69,13 +72,17 @@ _OPEN_TE = "టాప్ తెలుగు న్యూస్ — {label}. మ�
 _CLOSE_TE = "ఇవీ ఈ గంట ముఖ్యాంశాలు. పూర్తి వివరాలకు యాప్ చూడండి."
 _CONNECTIVES_TE = ("తర్వాత…", "ఇక…", "మరో వార్త…", "అలాగే…", "చివరగా…")
 
+#: Each slot's show name — stored on the row as `slot_label_te`, shown by every
+#: client and spoken in the opening line. Rename here; one key per SLOTS hour
+#: (a test holds the two in step).
 _LABELS_TE: dict[int, str] = {
-    6: "ఉదయం 6 గంటల బులెటిన్",
-    9: "ఉదయం 9 గంటల బులెటిన్",
-    12: "మధ్యాహ్నం 12 గంటల బులెటిన్",
-    15: "మధ్యాహ్నం 3 గంటల బులెటిన్",
-    18: "సాయంత్రం 6 గంటల బులెటిన్",
-    21: "రాత్రి 9 గంటల బులెటిన్",
+    7: "గరం చాయ్ న్యూస్",  # Garam Chai News
+    9: "ఆఫీస్ ఎక్స్‌ప్రెస్",  # Office Express
+    13: "లంచ్ బాక్స్ న్యూస్",  # Lunch Box News
+    15: "ఫటాఫట్ న్యూస్",  # Fatafat News
+    17: "మిర్చి బజ్జీ న్యూస్",  # Mirchi Bajji News
+    19: "ప్రైమ్ టైమ్ న్యూస్",  # Prime Time News
+    21: "గుడ్ నైట్ రౌండప్",  # Good Night Roundup
 }
 
 
@@ -89,7 +96,7 @@ def slot_label_te(slot: int) -> str:
 def window_for(day: date, slot: int) -> tuple[datetime, datetime]:
     """[previous slot, this slot) in UTC.
 
-    The 06:00 window reaches back to 21:00 the previous evening, so overnight
+    The 07:00 window reaches back to 21:00 the previous evening, so overnight
     news is carried rather than dropped — the gap between the last bulletin of
     one day and the first of the next is the longest of the cycle.
     """
@@ -186,7 +193,7 @@ def _ai_connectives(db: Session, headlines: list[str]) -> list[str] | None:
     ):
         return None
     try:
-        # Editorial model, not the bulk one: eight bulletins a day, and every
+        # Editorial model, not the bulk one: seven bulletins a day, and every
         # sentence it writes is read aloud to a listener who cannot re-read it.
         provider = get_ai(**settings_service.ai_credentials(db))
         if provider.key != "heuristic":
@@ -296,6 +303,9 @@ def script_bulletin(
     db: Session, bulletin: AudioBulletin, *, limit: int | None = None
 ) -> AudioBulletin:
     """Choose the stories and write the script. No provider is called."""
+    # The opener speaks the name from `_LABELS_TE`; a row made under an older
+    # name must show the one it now says.
+    bulletin.slot_label_te = slot_label_te(bulletin.slot)
     story_limit = limit or settings_service.get_int(db, "bulletin.story_limit")
     articles = select_stories(db, bulletin.bulletin_date, bulletin.slot, limit=story_limit)
     if not articles:
@@ -423,7 +433,7 @@ def render(
     bulletin.requested_by = requested_by
     db.flush()
     # One row for the whole bulletin, however many segments it took — the same
-    # shape `ensure_audio` writes, so six unattended slots a day show up on the
+    # shape `ensure_audio` writes, so seven unattended slots a day show up on the
     # AI meter next to the article audio they share a budget with.
     ai_usage_service.record(
         db,

@@ -1,27 +1,41 @@
-import { useQuery } from '@tanstack/react-query';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { router } from 'expo-router';
 import { View } from 'react-native';
 
-import { api } from '@/api/client';
+import { absoluteMediaUrl, api } from '@/api/client';
+import { Equalizer } from '@/components/player/PlayerVisuals';
 import { useI18n } from '@/lib/i18n';
-import { radius, space, TAP_LG } from '@/lib/theme';
-import { makeStyles } from '@/lib/useTheme';
+import { radius, space } from '@/lib/theme';
+import { makeStyles, useColors } from '@/lib/useTheme';
+import { formatTime, usePlayer, useTrackStatus, type Track } from '@/stores/player';
 import { Button, IconButton } from '@/ui/Button';
-import { Chip } from '@/ui/Chip';
 import { T } from '@/ui/Text';
 
 /**
  * §19–21 listen control — the app twin of the web AudioPlayer.
  *
  * Same three outcomes, decided by the server:
- *   * a generated file exists → real playback with seek and speed
+ *   * a generated file exists → the global player plays it
  *   * voice on, no file       → the device voice (expo-speech), unchanged
  *   * voice off (§20)         → nothing renders
+ *
+ * The control owns no audio. It is a trigger and a live status for the app's
+ * one player (stores/player.ts): idle, a "Listen · 3:10" pill that loads its
+ * track (or, with a `queue`, starts that queue at itself); while its track is
+ * the current one, an equalizer, elapsed / length, pause and a way into Now
+ * Playing. Seek, skips and speeds live there and on the lock screen, so the
+ * story keeps playing after the reader leaves it.
  *
  * A caller that already holds the file (the e-paper playlist ships an
  * `AudioTrack.url`) passes `url` and the lookup is skipped entirely. The
  * device-voice fallback only renders for a caller that supplies a real
  * `onToggleDevice` — an empty handler would be a button that does nothing.
+ * The track's id is `shortId`, which is how every surface recognises it.
+ *
+ * An article's own route renders the file on first request, so an article
+ * reads `/formats` (which never renders) and asks `/audio` only on the
+ * reader's tap — never on page view (§21: most stories are never listened
+ * to), exactly as on the web.
  */
 
 interface AudioState {
@@ -30,19 +44,6 @@ interface AudioState {
   duration_sec: number;
   fallback: 'device' | null;
   voice_enabled: boolean;
-}
-
-const SPEEDS = [0.75, 1, 1.25, 1.5] as const;
-const SKIP = 15;
-
-// ponytail: no i18n keys yet for these — see neededStrings.
-const L = (te: string, en: string, telugu: boolean) => (telugu ? te : en);
-
-function format(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 const useStyles = makeStyles((color) => ({
@@ -55,11 +56,10 @@ const useStyles = makeStyles((color) => ({
     gap: space.sm,
   },
   top: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  middle: { flex: 1, minWidth: 120, gap: space.xs },
+  middle: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: space.sm },
   track: { height: 4, borderRadius: radius.pill, backgroundColor: color.rule, overflow: 'hidden' },
   fill: { height: 4, borderRadius: radius.pill, backgroundColor: color.brand },
-  speeds: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm },
-  speed: { paddingHorizontal: space.md },
+  pill: { alignSelf: 'flex-start', borderRadius: radius.pill },
 }));
 
 export function ArticleAudio({
@@ -70,6 +70,8 @@ export function ArticleAudio({
   stopLabel,
   endpoint,
   url,
+  meta,
+  queue,
 }: {
   shortId: string;
   deviceSpeaking?: boolean;
@@ -82,89 +84,135 @@ export function ArticleAudio({
   endpoint?: string;
   /** A file the caller already holds — skips the lookup entirely. */
   url?: string;
+  /** How the track reads in the dock / Now Playing (defaults: an audio story titled by `listenLabel`). */
+  meta?: Pick<Track, 'title'> & Partial<Pick<Track, 'kind' | 'subtitle' | 'href' | 'artwork'>>;
+  /** A running order this control belongs to (the day's bulletins, the edition's radio): play starts it here. */
+  queue?: Track[];
 }) {
   const styles = useStyles();
-  const { t, isTelugu } = useI18n();
+  const color = useColors();
+  const { t } = useI18n();
   const source = endpoint ?? `/public/articles/${shortId}/audio`;
+  const status = useTrackStatus(shortId);
+  const { toggle, playTrack, playQueue } = usePlayer.getState();
+  const queryClient = useQueryClient();
+  const onDemand = !url && !endpoint;
 
-  const audio = useQuery({
-    queryKey: ['audio', source],
-    queryFn: async () => (await api.get<AudioState>(source)).data,
-    enabled: !url,
+  // Same key and payload as the article screen's own formats query: one request.
+  const formats = useQuery({
+    queryKey: ['formats', shortId],
+    queryFn: async () => (await api.get<{ audio: AudioState }>(`/public/articles/${shortId}/formats`)).data,
+    enabled: onDemand,
     retry: false,
     staleTime: 5 * 60_000,
   });
+  const audio = useQuery({
+    queryKey: ['audio', source],
+    queryFn: async () => (await api.get<AudioState>(source)).data,
+    enabled: !url && !onDemand,
+    retry: false,
+    staleTime: 5 * 60_000,
+  });
+  const state = audio.data ?? (onDemand ? formats.data?.audio : undefined);
 
-  // The hook has to run unconditionally, so it is created with a null source
-  // and only given one when a file is known to exist.
-  const player = useAudioPlayer(url ?? audio.data?.url ?? null);
-  const status = useAudioPlayerStatus(player);
+  if (!url && state && !state.voice_enabled) return null;
 
-  if (!url && audio.data && !audio.data.voice_enabled) return null;
+  const file = absoluteMediaUrl(url ?? (state?.available ? state.url : null) ?? null);
+  // Voice on, no file yet and not asked for one: the pill asks on the tap.
+  const renderable = onDemand && state?.voice_enabled === true && !audio.data && !audio.isError;
 
-  const hasFile = Boolean(url) || Boolean(audio.data?.available && audio.data.url);
-
-  if (!hasFile) {
+  // The story that is playing keeps its live control even when this route has
+  // no file of its own (still looking, or the lookup came back empty).
+  if (!file && !status.current && !renderable) {
+    // Nothing until the server answers: the device voice would flash for a
+    // story that has a file.
+    if (onDemand ? formats.isLoading : audio.isLoading) return null;
     return onToggleDevice ? (
       <Button
         variant={deviceSpeaking ? 'primary' : 'secondary'}
-        icon={deviceSpeaking ? 'pause' : 'volume2'}
+        icon={deviceSpeaking ? 'pause' : 'headphones'}
         label={deviceSpeaking ? stopLabel : listenLabel}
         onPress={onToggleDevice}
+        style={styles.pill}
       />
     ) : null;
   }
 
-  const total = status.duration || audio.data?.duration_sec || 0;
-  const elapsed = status.currentTime ?? 0;
-  const percent = total ? Math.min(100, (elapsed / total) * 100) : 0;
-  const back = L(`${SKIP} సెకన్లు వెనక్కి`, `Back ${SKIP} seconds`, isTelugu);
+  const length = status.duration || state?.duration_sec || queue?.find((q) => q.id === shortId)?.durationSec || 0;
 
+  const play = (src: string, durationSec: number) => {
+    const at = queue ? queue.findIndex((q) => q.id === shortId) : -1;
+    if (queue && at >= 0) return playQueue(queue, at);
+    playTrack({
+      id: shortId,
+      kind: meta?.kind ?? 'article',
+      title: meta?.title ?? listenLabel,
+      subtitle: meta?.subtitle ?? t('player.kindArticle'),
+      url: src,
+      durationSec: durationSec || undefined,
+      href: meta?.href,
+      artwork: meta?.artwork ?? null,
+    });
+  };
+
+  // Renders the story once server-side; every later reader gets the cached
+  // file. No file back, or no answer, and the device voice takes over.
+  const prepare = async () => {
+    const got = await queryClient
+      .fetchQuery({
+        queryKey: ['audio', source],
+        // Rendering a long story can outlast the client's 20 s default.
+        queryFn: async () => (await api.get<AudioState>(source, { timeout: 90_000 })).data,
+      })
+      .catch(() => null);
+    const src = absoluteMediaUrl(got?.available ? got.url : null);
+    if (src) play(src, got?.duration_sec ?? 0);
+    else if (got?.voice_enabled !== false) onToggleDevice?.();
+  };
+
+  const start = () => {
+    if (status.current) return toggle();
+    if (!file) return void prepare();
+    play(file, length);
+  };
+
+  const percent = length ? Math.min(100, (status.elapsed / length) * 100) : 0;
+  const idleLabel = length ? `${listenLabel} · ${formatTime(length)}` : listenLabel;
+
+  // One Button in both states, at the same place in one tree: the control a
+  // screen reader just pressed is still the one it is on when the track goes
+  // live (a swapped element takes the focus with it). The outer view never
+  // collapses, so the button keeps its native parent too.
   return (
-    <View style={styles.player}>
+    <View collapsable={false} style={status.current ? styles.player : undefined}>
       <View style={styles.top}>
-        <IconButton
-          name={status.playing ? 'pause' : 'play'}
-          label={status.playing ? stopLabel : listenLabel}
-          size={TAP_LG}
-          variant="primary"
-          haptic="medium"
-          onPress={() => (status.playing ? player.pause() : player.play())}
+        <Button
+          variant={status.current ? 'primary' : 'secondary'}
+          icon={!status.current ? 'headphones' : status.playing ? 'pause' : 'play'}
+          label={!status.current ? idleLabel : status.playing ? t('ui.pause') : listenLabel}
+          accessibilityLabel={!status.current && length ? `${listenLabel}, ${formatTime(length)}` : undefined}
+          haptic={status.current ? 'medium' : undefined}
+          pending={renderable && audio.isFetching}
+          onPress={start}
+          style={styles.pill}
         />
-        <View style={styles.middle}>
-          <View
-            style={styles.track}
-            accessibilityRole="progressbar"
-            accessibilityLabel={listenLabel}
-            accessibilityValue={{ min: 0, max: 100, now: Math.round(percent) }}
-          >
-            <View style={[styles.fill, { width: `${percent}%` }]} />
-          </View>
-          <T variant="meta" color="muted" lang="en">
-            {`${format(elapsed)} / ${format(total)}`}
-          </T>
+        {status.current ? (
+          <>
+            <View style={styles.middle}>
+              <Equalizer playing={status.playing && !status.buffering} color={color.brand} />
+              <T variant="meta" color="muted" lang="en">
+                {`${formatTime(status.elapsed)} / ${formatTime(length)}`}
+              </T>
+            </View>
+            <IconButton name="maximize2" label={t('player.open')} onPress={() => router.push('/player')} />
+          </>
+        ) : null}
+      </View>
+      {status.current ? (
+        <View style={styles.track} aria-hidden>
+          <View style={[styles.fill, { width: `${percent}%` }]} />
         </View>
-        <IconButton
-          name="history"
-          label={back}
-          onPress={() => player.seekTo(Math.max(0, elapsed - SKIP))}
-        />
-      </View>
-
-      <View style={styles.speeds} accessibilityRole="radiogroup" accessibilityLabel={t('ui.speed')}>
-        {SPEEDS.map((s) => (
-          <Chip
-            key={s}
-            role="radio"
-            label={`${s}x`}
-            lang="en"
-            selected={status.playbackRate === s}
-            accessibilityLabel={`${t('ui.speed')} ${s}x`}
-            onPress={() => player.setPlaybackRate(s)}
-            style={styles.speed}
-          />
-        ))}
-      </View>
+      ) : null}
     </View>
   );
 }

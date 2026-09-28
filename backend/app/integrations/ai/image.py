@@ -26,6 +26,7 @@ from __future__ import annotations
 import base64
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
 
@@ -50,6 +51,17 @@ _MAGIC: tuple[tuple[bytes, str], ...] = (
     (b"\x89PNG\r\n\x1a\n", "image/png"),
     (b"\xff\xd8\xff", "image/jpeg"),
 )
+
+
+#: The multipart field each reference picture travels in on `/images/edits`.
+#: aimlapi's page for gpt-image-2.5-flare says `image` takes one file or a
+#: list; OpenAI's own edits route spells a list `image[]`. Unverified against
+#: the live route (2026-09-28): aimlapi ignores fields it does not know, so a
+#: 200 proves nothing — if a drawing ignores its references, try "image".
+EDIT_IMAGE_FIELD = "image[]"
+#: The vendor takes 16; four is plenty to set a style and keeps the upload,
+#: and the bill for its input tokens, small.
+MAX_REFERENCES = 4
 
 
 def _sniff(raw: bytes) -> str:
@@ -109,47 +121,73 @@ class AimlapiImage(ImageProvider):
     def _resolved_key(self) -> str:
         return self._api_key or settings.AIMLAPI_API_KEY
 
-    def _endpoint(self) -> str:
+    def _endpoint(self, route: str = "generations") -> str:
         base = (self._base_url or settings.AIMLAPI_BASE_URL or "").rstrip("/")
         if not base:
-            return "https://api.aimlapi.com/v1/images/generations"
+            return f"https://api.aimlapi.com/v1/images/{route}"
         if base.endswith("/images/generations"):
-            return base
+            return base.removesuffix("generations") + route
         # The shared base setting may point at /chat/completions; the images
         # route is a sibling of it, not a child.
         base = base.removesuffix("/chat/completions")
-        return f"{base}/images/generations"
+        return f"{base}/images/{route}"
 
     def available(self) -> bool:
         return bool(self._resolved_key())
 
-    def generate(self, prompt: str, *, aspect: str = "16:9") -> GeneratedImage:
+    def _require_key(self) -> None:
         if not self.available():
             raise AiProviderError(
                 message_en="No aimlapi API key is configured.",
                 message_te="aimlapi API కీ కాన్ఫిగర్ చేయలేదు.",
                 details={"provider": self.key},
             )
+
+    def generate(self, prompt: str, *, aspect: str = "16:9") -> GeneratedImage:
+        self._require_key()
         model = self._model or DEFAULT_IMAGE_MODEL
         payload: dict[str, object] = {"model": model, "prompt": prompt}
         # Only google's family names the frame as a ratio; the others spell
-        # 16:9 as a keyword the catalogue owns, and inventing a second keyword
-        # here would be the 400 that map exists to prevent.
-        size_args = image_size_args(model)
-        if "aspect_ratio" in size_args:
-            size_args["aspect_ratio"] = aspect
-        payload.update(size_args)
+        # the shape as a keyword the catalogue owns, and inventing a second
+        # keyword here would be the 400 that map exists to prevent.
+        payload.update(image_size_args(model, aspect))
+        return self._draw(self._endpoint(), model, json=payload)
 
+    def edit(
+        self,
+        prompt: str,
+        images: list[tuple[str, bytes, str]],
+        *,
+        aspect: str = "16:9",
+    ) -> GeneratedImage:
+        """Draw `prompt` with `images` — (filename, bytes, mime) — attached.
+
+        The creative studio's design references: the model reads them for
+        style. Multipart to `/images/edits`, the route beside generations.
+        Only the gpt-image family documents that route, so any other model is
+        a ValueError raised before anything is sent or billed.
+        """
+        self._require_key()
+        model = self._model or DEFAULT_IMAGE_MODEL
+        if not model.startswith("openai/gpt-image"):
+            raise ValueError(f"{model} does not take reference images")
+        if not images or len(images) > MAX_REFERENCES:
+            raise ValueError(f"between 1 and {MAX_REFERENCES} reference images")
+        data = {"model": model, "prompt": prompt, **image_size_args(model, aspect)}
+        files = [(EDIT_IMAGE_FIELD, image) for image in images]
+        return self._draw(self._endpoint("edits"), model, data=data, files=files)
+
+    def _draw(self, url: str, model: str, **request: Any) -> GeneratedImage:
+        """POST one draw and parse the reply, whichever route it went to."""
         self.last_usage = {}
         try:
+            # No Content-Type here: httpx writes it from `json=`, and for
+            # multipart it must carry the boundary httpx generates.
             response = httpx.post(
-                self._endpoint(),
-                json=payload,
-                headers={
-                    "Authorization": f"Bearer {self._resolved_key()}",
-                    "Content-Type": "application/json",
-                },
+                url,
+                headers={"Authorization": f"Bearer {self._resolved_key()}"},
                 timeout=_TIMEOUT_SEC,
+                **request,
             )
             response.raise_for_status()
             body = response.json()

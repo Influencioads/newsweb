@@ -7,9 +7,11 @@ import type { FontStep } from '@/lib/theme';
 /**
  * Reader preferences — the mobile twin of frontend/src/stores/readerPrefs.ts.
  *
- * Language, the location choice (district edition + mandal) and the §4.1 font
- * step all persist locally; a signed-in reader's server preferences overwrite
- * these on load so devices converge.
+ * Language, the location choice (district edition, mandal, village) and the
+ * §4.1 font step all persist locally, and this store is what the feeds read.
+ * Nothing pulls the server's copy back in: the location is only ever set by the
+ * reader in `LocationSheet`, which also mirrors a signed-in reader's choice to
+ * their server preferences (local push targets the district stored there).
  */
 interface PrefsState {
   language: 'te' | 'en';
@@ -26,7 +28,7 @@ interface PrefsState {
   setEdition: (slug: string | null) => void;
   setMandal: (slug: string | null) => void;
   setLocality: (slug: string | null) => void;
-  /** Set the whole place at once — what the GPS path and the picker both do. */
+  /** Set the whole place at once, without the per-level resets. */
   setPlace: (place: {
     edition: string | null;
     mandal?: string | null;

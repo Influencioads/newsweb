@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
-import { router, Stack } from 'expo-router';
+import { router } from 'expo-router';
 import { memo, useEffect, useState } from 'react';
 import {
   RefreshControl,
@@ -32,14 +32,17 @@ import { ArticleActions } from '@/components/ArticleActions';
 import { Badge } from '@/ui/Badge';
 import { Button } from '@/ui/Button';
 import { Icon } from '@/ui/Icon';
+import { PressableScale } from '@/ui/PressableScale';
 import { ListFooter } from '@/ui/ListFooter';
 import { Screen } from '@/ui/Screen';
 import { ScreenHeader } from '@/ui/ScreenHeader';
 import { T } from '@/ui/Text';
 
 /**
- * Short news (§14): the InShorts/DailyHunt swipe — one full-deck card per
- * story, vertical paging, a tap through to the full article.
+ * Short news (§14), the Shorts tab: the InShorts/DailyHunt swipe — one
+ * full-deck card per item an editor marked short news (a photo and a few
+ * lines), vertical paging. A card taps through to the full article only when
+ * it has one: a body-less short item has `reading_time_sec` 0.
  *
  * The deck height is measured from the container (`onLayout`), never guessed
  * from the window minus a header constant, so the paging interval is exact on
@@ -52,6 +55,8 @@ import { T } from '@/ui/Text';
 const DOTS = 7;
 /** Half-cycles of the swipe hint's bob — even, so it settles where it started. */
 const HINT_BEATS = 6;
+/** The share of the card the photo keeps however much the short text needs. */
+const HERO_FLOOR = 0.3;
 
 const keyOf = (article: ArticleCard) => article.short_id;
 
@@ -73,6 +78,18 @@ const ShortCard = memo(function ShortCard({
   const m = useMotion();
   const { t, pick, language } = useI18n();
   const heroUrl = absoluteMediaUrl(article.hero?.url ?? null);
+  const hasBody = article.reading_time_sec > 0;
+  const open = () => router.push({ pathname: '/article/[shortId]', params: { shortId: article.short_id } });
+
+  // The photo gives way to the words, down to HERO_FLOOR; the short text then
+  // shows every whole line that fits in what is left, never a sliced one.
+  // Measured, not guessed: the headline's wrap, the reader's font step and the
+  // kickers all move it. Everything in the body but the summary is `chrome`.
+  const [bodyH, setBodyH] = useState(0);
+  const [textH, setTextH] = useState(0);
+  const [lineH, setLineH] = useState(0);
+  const room = deck * (heroUrl ? 1 - HERO_FLOOR : 1) - (bodyH - textH);
+  const lines = bodyH > 0 && lineH > 0 ? Math.max(1, Math.floor(room / lineH)) : 4;
 
   // The card is full-strength at its own page and recedes towards either
   // neighbour, so a drag reveals the deck behind it.
@@ -87,8 +104,8 @@ const ShortCard = memo(function ShortCard({
     return { opacity: 0.4 + 0.6 * p, transform: [{ scale: 0.93 + 0.07 * p }] };
   });
 
-  return (
-    <Animated.View style={[styles.card, { height: deck }, depth]}>
+  const content = (
+    <>
       {heroUrl ? (
         <Image
           source={{ uri: heroUrl }}
@@ -106,7 +123,7 @@ const ShortCard = memo(function ShortCard({
         <Badge tone="ai" icon="sparkles" size="xs" label={t('article.aiImage')} style={styles.aiTag} />
       ) : null}
 
-      <View style={styles.body}>
+      <View style={styles.body} onLayout={(e) => setBodyH(e.nativeEvent.layout.height)}>
         <View style={styles.kickers}>
           {article.is_breaking ? <Badge tone="breaking" icon="zap" size="xs" label={t('home.breaking')} /> : null}
           {article.is_exclusive ? <Badge tone="exclusive" size="xs" label={t('ui.exclusive')} /> : null}
@@ -116,14 +133,19 @@ const ShortCard = memo(function ShortCard({
           ) : null}
         </View>
 
-        {/* The text is the only thing that may give: the CTA below it is
-            pinned, so it stays on the page at every font step. */}
         <View style={styles.text}>
-          <T variant="headlineMd" weight="bold" scaled numberOfLines={3} style={styles.flexText}>
+          <T variant="headlineMd" weight="bold" scaled numberOfLines={3}>
             {pick(article.title_te, article.title_en)}
           </T>
           {article.summary_te ? (
-            <T variant="body" color="inkSoft" scaled numberOfLines={4} style={styles.flexText}>
+            <T
+              variant="body"
+              color="inkSoft"
+              scaled
+              numberOfLines={lines}
+              onLayout={(e) => setTextH(e.nativeEvent.layout.height)}
+              onTextLayout={(e) => setLineH(e.nativeEvent.lines[0]?.height ?? 0)}
+            >
               {article.summary_te}
             </T>
           ) : null}
@@ -132,15 +154,11 @@ const ShortCard = memo(function ShortCard({
           {timeAgo(article.published_at, language)}
         </T>
 
-        <View style={styles.action}>
-          <Button
-            label={t('shorts.readFull')}
-            iconRight="arrowRight"
-            onPress={() =>
-              router.push({ pathname: '/article/[shortId]', params: { shortId: article.short_id } })
-            }
-          />
-        </View>
+        {hasBody ? (
+          <View style={styles.action}>
+            <Button label={t('shorts.readFull')} iconRight="arrowRight" onPress={open} />
+          </View>
+        ) : null}
 
         {/* The same row the feed cards and the article carry. `flags="cache"`
             so a deck of cards never issues a request per card, and no
@@ -148,6 +166,20 @@ const ShortCard = memo(function ShortCard({
             button routes into the story like everything else here. */}
         <ArticleActions article={article} size="card" flags="cache" />
       </View>
+    </>
+  );
+
+  return (
+    <Animated.View style={[styles.card, { height: deck }, depth]}>
+      {/* With a body the whole card taps through; the "Read full" button stays
+          the screen-reader route, so the surface is not one grouped element. */}
+      {hasBody ? (
+        <PressableScale onPress={open} haptic={false} accessible={false} style={styles.fill}>
+          {content}
+        </PressableScale>
+      ) : (
+        <View style={styles.fill}>{content}</View>
+      )}
     </Animated.View>
   );
 });
@@ -239,8 +271,7 @@ export default function ShortNewsScreen() {
   );
 
   return (
-    <Screen edges={['top']} bottomInset>
-      <Stack.Screen options={{ headerShown: false, title: t('shorts.title') }} />
+    <Screen>
       <ScreenHeader title={t('shorts.title')} />
 
       <View style={styles.deck} onLayout={measure}>
@@ -249,7 +280,7 @@ export default function ShortNewsScreen() {
         ) : feed.isError && !feed.data ? (
           <ErrorState error={feed.error} onRetry={() => feed.refetch()} />
         ) : articles.length === 0 ? (
-          <EmptyState icon="zap" />
+          <EmptyState icon="zap" title={t('shorts.empty')} />
         ) : deck > 0 ? (
           <>
             <Animated.FlatList
@@ -305,20 +336,25 @@ const useStyles = makeStyles((color) => ({
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: color.rule,
+    // Clips the one frame before the summary is measured, and an A++ step on
+    // a phone too small for even one line.
+    overflow: 'hidden',
   },
+  fill: { flex: 1, justifyContent: 'flex-start' },
+  // Image news: the photo carries the card, taking whatever the words leave.
   hero: {
     width: '100%',
-    height: '38%',
+    flex: 1,
+    minHeight: `${HERO_FLOOR * 100}%`,
     borderTopLeftRadius: radius.lg,
     borderTopRightRadius: radius.lg,
     backgroundColor: color.placeholder,
   },
   aiTag: { position: 'absolute', top: space.md, left: space.lg },
   // Room at the foot for the swipe hint that floats over the first card.
-  body: { flex: 1, padding: space.lg, paddingBottom: space.xxl, gap: space.sm },
+  body: { padding: space.lg, paddingBottom: space.xxl, gap: space.sm },
   kickers: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm },
-  text: { flex: 1, minHeight: 0, gap: space.sm },
-  flexText: { flexShrink: 1, minWidth: 0 },
+  text: { gap: space.sm },
   action: { flexShrink: 0, alignSelf: 'flex-start' },
   // Its own snap page, so the end-of-list line and its retry are reachable.
   footer: { justifyContent: 'center' },

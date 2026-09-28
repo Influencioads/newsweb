@@ -8,10 +8,11 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
+import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
 import { space } from '@/lib/theme';
 import { makeStyles, useColors } from '@/lib/useTheme';
+import { useBottomInset } from '@/stores/player';
 
 /**
  * Screen — the root of every route.
@@ -20,6 +21,9 @@ import { makeStyles, useColors } from '@/lib/useTheme';
  * routes pushed outside the tabs opt in with `bottomInset`), the themed
  * ground, and the optional ScrollView / KeyboardAvoidingView / branded
  * RefreshControl so screens never assemble those themselves.
+ *
+ * `bottomInset` pads nothing while the audio dock is up: the dock sits under
+ * the stack and carries the home-indicator inset itself.
  */
 export interface ScreenProps {
   children?: ReactNode;
@@ -58,10 +62,10 @@ export function Screen({
 }: ScreenProps) {
   const styles = useStyles();
   const color = useColors();
-  const insets = useSafeAreaInsets();
+  const bottom = useBottomInset();
   const content: StyleProp<ViewStyle> = [
     padded && styles.padded,
-    bottomInset && { paddingBottom: insets.bottom },
+    bottomInset && { paddingBottom: bottom },
     contentContainerStyle,
   ];
 

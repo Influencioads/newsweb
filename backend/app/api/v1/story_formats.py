@@ -21,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.v1.audio import _article
+from app.api.v1.audio import _disabled_payload as audio_disabled_payload
 from app.api.v1.audio import _payload as audio_payload
 from app.core.deps import Principal, require_any_permission
 from app.core.errors import NotFoundError
@@ -63,8 +64,14 @@ def story_formats(short_id: str, response: Response, db: Session = Depends(get_d
     response.headers["CDN-Cache-Control"] = "public, s-maxage=120"
 
     # Reuses the article-audio payload verbatim rather than describing audio a
-    # second time — one shape, one place it can be wrong.
-    audio = audio_payload(article, tts_service.existing_ready(db, article))
+    # second time — one shape, one place it can be wrong. Gated by the same §20
+    # switch as /audio: turning voice off clears neither an upload nor a cached
+    # rendition, so without it this advertised a file /audio would refuse.
+    audio = (
+        audio_payload(article, tts_service.existing_ready(db, article))
+        if tts_service.is_enabled(db, article)
+        else audio_disabled_payload()
+    )
 
     video = video_for(db, article)
     card_url = share_card_service.ensure_card(db, article)

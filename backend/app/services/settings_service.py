@@ -16,7 +16,10 @@ require an explicit admin action, and this is where that is enforced.
 
 from __future__ import annotations
 
+import re
 import time
+from dataclasses import asdict
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import select
@@ -124,9 +127,9 @@ SPECS: dict[str, Spec] = {
     "ai.image_model": Spec(
         catalogue.DEFAULT_IMAGE_MODEL,
         "str_optional",
-        "Which model draws that illustration. The default is the only one "
-        "measured that left real space for a headline and drew no garbled "
-        "lettering.",
+        "Which model draws that illustration, and the picture on a news card. "
+        "The default, GPT Image 2.5 Flare, measured a third of the price of "
+        "1.5 with clean, text-free illustrations.",
     ),
     # --- §20 / §21 voice ----------------------------------------------------
     "voice.enabled": Spec(
@@ -137,7 +140,7 @@ SPECS: dict[str, Spec] = {
         "by hand still plays, because it costs nothing to serve.",
     ),
     "voice.provider": Spec(
-        "local", "str", "TTS adapter: local | google | bhashini | aimlapi."
+        "local", "str", "TTS adapter: local | google | bhashini | aimlapi | sarvam."
     ),
     "voice.api_key": Spec(
         "",
@@ -148,10 +151,12 @@ SPECS: dict[str, Spec] = {
     "voice.model": Spec(
         catalogue.DEFAULT_TTS_MODEL,
         "str_optional",
-        "Speech model to use where the provider exposes a choice (aimlapi). "
-        "The default is the cheapest one measured that returns a real MP3 — "
-        "sixteen times cheaper than the next that worked. Blank uses the "
-        "adapter default.",
+        "Speech model to use where the provider exposes a choice (aimlapi, "
+        "sarvam). The default is the cheapest aimlapi model measured that "
+        "returns a real MP3 — sixteen times cheaper than the next that "
+        "worked. Sarvam's own ids carry a `sarvam/` prefix and are only "
+        "meaningful when that provider is selected. Blank uses the adapter "
+        "default.",
     ),
     "voice.language": Spec("te-IN", "str", "Synthesis language tag."),
     "voice.auto_generate_on_publish": Spec(
@@ -252,6 +257,19 @@ SPECS: dict[str, Spec] = {
         "queue. An unknown name falls back to manual rather than locking "
         "applicants out.",
     ),
+    # --- branding -----------------------------------------------------------
+    # Defaults are the designed palette (assets/index.css). While a colour sits
+    # at its default the site renders the hand-tuned light and dark values; a
+    # changed one has its shades and dark-mode variant derived in the browser.
+    "brand.primary": Spec(
+        "#0d47a1", "color", "Main brand colour: masthead, buttons, links, active tabs."
+    ),
+    "brand.breaking": Spec(
+        "#be0a14", "color", "Breaking and urgent news: the ticker, Live and Breaking badges."
+    ),
+    "brand.accent": Spec(
+        "#d0101a", "color", "Accent colour: Exclusive badges and highlights."
+    ),
     # --- sharing ------------------------------------------------------------
     "share_card.enabled": Spec(
         True,
@@ -260,11 +278,26 @@ SPECS: dict[str, Spec] = {
         "on a host whose Pillow cannot shape Telugu — see the deployment "
         "notes; readers then share text and a link, as before.",
     ),
-    # --- three-hourly audio bulletin ----------------------------------------
+    # --- push notifications -------------------------------------------------
+    "push.enabled": Spec(
+        True,
+        "bool",
+        "Send push notifications to phones through Expo. Off keeps the in-app "
+        "inbox working and holds scheduled campaigns; anything published while "
+        "it is off stays inbox-only, so switching back on never floods phones.",
+    ),
+    "push.expo_access_token": Spec(
+        "",
+        "secret",
+        "Expo access token, held encrypted. Only needed when 'Enhanced push "
+        "security' is on in the Expo project; blank sends without one. "
+        "Write-only.",
+    ),
+    # --- audio bulletins, seven a day ----------------------------------------
     "bulletin.enabled": Spec(
         False,
         "bool",
-        "Produce and serve the three-hourly audio bulletin. Off stops the "
+        "Produce and serve the seven daily audio bulletins. Off stops the "
         "schedule and hides every bulletin, including ones already live — this "
         "is the emergency stop.",
     ),
@@ -370,13 +403,126 @@ SPECS: dict[str, Spec] = {
         "Rewrites per hour for the breaking beat, which runs on its own faster "
         "schedule. Hourly breaking news is not breaking.",
     ),
+    "crawl.open_licence_images": Spec(
+        False,
+        "bool",
+        "When an imported story has no usable picture of its own, look for one "
+        "on Wikimedia Commons. Only CC0/PDM images are used — the two licences "
+        "that waive credit worldwide — and a stand-in is captioned as a "
+        "representative image. Nothing is drawn and nothing is bought: if no "
+        "such photo exists, and for most district stories none does, the story "
+        "runs without one. Off means it never looks.",
+    ),
     "crawl.max_age_hours": Spec(
         18,
         "int",
         "Ignore feed entries older than this. A source that republishes its "
         "archive should not fill the queue with last month's news.",
     ),
+    # Everything below defaults to what the crawl did before it was a setting:
+    # round the clock, hourly, no daily ceiling, every district.
+    "crawl.active_from_hour": Spec(
+        0,
+        "int",
+        "First IST hour the crawl runs (0-23). With active_to_hour it may wrap "
+        "past midnight: 22 to 6 means overnight only.",
+    ),
+    "crawl.active_to_hour": Spec(
+        24,
+        "int",
+        "IST hour the crawl stops, exclusive (0-24; 0 and 24 both mean "
+        "midnight). Equal to the start hour means round the clock.",
+    ),
+    "crawl.breaking_all_day": Spec(
+        True,
+        "bool",
+        "Let the breaking beat run outside the crawl hours. News does not keep "
+        "office hours.",
+    ),
+    "crawl.fetch_every_minutes": Spec(
+        60,
+        "int",
+        "How often the fetch pass runs. A source is still only polled once its "
+        "own interval has passed.",
+    ),
+    "crawl.rewrite_every_minutes": Spec(
+        60,
+        "int",
+        "How often the rewrite pass runs. The hourly and daily caps still apply.",
+    ),
+    "crawl.daily_item_cap": Spec(
+        0,
+        "int",
+        "Rewrites per IST day across every beat. 0 means no daily ceiling, only "
+        "the hourly one.",
+    ),
+    "crawl.max_entries_per_fetch": Spec(
+        50, "int", "The most entries read from one feed in one fetch."
+    ),
+    "crawl.max_consecutive_failures": Spec(
+        8,
+        "int",
+        "A source failing this many times in a row is left alone until an "
+        "admin fetches it by hand; hammering a broken endpoint is how you get "
+        "blocked.",
+    ),
+    "crawl.districts": Spec(
+        [],
+        "ids",
+        "District ids the crawl works for. Empty means every district. A story "
+        "with no district is always kept — national news has none.",
+    ),
+    "crawl.similarity_block_percent": Spec(
+        int(env_settings.AI_SIMILARITY_BLOCK_PERCENT or 0),
+        "int",
+        "Refuse a Telugu rewrite that shares this much wording with its source "
+        "(0-100). 0 turns the check off.",
+    ),
+    "crawl.sensitive_extra_terms": Spec(
+        [],
+        "str_list",
+        "Words or phrases that send a story to a person instead of the AI. "
+        "They add to the built-in list and can never remove from it.",
+    ),
 }
+
+#: The fetch/rewrite cadences on offer. Each divides a day evenly, so a pass
+#: lands on the same clock minutes every day (see `crawl_service.cadence_due`).
+CRAWL_CADENCE_MINUTES = [5, 10, 15, 20, 30, 60, 120]
+
+#: Ranges for the int settings that have one. Only keys added with a range are
+#: listed: bounding an older key would make a save fail on any install whose
+#: stored value already sits outside it.
+_INT_BOUNDS: dict[str, tuple[int, int]] = {
+    "crawl.active_from_hour": (0, 23),
+    "crawl.active_to_hour": (0, 24),
+    "crawl.fetch_every_minutes": (5, 120),
+    "crawl.rewrite_every_minutes": (5, 120),
+    "crawl.daily_item_cap": (0, 5000),
+    "crawl.max_entries_per_fetch": (1, 200),
+    "crawl.max_consecutive_failures": (1, 100),
+    "crawl.similarity_block_percent": (0, 100),
+}
+
+
+def _speech_choices(kind: str) -> list[dict[str, Any]]:
+    """The speech models for `kind`, each carrying the voices it accepts and
+    any bulletin presets it has.
+
+    Attached per model rather than offered as one flat list because a voice
+    belongs to a model: `alloy` on an ElevenLabs model is a 400 nobody can
+    read, and a Sarvam v2 speaker on v3 is a 422. The screen can only show the
+    right ones if the payload says which are right.
+    """
+    return [
+        {
+            **choice,
+            "voices": list(catalogue.tts_voices(str(choice["id"]))),
+            "presets": [asdict(p) for p in catalogue.voice_presets(str(choice["id"]))],
+        }
+        for choice in catalogue.choices_for(kind)
+    ]
+
 
 #: What the settings screen should offer for the keys where free text is a
 #: trap: a model id nobody proof-reads becomes a 25-second timeout with no
@@ -387,7 +533,12 @@ _CHOICES: dict[str, list[Any]] = {
     "ai.model": catalogue.choices_for("text"),
     "ai.bulk_model": catalogue.choices_for("text"),
     "ai.image_model": catalogue.choices_for("image"),
-    "voice.model": catalogue.choices_for("tts"),
+    # One row, two vendors: the screen shows whichever list matches the
+    # selected provider and the `sarvam/` prefix is what tells them apart.
+    "voice.model": [
+        *_speech_choices("tts"),
+        *_speech_choices("tts_sarvam"),
+    ],
     # Voices belong to a model and this list cannot see which model is
     # selected, so it offers the default model's. A leftover choice from
     # another vendor is repaired at call time by `catalogue.valid_voice`, not
@@ -397,6 +548,10 @@ _CHOICES: dict[str, list[Any]] = {
         DEFAULT_VOICE_SENTINEL,
         *catalogue.tts_voices(catalogue.DEFAULT_TTS_MODEL),
     ],
+    # Unlike the model lists these are enforced by `_coerce`: any other
+    # cadence would drift across the day instead of landing on the clock.
+    "crawl.fetch_every_minutes": CRAWL_CADENCE_MINUTES,
+    "crawl.rewrite_every_minutes": CRAWL_CADENCE_MINUTES,
 }
 
 
@@ -498,7 +653,25 @@ def _coerce(key: str, value: Any) -> Any:
             raise ValidationError(details={key: "must be a whole number"})
         if value < 0:
             raise ValidationError(details={key: "must not be negative"})
+        low, high = _INT_BOUNDS.get(key, (0, value))
+        if not low <= value <= high:
+            raise ValidationError(details={key: f"must be {low}-{high}"})
+        allowed = _CHOICES.get(key)
+        if allowed is not None and value not in allowed:
+            raise ValidationError(details={key: f"must be one of {allowed}"})
         return value
+    if spec.kind == "ids":
+        if not isinstance(value, list) or any(
+            isinstance(v, bool) or not isinstance(v, int) or v <= 0 for v in value
+        ):
+            raise ValidationError(details={key: "must be a list of ids"})
+        return sorted(set(value))[:500]
+    if spec.kind == "str_list":
+        if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+            raise ValidationError(details={key: "must be a list of strings"})
+        # Blank lines from a textarea are dropped rather than refused.
+        terms = dict.fromkeys(v.strip()[:80] for v in value if v.strip())
+        return list(terms)[:200]
     if spec.kind == "float":
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             raise ValidationError(details={key: "must be a number"})
@@ -507,6 +680,12 @@ def _coerce(key: str, value: Any) -> Any:
         if not isinstance(value, str) or not value.strip():
             raise ValidationError(details={key: "must be a non-empty string"})
         return value.strip()[:120]
+    if spec.kind == "color":
+        # Only #rrggbb: it goes straight into a stylesheet on every page, so
+        # anything looser is a CSS-injection hole, not a convenience.
+        if not isinstance(value, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", value.strip()):
+            raise ValidationError(details={key: "must be a colour like #0d47a1"})
+        return value.strip().lower()
     if spec.kind == "str_optional":
         # Same as `str` but blank is meaningful: it means "use the adapter
         # default" rather than "the admin forgot to fill this in".
@@ -604,6 +783,7 @@ def describe() -> list[dict[str, Any]]:
     `choices` is the shortlist to render as a dropdown: measured model objects
     for the model settings, plain voice ids for `voice.voice_name`, and None
     wherever the value is genuinely free-form and the screen should show a box.
+    `min`/`max` are present only for the keys `_coerce` bounds.
     """
     return [
         {
@@ -612,6 +792,8 @@ def describe() -> list[dict[str, Any]]:
             "default": spec.default,
             "description": spec.description,
             "choices": _CHOICES.get(key),
+            "min": _INT_BOUNDS[key][0] if key in _INT_BOUNDS else None,
+            "max": _INT_BOUNDS[key][1] if key in _INT_BOUNDS else None,
         }
         for key, spec in SPECS.items()
     ]
@@ -671,13 +853,40 @@ def tts_credentials(db: Session) -> dict[str, str | float]:
     came back 400.
     """
     voice = str(get(db, "voice.voice_name") or "").strip()
+    provider = str(get(db, "voice.provider") or "local").lower()
+    key = get_secret(db, "voice.api_key")
     return {
-        "provider": str(get(db, "voice.provider") or "local").lower(),
-        "api_key": get_secret(db, "voice.api_key") or get_secret(db, "ai.api_key"),
-        "base_url": str(get(db, "ai.base_url") or ""),
+        "provider": provider,
+        # The fall back to the AI key is aimlapi's alone, because the reason
+        # for it is aimlapi's alone: one account issues one key for text and
+        # speech. Handing that key to Sarvam would be a 403 an admin reads as
+        # "my Sarvam key is wrong" while the box they filled in is empty.
+        "api_key": key or (get_secret(db, "ai.api_key") if provider == "aimlapi" else ""),
+        # Same reasoning: `ai.base_url` points at the aimlapi account, so it is
+        # only sent to the adapter that account belongs to.
+        "base_url": str(get(db, "ai.base_url") or "") if provider == "aimlapi" else "",
         "model": str(get(db, "voice.model") or ""),
         "voice": "" if voice == DEFAULT_VOICE_SENTINEL else voice,
+        # `voice.speed` has been on the settings screen, and in every adapter
+        # signature, without ever being read — so the pace an editor set was
+        # silently always 1.0. It is resolved here because this is the only
+        # place that talks to `get_tts`.
+        "speed": float(get(db, "voice.speed") or 1.0),
     }
+
+
+def brand_colors(db: Session) -> dict[str, str]:
+    """The brand colours an admin has changed, for `/public/config`.
+
+    Defaults are left out so the browser keeps the hand-tuned palette (and its
+    dark-mode values) for them, and so the defaults live only here.
+    """
+    changed = {}
+    for name in ("primary", "breaking", "accent"):
+        value = get(db, f"brand.{name}")
+        if value != SPECS[f"brand.{name}"].default:
+            changed[name] = str(value)
+    return changed
 
 
 def ai_enabled(db: Session) -> bool:
@@ -705,6 +914,29 @@ def crawl_rewrite_enabled(db: Session) -> bool:
     """The rewrite needs the crawl on, AI permitted by the environment, and an
     admin to have switched AI on — three separate decisions, all required."""
     return crawl_enabled(db) and ai_enabled(db) and get_bool(db, "crawl.rewrite_enabled")
+
+
+_IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def crawl_active_now(db: Session, now: datetime | None = None) -> bool:
+    """Whether `now` is inside the admin's crawl hours, in IST.
+
+    The window may wrap past midnight (22 to 6 is overnight). A start equal to
+    the end — including the default 0 to 24 — is round the clock.
+    """
+    start = get_int(db, "crawl.active_from_hour") % 24
+    end = get_int(db, "crawl.active_to_hour") % 24
+    if start == end:
+        return True
+    hour = (now or datetime.now(timezone.utc)).astimezone(_IST).hour
+    return start <= hour < end if start < end else (hour >= start or hour < end)
+
+
+def crawl_districts(db: Session) -> set[int]:
+    """The districts the crawl is limited to. Empty means all of them."""
+    value = get(db, "crawl.districts")
+    return {int(v) for v in value} if isinstance(value, list) else set()
 
 
 def feed_ratios(db: Session) -> dict[str, int]:

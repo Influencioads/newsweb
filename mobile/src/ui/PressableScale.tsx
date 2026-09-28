@@ -41,6 +41,9 @@ export interface PressableScaleProps {
   accessibilityRole?: AccessibilityRole;
   accessibilityState?: AccessibilityState;
   accessibilityHint?: string;
+  /** `false` for a tap-anywhere surface that holds its own controls (a
+   *  short-news card), so a screen reader still reaches each one. */
+  accessible?: boolean;
   /** Android ripple (ink at 8%). */
   ripple?: boolean;
   children?: ReactNode;
@@ -65,6 +68,7 @@ export function PressableScale({
   accessibilityRole = 'button',
   accessibilityState,
   accessibilityHint,
+  accessible,
   ripple = false,
   children,
   testID,
@@ -99,6 +103,7 @@ export function PressableScale({
       disabled={disabled}
       hitSlop={hitSlop}
       android_ripple={ripple ? { color: alpha(color.ink, 0.08) } : undefined}
+      accessible={accessible}
       accessibilityRole={accessibilityRole}
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}

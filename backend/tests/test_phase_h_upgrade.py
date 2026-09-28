@@ -161,6 +161,7 @@ class TestArticleForm:
             "source_type": "own",
             "is_exclusive": True,
             "is_featured": True,
+            "is_short": True,
             "voice_enabled": True,
             "seo_title": "Vijayawada metro construction begins",
             "seo_description": "Phase one covers twelve stations.",
@@ -172,6 +173,7 @@ class TestArticleForm:
 
         assert row["slug"] == "vijayawada-metro-work-begins"
         assert row["is_featured"] is True
+        assert row["is_short"] is True
         assert row["seo_title"] == "Vijayawada metro construction begins"
         assert row["mandal_id"] == (mandal.id if mandal else None)
         assert {t["name_te"] for t in row["tags"]} == {"మెట్రో", "విజయవాడ"}
@@ -271,6 +273,25 @@ class TestSettings:
         r = client.patch("/api/v1/cms/settings",
                          json={"values": {"ai.publish_without_review": True}}, headers=admin)
         assert r.status_code == 422
+
+    def test_brand_colour_is_validated_and_reaches_public_config(
+        self, client: TestClient, db: Session
+    ) -> None:
+        admin = staff_headers(db, role=RoleKey.ADMIN, email="h-admin@test.example.com")
+        # Goes into a stylesheet on every page, so anything but #rrggbb is refused.
+        for bad in ("red", "#fff", "#0f5f57;}body{display:none"):
+            r = client.patch("/api/v1/cms/settings",
+                             json={"values": {"brand.primary": bad}}, headers=admin)
+            assert r.status_code == 422, bad
+        r = client.patch("/api/v1/cms/settings",
+                         json={"values": {"brand.primary": "#C0392B"}}, headers=admin)
+        assert r.status_code == 200, r.text
+        # Only the changed colour is sent; defaults stay the designed palette.
+        assert client.get("/api/v1/public/config").json()["brand"] == {"primary": "#c0392b"}
+
+        client.patch("/api/v1/cms/settings",
+                     json={"values": {"brand.primary": "#0d47a1"}}, headers=admin)
+        assert client.get("/api/v1/public/config").json()["brand"] == {}
 
     def test_a_reporter_cannot_change_settings(self, client: TestClient, db: Session) -> None:
         reporter = staff_headers(db, role=RoleKey.REPORTER, email="h-reporter@test.example.com")

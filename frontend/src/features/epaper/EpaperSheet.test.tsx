@@ -87,13 +87,13 @@ describe('EpaperSheet', () => {
 
   it('draws the masthead on page 1 only and the folio on every page', () => {
     const first = draw(<EpaperSheet page={page} edition={edition} />);
-    expect(screen.getByText(WORDMARK)).toHaveClass('ep-wordmark');
+    expect(screen.getByAltText(WORDMARK)).toHaveClass('ep-wordmark');
     expect(screen.getByText('మొదటి పేజీ')).toBeInTheDocument();
     expect(screen.getByText('1')).toHaveClass('ep-folio-num');
     first.unmount();
 
     draw(<EpaperSheet page={{ ...page, page_number: 2, title: 'రాష్ట్రం' }} edition={edition} />);
-    expect(screen.queryByText(WORDMARK)).toBeNull();
+    expect(screen.queryByAltText(WORDMARK)).toBeNull();
     expect(screen.getByText('రాష్ట్రం')).toBeInTheDocument();
     expect(screen.getByText('2')).toHaveClass('ep-folio-num');
   });

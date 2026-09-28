@@ -1,4 +1,5 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList, RefreshControl, View, type ListRenderItem } from 'react-native';
 
@@ -19,7 +20,8 @@ import { ScreenHeader } from '@/ui/ScreenHeader';
 import { T } from '@/ui/Text';
 
 /**
- * Search (§10) — full-text with offset paging.
+ * Search (§10) — full-text with offset paging. A stack screen, reached from
+ * the Home masthead's search icon (the tab it used to hold is now Shorts).
  *
  * The box searches as the reader types (debounced, so a Telugu word being
  * composed does not fire a request per keystroke); Return searches at once.
@@ -77,7 +79,8 @@ export default function SearchScreen() {
   );
 
   return (
-    <Screen keyboard>
+    <Screen keyboard edges={['top']} bottomInset>
+      <Stack.Screen options={{ headerShown: false, title: t('search.title') }} />
       <ScreenHeader title={t('search.title')} showRule={false} />
       <View style={styles.searchRow}>
         <Input

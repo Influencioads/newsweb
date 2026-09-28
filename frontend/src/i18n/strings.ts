@@ -42,6 +42,8 @@ export const STRINGS = {
   'reader.fontSize': { te: 'అక్షర పరిమాణం', en: 'Text size' },
   'reader.language': { te: 'భాష', en: 'Language' },
   'reader.listen': { te: 'వినండి', en: 'Listen' },
+  'reader.location': { te: 'మీ ప్రాంతం', en: 'Your area' },
+  'reader.chooseLocation': { te: 'ప్రాంతం ఎంచుకోండి', en: 'Choose your area' },
   'reader.listenSoon': { te: 'టెక్స్ట్-టు-స్పీచ్ త్వరలో', en: 'Text-to-speech coming soon' },
   'reader.bookmark': { te: 'బుక్‌మార్క్', en: 'Bookmark' },
   'reader.bookmarkLogin': {
@@ -78,6 +80,15 @@ export const STRINGS = {
   'article.aiImage': {
     te: 'AI రూపొందించిన చిత్రం',
     en: 'AI-generated image',
+  },
+  /**
+   * A library photo standing in for a picture of the event. The article page
+   * prints it in the caption; cards and listings show no caption at all, which
+   * is where most readers meet the photo — so `NewsImage` badges it there.
+   */
+  'article.representativeImage': {
+    te: 'ప్రాతినిధ్య చిత్రం',
+    en: 'Representative image',
   },
   /** Shown when a story has no English headline yet (§7.3 translation is Phase 7). */
   'article.teluguOnly': {
@@ -324,6 +335,10 @@ export const STRINGS = {
   'admin.cms': { te: 'న్యూస్‌రూమ్ CMS', en: 'Newsroom CMS' },
   'admin.searchPlaceholder': { te: 'కథనాలు వెతకండి…', en: 'Search articles…' },
   'admin.signOut': { te: 'లాగ్ అవుట్', en: 'Sign out' },
+  'admin.teluguTyping': {
+    te: 'తెలుగు టైపింగ్ (ఇంగ్లీష్ అక్షరాలతో) — ఉదా. telugu → తెలుగు',
+    en: 'Telugu typing (phonetic) — e.g. telugu → తెలుగు',
+  },
   'admin.toggleNav': { te: 'నావిగేషన్ మార్చండి', en: 'Toggle navigation' },
   'admin.collapseNav': { te: 'సైడ్‌బార్ కుదించండి', en: 'Collapse sidebar' },
   'admin.expandNav': { te: 'సైడ్‌బార్ విస్తరించండి', en: 'Expand sidebar' },
@@ -336,6 +351,9 @@ export const STRINGS = {
   'admin.page.dashboard': { te: 'డాష్‌బోర్డ్', en: 'Dashboard' },
   'admin.page.articles': { te: 'కథనాలు', en: 'Articles' },
   'admin.page.newArticle': { te: 'కొత్త కథనం', en: 'New article' },
+  'admin.page.newShort': { te: 'కొత్త షార్ట్ న్యూస్', en: 'New short news' },
+  'admin.page.creative': { te: 'క్రియేటివ్ స్టూడియో', en: 'Creative studio' },
+  'admin.page.crawlSettings': { te: 'క్రాల్ సెట్టింగ్స్', en: 'Crawl settings' },
   'admin.page.editArticle': { te: 'కథనం సవరించండి', en: 'Edit article' },
   'admin.page.review': { te: 'రివ్యూ క్యూ', en: 'Review queue' },
   'admin.page.pending': { te: 'పెండింగ్ కథనాలు', en: 'Pending articles' },
@@ -381,6 +399,27 @@ export const STRINGS = {
   // Chrome, not domain copy: the picker's own wording stays inline beside it.
   'ui.generate': { te: 'తయారు చేయండి', en: 'Generate' },
   'ui.generating': { te: 'తయారవుతోంది…', en: 'Generating…' },
+
+  // --- the global audio player (components/player) ---------------------------
+  'player.label': { te: 'ఆడియో ప్లేయర్', en: 'Audio player' },
+  'player.nowPlaying': { te: 'ఇప్పుడు వినిపిస్తోంది', en: 'Now playing' },
+  'player.open': { te: 'ప్లేయర్ తెరవండి', en: 'Open player' },
+  'player.minimise': { te: 'ప్లేయర్ చిన్నదిగా చేయండి', en: 'Minimise player' },
+  'player.stop': { te: 'ఆపి ప్లేయర్ మూసివేయండి', en: 'Stop and close the player' },
+  'player.back15': { te: '15 సెకన్లు వెనక్కి', en: 'Back 15 seconds' },
+  'player.forward15': { te: '15 సెకన్లు ముందుకు', en: 'Forward 15 seconds' },
+  'player.position': { te: 'ఆడియో స్థానం', en: 'Audio position' },
+  'player.upNext': { te: 'వరుసలో', en: 'Up next' },
+  'player.readStory': { te: 'వార్త చదవండి', en: 'Read the story' },
+  'player.onAir': { te: 'ప్రసారంలో', en: 'On air' },
+  'player.offAir': { te: 'ప్రసారం కాలేదు', en: 'Not on air' },
+  'player.buffering': { te: 'లోడ్ అవుతోంది…', en: 'Loading…' },
+  'player.error': { te: 'ఆడియో ప్లే కాలేదు', en: 'The audio could not play' },
+  'player.playAll': { te: 'అన్నీ వినండి', en: 'Play all' },
+  'player.dial': { te: 'నేటి బులెటిన్ల డయల్', en: "Today's bulletin dial" },
+  'player.kind.article': { te: 'వార్త', en: 'Story' },
+  'player.kind.bulletin': { te: 'ఆడియో బులెటిన్', en: 'Audio bulletin' },
+  'player.kind.epaper': { te: 'ఈ-పేపర్ రేడియో', en: 'E-paper radio' },
 } as const satisfies Record<string, Record<Language, string>>;
 
 export type StringKey = keyof typeof STRINGS;

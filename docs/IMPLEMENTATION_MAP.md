@@ -12,26 +12,27 @@ Screen ids (`1a`..`1n`) are the mockup's own ids. `§x` refers to Build Instruct
 
 | Token | Value | Use |
 |---|---|---|
-| `--brand` | `#0F5F57` peacock teal | masthead, primary buttons, active nav, links |
-| `--breaking` | `#9A5B0B` burnished amber | breaking ticker/chips, overdue age chip, destructive — **never red** |
-| `--exclusive` | `#B48A2A` champagne gold | exclusive star, the premium accent, correction / editor note |
-| `--ink` | `#191C1C` | body text, CMS sidebar, dark surfaces |
-| `--muted` | `#6A6E6B` | secondary text |
-| `--muted-2` | `#8C918D` | decoration only (chevrons, placeholders) |
-| `--paper` | `#FBF9F4` ivory | card/page surface |
-| `--canvas` | `#F2EFE8` | app background |
-| `--cms-canvas` | `#F5F3EE` | CMS working background |
-| `--rule` | `#E4E0D6` | borders, dividers |
+| `--brand` | `#0D47A1` logo blue | primary buttons, active nav, links |
+| `--breaking` | `#BE0A14` deep red | breaking ticker/chips, overdue age chip, destructive |
+| `--exclusive` | `#D0101A` logo red | exclusive star, the accent, correction / editor note |
+| `--ink` | `#17191E` | body text, CMS sidebar, dark surfaces |
+| `--muted` | `#666B75` | secondary text |
+| `--muted-2` | `#8A8F99` | decoration only (chevrons, placeholders) |
+| `--paper` | `#FFFFFF` | card/page surface |
+| `--canvas` | `#FFFFFF` | app background |
+| `--cms-canvas` | `#F6F7F9` | CMS working background |
+| `--rule` | `#E5E7EB` | borders, dividers |
 | `--ai` | `#6D4FC4` | AI badges, AI drafts tab, auto-detected hotspots |
 | `--partial` | `#7A6A25` olive gold | pending / partially available |
 | `--success` | `#3B7D45` | linked hotspot, published state, toggles on |
 | `--info` | `#2F5E8C` | IN_REVIEW / SCHEDULED state, "see all" links |
 | `--placeholder` | `#E9E5DC` | reserved-height media boxes |
 
-The original mockup `1a` palette was brand-red; it was replaced in the UI
-upgrade with the teal-and-gold identity above (no red anywhere), and the dark
-palette lightens the teal, amber and gold so foregrounds on those fills become
-ink rather than white.
+The palette follows the logo (`frontend/public/logo.webp`): blue brand, red
+accent and breaking, clean white ground. It replaced the UI upgrade's
+teal-and-gold identity on 2026-09-24; migration `8e1c5a3f6d27` clears stored
+brand colours that still pinned the old defaults. The dark palette lightens
+the blue and red so foregrounds on those fills become ink rather than white.
 
 Type: headline `Noto Serif Telugu 700/800` 30-34px web / lh 1.5 · body `Noto Sans Telugu 400` 19px web,
 17sp app / **lh 1.7** · Latin display `Fraunces` · Latin chrome + numerals `Manrope`. Hit targets >= 44px.

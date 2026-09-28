@@ -211,6 +211,7 @@ function frontPage(teaser: EpaperTeaser | null): MediaOut | null {
     caption_te: null,
     credit: null,
     license_label: null,
+    representative: false,
     source_url: null,
     width: null,
     height: null,

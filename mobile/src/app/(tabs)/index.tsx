@@ -1,11 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { useAudioPlayer, type AudioPlayer } from 'expo-audio';
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
-import { RefreshControl, View, type ListRenderItem } from 'react-native';
+import { RefreshControl, View, useWindowDimensions, type ListRenderItem } from 'react-native';
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 
-import { absoluteMediaUrl } from '@/api/client';
 import * as engagementApi from '@/api/engagement';
 import * as epaperApi from '@/api/epaper';
 import type { Poll } from '@/api/epaper';
@@ -16,6 +14,7 @@ import { CompactCard, LeadCard, RowCard } from '@/components/ArticleCard';
 import { BulletinCard, useBulletin, type BulletinSummary } from '@/components/BulletinCard';
 import { EmptyState, ErrorState } from '@/components/Feedback';
 import { HomeListHeader } from '@/components/home/HomeListHeader';
+import { LocationSheet, usePlaceName } from '@/components/LocationSheet';
 import { PollCard } from '@/components/PollCard';
 import { SectionHeader } from '@/components/SectionHeader';
 import { VideoStrip } from '@/components/VideoStrip';
@@ -25,9 +24,12 @@ import { makeStyles, useColors } from '@/lib/useTheme';
 import { useAuth } from '@/stores/auth';
 import { usePrefs } from '@/stores/prefs';
 import { IconButton } from '@/ui/Button';
+import { Icon } from '@/ui/Icon';
+import { PressableScale } from '@/ui/PressableScale';
 import { Screen } from '@/ui/Screen';
 import { ScreenHeader } from '@/ui/ScreenHeader';
 import { SkeletonFeed } from '@/ui/Skeleton';
+import { T } from '@/ui/Text';
 
 /**
  * Home feed: breaking strip, e-paper promo, top topics, lead story, secondary
@@ -40,7 +42,7 @@ type Row =
   | { key: string; type: 'lead' | 'row' | 'compact'; article: ArticleCard }
   | { key: string; type: 'section'; title: string; href?: Href }
   | { key: string; type: 'poll'; poll: Poll }
-  | { key: string; type: 'bulletin'; bulletin: BulletinSummary; player: AudioPlayer }
+  | { key: string; type: 'bulletin'; bulletin: BulletinSummary }
   | { key: string; type: 'video' | 'empty' };
 
 const STAGGER_MAX = 6;
@@ -48,7 +50,7 @@ const STAGGER_MAX = 6;
 function flatten(
   home: HomePayload,
   forYou: ArticleCard[],
-  bulletin: { bulletin: BulletinSummary; player: AudioPlayer } | undefined,
+  bulletin: BulletinSummary | undefined,
   poll: Poll | undefined,
   pick: (te: string | null, en: string | null) => string,
   forYouTitle: string,
@@ -69,7 +71,7 @@ function flatten(
   }
 
   // No row at all when no bulletin is on air (between slots, or switched off).
-  if (bulletin) rows.push({ key: 'bulletin', type: 'bulletin', ...bulletin });
+  if (bulletin) rows.push({ key: 'bulletin', type: 'bulletin', bulletin });
   if (poll) rows.push({ key: `poll-${poll.id}`, type: 'poll', poll });
 
   if (home.latest.length) {
@@ -134,11 +136,6 @@ export default function HomeScreen() {
     staleTime: 120_000,
   });
 
-  const config = useQuery({
-    queryKey: ['config'],
-    queryFn: publicApi.fetchSiteConfig,
-    staleTime: 300_000,
-  });
   const topics = useQuery({
     queryKey: ['top-topics'],
     queryFn: epaperApi.fetchTopics,
@@ -148,14 +145,19 @@ export default function HomeScreen() {
     queryFn: () => epaperApi.fetchPolls(true),
   });
 
-  // The player lives here, not in the row: a virtualised row unmounts a few
-  // viewports down and would release the audio mid-bulletin.
+  // The row is only a trigger: playback belongs to the global player, so a
+  // virtualised row unmounting a few viewports down cannot cut a bulletin off.
   const bulletin = useBulletin();
   const onAir = bulletin.data?.available && bulletin.data.url ? bulletin.data : undefined;
-  const player = useAudioPlayer(onAir ? absoluteMediaUrl(onAir.url) : null);
 
-  const district = edition ? config.data?.districts.find((d) => d.slug === edition) : undefined;
-  const editionName = district ? pick(district.name_te, district.name_en) : null;
+  // Always on screen, naming the reader's place: the chooser is the only way a
+  // location is ever set, so it must never be hard to find.
+  const placeName = usePlaceName();
+  const placeLabel = placeName ?? t('ui.chooseDistrict');
+  const [locationOpen, setLocationOpen] = useState(false);
+  // The logo (140 wide) and the header's padding keep their room; the place
+  // name shrinks to whatever is left beside the icon buttons.
+  const { width } = useWindowDimensions();
   const unreadCount = authed ? (unread.data?.unread ?? 0) : 0;
 
   const scrollY = useSharedValue(0);
@@ -184,7 +186,7 @@ export default function HomeScreen() {
       case 'poll':
         return <PollCard poll={item.poll} />;
       case 'bulletin':
-        return <BulletinCard bulletin={item.bulletin} player={item.player} />;
+        return <BulletinCard bulletin={item.bulletin} />;
       case 'video':
         return <VideoStrip />;
       case 'empty':
@@ -196,7 +198,7 @@ export default function HomeScreen() {
     ? flatten(
         home.data,
         authed ? (forYou.data?.articles ?? []) : [],
-        onAir ? { bulletin: onAir, player } : undefined,
+        onAir,
         polls.data?.[0],
         pick,
         t('foryou.title'),
@@ -209,14 +211,21 @@ export default function HomeScreen() {
       <ScreenHeader
         large
         title={t('site.name')}
-        subtitle={editionName ?? undefined}
         collapsible={{ scrollY }}
         right={
-          <View style={styles.actions}>
-            {editionName ? null : (
-              <IconButton name="mapPin" label={t('ui.chooseDistrict')} onPress={() => router.push('/local')} />
-            )}
-            <IconButton name="zap" label={t('shorts.title')} onPress={() => router.push('/short-news')} />
+          <View style={[styles.actions, { maxWidth: width - 172 }]}>
+            <PressableScale
+              onPress={() => setLocationOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('local.change')}: ${placeLabel}`}
+              style={styles.place}
+            >
+              <Icon name="mapPin" size={16} color={color.brand} />
+              <T variant="ui" weight="semibold" numberOfLines={1} style={styles.placeText}>
+                {placeLabel}
+              </T>
+            </PressableScale>
+            <IconButton name="search" label={t('ui.search')} onPress={() => router.push('/search')} />
             {authed ? (
               <IconButton
                 name="bell"
@@ -228,6 +237,7 @@ export default function HomeScreen() {
           </View>
         }
       />
+      <LocationSheet open={locationOpen} onClose={() => setLocationOpen(false)} />
 
       {home.isLoading ? (
         <SkeletonFeed />
@@ -269,5 +279,7 @@ export default function HomeScreen() {
 
 const useStyles = makeStyles(() => ({
   actions: { flexDirection: 'row', alignItems: 'center' },
+  place: { flexDirection: 'row', alignItems: 'center', gap: space.xs, maxWidth: 160, paddingHorizontal: space.sm, flexShrink: 1 },
+  placeText: { flexShrink: 1 },
   content: { paddingBottom: space.xl },
 }));

@@ -3,8 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#0F5F57" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
     <!--
       Theme + font scale before first paint. Reads the same localStorage key the
@@ -23,9 +24,18 @@
           if (dark) root.classList.add('dark');
           root.style.colorScheme = dark ? 'dark' : 'light';
           var meta = document.querySelector('meta[name="theme-color"]');
-          if (meta) meta.setAttribute('content', dark ? '#1A1F1E' : '#0F5F57');
+          if (meta) meta.setAttribute('content', dark ? '#16181C' : '#FFFFFF');
           var scale = { 'A-': 0.9, 'A': 1, 'A+': 1.15, 'A++': 1.32 }[st.fontStep];
           if (scale) root.style.setProperty('--reader-scale', String(scale));
+          // Last-seen admin brand colours (utils/brand.ts), so a rebranded site
+          // does not flash the default red before /public/config answers.
+          var brand = localStorage.getItem('tn.brand-css');
+          if (brand) {
+            var style = document.createElement('style');
+            style.id = 'tn-brand';
+            style.textContent = brand;
+            document.head.appendChild(style);
+          }
         } catch (e) {}
       })();
     </script>

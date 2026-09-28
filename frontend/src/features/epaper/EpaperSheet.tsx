@@ -226,7 +226,7 @@ export function EpaperSheet({
           style={{ left: MARGIN, top: MARGIN + FOLIO_H, width: CONTENT_W, height: MASTHEAD_H }}
         >
           <div className="mt-2 flex-1 border-t-2 border-ink pt-1">
-            <p className="ep-wordmark th font-extrabold text-brand">{WORDMARK}</p>
+            <img src="/logo.webp" alt={WORDMARK} width={720} height={205} className="ep-wordmark mx-auto" />
             <p lang="en" className="font-sans text-eyebrow font-semibold uppercase tracking-wordmark text-exclusive-text">
               Top Telugu News
             </p>

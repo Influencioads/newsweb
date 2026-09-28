@@ -9,7 +9,7 @@ export type Language = 'te' | 'en';
 const STRINGS = {
   'tab.home': { te: 'హోమ్', en: 'Home' },
   'tab.local': { te: 'లోకల్', en: 'Local' },
-  'tab.search': { te: 'వెతకండి', en: 'Search' },
+  'tab.shorts': { te: 'షార్ట్స్', en: 'Shorts' },
   'tab.profile': { te: 'ప్రొఫైల్', en: 'Profile' },
   'home.breaking': { te: 'బ్రేకింగ్', en: 'BREAKING' },
   'home.latest': { te: 'తాజా వార్తలు', en: 'Latest' },
@@ -92,6 +92,7 @@ const STRINGS = {
   'shorts.title': { te: 'షార్ట్ న్యూస్', en: 'Short News' },
   'shorts.hint': { te: 'పైకి స్వైప్ చేసి చదవండి', en: 'Swipe up to read' },
   'shorts.readFull': { te: 'పూర్తి కథనం చదవండి', en: 'Read the full story' },
+  'shorts.empty': { te: 'షార్ట్ న్యూస్ త్వరలో', en: 'Short news is on its way' },
   'foryou.title': { te: 'మీ కోసం', en: 'For you' },
   'article.listen': { te: 'వినండి', en: 'Listen' },
   'article.stopListening': { te: 'ఆపండి', en: 'Stop' },
@@ -195,16 +196,6 @@ const STRINGS = {
   'local.locality': { te: 'ఊరు / పట్టణం', en: 'Village / town' },
   'local.change': { te: 'ప్రాంతం మార్చండి', en: 'Change location' },
   'local.choosePlace': { te: 'మీ ప్రాంతం ఎంచుకోండి', en: 'Choose your area' },
-  'local.useMyLocation': { te: 'నా ప్రాంతాన్ని గుర్తించు', en: 'Use my location' },
-  'local.locating': { te: 'గుర్తిస్తున్నాం…', en: 'Locating…' },
-  'local.locationDenied': {
-    te: 'ప్రాంత అనుమతి లేదు. కింద ఎంచుకోండి.',
-    en: 'Location permission denied. Choose below.',
-  },
-  'local.locationFailed': {
-    te: 'ప్రాంతాన్ని గుర్తించలేకపోయాం. కింద ఎంచుకోండి.',
-    en: 'Could not detect your location. Choose below.',
-  },
   'article.criticNote': { te: 'సంపాదకుల వ్యాఖ్య', en: "Editor's note" },
   'article.notPreReviewed': { te: 'ఇది ముందుగా సమీక్షించలేదు', en: 'Not pre-reviewed' },
   'article.ugcNotice': {
@@ -273,6 +264,27 @@ const STRINGS = {
   'ui.fontStepDefault': { te: 'సాధారణం', en: 'Default' },
   'ui.fontStepLarger': { te: 'పెద్దది', en: 'Larger' },
   'ui.fontStepLargest': { te: 'అతి పెద్దది', en: 'Largest' },
+  // --- audio player (global player, dock, Now Playing, radio dial) ---------
+  'player.nowPlaying': { te: 'ఇప్పుడు వింటున్నది', en: 'Now playing' },
+  'player.nothing': { te: 'ఏ ఆడియో ప్లే కావడం లేదు.', en: 'Nothing is playing.' },
+  'player.open': { te: 'ప్లేయర్ తెరవండి', en: 'Open player' },
+  'player.minimise': { te: 'ప్లేయర్ చిన్నదిగా చేయండి', en: 'Minimise player' },
+  'player.close': { te: 'ప్లేయర్ మూసివేయండి', en: 'Close player' },
+  'player.next': { te: 'తదుపరి', en: 'Next' },
+  'player.previous': { te: 'మునుపటి', en: 'Previous' },
+  'player.back15': { te: '15 సెకన్లు వెనక్కి', en: 'Back 15 seconds' },
+  'player.forward15': { te: '15 సెకన్లు ముందుకు', en: 'Forward 15 seconds' },
+  'player.position': { te: 'ప్లే అవుతున్న స్థానం', en: 'Playback position' },
+  'player.upNext': { te: 'వరుసలో', en: 'Up next' },
+  'player.readStory': { te: 'వార్త చదవండి', en: 'Read the story' },
+  'player.error': { te: 'ఆడియో ప్లే కాలేదు.', en: 'This audio could not play.' },
+  'player.onAir': { te: 'ప్రసారంలో', en: 'On air' },
+  'player.offAir': { te: 'ఇంకా ప్రసారం కాలేదు', en: 'Not on air yet' },
+  'player.playAll': { te: 'అన్నీ వినండి', en: 'Play all' },
+  'player.dial': { te: 'బులెటిన్ రేడియో', en: 'Bulletin radio' },
+  'player.kindArticle': { te: 'ఆడియో వార్త', en: 'Audio story' },
+  'player.kindBulletin': { te: 'ఆడియో బులెటిన్', en: 'Audio bulletin' },
+  'player.kindEpaper': { te: 'ఈ-పేపర్ రేడియో', en: 'E-paper radio' },
 } as const;
 
 export type StringKey = keyof typeof STRINGS;

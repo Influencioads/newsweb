@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
@@ -21,13 +22,14 @@ import { T, type TLang } from '@/ui/Text';
 /**
  * ScreenHeader — the in-app header bar (native headers are off).
  *
- * Paper ground, hairline rule, headline title (masthead `display` when
- * `large`), a back IconButton on the left whenever the router can go back,
+ * Paper ground, hairline rule, headline title (the logo when `large`,
+ * with the title as its label), a back IconButton on the left whenever the router can go back,
  * and free slots for other controls. Pass `collapsible` with a scroll
  * SharedValue and the bar shrinks 56 → 44 while the title scales down —
  * skipped entirely under reduced motion.
  */
 export const HEADER_HEIGHT = 56;
+const LOGO = require('../../assets/images/logo.png');
 const HEADER_MIN = 44;
 
 export interface ScreenHeaderProps {
@@ -39,7 +41,7 @@ export interface ScreenHeaderProps {
   /** Collapse against a scroll offset; `range` is the offset window (default 0 → 56). */
   collapsible?: { scrollY: SharedValue<number>; range?: [number, number] };
   showRule?: boolean;
-  /** Masthead style: `display` title in brand colour. */
+  /** Masthead style: the logo stands in for the title. */
   large?: boolean;
   transparent?: boolean;
   lang?: TLang;
@@ -113,16 +115,20 @@ export function ScreenHeader({
         {leading}
         <View style={[styles.titles, leading ? styles.titlesAfterControl : null]}>
           <Animated.View style={[styles.titleOrigin, titleStyle]}>
-            <T
-              variant={large ? 'display' : 'headlineMd'}
-              weight={large ? 'heavy' : 'bold'}
-              color={large ? 'brand' : 'ink'}
-              lang={lang}
-              numberOfLines={1}
-              accessibilityRole="header"
-            >
-              {title}
-            </T>
+            {large ? (
+              <Image
+                source={LOGO}
+                style={styles.logo}
+                contentFit="contain"
+                accessible
+                accessibilityRole="header"
+                accessibilityLabel={title}
+              />
+            ) : (
+              <T variant="headlineMd" weight="bold" color="ink" lang={lang} numberOfLines={1} accessibilityRole="header">
+                {title}
+              </T>
+            )}
           </Animated.View>
           {subtitle ? (
             <Animated.View style={subtitleStyle}>
@@ -151,4 +157,6 @@ const useStyles = makeStyles((color) => ({
   titles: { flex: 1, justifyContent: 'center' },
   titlesAfterControl: { marginLeft: space.xs },
   titleOrigin: { alignSelf: 'flex-start', transformOrigin: 'left center' },
+  /** logo.png is 600×171. */
+  logo: { height: 40, aspectRatio: 600 / 171 },
 }));

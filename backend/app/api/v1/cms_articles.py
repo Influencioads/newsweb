@@ -42,11 +42,20 @@ def _get(db: Session, article_id: int) -> Article:
 
 
 def _media_ref(media: Media) -> CmsMediaRef:
+    open_licence = (media.meta or {}).get("open_licence") or {}
     return CmsMediaRef(
         id=media.id,
         url=media.cdn_url or f"/media/{media.storage_key}",
         alt_te=media.alt_te,
+        caption_te=media.caption_te,
         credit=media.credit,
+        source_type=media.source_type,
+        # Licence plus where it came from. The provider's name is fine here and
+        # nowhere else: this response is behind the newsroom login.
+        licence=" · ".join(
+            p for p in (media.copyright, open_licence.get("source")) if p
+        )
+        or None,
         width=media.width,
         height=media.height,
     )
@@ -196,7 +205,22 @@ def list_articles(
             .limit(limit)
         ).scalars()
     )
-    return CmsArticleList(articles=[_list_row(a) for a in rows], total=total)
+    # The hero as a thumbnail (the creative studio's article picker): one
+    # query for the page, not one per row.
+    hero_ids = {a.hero_media_id for a in rows if a.hero_media_id}
+    heroes = (
+        {m.id: m for m in db.scalars(select(Media).where(Media.id.in_(hero_ids)))}
+        if hero_ids
+        else {}
+    )
+    out = []
+    for a in rows:
+        row = _list_row(a)
+        hero = heroes.get(a.hero_media_id) if a.hero_media_id else None
+        if hero is not None and hero.deleted_at is None:
+            row.hero_media = _media_ref(hero)
+        out.append(row)
+    return CmsArticleList(articles=out, total=total)
 
 
 @router.get("/pending", response_model=CmsArticleList)
@@ -291,6 +315,112 @@ def get_article(
     article = _get(db, article_id)
     workflow_service._scope(principal, article)
     return _out(db, article)
+
+
+@router.get("/{article_id}/origin")
+def article_origin(
+    article_id: int,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(
+        require_any_permission("article.review", "article.view")
+    ),
+):
+    """The publisher's original beside our rewrite, for the person approving it.
+
+    The ingest queue has had this comparison since the rewrite feature shipped,
+    but it lives one screen earlier: by the time a story is an article awaiting
+    approval, the reviewer sees only our words and has to take "this really is
+    a rewrite" on trust. Same two columns, moved to where the decision is made.
+
+    `IngestedRewrite.source_text` is the held copy and is the cheap path. When
+    it is absent — the story predates the retention change, or the source is
+    excerpt-only and no page was ever fetched — the publisher's page is read
+    live and thrown away with the response. Nothing about the original is
+    stored by this endpoint; `held=false, fetched_live=true` says which
+    happened, because a reviewer comparing against a page that has since been
+    edited deserves to know that is what they are reading.
+    """
+    from app.integrations.feeds.extract import extract_article
+    from app.models.ingestion import IngestedItem
+    from app.services import crawl_service
+
+    article = _get(db, article_id)
+    workflow_service._scope(principal, article)
+
+    item = db.scalar(
+        select(IngestedItem)
+        .where(IngestedItem.article_id == article.id)
+        .options(selectinload(IngestedItem.source))
+    )
+    if item is None:
+        raise NotFoundError(
+            message_en="This article did not come from a crawled source.",
+        )
+
+    rewrite = item.latest_rewrite
+    source = item.source
+    target = item.canonical_url or item.url
+
+    held = rewrite.source_text if rewrite is not None else None
+    text, fetched_live = held, False
+    if not text and target and crawl_service._host_allowed(target):
+        page = extract_article(target)
+        if page.status == "ok" and page.text:
+            text, fetched_live = page.text, True
+
+    return {
+        "article_id": article.id,
+        "item_id": item.id,
+        "source": {
+            "name": source.name if source else None,
+            "slug": source.slug if source else None,
+            "licence": source.licence if source else None,
+            "content_policy": source.content_policy if source else None,
+            "url": target,
+        },
+        "original": {
+            "title": item.title,
+            "summary": item.summary,
+            "author": item.author,
+            "published_at": item.published_at,
+            "image_url": item.image_url,
+            "text": text,
+            # Which of the three things happened, so the UI can say so rather
+            # than showing an empty column that looks like a bug.
+            "held": bool(held),
+            "fetched_live": fetched_live,
+        },
+        # What the reader would get if this were published right now — the
+        # article as it stands, not the rewrite as the model first wrote it.
+        # An editor who has already touched the copy must be comparing their
+        # own latest version, or the check is theatre.
+        "ours": {
+            "title_te": article.title_te,
+            "summary_te": article.summary_te,
+            "body_plain": article.body_plain,
+            "word_count": article.word_count,
+            "edited_since_import": bool(
+                rewrite is not None and (article.body_plain or "") != (rewrite.body_plain or "")
+            ),
+        },
+        "rewrite": (
+            {
+                "title_te": rewrite.title_te or None,
+                "summary_te": rewrite.summary_te,
+                "body_plain": rewrite.body_plain,
+                "attribution_te": rewrite.attribution_te or None,
+                "similarity_percent": rewrite.similarity_percent,
+                "confidence": round(rewrite.confidence, 2),
+                "unverified": rewrite.unverified,
+                "engine": rewrite.engine,
+                "model": rewrite.model,
+                "word_count": rewrite.word_count,
+                "created_at": rewrite.created_at,
+            }
+            if rewrite is not None
+            else None
+        ),
+    }
 
 
 @router.patch("/{article_id}", response_model=CmsArticleOut)

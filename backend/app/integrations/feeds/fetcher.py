@@ -18,6 +18,7 @@ hand is a reliable way to silently drop stories.
 
 from __future__ import annotations
 
+import re
 import threading
 import time
 from dataclasses import dataclass, field
@@ -159,12 +160,22 @@ def _to_datetime(struct) -> datetime | None:
         return None
 
 
+_INLINE_IMG = re.compile(r"""<img[^>]+src=["']([^"']+)["']""", re.IGNORECASE)
+
+
 def _entry_images(entry) -> list[str]:
     """Every image the entry offers, in dialect order.
 
-    All four locations are read rather than the first hit returned: the first
+    All five locations are read rather than the first hit returned: the first
     one is as likely to be a publisher logo as a photograph, and the filter
     downstream needs alternatives to fall back to.
+
+    The fifth is `<img>` inside `content:encoded` / `description`, and it is
+    the only one most Telugu WordPress feeds populate at all — every one of
+    ntvtelugu, tv9telugu, 10tv and v6velugu ships the story photo there and
+    nothing in media:content or enclosure. It reads last because the structured
+    dialects are a publisher's explicit answer, while an inline `<img>` is
+    whatever the body happened to open with.
     """
     found: list[str] = []
     for media in getattr(entry, "media_content", None) or []:
@@ -181,6 +192,9 @@ def _entry_images(entry) -> list[str]:
             "href"
         ):
             found.append(enclosure["href"])
+    for html in (_entry_content(entry), getattr(entry, "summary", None)):
+        if html:
+            found.extend(_INLINE_IMG.findall(html))
     # Feeds repeat the same URL across media:content and enclosure constantly.
     return list(dict.fromkeys(found))
 

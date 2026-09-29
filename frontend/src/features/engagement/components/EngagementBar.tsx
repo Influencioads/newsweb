@@ -146,6 +146,8 @@ export function EngagementBar({ article }: { article: ArticleDetail }) {
         />
 
         <IconButton
+          // The UGC notice above the body points readers at this exact control.
+          id="report-article"
           icon={Flag}
           label={reported ? t('state.reported') : L('నివేదించండి', 'Report')}
           disabled={reported || report.isPending}

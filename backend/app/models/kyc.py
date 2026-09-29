@@ -42,7 +42,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import MYSQL_TABLE_ARGS, Base, PKMixin, TimestampMixin
 from app.db.types import UTCDateTime
-from app.models.enums import ContributorType, KycDocumentKind, KycStatus
+from app.models.enums import ContributorType, KycDocumentKind, KycStatus, Vertical
 
 
 class ContributorProfile(PKMixin, TimestampMixin, Base):
@@ -50,6 +50,7 @@ class ContributorProfile(PKMixin, TimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint("user_id", name="uq_contributor_profiles_user_id"),
         Index("ix_contributor_profiles_status_created", "kyc_status", "created_at"),
+        Index("ix_contributor_profiles_vertical_status", "vertical", "kyc_status"),
         MYSQL_TABLE_ARGS,
     )
 
@@ -61,6 +62,12 @@ class ContributorProfile(PKMixin, TimestampMixin, Base):
         nullable=False,
         default=ContributorType.CITIZEN,
         server_default=ContributorType.CITIZEN.name,
+    )
+    #: Which desk they write for. Nullable: the twelve verticals are a product
+    #: feature layered on top of verification, not a thing every applicant has.
+    vertical: Mapped[Vertical | None] = mapped_column(
+        Enum(Vertical, native_enum=False, length=20, validate_strings=True),
+        nullable=True,
     )
     kyc_status: Mapped[KycStatus] = mapped_column(
         Enum(KycStatus, native_enum=False, length=12, validate_strings=True),
@@ -87,6 +94,21 @@ class ContributorProfile(PKMixin, TimestampMixin, Base):
     )
     mandal_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("mandals.id", ondelete="SET NULL"), nullable=True
+    )
+    #: A gram panchayat is a `Locality`, so a PANCHAYAT contributor's patch is
+    #: one of these rather than a new table.
+    locality_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("localities.id", ondelete="SET NULL"), nullable=True
+    )
+
+    #: Set when the desk lets a panchayat contributor's copy skip the queue.
+    #: Separate from approval because verifying who somebody is and trusting
+    #: what they file are decisions a different person makes.
+    panchayat_publish_granted_at: Mapped[datetime | None] = mapped_column(
+        UTCDateTime, nullable=True
+    )
+    panchayat_publish_granted_by: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
     #: Outlet for a freelance applicant, college for a student one.

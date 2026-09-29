@@ -7,6 +7,8 @@ import {
   useRef,
   useState,
   type InputHTMLAttributes,
+  type ChangeEvent,
+  type FocusEvent,
   type ReactNode,
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
@@ -16,6 +18,7 @@ import { ChevronDown } from 'lucide-react';
 import { Icon, type LucideIcon } from './Icon';
 import { useI18n, useScript } from '@/i18n';
 import { cn } from '@/utils/cn';
+import { toTelugu } from '@/utils/transliterate';
 
 /**
  * Form primitives — Field (label / hint / error), Input, Select, Textarea,
@@ -32,6 +35,102 @@ import { cn } from '@/utils/cn';
  *     </Field>
  *     <Switch checked={on} onChange={setOn} label={t('ui.darkMode')} />
  */
+
+// ---------------------------------------------------------------------------
+// Phonetic Telugu typing
+// ---------------------------------------------------------------------------
+
+/**
+ * On inside the admin shell (AdminLayout provides it): `script="te"` controls
+ * turn the Latin word before each space / punctuation into Telugu, and a
+ * half-typed last word on blur. Admin-only: the lookup goes to Google. Pastes and existing text are never touched.
+ */
+export const TeluguTypingContext = createContext(false);
+
+type TextControl = HTMLInputElement | HTMLTextAreaElement;
+
+/** Controls holding a Latin word the user is still typing. */
+const typing = new WeakSet<TextControl>();
+
+/** Set a value the way the browser would, so React's onChange sees it. */
+function setNative(el: TextControl, value: string): void {
+  Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value')?.set?.call(el, value);
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+/**
+ * Swap the Latin `word` typed at `start` for its Telugu spelling. The lookup is
+ * async and the editor keeps typing, so the word is found again by position
+ * (the nearest whole-word match) rather than trusted to still be at `start`.
+ */
+async function commit(el: TextControl, word: string, start: number): Promise<void> {
+  const te = await toTelugu(word);
+  const re = new RegExp(`(?<![A-Za-z])${word}(?![A-Za-z])`, 'g');
+  let at = -1;
+  for (const m of el.value.matchAll(re)) {
+    if (at < 0 || Math.abs(m.index - start) < Math.abs(at - start)) at = m.index;
+  }
+  if (at < 0) return; // edited away meanwhile
+  const caret = el.selectionStart ?? el.value.length;
+  const focused = document.activeElement === el;
+  setNative(el, el.value.slice(0, at) + te + el.value.slice(at + word.length));
+  if (focused) {
+    const c = caret > at ? caret + te.length - word.length : caret;
+    el.setSelectionRange(c, c);
+  }
+}
+
+/** The run of Latin letters ending at `end`, with where it starts. */
+function wordBefore(value: string, end: number): [string, number] | null {
+  const m = /[A-Za-z]+$/.exec(value.slice(0, end));
+  return m ? [m[0], m.index] : null;
+}
+
+/**
+ * Commit every finished Latin word the insert touched. Usually that is the one
+ * word before a space, but phone keyboards and suggestions insert whole words
+ * or phrases in one event.
+ */
+function onType(el: TextControl, e: InputEvent): void {
+  const caret = el.selectionStart;
+  // Our own setNative events have no inputType, so they never re-enter here.
+  if (!e.inputType?.startsWith('insert') || e.inputType === 'insertFromPaste' || caret == null) return;
+  let from = caret - (e.data?.length ?? 1);
+  while (from > 0 && /[A-Za-z]/.test(el.value[from - 1] ?? '')) from--;
+  const typed = el.value.slice(from, caret);
+  const open = /[A-Za-z]$/.test(typed); // the last word is still being typed
+  if (open) typing.add(el);
+  else typing.delete(el);
+  for (const m of typed.matchAll(/[A-Za-z]+/g)) {
+    if (open && m.index + m[0].length === typed.length) break;
+    void commit(el, m[0], from + m.index);
+  }
+}
+
+function onLeave(el: TextControl): void {
+  if (!typing.delete(el)) return;
+  const w = wordBefore(el.value, el.value.length);
+  if (w) void commit(el, ...w);
+}
+
+function useTeluguTyping<E extends TextControl>(
+  script: Script | undefined,
+  onChange: ((e: ChangeEvent<E>) => void) | undefined,
+  onBlur: ((e: FocusEvent<E>) => void) | undefined,
+) {
+  const on = useContext(TeluguTypingContext) && script === 'te';
+  if (!on) return { onChange, onBlur };
+  return {
+    onChange: (e: ChangeEvent<E>) => {
+      onType(e.currentTarget, e.nativeEvent as InputEvent);
+      onChange?.(e);
+    },
+    onBlur: (e: FocusEvent<E>) => {
+      onLeave(e.currentTarget);
+      onBlur?.(e);
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Field
@@ -158,11 +257,12 @@ export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { size = 'md', invalid, leading, trailing, script, className, id, 'aria-describedby': describedBy, ...rest },
+  { size = 'md', invalid, leading, trailing, script, className, id, 'aria-describedby': describedBy, onChange, onBlur, ...rest },
   ref,
 ) {
   const field = useFieldControl({ id, 'aria-describedby': describedBy, invalid });
   const sc = useControlScript(script);
+  const te = useTeluguTyping(script, onChange, onBlur);
   const control = (
     <input
       ref={ref}
@@ -181,6 +281,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         className,
       )}
       {...rest}
+      onChange={te.onChange}
+      onBlur={te.onBlur}
     />
   );
   if (!leading && !trailing) return control;
@@ -253,6 +355,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
     id,
     'aria-describedby': describedBy,
     onChange,
+    onBlur,
     value,
     defaultValue,
     maxLength,
@@ -263,6 +366,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
 ) {
   const field = useFieldControl({ id, 'aria-describedby': describedBy, invalid });
   const sc = useControlScript(script);
+  const te = useTeluguTyping(script, onChange, onBlur);
   const inner = useRef<HTMLTextAreaElement | null>(null);
   const [len, setLen] = useState(() => String(value ?? defaultValue ?? '').length);
   const count = value != null ? String(value).length : len;
@@ -291,8 +395,9 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
         onChange={(e) => {
           if (autoGrow) grow(e.currentTarget);
           if (value == null) setLen(e.currentTarget.value.length);
-          onChange?.(e);
+          te.onChange?.(e);
         }}
+        onBlur={te.onBlur}
         className={cn(
           INPUT_BASE,
           sc.cls,

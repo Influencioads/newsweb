@@ -9,6 +9,21 @@ e-paper, video, and an AI gateway — built to **Build Instructions v1.0** and t
 > auto-publish flag anywhere in this codebase — not for AI drafts, not for
 > scheduled posts, not for API imports. A bypass added "for testing" gets removed
 > before merge.
+>
+> **The one exception, and it is one.** An admin-approved gram-panchayat
+> secretary publishes to their own panchayat without per-article review. It is
+> still not a permission: `FORBIDDEN_PERMISSION_SUBSTRINGS` bans any key naming
+> an approval bypass, and the three tests that assert it — in `test_rbac.py`,
+> `test_phase_k_crawl.py` and `db/seed.py` — are untouched. The exception is a
+> dated grant on one contributor profile, read from the database on every
+> request, and it lives in one function, `panchayat_service.may_self_publish`,
+> under four restrictions: their own copy, their own gram panchayat, a live
+> (unexpired) KYC, and nothing the sensitive-topics screen trips on — plus a
+> three-article probation, so a freshly granted account's first stories still
+> go to the desk. Such a publish leaves `approved_by` NULL on purpose, so
+> `PUBLISHED AND approved_by IS NULL` is the query that finds every story that
+> took this path. Revoking the grant is instant and takes their live copy down
+> with it. **The answer to a second exception is no.**
 
 ## Stack
 
@@ -137,11 +152,11 @@ duration is picked from the system rather than invented:
 | Motion | `frontend/src/utils/motion.ts` (+ CSS keyframes) | `mobile/src/lib/motion.ts` (`useMotion`) |
 | Primitives | `frontend/src/components/ui/*` | `mobile/src/ui/*` |
 
-**Identity.** Peacock teal (`#0F5F57`) as the brand, champagne gold as the
-accent, ivory paper and charcoal ink, with urgency carried by a burnished
-amber — there is no red anywhere in the system, deliberately unlike the rest of
-the Telugu news market. Headlines and the wordmark are set in **Noto Serif
-Telugu**, body copy in **Noto Sans Telugu** (the most legible face at 19px on
+**Identity.** Taken from the logo (`frontend/public/logo.webp`, app
+`mobile/assets/images/logo.png`): its blue (`#0D47A1`) is the brand — buttons,
+links, active tabs — and its red (`#D0101A`) the accent, with breaking news in
+a deeper red, on a clean white page and cool neutral greys. Headlines are set
+in **Noto Serif Telugu**, body copy in **Noto Sans Telugu** (the most legible face at 19px on
 a mid-range Android), Latin display in **Fraunces** and Latin chrome in
 **Manrope**. All four are self-hosted variable WOFF2 files in
 `frontend/public/fonts` (the Telugu subsets keep U+200C–200D) and the same
@@ -211,7 +226,7 @@ docs/
 | 5 | Public website (search + SEO pending) | Partial |
 | 6 | Media — storage providers, derivatives, blurhash | **Done** |
 | 7 | AI gateway, AI article tools, AI images | Pending |
-| 8 | E-paper Mode A | Pending |
+| 8 | E-paper (generated daily edition, CMS builder with page count and auto-fill) | **Done** |
 | 9 | Video | Pending |
 | 10 | Notifications, analytics, CMS extras | Pending |
 | 11 | Security, performance, testing, deployment | Pending |

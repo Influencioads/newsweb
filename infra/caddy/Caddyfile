@@ -13,8 +13,32 @@ telugunews.influencioweb.com {
         -Server
     }
 
-    @backend path /api/* /health* /media/* /docs* /redoc*
+    # /_og/* and the SEO documents live on the API, not in the SPA bundle.
+    # Leaving them out here is what made every WhatsApp preview blank and made
+    # /robots.txt and /rss.xml return index.html.
+    @backend path /api/* /health* /media/* /docs* /redoc* /_og/* /robots.txt /sitemap*.xml /news-sitemap.xml /rss.xml
     handle @backend {
+        reverse_proxy api:8000
+    }
+
+    # Link-preview crawlers run no JavaScript and the reader is a Vite SPA, so
+    # a bot asking for an article gets the API's server-rendered OG head
+    # instead. Matchers inside a named block are ANDed: bot agent AND an
+    # article-shaped path.
+    #
+    # Deliberately NOT Googlebot — it renders JS and indexes the SPA correctly,
+    # and the stub carries the same headline, photo and canonical link, so this
+    # is a minimal version of the page rather than a different one.
+    #
+    # The path regex requires exactly six characters after the final hyphen
+    # (the nanoid short id). A looser "two segments" rule would swallow
+    # /section/andhra-pradesh and /epaper/2026-09-11.
+    @bots {
+        expression {header.User-Agent}.matches("(?i)(whatsapp|facebookexternalhit|facebookcatalog|twitterbot|telegrambot|slackbot|linkedinbot|discordbot|pinterest|skypeuripreview|redditbot|vkshare|embedly|quora link preview|nuzzel|bitlybot)")
+        path_regexp og ^/[a-z0-9-]+/([A-Za-z0-9_-]+-[A-Za-z0-9_-]{6})$
+    }
+    handle @bots {
+        rewrite * /_og/article/{re.og.1}
         reverse_proxy api:8000
     }
 

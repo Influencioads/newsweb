@@ -10,6 +10,7 @@ import { Tabs, type TabItem } from '@/components/ui/Tabs';
 import { useToast } from '@/components/ui/Toast';
 import * as cmsApi from '@/features/cms/api';
 import { useI18n } from '@/i18n';
+import { useAuth } from '@/stores/auth';
 
 import { CommentCard, ReportCard, SubmissionCard, type CommentRow, type ReportRow, type SubmissionRow } from './ModerationCards';
 import { useL } from './shared';
@@ -28,6 +29,7 @@ export function ModerationPage() {
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
   const qc = useQueryClient();
+  const canUnpublish = useAuth((st) => st.can)('article.unpublish');
   const [tab, setTab] = useState<Tab>('reports');
   const [rejecting, setRejecting] = useState<SubmissionRow | null>(null);
 
@@ -58,11 +60,34 @@ export function ModerationPage() {
     },
     onError,
   });
+  // The endpoint already exists; the queue simply never offered it. Taking a
+  // reported story down and closing the report are separate acts, so this does
+  // not close anything — the moderator still resolves or dismisses.
+  const unpublish = useMutation({
+    mutationFn: (id: number) => cmsApi.transitionArticle(id, 'unpublish'),
+    onSuccess: () => {
+      invalidate();
+      toast.success(L('కథనం ప్రచురణ ఉపసంహరించారు', 'Article unpublished'));
+    },
+    onError,
+  });
   const moderate = useMutation({
     mutationFn: ({ id, hide }: { id: number; hide: boolean }) => cmsApi.moderateComment(id, hide),
     onSuccess: (_r, v) => {
       invalidate();
       toast.success(v.hide ? L('వ్యాఖ్య దాచారు', 'Comment hidden') : L('వ్యాఖ్య పునరుద్ధరించారు', 'Comment restored'));
+    },
+    onError,
+  });
+  const pin = useMutation({
+    mutationFn: ({ id, pinned }: { id: number; pinned: boolean }) => cmsApi.pinComment(id, pinned),
+    onSuccess: (_r, v) => {
+      invalidate();
+      toast.success(
+        v.pinned
+          ? L('వ్యాఖ్యను పైన ఉంచారు', 'Comment pinned to the top')
+          : L('పిన్ తీసేశారు', 'Comment unpinned'),
+      );
     },
     onError,
   });
@@ -94,7 +119,21 @@ export function ModerationPage() {
     if (ok) moderate.mutate({ id, hide: true });
   };
 
+  const unpublishArticle = async (r: ReportRow) => {
+    const ok = await confirm({
+      title: L('ఈ కథనాన్ని ఉపసంహరించాలా?', 'Unpublish this story?'),
+      body: L(
+        'కథనం వెంటనే పాఠకులకు కనిపించకుండా పోతుంది. తర్వాత మళ్లీ ప్రచురించవచ్చు.',
+        'Readers stop seeing it immediately. It can be published again later.',
+      ),
+      confirmLabel: L('ఉపసంహరించండి', 'Unpublish'),
+      tone: 'danger',
+    });
+    if (ok) unpublish.mutate(r.target.id);
+  };
+
   const reportBusy = (r: ReportRow) => {
+    if (unpublish.isPending && unpublish.variables === r.target.id) return 'unpublish';
     if (moderate.isPending && moderate.variables?.id === r.target.id) return 'hide';
     const v = close.variables;
     if (close.isPending && v && v.id === r.id) return v.dismiss ? 'dismiss' : 'resolve';
@@ -126,7 +165,9 @@ export function ModerationPage() {
                       key={r.id}
                       report={r}
                       busy={reportBusy(r)}
+                      canUnpublish={canUnpublish}
                       onHide={() => void hideComment(r.target.id)}
+                      onUnpublish={() => void unpublishArticle(r)}
                       onResolve={() => close.mutate({ id: r.id, dismiss: false })}
                       onDismiss={() => close.mutate({ id: r.id, dismiss: true })}
                     />
@@ -149,6 +190,7 @@ export function ModerationPage() {
                       busy={moderate.isPending && moderate.variables?.id === c.id}
                       onHide={() => void hideComment(c.id)}
                       onRestore={() => moderate.mutate({ id: c.id, hide: false })}
+                      onPin={(pinned) => pin.mutate({ id: c.id, pinned })}
                     />
                   ))}
                 </div>

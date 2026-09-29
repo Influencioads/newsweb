@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Check, ExternalLink, Eye, EyeOff, FileText, Flag, MessageSquare, X } from 'lucide-react';
+import { Check, ExternalLink, Eye, EyeOff, FileText, Flag, MessageSquare, Pin, Undo2, X } from 'lucide-react';
 
 import { Badge, StatusPill } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -23,6 +23,8 @@ export type ReportRow = {
   status: string;
   created_at: string;
   resolution_note: string | null;
+  /** Open reports against this same target, this one included. */
+  report_count: number;
   target: {
     kind: string;
     id: number;
@@ -43,6 +45,9 @@ export type CommentRow = {
   article_title_te: string | null;
   article_short_id: string | null;
   created_at: string;
+  is_pinned: boolean;
+  /** Editorially seeded: no account behind it, so the name is not a reader. */
+  is_seeded: boolean;
 };
 
 export type SubmissionRow = {
@@ -55,6 +60,10 @@ export type SubmissionRow = {
   district_slug: string | null;
   status: string;
   created_at: string;
+  vertical?: string | null;
+  /** Photographs the contributor attached. Resolved server-side to URLs,
+   *  because a moderator cannot look at a media id. */
+  media?: { id: number; url: string | null; alt_te: string | null }[];
 };
 
 const when = (iso: string) => new Date(iso).toLocaleString('en-IN');
@@ -71,18 +80,28 @@ function Split({ children, actions }: { children: ReactNode; actions: ReactNode 
   );
 }
 
-export type ReportBusy = 'hide' | 'resolve' | 'dismiss' | null;
+export type ReportBusy = 'hide' | 'resolve' | 'dismiss' | 'unpublish' | null;
 
 export function ReportCard({
   report: r,
   busy,
+  canUnpublish,
   onHide,
+  onUnpublish,
   onResolve,
   onDismiss,
 }: {
   report: ReportRow;
   busy: ReportBusy;
+  /**
+   * `article.unpublish`, which a moderator does not hold. Taking a story off
+   * the site is an editorial act, so for a moderator the button is absent
+   * rather than disabled — a control that always 403s teaches people to ignore
+   * permission errors.
+   */
+  canUnpublish: boolean;
   onHide: () => void;
+  onUnpublish: () => void;
   onResolve: () => void;
   onDismiss: () => void;
 }) {
@@ -96,6 +115,11 @@ export function ReportCard({
           {isComment && r.target.status !== 'hidden' ? (
             <Button variant="danger" size="sm" icon={EyeOff} pending={busy === 'hide'} disabled={busy !== null} onClick={onHide}>
               {L('వ్యాఖ్య దాచండి', 'Hide comment')}
+            </Button>
+          ) : null}
+          {!isComment && canUnpublish ? (
+            <Button variant="danger" size="sm" icon={Undo2} pending={busy === 'unpublish'} disabled={busy !== null} onClick={onUnpublish}>
+              {L('ప్రచురణ ఉపసంహరించండి', 'Unpublish')}
             </Button>
           ) : null}
           <Button size="sm" icon={Check} pending={busy === 'resolve'} disabled={busy !== null} onClick={onResolve}>
@@ -115,6 +139,13 @@ export function ReportCard({
           {isComment ? L('వ్యాఖ్య', 'Comment') : L('కథనం', 'Article')}
         </Badge>
         {isComment && r.target.status ? <StatusPill status={r.target.status} /> : null}
+        {/* Three complaints about one story is a different fact from one, and
+            the queue is already ordered by it — say the number out loud. */}
+        {r.report_count > 1 ? (
+          <Badge tone="breaking" size="xs">
+            {r.report_count} {L('నివేదికలు', 'reports')}
+          </Badge>
+        ) : null}
       </div>
       {isComment ? (
         <p lang="te" className="te mt-2 text-te-body-xs text-ink">
@@ -154,20 +185,34 @@ export function CommentCard({
   busy,
   onHide,
   onRestore,
+  onPin,
 }: {
   comment: CommentRow;
   busy: boolean;
   onHide: () => void;
   onRestore: () => void;
+  /** Promote to the top of the thread. Moderation, so no new permission. */
+  onPin: (pinned: boolean) => void;
 }) {
   const L = useL();
   return (
     <Split
       actions={
         c.status === 'visible' ? (
-          <Button variant="danger" size="sm" icon={EyeOff} pending={busy} onClick={onHide}>
-            {L('దాచండి', 'Hide')}
-          </Button>
+          <>
+            <Button
+              variant={c.is_pinned ? 'primary' : 'secondary'}
+              size="sm"
+              icon={Pin}
+              pending={busy}
+              onClick={() => onPin(!c.is_pinned)}
+            >
+              {c.is_pinned ? L('పిన్ తీయండి', 'Unpin') : L('పిన్ చేయండి', 'Pin')}
+            </Button>
+            <Button variant="danger" size="sm" icon={EyeOff} pending={busy} onClick={onHide}>
+              {L('దాచండి', 'Hide')}
+            </Button>
+          </>
         ) : c.status === 'hidden' ? (
           <Button variant="secondary" size="sm" icon={Eye} pending={busy} onClick={onRestore}>
             {L('పునరుద్ధరించండి', 'Restore')}
@@ -187,6 +232,10 @@ export function CommentCard({
         <span>{c.author ?? '?'}</span>
         <span>{when(c.created_at)}</span>
         <StatusPill status={c.status} />
+        {c.is_pinned ? <Badge tone="brand" size="xs">{L('పిన్ చేసినది', 'Pinned')}</Badge> : null}
+        {/* Say so plainly in the queue: a moderator must never mistake a
+            seeded comment for a reader they could look up. */}
+        {c.is_seeded ? <Badge tone="partial" size="xs">{L('సీడ్', 'Seeded')}</Badge> : null}
       </p>
     </Split>
   );
@@ -248,6 +297,29 @@ export function SubmissionCard({
         <Button variant="link" size="sm" className="mt-1" aria-expanded={expanded} onClick={() => setExpanded((v) => !v)}>
           {expanded ? L('తగ్గించండి', 'Show less') : t('ui.more')}
         </Button>
+      ) : null}
+      {sub.media?.length ? (
+        <div className="mt-3">
+          <p className="font-sans text-meta text-muted">
+            {L(`ఫోటోలు (${sub.media.length})`, `Photographs (${sub.media.length})`)}
+          </p>
+          <ul className="mt-1 flex flex-wrap gap-2">
+            {sub.media.map((photo) => (
+              <li key={photo.id}>
+                {/* Opens full size: approving a photo you only saw at 80px is
+                    not reviewing it. */}
+                <a href={photo.url ?? '#'} target="_blank" rel="noreferrer">
+                  <img
+                    src={photo.url ?? ''}
+                    alt={photo.alt_te ?? ''}
+                    loading="lazy"
+                    className="h-20 w-20 rounded-lg object-cover"
+                  />
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : null}
     </Split>
   );

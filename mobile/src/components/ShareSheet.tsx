@@ -118,23 +118,30 @@ function ShareRow({
  * The sheet on its own, for callers that already own a trigger (the
  * engagement row's share button).
  */
-export function ShareOptionsSheet({
-  open,
-  onClose,
-  shortId,
-  url,
-  title,
-  cardAvailable = false,
-}: ShareTarget & { open: boolean; onClose: () => void }) {
-  const styles = useStyles();
-  const { t, isTelugu } = useI18n();
+/**
+ * The three share paths, without the sheet.
+ *
+ * Extracted so the article action row can put WhatsApp on a button of its own
+ * rather than behind two taps — and so there is exactly one implementation of
+ * the wa.me link, the card download and the beacon call. Mirrors the web's
+ * `useShareActions` in frontend/src/components/article/ShareSheet.tsx.
+ *
+ * `onDone` is what the sheet passes to close itself. A caller with no sheet
+ * omits it.
+ */
+export function useShareActions(
+  { shortId, url, title }: ShareTarget,
+  onDone: () => void = () => {},
+) {
+  const { isTelugu } = useI18n();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const link = `${API_ORIGIN}${url}`;
-  const message = `${title}\n${link}`;
+  const message = `${title}
+${link}`;
 
   async function whatsapp() {
-    onClose();
+    onDone();
     trackShare(shortId);
     try {
       await Linking.openURL(`https://wa.me/?text=${encodeURIComponent(message)}`);
@@ -144,7 +151,7 @@ export function ShareOptionsSheet({
   }
 
   async function native() {
-    onClose();
+    onDone();
     trackShare(shortId);
     try {
       await Share.share({ message });
@@ -158,20 +165,20 @@ export function ShareOptionsSheet({
     try {
       const directory = new Directory(Paths.cache, 'cards');
       directory.create({ idempotent: true });
-      const destination = new File(directory, `${shortId}.png`);
+      const destination = new File(directory, `${shortId}.jpg`);
       const file = await File.downloadFileAsync(
-        `${API_BASE}/public/articles/${shortId}/card.png`,
+        `${API_BASE}/public/articles/${shortId}/card.jpg`,
         destination,
         { idempotent: true },
       );
       if (await Sharing.isAvailableAsync()) {
-        onClose();
-        await Sharing.shareAsync(file.uri, { mimeType: 'image/png', dialogTitle: title });
+        onDone();
+        await Sharing.shareAsync(file.uri, { mimeType: 'image/jpeg', dialogTitle: title });
         trackShare(shortId);
       } else {
         // No share provider on the device: say so instead of ending the tap in
         // a spinner that quietly stops.
-        onClose();
+        onDone();
         toast.error(
           L(
             'ఈ ఫోన్‌లో షేర్ చేయలేకపోయాం. లింక్‌ను షేర్ చేయండి.',
@@ -193,20 +200,42 @@ export function ShareOptionsSheet({
     }
   }
 
+  return { whatsapp, native, card, busy };
+}
+
+/**
+ * The sheet on its own, for callers that already own a trigger (the article
+ * action row's share button).
+ */
+export function ShareOptionsSheet({
+  open,
+  onClose,
+  shortId,
+  url,
+  title,
+  cardAvailable = false,
+}: ShareTarget & { open: boolean; onClose: () => void }) {
+  const styles = useStyles();
+  const { t } = useI18n();
+  const { whatsapp, native, card, busy } = useShareActions(
+    { shortId, url, title },
+    onClose,
+  );
+
   return (
     <BottomSheet open={open} onClose={onClose} title={t('ui.share')}>
       <View style={styles.list}>
         <ShareRow
-          icon="messageCircle"
+          icon="whatsapp"
           label={t('ui.whatsapp')}
-          hint={L('లింక్‌తో పంపండి', 'Send with a link', isTelugu)}
+          hint={t('ui.whatsappHint')}
           onPress={() => void whatsapp()}
         />
         {cardAvailable ? (
           <ShareRow
             icon="image"
             label={t('ui.shareCard')}
-            hint={L('స్టేటస్, గ్రూపుల కోసం', 'For Status and groups', isTelugu)}
+            hint={t('ui.shareCardHint')}
             pending={busy}
             onPress={() => void card()}
           />

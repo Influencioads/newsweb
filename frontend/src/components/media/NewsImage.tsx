@@ -126,6 +126,15 @@ export function NewsImage({
             <Badge tone="ai" size="xs" className="absolute bottom-2 left-2 shadow-card">
               {t('article.aiImage')}
             </Badge>
+          ) : media.representative ? (
+            // Same reasoning as the AI label. `ImageCaption` carries this in
+            // Telugu, but only the article page renders captions — home, every
+            // listing and every shelf draw a bare NewsImage, and that is where
+            // most readers meet the picture. Unbadged, a library photo reads as
+            // a picture of the event.
+            <Badge tone="muted" size="xs" className="absolute bottom-2 left-2 shadow-card">
+              {t('article.representativeImage')}
+            </Badge>
           ) : null}
         </>
       ) : (

@@ -150,6 +150,12 @@ class ContentSource(PKMixin, TimestampMixin, Base):
     rewrite_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="0"
     )
+    #: Download this source's own article images at import. Off by default,
+    #: deliberately: switching it on for forty sources at once on deploy day is
+    #: exactly the misfire the default prevents.
+    images_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
     #: Guess a mandal from the item text when no default mandal is set.
     mandal_autotag: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="1"
@@ -241,6 +247,10 @@ class IngestedItem(PKMixin, TimestampMixin, Base):
     content_html: Mapped[str | None] = mapped_column(Text, nullable=True)
     author: Mapped[str | None] = mapped_column(String(200), nullable=True)
     image_url: Mapped[str | None] = mapped_column(String(900), nullable=True)
+    #: Every candidate that survived `feeds.images.pick`, in feed order.
+    #: `image_url` is the first of these — kept as its own column because the
+    #: review queue and `crawl_service` have always read it.
+    image_urls: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     language: Mapped[str | None] = mapped_column(String(10), nullable=True)
     word_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
@@ -355,6 +365,14 @@ class IngestedRewrite(PKMixin, TimestampMixin, Base):
     summary_te: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     body: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     body_plain: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: The publisher's own words, held only so the reviewer can read them
+    #: beside the rewrite. Written by `crawl_service.gather_source_text` only
+    #: when it actually fetched a page, and NULLed the moment the editorial
+    #: decision lands — see `ingestion_service.drop_source_text`. Safe here in
+    #: a way it would not be on `IngestedItem.content_html`, because this table
+    #: is queue-only: no public serializer reads it, whereas `_body_document`
+    #: can publish `content_html` verbatim.
+    source_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     #: Appended by the service, never taken from the model. A model asked to
     #: attribute will sometimes forget, and an unattributed rewrite of another
     #: publisher's reporting is the one output we must never produce.

@@ -110,6 +110,13 @@ PERMISSIONS: tuple[PermissionDef, ...] = (
     PermissionDef(
         "article.assign", "article", "Assign work", "పని కేటాయించడం", scoped=True
     ),
+    PermissionDef(
+        "article.critic_note",
+        "article",
+        "Attach an editorial note",
+        "సంపాదకీయ వ్యాఖ్య జోడించడం",
+        scoped=True,
+    ),
     # --- taxonomy ---------------------------------------------------------
     PermissionDef("taxonomy.view", "taxonomy", "View taxonomy", "వర్గీకరణ చూడటం"),
     PermissionDef(
@@ -127,10 +134,14 @@ PERMISSIONS: tuple[PermissionDef, ...] = (
     # --- e-paper ----------------------------------------------------------
     PermissionDef("epaper.view", "epaper", "View editions", "ఎడిషన్లు చూడటం"),
     PermissionDef(
-        "epaper.upload", "epaper", "Upload edition PDF", "ఎడిషన్ PDF అప్‌లోడ్", scoped=True
+        "epaper.upload",
+        "epaper",
+        "Generate editions and manage templates",
+        "ఎడిషన్లు రూపొందించడం, టెంప్లేట్ల నిర్వహణ",
+        scoped=True,
     ),
     PermissionDef(
-        "epaper.hotspot", "epaper", "Edit hotspots", "హాట్‌స్పాట్‌లు సవరించడం", scoped=True
+        "epaper.hotspot", "epaper", "Edit edition pages", "ఎడిషన్ పేజీలు సవరించడం", scoped=True
     ),
     PermissionDef(
         "epaper.publish",
@@ -209,6 +220,17 @@ PERMISSIONS: tuple[PermissionDef, ...] = (
     ),
     # --- comments ---------------------------------------------------------
     PermissionDef("comment.moderate", "comment", "Moderate comments", "వ్యాఖ్యల నియంత్రణ"),
+    # --- seeded engagement ------------------------------------------------
+    # Its own group on purpose, so it does NOT arrive through the
+    # `_keys("article", ..., "comment")` bundle the editor-in-chief holds.
+    # Fabricating engagement is an owner's decision about the product, not an
+    # editorial one, so it reaches only the roles that take the whole set.
+    PermissionDef(
+        "engagement.seed",
+        "engagement",
+        "Seed likes and comments",
+        "లైక్‌లు, వ్యాఖ్యలు సీడ్ చేయడం",
+    ),
     # --- users & admin ----------------------------------------------------
     PermissionDef("user.view", "user", "View users", "వినియోగదారులను చూడటం"),
     PermissionDef("user.manage", "user", "Create and edit users", "వినియోగదారుల నిర్వహణ"),
@@ -280,6 +302,7 @@ ROLE_PERMISSIONS: dict[RoleKey, set[str]] = {
         "media.upload",
         "media.edit",
         "epaper.view",
+        "epaper.upload",
         "epaper.hotspot",
         "epaper.publish",
         "video.view",
@@ -353,7 +376,7 @@ ROLE_PERMISSIONS: dict[RoleKey, set[str]] = {
         "article.view",
         "taxonomy.view",
     },
-    # Upload e-paper PDFs, mark hotspots. Cannot publish the edition.
+    # Generate editions and lay out pages. Cannot publish the edition.
     RoleKey.DTP_OPERATOR: {
         "epaper.view",
         "epaper.upload",
@@ -387,6 +410,22 @@ ROLE_PERMISSIONS: dict[RoleKey, set[str]] = {
     RoleKey.CONTRIBUTOR: {
         "article.view",
         "article.view_own",
+        "taxonomy.view",
+    },
+    # The one account that may publish its own copy — and note that nothing
+    # here says so. These are the ordinary write keys a stringer holds plus
+    # `article.publish`, which on its own still demands an APPROVED article
+    # approved by somebody else. What actually skips review is the dated grant
+    # on the contributor profile, read fresh on every request by
+    # `panchayat_service.may_self_publish`. No `article.approve`, so they
+    # cannot manufacture the approval either, and no `article.breaking`.
+    RoleKey.PANCHAYAT_SECRETARY: {
+        "article.view_own",
+        "article.create",
+        "article.edit_own",
+        "article.submit",
+        "article.publish",
+        "media.upload",
         "taxonomy.view",
     },
     RoleKey.SUBSCRIBER: set(),
@@ -488,6 +527,17 @@ ROLE_DEFINITIONS: dict[RoleKey, dict[str, object]] = {
         # submission quota. They still file through the moderation queue.
         "staff": False,
     },
+    RoleKey.PANCHAYAT_SECRETARY: {
+        "level": 15,
+        # MANDAL, not a new LOCALITY scope: the mandal keeps `_scope` and every
+        # scope test working untouched, and which *panchayat* they may file for
+        # is `ContributorProfile.locality_id`, checked in the publish fork.
+        "scope": ScopeType.MANDAL,
+        "te": "పంచాయతీ కార్యదర్శి",
+        "en": "Panchayat Secretary",
+        # Not staff. They hold no desk, no queue and no other author's copy.
+        "staff": False,
+    },
     RoleKey.SUBSCRIBER: {
         "level": 10,
         "scope": ScopeType.SELF,
@@ -501,3 +551,8 @@ ROLE_DEFINITIONS: dict[RoleKey, dict[str, object]] = {
 LEVEL_BREAKING_NEWS = 80  # §6.3 — is_breaking requires level >= 80
 LEVEL_PUSH_APPROVE = 60  # §11  — every push needs approval from level >= 60
 LEVEL_PUSH_BREAKING = 80  # §11  — a breaking push needs level >= 80
+#: §8 / §9 — choosing what leads the home page or Top trending. Was implied by
+#: `article.publish` alone until a level-15 panchayat secretary came to hold
+#: that key; every other holder is already at 60 or above, so this threshold
+#: changes nothing for anyone who had it before.
+LEVEL_PIN_PLACEMENT = 60

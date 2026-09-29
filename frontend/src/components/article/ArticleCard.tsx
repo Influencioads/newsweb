@@ -1,4 +1,4 @@
-import { Sparkles, Zap } from 'lucide-react';
+import { Heart, MessageCircle, Sparkles, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { NewsImage } from '@/components/media/NewsImage';
@@ -105,14 +105,24 @@ function Badges({
   );
 }
 
-/** Byline · relative time. District lives in the badge row, not here. */
+/**
+ * Byline · relative time · the counts. District lives in the badge row.
+ *
+ * The counts are social proof, so they are text, not controls: every card
+ * variant wraps its whole body in a `<Link>`, and a `<button>` inside an `<a>`
+ * is invalid HTML that breaks keyboard order. Liking from a web feed would
+ * mean restructuring eight variants out of the anchor, and nothing suggests
+ * readers want to. The app is where the per-card actions live.
+ */
 function Meta({ article, className }: { article: Item; className?: string }) {
-  const { language } = useI18n();
+  const { language, t } = useI18n();
   const s = useScript();
   const time = relativeTime(article.published_at, language);
-  if (!article.byline_te && !time) return null;
+  const likes = article.like_count ?? 0;
+  const comments = article.comment_count ?? 0;
+  if (!article.byline_te && !time && !likes && !comments) return null;
   return (
-    <p className={cn('mt-2 text-meta text-muted', className)}>
+    <p className={cn('mt-2 flex flex-wrap items-center gap-x-2 text-meta text-muted', className)}>
       {/* Bylines are personal names; they stay in Telugu script in both modes. */}
       {article.byline_te ? (
         <span lang="te" className="te">
@@ -124,6 +134,20 @@ function Meta({ article, className }: { article: Item; className?: string }) {
       {time ? (
         <span lang={language} className={cn(s.body, 'tabular-nums')}>
           {time}
+        </span>
+      ) : null}
+      {likes > 0 ? (
+        <span className="inline-flex items-center gap-1">
+          <Heart className="h-3.5 w-3.5" aria-hidden />
+          <span className="tabular-nums">{likes}</span>
+          <span className="sr-only">{t('ui.like')}</span>
+        </span>
+      ) : null}
+      {comments > 0 ? (
+        <span className="inline-flex items-center gap-1">
+          <MessageCircle className="h-3.5 w-3.5" aria-hidden />
+          <span className="tabular-nums">{comments}</span>
+          <span className="sr-only">{t('ui.comments')}</span>
         </span>
       ) : null}
     </p>

@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, RotateCcw, Save } from 'lucide-react';
+import { Check, ChevronRight, RotateCcw, Save } from 'lucide-react';
 
 import { ApiError } from '@/api/client';
 import { AdminPage } from '@/components/admin/AdminPage';
 import { Section } from '@/components/admin/FormControls';
 import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
+import { Button, ButtonLink } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Field, Input, Select, Switch } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
@@ -14,7 +14,7 @@ import { QueryState, Skeleton } from '@/components/ui/State';
 import { useToast } from '@/components/ui/Toast';
 import * as cmsApi from '@/features/cms/api';
 import { useI18n, useScript } from '@/i18n';
-import type { SettingsPayload } from '@/types/cms';
+import type { SettingSpec, SettingsPayload } from '@/types/cms';
 import { cn } from '@/utils/cn';
 
 /**
@@ -33,17 +33,99 @@ type Values = Record<string, unknown>;
 
 const RATIO_KEYS = ['personal', 'local', 'trending', 'breaking'] as const;
 
-/** Mirrors the closed key set of `crawl.beat_quota`; the server rejects any other shape. */
-const BEAT_KEYS = [
-  { key: 'national', te: 'జాతీయం', en: 'National' },
-  { key: 'state', te: 'రాష్ట్రం', en: 'State' },
-  { key: 'district_local', te: 'జిల్లా / స్థానికం', en: 'District / local' },
-  { key: 'breaking', te: 'బ్రేకింగ్', en: 'Breaking' },
-  { key: 'sports', te: 'క్రీడలు', en: 'Sports' },
-  { key: 'film', te: 'సినిమా', en: 'Film' },
-  { key: 'govt_jobs', te: 'ఉద్యోగాలు', en: 'Government jobs' },
-  { key: 'general', te: 'సాధారణం', en: 'General' },
+/** The `brand.*` colour settings; derivation and dark mode live in utils/brand.ts. */
+const BRAND_KEYS = [
+  { key: 'brand.primary', te: 'ప్రధాన రంగు', en: 'Primary', hintTe: 'మాస్ట్‌హెడ్, బటన్లు, లింకులు', hintEn: 'Masthead, buttons, links' },
+  { key: 'brand.breaking', te: 'బ్రేకింగ్', en: 'Breaking', hintTe: 'టిక్కర్, లైవ్ బ్యాడ్జ్', hintEn: 'Ticker, Live and Breaking badges' },
+  { key: 'brand.accent', te: 'యాక్సెంట్', en: 'Accent', hintTe: 'ఎక్స్‌క్లూజివ్ బ్యాడ్జ్', hintEn: 'Exclusive badges' },
 ] as const;
+
+/**
+ * One entry of the measured shortlist `settings_service.describe()` hangs on a
+ * model setting.
+ *
+ * `usd_per_call` is what one real call cost on the day the catalogue was
+ * measured — not a rate card, and `0` means the vendor reported no spend at
+ * all, which is unknown rather than free.
+ */
+interface ModelChoice {
+  id: string;
+  label: string;
+  tier: string;
+  usd_per_call: number;
+  note: string;
+  /** TTS only: the voices this model accepts. Empty means it takes none. */
+  voices?: string[];
+  /** TTS only: named starting points for a bulletin read. */
+  presets?: VoicePreset[];
+}
+
+/** A speaker and a pace under one label. `pace` is the part that carries the
+ *  house style; the speaker is a first pick to audition, not a likeness. */
+interface VoicePreset {
+  label: string;
+  speaker: string;
+  pace: number;
+  note: string;
+}
+
+/** `choices` is new and only the model settings carry it, so it is widened
+ *  here rather than pushed onto the `SettingSpec` every other screen shares. */
+type SpecWithChoices = SettingSpec & { choices?: Array<ModelChoice | string> | null };
+
+/** The measured price of one call, in the dollars it actually cost. */
+const usdPerCall = (value: number, en: boolean) =>
+  value > 0
+    ? `$${value.toFixed(value < 0.001 ? 6 : 4)}`
+    : en
+      ? 'cost not reported'
+      : 'ఖర్చు నివేదించలేదు';
+
+/**
+ * One model dropdown, priced.
+ *
+ * The cost sits on the option rather than in a help line because the choice
+ * being made here spans 29x — an admin comparing two models is reading the
+ * list, not the text under it. The note below the field is the catalogue's own
+ * sentence about the selected model, shown verbatim: it was written for
+ * whoever is choosing, and paraphrasing it would lose the measurement.
+ *
+ * A stored model that is not on the shortlist keeps its own option. The
+ * catalogue is a shortlist, not a whitelist, and a screen that quietly showed
+ * "adapter default" for a configured model would change it on the next save.
+ */
+function ModelField({
+  label,
+  hint,
+  choices,
+  value,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  hint?: string;
+  choices: ModelChoice[];
+  value: string;
+  onChange: (id: string) => void;
+  disabled?: boolean;
+}) {
+  const { language } = useI18n();
+  const en = language === 'en';
+  const selected = choices.find((c) => c.id === value);
+  return (
+    <Field label={label} hint={selected ? selected.note : hint}>
+      <Select value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled}>
+        <option value="">{en ? 'Adapter default' : 'అడాప్టర్ డిఫాల్ట్'}</option>
+        {choices.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.label} — {usdPerCall(c.usd_per_call, en)}
+          </option>
+        ))}
+        {value && !selected ? <option value={value}>{value}</option> : null}
+      </Select>
+    </Field>
+  );
+}
 
 function SettingsSkeleton() {
   return (
@@ -77,6 +159,8 @@ export default function SettingsPage() {
     mutationFn: (values: Values) => cmsApi.patchSettings(values),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['cms', 'settings'] });
+      // Brand colours ride on /public/config; refetch so this screen repaints now.
+      void queryClient.invalidateQueries({ queryKey: ['public', 'config'] });
       toast.success(en ? 'Settings saved.' : 'సెట్టింగ్‌లు సేవ్ అయ్యాయి.');
     },
     onError: (e) => toast.error(e),
@@ -96,7 +180,6 @@ export default function SettingsPage() {
     personal: 40, local: 25, trending: 25, breaking: 10,
   };
   const ratioTotal = RATIO_KEYS.reduce((sum, k) => sum + (ratios[k] ?? 0), 0);
-  const beatQuota = (draft['crawl.beat_quota'] as Record<string, number> | undefined) ?? {};
 
   const renderForm = (payload: SettingsPayload) => {
     const env = payload.environment;
@@ -109,11 +192,42 @@ export default function SettingsPage() {
     // aimlapi is ready when a key is stored on this screen — either its own or
     // the AI one it shares — rather than when the deployment set an env var.
     const voiceKeySet = Boolean(payload.values['voice.api_key'] || payload.values['ai.api_key']);
+    // Sarvam bills on its own account, so only its own box counts — the AI key
+    // belongs to aimlapi, and reusing it here is a 403, not a shortcut.
+    const sarvamKeySet = Boolean(payload.values['voice.api_key']);
+    const voiceProvider = str('voice.provider');
     const voiceProviderReady =
-      str('voice.provider') === 'local' ||
-      (str('voice.provider') === 'google' && env.tts_google_configured) ||
-      (str('voice.provider') === 'bhashini' && env.tts_bhashini_configured) ||
-      (str('voice.provider') === 'aimlapi' && voiceKeySet);
+      voiceProvider === 'local' ||
+      (voiceProvider === 'google' && env.tts_google_configured) ||
+      (voiceProvider === 'bhashini' && env.tts_bhashini_configured) ||
+      (voiceProvider === 'aimlapi' && voiceKeySet) ||
+      (voiceProvider === 'sarvam' && sarvamKeySet);
+    //: Both providers take their key and model from this screen rather than
+    //  from the deploy environment, so they share one block of fields.
+    const configuredProvider = voiceProvider === 'aimlapi' || voiceProvider === 'sarvam';
+
+    const choicesOf = (key: string) => (payload.specs as SpecWithChoices[]).find((sp) => sp.key === key)?.choices ?? [];
+    const models = (key: string) => choicesOf(key).filter((c): c is ModelChoice => typeof c === 'object' && c !== null);
+    // The voices belong to the chosen model — `alloy` left behind on an
+    // ElevenLabs model is a 400 nobody can read — so the model's own list wins.
+    // The flat `voice.voice_name` list is the default model's and is only the
+    // fallback for an install whose backend does not send per-model voices yet.
+    const voicesFor = (model: string) =>
+      models('voice.model').find((c) => c.id === model)?.voices ??
+      choicesOf('voice.voice_name').filter((c): c is string => typeof c === 'string');
+    // Google and Bhashini name their voices themselves; offering them the
+    // aimlapi catalogue would be confidently wrong, so they keep the text box.
+    // The two vendors share the `voice.model` row and the `sarvam/` prefix is
+    // what tells them apart. Offering one provider the other's models is how a
+    // saved setting turns into a 4xx nobody can read.
+    const speechModels = models('voice.model').filter(
+      (c) => c.id.startsWith('sarvam/') === (voiceProvider === 'sarvam'),
+    );
+    // A model left behind by the other provider resolves to this provider's
+    // first one — the same fallback the adapters make server-side.
+    const speechModel = speechModels.find((c) => c.id === str('voice.model')) ?? speechModels[0];
+    const voiceOptions = configuredProvider ? voicesFor(speechModel?.id ?? '') : null;
+    const presets = speechModel?.presets ?? [];
 
     return (
       <>
@@ -202,8 +316,9 @@ export default function SettingsPage() {
           {/* The key is write-only: the API returns a mask, never the value, so
               what lands here is a mask the admin can overwrite but not read. */}
           {str('ai.provider') !== 'heuristic' ? (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <>
               <Field
+                className="sm:max-w-md"
                 label={en ? 'API key' : 'API కీ'}
                 hint={keySet
                   ? (en ? 'A key is saved. Type a new one to replace it, or clear the box to remove it.'
@@ -216,80 +331,70 @@ export default function SettingsPage() {
                   value={str('ai.api_key')}
                   onChange={(e) => set('ai.api_key', e.target.value)} />
               </Field>
-              <Field
-                label={en ? 'Model' : 'మోడల్'}
-                hint={en ? 'Blank uses the adapter default. aimlapi namespaces models, e.g. openai/gpt-4o-mini.'
-                         : 'ఖాళీ అయితే డిఫాల్ట్. aimlapiలో పేరు ఇలా ఉంటుంది: openai/gpt-4o-mini.'}
-              >
-                <Input script="en" autoComplete="off" spellCheck={false}
-                  placeholder="openai/gpt-4o-mini"
+
+              {/* The whole reason there are two model settings is the bill.
+                  An admin who cannot see that will set both to the best model
+                  and find out at the end of the month. */}
+              <p className={note}>
+                {en
+                  ? 'Two models, because the volumes are not comparable: the editorial model writes the eight or ten pieces a day a human reads every word of, while the bulk model runs the hourly crawl at sixty rewrites an hour. At crawl volume the cheapest good model costs about ₹6,000 a month and the best one about ₹34,000 — same story, same prompt.'
+                  : 'రెండు మోడల్స్ ఎందుకంటే పని పరిమాణం ఒకటి కాదు: ఎడిటోరియల్ మోడల్ రోజుకు ఎనిమిది–పది కథనాలు రాస్తుంది, ప్రతి పదాన్నీ మనిషి చదువుతాడు. బల్క్ మోడల్ గంటకు అరవై పునర్లేఖనాల క్రాల్‌ను నడుపుతుంది. ఆ స్థాయిలో చవకైన మంచి మోడల్ నెలకు దాదాపు ₹6,000, అత్యుత్తమమైనది దాదాపు ₹34,000 — ఒకే కథనం, ఒకే ప్రాంప్ట్.'}
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <ModelField
+                  label={en ? 'Editorial model — a human reads every word' : 'ఎడిటోరియల్ మోడల్ — ప్రతి పదాన్నీ మనిషి చదువుతాడు'}
+                  hint={en ? 'Drafts and bulletin scripts. Blank uses the adapter default.'
+                           : 'డ్రాఫ్ట్‌లు, బులెటిన్ స్క్రిప్ట్‌లు. ఖాళీ అయితే అడాప్టర్ డిఫాల్ట్.'}
+                  choices={models('ai.model')}
                   value={str('ai.model')}
-                  onChange={(e) => set('ai.model', e.target.value)} />
-              </Field>
+                  onChange={(id) => set('ai.model', id)}
+                />
+                <ModelField
+                  label={en ? 'Bulk model — the hourly crawl, sixty an hour' : 'బల్క్ మోడల్ — గంటవారీ క్రాల్, గంటకు అరవై'}
+                  hint={en ? 'Crawl rewrites and topic discovery. Blank uses the adapter default.'
+                           : 'క్రాల్ పునర్లేఖనాలు, అంశ సూచనలు. ఖాళీ అయితే అడాప్టర్ డిఫాల్ట్.'}
+                  choices={models('ai.bulk_model')}
+                  value={str('ai.bulk_model')}
+                  onChange={(id) => set('ai.bulk_model', id)}
+                />
+              </div>
+            </>
+          ) : null}
+
+          {/* --------------------------------------------- §17 AI images -- */}
+          <Switch checked={bool('ai.image_enabled')} onChange={(v) => set('ai.image_enabled', v)}
+            disabled={!bool('ai.enabled') || !keySet}
+            label={en ? 'Draw an illustration when there is no photograph' : 'ఫోటో లేనప్పుడు చిత్రం గీయండి'}
+            hint={en
+              ? 'Needs AI on and a key saved above. Sensitive stories — communal, sexual violence, a named minor, suicide — are refused before any call is made, and every generated image carries a visible label.'
+              : 'పైన AI ఆన్ కావాలి, కీ సేవ్ కావాలి. సున్నితమైన కథనాలు — మతపరమైనవి, లైంగిక హింస, మైనర్లు, ఆత్మహత్య — కాల్ చేయకముందే తిరస్కరించబడతాయి. తయారైన ప్రతి చిత్రంపై లేబుల్ కనిపిస్తుంది.'} />
+          {bool('ai.image_enabled') ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <ModelField
+                label={en ? 'Image model' : 'ఇమేజ్ మోడల్'}
+                hint={en ? 'Blank uses the adapter default.' : 'ఖాళీ అయితే అడాప్టర్ డిఫాల్ట్.'}
+                choices={models('ai.image_model')}
+                value={str('ai.image_model')}
+                onChange={(id) => set('ai.image_model', id)}
+                disabled={!bool('ai.enabled') || !keySet}
+              />
             </div>
           ) : null}
         </Section>
 
         {/* ------------------------------------------------ hourly crawl -- */}
+        {/* Every crawl.* setting lives on its own tab beside the sources it
+            governs. Save below sends only what changed on this page, so it
+            cannot overwrite a crawl value set there. */}
         <Section
-          title={en ? 'Hourly crawl' : 'గంటవారీ క్రాల్'}
+          title={en ? 'Crawl' : 'క్రాల్'}
           subtitle={en
-            ? 'How many stories are pulled and rewritten each hour, and from which beats. Rewrites still land in the review queue — nothing here publishes.'
-            : 'ప్రతి గంటకు ఎన్ని వార్తలు తేవాలి, ఏ బీట్ల నుంచి. పునర్లేఖనాలు సమీక్ష క్యూలోకే వెళ్తాయి — ఇక్కడ ఏదీ ప్రచురించదు.'}
+            ? 'Crawl hours, how often, how many, which districts and the safety checks are set with the content sources.'
+            : 'క్రాల్ వేళలు, ఎంత తరచుగా, ఎన్ని, ఏ జిల్లాలు, భద్రతా తనిఖీలు — ఇవన్నీ కంటెంట్ మూలాల పేజీలో.'}
         >
-          <Switch checked={bool('crawl.enabled')} onChange={(v) => set('crawl.enabled', v)}
-            label={en ? 'Run the hourly crawl' : 'గంటవారీ క్రాల్ నడపండి'}
-            hint={en
-              ? 'Off means no source is polled on a schedule and no provider is called.'
-              : 'ఆఫ్ అయితే షెడ్యూల్‌లో ఏ మూలాన్నీ తనిఖీ చేయదు, ఏ ప్రొవైడర్‌నూ పిలవదు.'} />
-          <Switch checked={bool('crawl.rewrite_enabled')} onChange={(v) => set('crawl.rewrite_enabled', v)}
-            disabled={!bool('crawl.enabled') || !bool('ai.enabled')}
-            label={en ? 'Rewrite crawled stories in Telugu' : 'తెచ్చిన వార్తలను తెలుగులో తిరగరాయండి'}
-            hint={en
-              ? 'Needs AI switched on above. Off means the crawl only fills the queue with headlines and links.'
-              : 'పైన AI ఆన్ కావాలి. ఆఫ్ అయితే క్యూలో శీర్షికలు, లింక్‌లు మాత్రమే చేరతాయి.'} />
-          <Switch checked={bool('crawl.html_fallback_enabled')} onChange={(v) => set('crawl.html_fallback_enabled', v)}
-            disabled={!bool('crawl.enabled')}
-            label={en ? 'Fetch article pages for stub feeds' : 'చిన్న ఫీడ్‌లకు వ్యాసం పేజీ తేండి'}
-            hint={en
-              ? 'Each source must also permit it and carry a written note. Text from an unlicensed source is used to build the prompt and then discarded — it is never stored.'
-              : 'ప్రతి మూలం కూడా అనుమతించాలి, కారణం రాసి ఉండాలి. లైసెన్స్ లేని మూలం పాఠ్యం భద్రపరచబడదు.'} />
-          <Switch checked={bool('crawl.mandal_autotag')} onChange={(v) => set('crawl.mandal_autotag', v)}
-            label={en ? 'Guess the mandal from the story text' : 'వార్త నుంచి మండలాన్ని ఊహించండి'}
-            hint={en
-              ? 'Always a guess. The editor sees it with a confidence score and can change it in one click.'
-              : 'ఇది ఎప్పుడూ ఊహే. ఎడిటర్‌కు నమ్మకపు స్థాయితో కనిపిస్తుంది, ఒక్క క్లిక్‌లో మార్చవచ్చు.'} />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={en ? 'Stories rewritten per hour (all beats)' : 'గంటకు పునర్లేఖనాలు (అన్ని బీట్లు)'}>
-              <Input script="en" type="number" min={0} max={500}
-                value={num('crawl.hourly_item_cap')}
-                onChange={(e) => set('crawl.hourly_item_cap', Number(e.target.value))} />
-            </Field>
-            <Field label={en ? 'Per-source hourly default' : 'మూలానికి గంటవారీ డిఫాల్ట్'}>
-              <Input script="en" type="number" min={0} max={500}
-                value={num('crawl.per_source_default_cap')}
-                onChange={(e) => set('crawl.per_source_default_cap', Number(e.target.value))} />
-            </Field>
-          </div>
-          <fieldset className="rounded-xl border border-rule p-3">
-            <legend className={cn(s.body, 'px-1 text-ui-sm font-semibold text-ink')}>
-              {en ? 'Stories per hour, by beat' : 'బీట్ వారీగా గంటకు వార్తలు'}
-            </legend>
-            <p className={cn(s.body, 'mb-3 text-meta text-muted')}>
-              {en
-                ? 'Absolute counts, not shares — these need not add up to anything. Their total is capped by the hourly limit above.'
-                : 'ఇవి శాతాలు కావు, సంఖ్యలు — మొత్తం ఎంతైనా కావచ్చు. పైన ఉన్న గంటవారీ పరిమితి వర్తిస్తుంది.'}
-            </p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {BEAT_KEYS.map((beat) => (
-                <Field key={beat.key} label={en ? beat.en : beat.te}>
-                  <Input script="en" type="number" min={0} max={500}
-                    value={Number(beatQuota[beat.key] ?? 0)}
-                    onChange={(e) => set('crawl.beat_quota', { ...beatQuota, [beat.key]: Number(e.target.value) })} />
-                </Field>
-              ))}
-            </div>
-          </fieldset>
+          <ButtonLink to="/admin/sources?tab=crawl" variant="secondary" iconRight={ChevronRight}>
+            {t('admin.page.crawlSettings')}
+          </ButtonLink>
         </Section>
 
         {/* --------------------------------------------------- §20 voice -- */}
@@ -316,6 +421,7 @@ export default function SettingsPage() {
                 <option value="google">google — {keyState(env.tts_google_configured)}</option>
                 <option value="bhashini">bhashini — {keyState(env.tts_bhashini_configured)}</option>
                 <option value="aimlapi">aimlapi — {keyState(voiceKeySet)}</option>
+                <option value="sarvam">sarvam — {keyState(sarvamKeySet)}</option>
               </Select>
             </Field>
             <Field label={en ? 'Monthly character budget' : 'నెలవారీ అక్షరాల బడ్జెట్'}>
@@ -325,29 +431,39 @@ export default function SettingsPage() {
             </Field>
           </div>
           {/* aimlapi bills one key for text and speech, so leaving this blank
-              deliberately reuses the AI key rather than demanding it twice. */}
-          {str('voice.provider') === 'aimlapi' ? (
+              deliberately reuses the AI key rather than demanding it twice.
+              Sarvam is a separate account and has no such fallback: blank
+              there means no audio, which is why the hint differs. */}
+          {configuredProvider ? (
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
-                label={en ? 'Voice API key' : 'వాయిస్ API కీ'}
-                hint={en
-                  ? 'Blank reuses the AI key above. Stored encrypted; never shown again.'
-                  : 'ఖాళీగా ఉంటే పైన ఇచ్చిన AI కీనే వాడుతుంది. ఎన్‌క్రిప్ట్ చేసి భద్రపరుస్తాం.'}
+                label={voiceProvider === 'sarvam'
+                  ? (en ? 'Sarvam AI API key' : 'Sarvam AI API కీ')
+                  : (en ? 'Voice API key' : 'వాయిస్ API కీ')}
+                hint={voiceProvider === 'sarvam'
+                  ? (en
+                      ? 'From the Sarvam AI dashboard. Required — it is a separate account from the AI key above. Stored encrypted; never shown again.'
+                      : 'Sarvam AI డాష్‌బోర్డ్ నుండి. తప్పనిసరి — ఇది పైన ఇచ్చిన AI కీ కంటే వేరే ఖాతా. ఎన్‌క్రిప్ట్ చేసి భద్రపరుస్తాం.')
+                  : (en
+                      ? 'Blank reuses the AI key above. Stored encrypted; never shown again.'
+                      : 'ఖాళీగా ఉంటే పైన ఇచ్చిన AI కీనే వాడుతుంది. ఎన్‌క్రిప్ట్ చేసి భద్రపరుస్తాం.')}
               >
                 <Input script="en" type="password" autoComplete="off" spellCheck={false}
-                  placeholder={voiceKeySet ? '••••••••' : (en ? 'reuses the AI key' : 'AI కీనే వాడుతుంది')}
+                  placeholder={voiceProvider === 'sarvam'
+                    ? (sarvamKeySet ? '••••••••' : 'sk_…')
+                    : (voiceKeySet ? '••••••••' : (en ? 'reuses the AI key' : 'AI కీనే వాడుతుంది'))}
                   value={str('voice.api_key')}
                   onChange={(e) => set('voice.api_key', e.target.value)} />
               </Field>
-              <Field
+              <ModelField
                 label={en ? 'Speech model' : 'స్పీచ్ మోడల్'}
-                hint={en ? 'Blank uses openai/gpt-4o-mini-tts.' : 'ఖాళీ అయితే openai/gpt-4o-mini-tts.'}
-              >
-                <Input script="en" autoComplete="off" spellCheck={false}
-                  placeholder="openai/gpt-4o-mini-tts"
-                  value={str('voice.model')}
-                  onChange={(e) => set('voice.model', e.target.value)} />
-              </Field>
+                hint={voiceProvider === 'sarvam'
+                  ? (en ? 'Blank uses bulbul:v2.' : 'ఖాళీ అయితే bulbul:v2.')
+                  : (en ? 'Blank uses openai/gpt-4o-mini-tts.' : 'ఖాళీ అయితే openai/gpt-4o-mini-tts.')}
+                choices={speechModels}
+                value={speechModel?.id ?? ''}
+                onChange={(id) => set('voice.model', id)}
+              />
             </div>
           ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
@@ -356,13 +472,83 @@ export default function SettingsPage() {
                 value={str('voice.language')}
                 onChange={(e) => set('voice.language', e.target.value)} />
             </Field>
+            {/* A model that takes no voice — minimax, hume — 400s when sent
+                one, so the field goes away rather than sitting there dead. */}
+            {voiceOptions && voiceOptions.length === 0 ? null : (
+              <Field
+                label={en ? 'Voice name' : 'వాయిస్ పేరు'}
+                hint={voiceOptions
+                  ? (en ? 'Only the voices the chosen speech model accepts. Another vendor’s voice is rejected outright.'
+                        : 'ఎంచుకున్న స్పీచ్ మోడల్ అంగీకరించే వాయిస్‌లు మాత్రమే. వేరే వెండర్ వాయిస్ తిరస్కరించబడుతుంది.')
+                  : (en ? 'Provider-specific, e.g. alloy for aimlapi.' : 'ప్రొవైడర్‌ను బట్టి మారుతుంది, ఉదా: alloy.')}
+              >
+                {voiceOptions ? (
+                  <Select value={str('voice.voice_name')} onChange={(e) => set('voice.voice_name', e.target.value)}>
+                    {voiceOptions.map((v) => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                    {str('voice.voice_name') && !voiceOptions.includes(str('voice.voice_name')) ? (
+                      <option value={str('voice.voice_name')}>{str('voice.voice_name')}</option>
+                    ) : null}
+                  </Select>
+                ) : (
+                  <Input script="en" autoComplete="off" placeholder="alloy"
+                    value={str('voice.voice_name')}
+                    onChange={(e) => set('voice.voice_name', e.target.value)} />
+                )}
+              </Field>
+            )}
+          </div>
+          {/* Telugu bulletin references. What these carry is the PACE — the
+              difference between ETV's measured read and TV9's headline read is
+              real and it is the part worth copying. The speaker attached to
+              each is a first pick to audition, not a likeness, and no preset
+              reproduces a named journalist's voice. Audition on the Voice
+              screen, then change the speaker and keep the pace. */}
+          {presets.length ? (
+            <div className="rounded-xl border border-rule bg-canvas p-3">
+              <p className={cn(s.body, 'text-meta font-semibold text-muted')}>
+                {en ? 'Telugu bulletin references' : 'తెలుగు బులెటిన్ రిఫరెన్స్‌లు'}
+              </p>
+              <p className={cn(s.body, 'mt-1 text-muted', s.te ? 'text-te-body-xs' : 'text-ui')}>
+                {en
+                  ? 'A starting point for the read, not an imitation of any presenter. Each sets the voice and the pace below; listen, then adjust.'
+                  : 'ఇవి చదివే శైలికి ప్రారంభ బిందువు మాత్రమే — ఏ యాంకర్‌నూ అనుకరించవు. ప్రతి ఎంపిక కింది వాయిస్‌ను, వేగాన్ని సెట్ చేస్తుంది; విని సర్దుబాటు చేయండి.'}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {presets.map((p) => {
+                  const active = str('voice.voice_name') === p.speaker && num('voice.speed') === p.pace;
+                  return (
+                    <button
+                      key={p.label}
+                      type="button"
+                      title={`${p.note} (${p.speaker}, ${p.pace}x)`}
+                      onClick={() => {
+                        set('voice.voice_name', p.speaker);
+                        set('voice.speed', p.pace);
+                      }}
+                      className={cn(
+                        'rounded-lg border px-3 py-1.5 text-ui font-sans',
+                        active ? 'border-ink bg-ink text-canvas' : 'border-rule text-ink hover:bg-rule/30',
+                      )}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field
-              label={en ? 'Voice name' : 'వాయిస్ పేరు'}
-              hint={en ? 'Provider-specific, e.g. alloy for aimlapi.' : 'ప్రొవైడర్‌ను బట్టి మారుతుంది, ఉదా: alloy.'}
+              label={en ? 'Speaking pace' : 'మాట్లాడే వేగం'}
+              hint={en
+                ? '1.0 is the voice’s own. Around 0.9 reads as a bulletin; above 1.1 reads as a headline block.'
+                : '1.0 అంటే వాయిస్ సహజ వేగం. 0.9 దగ్గర బులెటిన్‌లా, 1.1 పైన హెడ్‌లైన్‌లా వినిపిస్తుంది.'}
             >
-              <Input script="en" autoComplete="off" placeholder="alloy"
-                value={str('voice.voice_name')}
-                onChange={(e) => set('voice.voice_name', e.target.value)} />
+              <Input script="en" type="number" min={0.25} max={4} step={0.01}
+                value={num('voice.speed')}
+                onChange={(e) => set('voice.speed', Number(e.target.value))} />
             </Field>
           </div>
           <Switch checked={bool('voice.article_tts_enabled')} onChange={(v) => set('voice.article_tts_enabled', v)}
@@ -400,6 +586,9 @@ export default function SettingsPage() {
           <Switch checked={bool('epaper.auto_generate')} onChange={(v) => set('epaper.auto_generate', v)} label={en ? 'Auto-generate daily draft' : 'రోజువారీ డ్రాఫ్ట్ ఆటో జనరేట్'} />
           <Field label={en ? 'Generation time (IST)' : 'జనరేషన్ సమయం (IST)'} className="max-w-xs">
             <Input script="en" type="time" value={str('epaper.auto_generate_time')} onChange={(e) => set('epaper.auto_generate_time', e.target.value)} />
+          </Field>
+          <Field label={en ? 'Pages per edition' : 'ఎడిషన్‌కు పేజీలు'} hint={en ? '1–24. A generate can override it for the day.' : '1–24. జనరేట్ చేసేటప్పుడు ఆ రోజుకు మార్చవచ్చు.'} className="max-w-xs">
+            <Input script="en" type="number" min={1} max={24} value={num('epaper.page_count')} onChange={(e) => set('epaper.page_count', Number(e.target.value))} />
           </Field>
           <Switch checked={bool('epaper.audio_enabled')} onChange={(v) => set('epaper.audio_enabled', v)} label={en ? 'Audio edition' : 'ఆడియో ఎడిషన్'} />
           <Switch checked={bool('voice.article_tts_enabled')} onChange={(v) => set('voice.article_tts_enabled', v)} label={en ? 'Article TTS' : 'కథనం TTS'} />
@@ -468,6 +657,61 @@ export default function SettingsPage() {
           </div>
         </Section>
 
+        {/* ---------------------------------------------------- branding -- */}
+        <Section
+          title={en ? 'Branding' : 'బ్రాండింగ్'}
+          subtitle={en
+            ? 'Site colours for readers and this panel. Lighter and darker shades and dark mode are worked out automatically. Keep Primary and Breaking dark enough for white text on them.'
+            : 'పాఠకులకు, ఈ ప్యానెల్‌కు రంగులు. తేలిక/ముదురు షేడ్‌లు, డార్క్ మోడ్ ఆటోమేటిక్‌గా వస్తాయి. ప్రధాన, బ్రేకింగ్ రంగులపై తెల్లని అక్షరాలు కనబడేంత ముదురుగా ఉంచండి.'}
+        >
+          <div className="grid gap-4 sm:grid-cols-3">
+            {BRAND_KEYS.map((b) => {
+              const fallback = String(payload.specs.find((sp) => sp.key === b.key)?.default ?? '');
+              return (
+                <Field key={b.key} label={en ? b.en : b.te} hint={en ? b.hintEn : b.hintTe}>
+                  <div className="flex items-center gap-2">
+                    <Input script="en" type="color" className="w-14 shrink-0 cursor-pointer p-1"
+                      value={str(b.key) || fallback} onChange={(e) => set(b.key, e.target.value)} />
+                    <span className="font-mono text-meta text-muted">{str(b.key)}</span>
+                    {str(b.key) !== fallback ? (
+                      <Button variant="ghost" size="sm" icon={RotateCcw} onClick={() => set(b.key, fallback)}>
+                        {en ? 'Default' : 'డిఫాల్ట్'}
+                      </Button>
+                    ) : null}
+                  </div>
+                </Field>
+              );
+            })}
+          </div>
+        </Section>
+
+        {/* ------------------------------------------------ §13 push ------ */}
+        <Section
+          title={en ? 'Push notifications' : 'పుష్ నోటిఫికేషన్లు'}
+          subtitle={en
+            ? 'Alerts on readers’ phones through Expo. Compose and see delivery under Notifications.'
+            : 'Expo ద్వారా పాఠకుల ఫోన్లకు అలర్ట్‌లు. నోటిఫికేషన్ల పేజీలో పంపండి, ఫలితం చూడండి.'}
+        >
+          <Switch checked={bool('push.enabled')} onChange={(v) => set('push.enabled', v)}
+            label={en ? 'Send push notifications' : 'పుష్ నోటిఫికేషన్లు పంపండి'}
+            hint={en
+              ? 'Off keeps the in-app inbox and holds scheduled pushes; anything sent meanwhile stays inbox-only.'
+              : 'ఆఫ్ అయితే యాప్ ఇన్‌బాక్స్‌కే; షెడ్యూల్ చేసినవి ఆగుతాయి.'} />
+          <Field
+            label={en ? 'Expo access token' : 'Expo యాక్సెస్ టోకెన్'}
+            optionalLabel
+            className="max-w-md"
+            hint={en
+              ? 'Only if “Enhanced push security” is on in the Expo project. Stored encrypted; never shown again.'
+              : 'Expo ప్రాజెక్ట్‌లో “Enhanced push security” ఆన్ అయితేనే. ఎన్‌క్రిప్ట్ చేసి భద్రపరుస్తాం.'}
+          >
+            <Input script="en" type="password" autoComplete="off" spellCheck={false}
+              placeholder={payload.values['push.expo_access_token'] ? '••••••••' : (en ? 'not needed by default' : 'సాధారణంగా అవసరం లేదు')}
+              value={str('push.expo_access_token')}
+              onChange={(e) => set('push.expo_access_token', e.target.value)} />
+          </Field>
+        </Section>
+
         {/* ------------------------------------------------ §9 / §6 misc -- */}
         <Section title={en ? 'Newsroom' : 'న్యూస్‌రూమ్'} subtitle={en ? 'Breaking window and reader submissions' : 'బ్రేకింగ్ వ్యవధి, పాఠకుల రచనలు'}>
           <Field label={en ? 'Default breaking duration (minutes)' : 'బ్రేకింగ్ డిఫాల్ట్ వ్యవధి (నిమిషాలు)'} className="max-w-xs">
@@ -504,12 +748,16 @@ export default function SettingsPage() {
           </dl>
         </Section>
 
-        <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-end gap-2 border-t border-rule bg-surface px-4 py-3 md:-mx-6 md:px-6">
+        <div className="sticky bottom-dock z-10 -mx-4 flex flex-wrap items-center justify-end gap-2 border-t border-rule bg-surface px-4 py-3 md:-mx-6 md:px-6">
           {dirty ? <Badge tone="partial" className="mr-auto">{t('admin.unsaved')}</Badge> : null}
           <Button variant="secondary" icon={RotateCcw} disabled={!dirty || save.isPending} onClick={() => setDraft(payload.values)}>
             {en ? 'Reset' : 'రీసెట్'}
           </Button>
-          <Button icon={Save} pending={save.isPending} onClick={() => save.mutate(draft)}>
+          {/* Only the keys changed here: sending the whole draft let a stale
+              copy of this page write back values moved elsewhere since. */}
+          <Button icon={Save} pending={save.isPending} onClick={() => save.mutate(
+            Object.fromEntries(Object.entries(draft).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(payload.values[k]))),
+          )}>
             {save.isPending ? (en ? 'Saving…' : 'సేవ్ అవుతోంది…') : (en ? 'Save settings' : 'సెట్టింగ్‌లు సేవ్ చేయండి')}
           </Button>
         </div>

@@ -1,5 +1,5 @@
 import { useId, useState, type FormEvent } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { ApiError } from '@/api/client';
 import { Button } from '@/components/ui/Button';
@@ -52,7 +52,24 @@ function SourceForm({ id, source, error, onSubmit }: {
   const [beat, setBeat] = useState<SourceBeat>(source?.beat ?? 'general');
   const [perHour, setPerHour] = useState(source?.max_items_per_hour ?? 8);
   const [rewrite, setRewrite] = useState(source?.rewrite_enabled ?? false);
+  const [images, setImages] = useState(source?.images_enabled ?? false);
   const [htmlFallback, setHtmlFallback] = useState(source?.allow_html_fallback ?? false);
+  const [nameTe, setNameTe] = useState(source?.name_te ?? '');
+  const [homepage, setHomepage] = useState(source?.homepage_url ?? '');
+  const [logo, setLogo] = useState(source?.logo_url ?? '');
+  const [lang, setLang] = useState(source?.language ?? 'te');
+  const [districtId, setDistrictId] = useState<number | null>(source?.default_district_id ?? null);
+  const [mandalId, setMandalId] = useState<number | null>(source?.default_mandal_id ?? null);
+  const [categoryId, setCategoryId] = useState<number | null>(source?.default_category_id ?? null);
+  const [autotag, setAutotag] = useState(source?.mandal_autotag ?? true);
+
+  const options = useQuery({ queryKey: ['cms', 'editor-options'], queryFn: cmsApi.fetchEditorOptions });
+  const mandals = useQuery({
+    queryKey: ['cms', 'mandals', districtId],
+    queryFn: () => cmsApi.fetchEditorMandals(districtId!),
+    enabled: districtId != null,
+  });
+  const idOrNull = (raw: string) => (raw ? Number(raw) : null);
 
   const fieldError = (key: string) => {
     const v = error?.details[key];
@@ -66,7 +83,10 @@ function SourceForm({ id, source, error, onSubmit }: {
       slug, name, feed_url: feedUrl, licence, content_policy: policy,
       licence_note: note || null, fetch_interval_minutes: interval,
       beat, max_items_per_hour: perHour,
-      rewrite_enabled: rewrite, allow_html_fallback: htmlFallback,
+      rewrite_enabled: rewrite, images_enabled: images, allow_html_fallback: htmlFallback,
+      name_te: nameTe || null, homepage_url: homepage || null, logo_url: logo || null, language: lang,
+      default_district_id: districtId, default_mandal_id: mandalId, default_category_id: categoryId,
+      mandal_autotag: autotag,
     });
   };
 
@@ -87,6 +107,20 @@ function SourceForm({ id, source, error, onSubmit }: {
             className="font-mono"
           />
         </Field>
+        <Field label={L('తెలుగు పేరు', 'Name in Telugu')} error={fieldError('name_te')}>
+          <Input value={nameTe} onChange={(e) => setNameTe(e.target.value)} />
+        </Field>
+        <Field
+          label={L('ఫీడ్ భాష', 'Feed language')}
+          hint={L('తెలుగు మూలాలకే పోలిక తనిఖీ జరుగుతుంది.', 'The similarity check only runs for Telugu sources.')}
+        >
+          <Select value={lang} onChange={(e) => setLang(e.target.value)}>
+            <option value="te">{L('తెలుగు', 'Telugu')}</option>
+            <option value="en">{L('ఇంగ్లీష్', 'English')}</option>
+            <option value="hi">{L('హిందీ', 'Hindi')}</option>
+            {['te', 'en', 'hi'].includes(lang) ? null : <option value={lang}>{lang}</option>}
+          </Select>
+        </Field>
       </div>
 
       <Field label={L('ఫీడ్ URL (RSS లేదా Atom)', 'Feed URL (RSS or Atom)')} required error={fieldError('feed_url')}>
@@ -99,6 +133,23 @@ function SourceForm({ id, source, error, onSubmit }: {
           placeholder="https://publisher.example.com/feed.xml"
         />
       </Field>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field
+          label={L('ప్రచురణకర్త వెబ్‌సైట్', 'Publisher homepage')}
+          hint={L('చిత్రం ఈ డొమైన్‌దేనా అని ఇది చూసి నిర్ణయిస్తాం.', 'Pictures are only taken from this domain.')}
+          error={fieldError('homepage_url')}
+        >
+          <Input type="url" script="en" value={homepage} onChange={(e) => setHomepage(e.target.value)} placeholder="https://publisher.example.com" />
+        </Field>
+        <Field
+          label={L('లోగో URL', 'Logo URL')}
+          hint={L('ఈ చిత్రాన్ని వార్త ఫోటోగా ఎప్పుడూ వాడం.', 'This image is never used as a story photo.')}
+          error={fieldError('logo_url')}
+        >
+          <Input type="url" script="en" value={logo} onChange={(e) => setLogo(e.target.value)} />
+        </Field>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={L('లైసెన్స్', 'Licence')}>
@@ -146,9 +197,57 @@ function SourceForm({ id, source, error, onSubmit }: {
         </Field>
         <Field
           label={L('గంటకు గరిష్ఠ వార్తలు', 'Max stories per hour')}
-          hint={L('ఒకే ఫీడ్ మొత్తం కోటాను తినకుండా ఆపుతుంది.', 'Stops one busy feed consuming the whole beat budget.')}
+          hint={L(
+            'ఒకే ఫీడ్ మొత్తం కోటాను తినకుండా ఆపుతుంది. 0 అంటే క్రాల్ సెట్టింగ్స్‌లోని సాధారణ పరిమితి.',
+            'Stops one busy feed consuming the whole beat budget. 0 = use the global default from Crawl settings.',
+          )}
         >
           <Input type="number" script="en" min={0} max={500} value={perHour} onChange={(e) => setPerHour(Number(e.target.value))} />
+        </Field>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Field
+          label={L('డిఫాల్ట్ జిల్లా', 'Default district')}
+          hint={L('ఈ మూలం వార్తలకు జిల్లా. జాతీయ మూలాలకు ఖాళీగా ఉంచండి.', 'Where this source’s stories are from. Leave blank for national sources.')}
+        >
+          <Select
+            value={districtId ?? ''}
+            onChange={(e) => {
+              setDistrictId(idOrNull(e.target.value));
+              setMandalId(null);
+            }}
+          >
+            <option value="">{L('ఏదీ కాదు', 'None')}</option>
+            {(options.data?.districts ?? []).map((d) => (
+              <option key={d.id} value={d.id}>
+                {L(d.name_te, d.name_en)} ({d.state})
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field
+          label={L('డిఫాల్ట్ మండలం', 'Default mandal')}
+          hint={districtId ? L('ఎంచుకుంటే ప్రతి వార్తకు ఇదే మండలం.', 'Pins every story to this mandal.') : L('ముందు జిల్లా ఎంచుకోండి', 'Choose a district first')}
+        >
+          <Select disabled={districtId == null || mandals.isLoading} value={mandalId ?? ''} onChange={(e) => setMandalId(idOrNull(e.target.value))}>
+            <option value="">{L('ఏదీ కాదు', 'None')}</option>
+            {(mandals.data ?? []).map((m) => (
+              <option key={m.id} value={m.id}>
+                {L(m.name_te, m.name_en)}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label={L('డిఫాల్ట్ విభాగం', 'Default category')} hint={L('దిగుమతి చేసినప్పుడు వాడతాం.', 'Used when an item is imported.')}>
+          <Select value={categoryId ?? ''} onChange={(e) => setCategoryId(idOrNull(e.target.value))}>
+            <option value="">{L('ఏదీ కాదు', 'None')}</option>
+            {(options.data?.categories ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.parent_id ? '↳ ' : ''}{L(c.name_te, c.name_en)}
+              </option>
+            ))}
+          </Select>
         </Field>
       </div>
 
@@ -161,11 +260,33 @@ function SourceForm({ id, source, error, onSubmit }: {
         )}
       />
       <Checkbox
+        checked={images}
+        onChange={setImages}
+        label={L(
+          'ఈ ప్రచురణకర్త సొంత చిత్రాలను తెచ్చి కథనానికి జోడించండి.',
+          "Pull this publisher's own photographs in with the story.",
+        )}
+        hint={L(
+          'డిఫాల్ట్‌గా ఆఫ్. ఇతర సైట్ల చిత్రాలు ఎప్పుడూ తీసుకోం — ఈ ప్రచురణకర్త డొమైన్‌లో ఉన్నవి, లోగో కానివి, తగినంత పెద్దవి మాత్రమే.',
+          'Off by default. We never take images from anywhere else: only files on this publisher\u2019s own domain, that are not their logo and are large enough to print.',
+        )}
+      />
+      <Checkbox
         checked={htmlFallback}
         onChange={setHtmlFallback}
         label={L(
           'ఫీడ్‌లో చిన్న ముక్క మాత్రమే ఉంటే వ్యాసం పేజీని తెండి. ఇది ఈ ప్రచురణకర్తకు ఎందుకు సమ్మతమో కింద రాయాలి.',
           'When the feed carries only a stub, fetch the article page. Needs a written note below saying why that is acceptable for this publisher.',
+        )}
+      />
+      <Checkbox
+        checked={autotag && mandalId == null}
+        onChange={setAutotag}
+        disabled={mandalId != null}
+        label={L('ప్రతి వార్త నుంచి మండలాన్ని ఊహించండి.', 'Guess the mandal from each story.')}
+        hint={L(
+          'మండలం పైన నిర్ణయిస్తే ఊహ అవసరం లేదు. క్రాల్ సెట్టింగ్స్‌లోని స్విచ్ కూడా ఆన్ ఉండాలి.',
+          'Not needed when a mandal is pinned above. The switch in Crawl settings must be on too.',
         )}
       />
 

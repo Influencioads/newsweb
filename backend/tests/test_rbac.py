@@ -73,10 +73,17 @@ class TestForbiddenPermissions:
 class TestRoleMatrix:
     """§6.1 'Can do' column, asserted role by role."""
 
-    def test_all_fourteen_roles_are_defined(self) -> None:
+    def test_all_fifteen_roles_are_defined(self) -> None:
         # Fourteen since citizen journalism: `contributor` is a reader whose
         # identity was checked, holding no CMS access at all.
-        assert len(ROLE_DEFINITIONS) == 14
+        #
+        # Fifteen since `panchayat_secretary`, the ONE exception to per-article
+        # review. Note what it did *not* need: no new permission, and none of
+        # the three bypass tests above changed. What lets their copy skip the
+        # queue is a dated grant on their contributor profile, checked in
+        # `panchayat_service.may_self_publish` on every request. A sixteenth
+        # role asking for the same deal is a no.
+        assert len(ROLE_DEFINITIONS) == 15
         assert set(ROLE_DEFINITIONS) == set(RoleKey)
 
     def test_levels_match_the_specification(self) -> None:
@@ -93,10 +100,27 @@ class TestRoleMatrix:
             RoleKey.AD_MANAGER: 30,
             RoleKey.SEO_ANALYST: 30,
             RoleKey.MODERATOR: 20,
+            # Load-bearing: the pin-placement gate is level 60, and this role
+            # holding `article.publish` at 15 is the reason that gate exists.
+            RoleKey.PANCHAYAT_SECRETARY: 15,
             RoleKey.SUBSCRIBER: 10,
         }
         for role, level in expected.items():
             assert ROLE_DEFINITIONS[role]["level"] == level, role
+
+    def test_the_panchayat_secretary_holds_no_approval_authority(self) -> None:
+        """The exception is a grant on a profile, not authority in the matrix.
+        This role must not be able to manufacture its own approval, mark
+        breaking news, or touch anybody else's copy."""
+        perms = ROLE_PERMISSIONS[RoleKey.PANCHAYAT_SECRETARY]
+        assert "article.publish" in perms
+        assert not {
+            "article.approve",
+            "article.breaking",
+            "article.edit",
+            "article.view",
+            "article.unpublish",
+        } & perms
 
     def test_every_granted_permission_exists(self) -> None:
         for role, keys in ROLE_PERMISSIONS.items():

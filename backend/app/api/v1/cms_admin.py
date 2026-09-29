@@ -1,21 +1,40 @@
 from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, or_, select, union_all, update
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.deps import Principal, require_permission
-from app.core.errors import NotFoundError, ValidationError
+from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.core.redis_client import cache_delete_prefix
+from app.db.base import utcnow
+from app.db.seed_content import RETIRED_CATEGORY_SLUGS
 from app.db.session import get_db
+from app.models.ai import AiArticleDraft, AiSuggestion
 from app.models.audit import AuditLog
-from app.models.content import Category, Tag
-from app.models.enums import AuditAction, HomeSectionKind
+from app.models.content import Article, Category, Tag
+from app.models.creator import AdCampaign, CreatorSubmission
+from app.models.discovery import Pin, TrendingScore
+from app.models.engagement import Follow
+from app.models.enums import (
+    AuditAction,
+    FollowTargetType,
+    HomeSectionKind,
+    ScopeType,
+    TrendingScope,
+)
+from app.models.epaper import EpaperPageTemplate, EpaperUserEditionPreference
 from app.models.geo import District, Locality, Mandal, State
+from app.models.ingestion import ContentSource
 from app.models.media import Media
+from app.models.notify import NotificationCampaign
+from app.models.poll import Poll, TrendingTopic
+from app.models.reader import UserPreference
+from app.models.setting import AppSetting
 from app.models.site import HomepageSection
-from app.models.user import Role, User
-from app.services import audit_service
+from app.models.user import Role, User, UserRole
+from app.models.video import Video
+from app.services import audit_service, panchayat_service
 
 router = APIRouter(prefix="/cms", tags=["cms-management"])
 
@@ -33,6 +52,20 @@ def taxonomy(
     categories = db.scalars(
         select(Category).order_by(Category.sort, Category.name_en)
     ).all()
+    # One grouped count over both placement columns (a story is filed under a
+    # section and optionally a sub-section). Soft-deleted stories count too:
+    # they still block a delete.
+    refs = union_all(
+        select(Article.category_id.label("cid")),
+        select(Article.subcategory_id.label("cid")),
+    ).subquery()
+    article_counts = dict(
+        db.execute(
+            select(refs.c.cid, func.count())
+            .where(refs.c.cid.is_not(None))
+            .group_by(refs.c.cid)
+        ).all()
+    )
     districts = db.scalars(
         select(District).order_by(District.state, District.sort, District.name_en)
     ).all()
@@ -48,6 +81,12 @@ def taxonomy(
                 "name_en": x.name_en,
                 "active": x.is_active,
                 "in_nav": x.show_in_nav,
+                "is_active": x.is_active,
+                "show_in_nav": x.show_in_nav,
+                "sort": x.sort,
+                "parent_id": x.parent_id,
+                "description_te": x.description_te,
+                "article_count": int(article_counts.get(x.id, 0)),
             }
             for x in categories
         ],
@@ -84,9 +123,13 @@ def media_library(
     db: Session = Depends(get_db),
     _p: Principal = Depends(require_permission("media.view")),
 ):
+    from app.services.media_service import STUDIO_ONLY, meta_flag
+
+    # The creative studio's references and backdrops live on its own screen;
+    # here they would be offered as a story's main image.
     stmt = (
         select(Media)
-        .where(Media.deleted_at.is_(None))
+        .where(Media.deleted_at.is_(None), *(~meta_flag(k) for k in STUDIO_ONLY))
         .order_by(Media.created_at.desc())
     )
     rows, total = page(db, Media, stmt, offset, limit)
@@ -257,20 +300,58 @@ def audit(
 # --------------------------------------------------------------------------- #
 # taxonomy management (updated doc §19 Categories)
 # --------------------------------------------------------------------------- #
+_CATEGORY_SLUG = r"^[a-z0-9-]+$"
+
+
 class CategoryWrite(BaseModel):
-    slug: str = Field(min_length=2, max_length=80, pattern=r"^[a-z0-9-]+$")
+    slug: str = Field(min_length=2, max_length=80, pattern=_CATEGORY_SLUG)
     name_te: str = Field(min_length=1, max_length=120)
     name_en: str = Field(min_length=1, max_length=120)
+    parent_id: int | None = None
+    description_te: str | None = Field(default=None, max_length=2000)
     show_in_nav: bool = True
-    sort: int = 0
+    is_active: bool = True
+    #: Omitted -> appended after the last category.
+    sort: int | None = None
 
 
 class CategoryPatch(BaseModel):
-    name_te: str | None = Field(default=None, max_length=120)
-    name_en: str | None = Field(default=None, max_length=120)
+    slug: str | None = Field(
+        default=None, min_length=2, max_length=80, pattern=_CATEGORY_SLUG
+    )
+    name_te: str | None = Field(default=None, min_length=1, max_length=120)
+    name_en: str | None = Field(default=None, min_length=1, max_length=120)
+    parent_id: int | None = None
+    description_te: str | None = Field(default=None, max_length=2000)
     show_in_nav: bool | None = None
     is_active: bool | None = None
     sort: int | None = None
+
+
+class CategoryOrder(BaseModel):
+    ordered_ids: list[int] = Field(min_length=1, max_length=500)
+
+
+#: Columns NOT NULL in `categories` — a PATCH may omit them, never null them.
+_CATEGORY_REQUIRED = ("slug", "name_te", "name_en", "show_in_nav", "is_active", "sort")
+
+#: Rows that file content under a category. Deleting a category any of these
+#: point at needs a destination (`move_to`), so nothing silently loses its
+#: section — and ad campaigns, which the FK would cascade-delete, survive.
+_FILED_UNDER = (
+    ("videos", Video.category_id),
+    ("sources", ContentSource.default_category_id),
+    ("submissions", CreatorSubmission.category_id),
+    ("ad_campaigns", AdCampaign.category_id),
+)
+#: Loose labels: they follow a move, or lose the category (what MySQL's SET
+#: NULL would do; SQLite tests don't enforce FKs, so it is done by hand).
+_LOOSE_REFS = (
+    Poll.category_id,
+    TrendingTopic.category_id,
+    AiSuggestion.category_id,
+    AiArticleDraft.category_id,
+)
 
 
 def _invalidate_public_cache() -> None:
@@ -278,6 +359,131 @@ def _invalidate_public_cache() -> None:
     the config/home caches are purged, the next request rebuilds them."""
     cache_delete_prefix("home:")
     cache_delete_prefix("locations")
+    # Per-category trending lists are keyed by slug and carry its names.
+    cache_delete_prefix("trending:")
+
+
+def _count(db: Session, *where) -> int:
+    return int(db.scalar(select(func.count()).where(*where)) or 0)
+
+
+def _refuse_system_category(cat: Category, what: str) -> None:
+    """`panchayat_service.stamp_ugc` finds its section by this exact slug."""
+    if cat.slug == panchayat_service.PANCHAYAT_CATEGORY_SLUG:
+        raise ConflictError(
+            message_en=f"The panchayat section is used by the system; it can't be {what}.",
+            message_te="పంచాయతీ విభాగాన్ని సిస్టమ్ వాడుతుంది; దీన్ని మార్చడం/తొలగించడం కుదరదు.",
+            details={"slug": cat.slug},
+        )
+
+
+def _repoint_campaigns(db: Session, old_slug: str, new_slug: str | None) -> int:
+    """A scheduled push stores its audience as `category:<slug>` and resolves
+    it at send time, so it follows a rename/move — or, with nowhere to go, is
+    cancelled now rather than failing unseen at release."""
+    values = (
+        {"audience": f"category:{new_slug}"} if new_slug else {"status": "cancelled"}
+    )
+    return db.execute(
+        update(NotificationCampaign)
+        .where(
+            NotificationCampaign.status == "scheduled",
+            NotificationCampaign.audience == f"category:{old_slug}",
+        )
+        .values(**values)
+    ).rowcount
+
+
+def _check_parent(db: Session, cat_id: int | None, parent_id: int | None) -> None:
+    """Two levels only (section > sub-section), which also rules out cycles:
+    the parent must be an existing top-level category other than this one, and
+    a category that has sub-categories can't become one itself."""
+    if parent_id is None:
+        return
+    parent = db.get(Category, parent_id)
+    if parent is None or parent.id == cat_id or parent.parent_id is not None:
+        raise ValidationError(
+            details={"parent_id": "must be another existing top-level category"}
+        )
+    if cat_id is not None and _count(db, Category.parent_id == cat_id):
+        raise ValidationError(
+            details={"parent_id": "a category with sub-categories can't be nested"}
+        )
+
+
+def _ensure_home_section(db: Session, cat: Category) -> None:
+    """A top-level nav category gets a home block (web + mobile render only
+    configured sections), appended at the end — the insert-only rule of
+    `seed_homepage_sections`, inlined so the route doesn't import the seed."""
+    if cat.parent_id is not None or not cat.show_in_nav:
+        return
+    taken = db.scalar(
+        select(HomepageSection.id).where(
+            or_(HomepageSection.key == cat.slug, HomepageSection.category_id == cat.id)
+        )
+    )
+    if taken is not None:
+        return
+    last = db.scalar(select(func.coalesce(func.max(HomepageSection.sort), -1)))
+    db.add(
+        HomepageSection(
+            key=cat.slug,
+            kind=HomeSectionKind.CATEGORY,
+            category_id=cat.id,
+            sort=int(last) + 1,
+            is_enabled=True,
+            item_count=7,
+            min_items=3,
+        )
+    )
+    db.flush()
+
+
+def _rewrite_reader_slugs(db: Session, old: str, new: str | None) -> None:
+    """Readers' interests are a JSON list of slugs: rename (or drop, when
+    `new` is None) in Python so it runs the same on SQLite and MySQL."""
+    # ponytail: scans every preferences row; add a JSON_CONTAINS prefilter if
+    # user_preferences grows past what an admin click can wait for.
+    for prefs in db.scalars(
+        select(UserPreference).where(UserPreference.category_slugs.is_not(None))
+    ):
+        slugs = list(prefs.category_slugs or [])
+        if old not in slugs:
+            continue
+        out: list[str] = []
+        for s in slugs:
+            s = new if s == old else s
+            if s and s not in out:
+                out.append(s)
+        prefs.category_slugs = out
+
+
+def _retire_slug(db: Session, slug: str) -> None:
+    """Remember a slug renamed away or deleted, so `seed_categories` doesn't
+    re-create it (with a nav entry and home block) on the next re-seed."""
+    row = db.scalar(select(AppSetting).where(AppSetting.key == RETIRED_CATEGORY_SLUGS))
+    if row is None:
+        row = AppSetting(key=RETIRED_CATEGORY_SLUGS, value={"v": []})
+        db.add(row)
+    slugs = list((row.value or {}).get("v") or [])
+    if slug not in slugs:
+        row.value = {"v": [*slugs, slug]}
+
+
+def _repoint(db: Session, owner, target, kind, old: int, new: int | None) -> None:
+    """Move rows unique per (owner, kind, target) — reader follows, personal
+    e-paper picks — from category `old` to `new`. An owner already holding
+    `new` just loses `old`; with no `new` they are all dropped."""
+    model = target.class_
+    if new is not None:
+        # ponytail: the ids are materialised (MySQL can't subselect the table
+        # it deletes from); fine up to tens of thousands of followers.
+        have = list(db.scalars(select(owner).where(kind, target == new)))
+        if have:
+            db.execute(delete(model).where(kind, target == old, owner.in_(have)))
+        db.execute(update(model).where(kind, target == old).values({target: new}))
+    else:
+        db.execute(delete(model).where(kind, target == old))
 
 
 @router.post("/taxonomy/categories", status_code=201)
@@ -290,20 +496,56 @@ def create_category(
     exists = db.scalar(select(Category).where(Category.slug == payload.slug))
     if exists is not None:
         raise ValidationError(details={"slug": "already exists"})
-    cat = Category(**payload.model_dump())
+    _check_parent(db, None, payload.parent_id)
+    data = payload.model_dump()
+    # The reader nav is flat: a sub-section joins it only when asked to.
+    if payload.parent_id is not None and "show_in_nav" not in payload.model_fields_set:
+        data["show_in_nav"] = False
+    if data["sort"] is None:
+        data["sort"] = int(db.scalar(select(func.coalesce(func.max(Category.sort), -1)))) + 1
+    cat = Category(**data)
     db.add(cat)
     db.flush()
+    _ensure_home_section(db, cat)
     audit_service.record(
         db,
         action=AuditAction.CREATE,
         entity_type="category",
         entity_id=cat.id,
         actor=p.user,
-        after=payload.model_dump(),
+        after=data,
         request=request,
     )
     _invalidate_public_cache()
     return {"id": cat.id, "slug": cat.slug}
+
+
+@router.put("/taxonomy/categories/order")
+def reorder_categories(
+    payload: CategoryOrder,
+    request: Request,
+    db: Session = Depends(get_db),
+    p: Principal = Depends(require_permission("taxonomy.manage")),
+):
+    rows = {c.id: c for c in db.scalars(select(Category)).all()}
+    unknown = [i for i in payload.ordered_ids if i not in rows]
+    if unknown:
+        raise ValidationError(
+            details={"ordered_ids": f"unknown category ids: {unknown}"}
+        )
+    for position, cat_id in enumerate(payload.ordered_ids):
+        rows[cat_id].sort = position
+    audit_service.record(
+        db,
+        action=AuditAction.UPDATE,
+        entity_type="category",
+        entity_id="order",
+        actor=p.user,
+        after={"ordered_ids": payload.ordered_ids},
+        request=request,
+    )
+    _invalidate_public_cache()
+    return {"ok": True, "count": len(payload.ordered_ids)}
 
 
 @router.patch("/taxonomy/categories/{category_id}")
@@ -318,9 +560,68 @@ def update_category(
     if cat is None:
         raise NotFoundError()
     changes = payload.model_dump(exclude_unset=True)
+    for k in _CATEGORY_REQUIRED:
+        if k in changes and changes[k] is None:
+            raise ValidationError(details={k: "may not be empty"})
+    if changes.get("slug", cat.slug) == cat.slug:
+        changes.pop("slug", None)
+    if changes.get("parent_id", cat.parent_id) == cat.parent_id:
+        changes.pop("parent_id", None)
+
+    old_slug = cat.slug
+    if "slug" in changes:
+        _refuse_system_category(cat, "renamed")
+        new_slug = changes["slug"]
+        if db.scalar(select(Category.id).where(Category.slug == new_slug)) is not None:
+            raise ValidationError(details={"slug": "already exists"})
+        # The category's home block is keyed by its slug (/section/<key>); a
+        # different block already holding the new key would collide.
+        if db.scalar(
+            select(HomepageSection.id).where(
+                HomepageSection.key == new_slug,
+                or_(
+                    HomepageSection.category_id.is_(None),
+                    HomepageSection.category_id != cat.id,
+                ),
+            )
+        ) is not None:
+            raise ValidationError(
+                details={"slug": "already used by a homepage section"}
+            )
+    if "parent_id" in changes:
+        _refuse_system_category(cat, "moved")
+        _check_parent(db, cat.id, changes["parent_id"])
+
     before = {k: getattr(cat, k) for k in changes}
+    audit_after = dict(changes)
     for k, v in changes.items():
         setattr(cat, k, v)
+    if "parent_id" in changes:
+        # Re-file its stories so each stays valid for
+        # workflow_service._resolve_placement (a sub-section is a child of the
+        # story's section): nested -> section = new parent, sub-section = this;
+        # promoted -> section = this, no sub-section. (It has no children:
+        # _check_parent refuses nesting one that does.)
+        ours = or_(Article.category_id == cat.id, Article.subcategory_id == cat.id)
+        section, sub = (cat.parent_id, cat.id) if cat.parent_id else (cat.id, None)
+        audit_after["stories_refiled"] = db.execute(
+            update(Article).where(ours).values(category_id=section, subcategory_id=sub)
+        ).rowcount
+    if "slug" in changes:
+        _retire_slug(db, old_slug)
+        db.execute(
+            update(HomepageSection)
+            .where(
+                HomepageSection.category_id == cat.id,
+                HomepageSection.key == old_slug,
+            )
+            .values(key=cat.slug)
+        )
+        _rewrite_reader_slugs(db, old_slug, cat.slug)
+        audit_after["campaigns_repointed"] = _repoint_campaigns(db, old_slug, cat.slug)
+    if changes.get("show_in_nav") or "parent_id" in changes:
+        db.flush()
+        _ensure_home_section(db, cat)
     audit_service.record(
         db,
         action=AuditAction.UPDATE,
@@ -328,7 +629,7 @@ def update_category(
         entity_id=cat.id,
         actor=p.user,
         before=before,
-        after=changes,
+        after=audit_after,
         request=request,
     )
     _invalidate_public_cache()
@@ -338,7 +639,121 @@ def update_category(
         "active": cat.is_active,
         "in_nav": cat.show_in_nav,
         "sort": cat.sort,
+        "parent_id": cat.parent_id,
     }
+
+
+@router.delete("/taxonomy/categories/{category_id}")
+def delete_category(
+    category_id: int,
+    request: Request,
+    move_to: int | None = Query(None, description="Category that inherits its content"),
+    db: Session = Depends(get_db),
+    p: Principal = Depends(require_permission("taxonomy.manage")),
+):
+    """Hard delete. A category still holding content is refused (409, with
+    the counts) unless `move_to` names where that content goes; hiding it
+    instead is PATCH `is_active=false`."""
+    cat = db.get(Category, category_id)
+    if cat is None:
+        raise NotFoundError()
+    _refuse_system_category(cat, "deleted")
+    children = _count(db, Category.parent_id == cat.id)
+    if children:
+        raise ConflictError(
+            message_en="Delete or move its sub-categories first.",
+            message_te="ముందు దీని ఉప-విభాగాలను తొలగించండి లేదా మార్చండి.",
+            details={"children": children},
+        )
+    desks = _count(
+        db, UserRole.scope_type == ScopeType.DESK, UserRole.scope_id == cat.id
+    )
+    if desks:
+        raise ConflictError(
+            message_en="Staff roles are scoped to this desk; reassign them first.",
+            message_te="ఈ డెస్క్‌కు సిబ్బంది పాత్రలు ఉన్నాయి; ముందు వాటిని మార్చండి.",
+            details={"desk_roles": desks},
+        )
+
+    counts = {
+        "articles": _count(
+            db, or_(Article.category_id == cat.id, Article.subcategory_id == cat.id)
+        ),
+        **{name: _count(db, col == cat.id) for name, col in _FILED_UNDER},
+    }
+    target: Category | None = None
+    if move_to is not None:
+        target = db.get(Category, move_to)
+        if target is None or target.id == cat.id:
+            raise ValidationError(details={"move_to": "must be another existing category"})
+    elif any(counts.values()):
+        raise ConflictError(
+            message_en="This category still has content. Choose where to move it.",
+            message_te="ఈ విభాగంలో ఇంకా కంటెంట్ ఉంది. దాన్ని ఎక్కడికి మార్చాలో ఎంచుకోండి.",
+            details={"counts": counts},
+        )
+
+    if target is not None:
+        # Every story filed here (as section or sub-section) lands on the
+        # target, kept valid for _resolve_placement: a sub-section target
+        # files it under its parent + it, a section target alone.
+        section, sub = (
+            (target.parent_id, target.id) if target.parent_id else (target.id, None)
+        )
+        db.execute(
+            update(Article)
+            .where(or_(Article.category_id == cat.id, Article.subcategory_id == cat.id))
+            .values(category_id=section, subcategory_id=sub)
+        )
+        for _name, col in _FILED_UNDER:
+            db.execute(update(col.class_).where(col == cat.id).values({col: target.id}))
+    new_id = target.id if target else None
+    follows = Follow.target_type == FollowTargetType.CATEGORY
+    _repoint(db, Follow.user_id, Follow.target_id, follows, cat.id, new_id)
+    pick = EpaperUserEditionPreference
+    picks = pick.preference_type == "category"
+    _repoint(db, pick.user_edition_id, pick.target_id, picks, cat.id, new_id)
+    for col in _LOOSE_REFS:
+        db.execute(
+            update(col.class_)
+            .where(col == cat.id)
+            .values({col: target.id if target else None})
+        )
+    # FK cascades, done explicitly — SQLite (tests) doesn't enforce them.
+    db.execute(delete(HomepageSection).where(HomepageSection.category_id == cat.id))
+    db.execute(delete(Pin).where(Pin.category_id == cat.id))
+    db.execute(
+        delete(TrendingScore).where(
+            TrendingScore.scope_type == TrendingScope.CATEGORY,
+            TrendingScore.scope_id == cat.id,
+        )
+    )
+    # References with no FK at all.
+    for tpl in db.scalars(select(EpaperPageTemplate)):
+        if cat.id in (tpl.category_ids or []):
+            tpl.category_ids = [i for i in tpl.category_ids if i != cat.id]
+    _rewrite_reader_slugs(db, cat.slug, None)
+    campaigns = _repoint_campaigns(db, cat.slug, target.slug if target else None)
+    _retire_slug(db, cat.slug)
+
+    slug = cat.slug
+    db.delete(cat)
+    audit_service.record(
+        db,
+        action=AuditAction.DELETE,
+        entity_type="category",
+        entity_id=category_id,
+        actor=p.user,
+        before={"slug": slug, "name_en": cat.name_en},
+        after={
+            "move_to": target.slug if target else None,
+            "moved": counts,
+            "scheduled_pushes": campaigns,
+        },
+        request=request,
+    )
+    _invalidate_public_cache()
+    return {"ok": True, "slug": slug, "moved": counts}
 
 
 # --------------------------------------------------------------------------- #
@@ -493,24 +908,72 @@ class ReportClose(BaseModel):
 
 
 class CommentModerate(BaseModel):
+    """`hide` stays required for every existing caller; `pinned` is optional so
+    a client that only hides is unchanged."""
+
     hide: bool
+    pinned: bool | None = None
 
 
 @router.get("/moderation/reports")
 def moderation_reports(
     status: str | None = Query(None, pattern="^(open|resolved|dismissed)$"),
+    ugc_only: bool = Query(
+        False, description="Only reports about contributed (user-submitted) articles"
+    ),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
     _p: Principal = Depends(require_permission("comment.moderate")),
 ):
-    from app.models.engagement import Comment
+    """The moderation queue, heaviest first.
+
+    Ordered by how many people reported the same target, because three reports
+    on one article is a different signal from three reports on three. That is
+    all it is: **nothing here unpublishes anything at a threshold.** A
+    coordinated brigade would be the fastest way to take down real journalism,
+    so the count moves a story up a human's list and no further.
+    """
+    from app.models.content import Article
+    from app.models.engagement import Comment, Report
     from app.models.enums import ReportStatus, ReportTargetType
     from app.repositories import engagement_repo
 
-    rows, total = engagement_repo.report_queue(
-        db, status=ReportStatus(status) if status else None, offset=offset, limit=limit
+    where = [Report.status == ReportStatus(status)] if status else []
+    if ugc_only:
+        where += [
+            Report.target_type == ReportTargetType.ARTICLE,
+            Report.target_id.in_(
+                select(Article.id).where(Article.article_source_type == "USER")
+            ),
+        ]
+    # One GROUP BY over open reports, joined back on the target.
+    open_counts = (
+        select(
+            Report.target_type.label("target_type"),
+            Report.target_id.label("target_id"),
+            func.count(Report.id).label("n"),
+        )
+        .where(Report.status == ReportStatus.OPEN)
+        .group_by(Report.target_type, Report.target_id)
+        .subquery()
     )
+    heat = func.coalesce(open_counts.c.n, 0)
+    paged = db.execute(
+        select(Report, heat)
+        .outerjoin(
+            open_counts,
+            (open_counts.c.target_type == Report.target_type)
+            & (open_counts.c.target_id == Report.target_id),
+        )
+        .where(*where)
+        .order_by(heat.desc(), Report.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    ).all()
+    rows = [row[0] for row in paged]
+    counts = {row[0].id: int(row[1] or 0) for row in paged}
+    total = int(db.scalar(select(func.count(Report.id)).where(*where)) or 0)
 
     article_ids = [
         r.target_id for r in rows if r.target_type == ReportTargetType.ARTICLE
@@ -557,6 +1020,8 @@ def moderation_reports(
                 "note": r.note,
                 "status": r.status,
                 "reporter_id": r.user_id,
+                #: Open reports against the same target, this one included.
+                "report_count": counts.get(r.id, 0),
                 "created_at": r.created_at,
                 "resolved_at": r.resolved_at,
                 "resolution_note": r.resolution_note,
@@ -661,6 +1126,11 @@ def moderation_comments(
                 "article_title_te": parent_of(c)["title_te"],
                 "article_short_id": parent_of(c)["ref"],
                 "created_at": c.created_at,
+                "is_pinned": c.pinned_at is not None,
+                # An editorially seeded comment has no account behind it. The
+                # queue says so rather than showing a moderator a name they
+                # cannot look up.
+                "is_seeded": c.is_seeded,
             }
             for c in rows
         ],
@@ -681,16 +1151,28 @@ def moderate_comment(
     comment = engagement_service.moderate_comment(
         db, comment_id=comment_id, moderator_id=p.id, hide=payload.hide
     )
+    if payload.pinned is not None:
+        # Promoting the best comment to the top of the thread is moderation,
+        # so it reuses `comment.moderate` rather than inventing a permission.
+        comment.pinned_at = utcnow() if payload.pinned else None
+        db.flush()
     audit_service.record(
         db,
         action=AuditAction.UPDATE,
         entity_type="comment",
         entity_id=comment.id,
         actor=p.user,
-        after={"status": comment.status},
+        after={
+            "status": comment.status,
+            "pinned_at": comment.pinned_at.isoformat() if comment.pinned_at else None,
+        },
         request=request,
     )
-    return {"id": comment.id, "status": comment.status}
+    return {
+        "id": comment.id,
+        "status": comment.status,
+        "is_pinned": comment.pinned_at is not None,
+    }
 
 
 # --------------------------------------------------------------------------- #

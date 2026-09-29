@@ -20,6 +20,7 @@ from app.db.base import utcnow
 from app.models.content import Article, WorkflowTransition
 from app.models.creator import CreatorSubmission
 from app.models.enums import ArticleStatus, SubmissionStatus, WorkflowState
+from app.models.media import ArticleMedia
 from app.models.user import User
 from app.services import kyc_service, settings_service, tiptap
 from app.telugu.normalize import normalize_headline, normalize_text
@@ -36,6 +37,10 @@ MAX_PENDING_PER_USER = 5
 TITLE_MIN = 10
 BODY_MIN = 100
 BODY_MAX = 20_000
+
+#: Photographs per submission. A citizen journalist sends the scene, not an
+#: album, and four is what fits a hero plus a gallery strip.
+MAX_MEDIA = 4
 
 
 def plain_text_to_tiptap(text: str) -> dict[str, Any]:
@@ -146,6 +151,34 @@ def _get_pending(db: Session, submission_id: int) -> CreatorSubmission:
     return submission
 
 
+def check_can_attach(
+    db: Session, *, submission_id: int, user_id: int
+) -> CreatorSubmission:
+    """Everything that can refuse a photograph, checked before one is
+    processed — a refusal after the upload would leave an orphan `Media` row
+    and a stored file behind."""
+    submission = _get_pending(db, submission_id)
+    if submission.user_id != user_id:
+        raise NotFoundError()
+    if len(submission.media_ids or []) >= MAX_MEDIA:
+        raise ValidationError(
+            message_en=f"At most {MAX_MEDIA} photographs per submission.",
+            message_te=f"ఒక రచనకు గరిష్ఠంగా {MAX_MEDIA} ఫోటోలు మాత్రమే.",
+            details={"media_ids": f"limit {MAX_MEDIA}"},
+        )
+    return submission
+
+
+def attach_media(
+    db: Session, *, submission: CreatorSubmission, media_id: int
+) -> CreatorSubmission:
+    # Rebound rather than appended: a plain JSON column does not track
+    # mutation of the list in place, so `.append()` would never be saved.
+    submission.media_ids = [*(submission.media_ids or []), media_id][:MAX_MEDIA]
+    db.flush()
+    return submission
+
+
 def approve_submission(
     db: Session, *, submission_id: int, moderator_id: int
 ) -> tuple[CreatorSubmission, Article]:
@@ -180,6 +213,21 @@ def approve_submission(
     )
     db.add(article)
     db.flush()
+
+    # The photographs the contributor sent travel with the story: the first is
+    # the hero an editor would otherwise have to find, the rest a gallery.
+    for position, media_id in enumerate(dict.fromkeys(submission.media_ids or [])):
+        if position == 0:
+            article.hero_media_id = media_id
+        db.add(
+            ArticleMedia(
+                article_id=article.id,
+                media_id=media_id,
+                role="hero" if position == 0 else "gallery",
+                sort=position,
+            )
+        )
+
     db.add(
         WorkflowTransition(
             article_id=article.id,

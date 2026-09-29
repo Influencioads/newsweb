@@ -7,14 +7,16 @@ import { StatusPill } from '@/components/ui/Badge';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { useConfirm } from '@/components/ui/Dialog';
-import { Field, FileDrop, Input, Radio, Textarea } from '@/components/ui/Field';
+import { Field, FileDrop, Input, Radio, Select, Textarea } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
 import { PageContainer, PageHeader } from '@/components/ui/Layout';
 import { EmptyState, ErrorState } from '@/components/ui/State';
 import { useToast } from '@/components/ui/Toast';
 import { KYC_STATUS } from '@/features/cms/status';
+import { VERTICALS } from '@/features/cms/verticals';
 import { useI18n, useScript } from '@/i18n';
 import { useAuth } from '@/stores/auth';
+import type { Vertical } from '@/types/cms';
 import { cn } from '@/utils/cn';
 import { useDocumentTitle } from '@/utils/motion';
 
@@ -49,6 +51,7 @@ interface Application {
   id?: number;
   status: Status;
   contributor_type: string | null;
+  vertical: Vertical | null;
   display_name_te?: string;
   organisation?: string | null;
   portfolio_url?: string | null;
@@ -82,6 +85,10 @@ const DOC_LABELS: Record<string, { te: string; en: string }> = {
   press_accreditation: { te: 'ప్రెస్ అక్రిడిటేషన్', en: 'Press accreditation' },
   student_id: { te: 'కళాశాల గుర్తింపు కార్డు', en: 'College ID' },
   college_bonafide: { te: 'బోనఫైడ్ సర్టిఫికెట్', en: 'Bonafide certificate' },
+  // Asked for only by a vertical: medical/legal owe a register entry, a
+  // panchayat secretary owes the order that posted them there.
+  professional_reg: { te: 'వృత్తి నమోదు పత్రం', en: 'Professional registration' },
+  govt_order: { te: 'ప్రభుత్వ ఉత్తర్వు', en: 'Government order' },
 };
 
 /** What the status means for the applicant; the colour comes from KYC_STATUS. */
@@ -150,6 +157,7 @@ export default function ContributorApplyPage() {
   const { confirm, dialog } = useConfirm();
 
   const [type, setType] = useState<string>('citizen');
+  const [vertical, setVertical] = useState<Vertical | ''>('');
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
   const [organisation, setOrganisation] = useState('');
@@ -168,6 +176,7 @@ export default function ContributorApplyPage() {
     const data = application.data;
     if (!data) return;
     if (data.contributor_type) setType(data.contributor_type);
+    if (data.vertical) setVertical(data.vertical);
     if (data.display_name_te) setName(data.display_name_te);
     if (data.organisation) setOrganisation(data.organisation);
     if (data.portfolio_url) setPortfolio(data.portfolio_url);
@@ -179,6 +188,7 @@ export default function ContributorApplyPage() {
     mutationFn: async () =>
       (await api.post('/users/me/contributor', {
         contributor_type: type,
+        vertical: vertical || null,
         display_name_te: name,
         bio_te: bio || null,
         organisation: organisation || null,
@@ -330,6 +340,24 @@ export default function ContributorApplyPage() {
                   ))}
                 </div>
               </fieldset>
+
+              <Field
+                label={L('మీరు ఏ రంగం గురించి రాస్తారు', 'What you write about')}
+                optionalLabel
+                hint={L(
+                  'ఇది మీ దరఖాస్తును సరైన డెస్క్‌కు చేరుస్తుంది. కొన్ని రంగాలకు అదనపు పత్రం అడగవచ్చు.',
+                  'This routes your application to the right desk. Some areas ask for one extra document.',
+                )}
+              >
+                <Select value={vertical} onChange={(e) => setVertical(e.target.value as Vertical | '')}>
+                  <option value="">{L('ఏదీ కాదు / సాధారణం', 'None / general')}</option>
+                  {VERTICALS.map((v) => (
+                    <option key={v.value} value={v.value}>
+                      {L(v.te, v.en)}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
 
               <Field label={L('మీ కథనాలపై కనిపించే పేరు', 'The name to print on your stories')} required>
                 <Input script="te" required value={name} onChange={(e) => setName(e.target.value)} />

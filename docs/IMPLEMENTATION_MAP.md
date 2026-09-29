@@ -12,26 +12,27 @@ Screen ids (`1a`..`1n`) are the mockup's own ids. `§x` refers to Build Instruct
 
 | Token | Value | Use |
 |---|---|---|
-| `--brand` | `#0F5F57` peacock teal | masthead, primary buttons, active nav, links |
-| `--breaking` | `#9A5B0B` burnished amber | breaking ticker/chips, overdue age chip, destructive — **never red** |
-| `--exclusive` | `#B48A2A` champagne gold | exclusive star, the premium accent, correction / editor note |
-| `--ink` | `#191C1C` | body text, CMS sidebar, dark surfaces |
-| `--muted` | `#6A6E6B` | secondary text |
-| `--muted-2` | `#8C918D` | decoration only (chevrons, placeholders) |
-| `--paper` | `#FBF9F4` ivory | card/page surface |
-| `--canvas` | `#F2EFE8` | app background |
-| `--cms-canvas` | `#F5F3EE` | CMS working background |
-| `--rule` | `#E4E0D6` | borders, dividers |
+| `--brand` | `#0D47A1` logo blue | primary buttons, active nav, links |
+| `--breaking` | `#BE0A14` deep red | breaking ticker/chips, overdue age chip, destructive |
+| `--exclusive` | `#D0101A` logo red | exclusive star, the accent, correction / editor note |
+| `--ink` | `#17191E` | body text, CMS sidebar, dark surfaces |
+| `--muted` | `#666B75` | secondary text |
+| `--muted-2` | `#8A8F99` | decoration only (chevrons, placeholders) |
+| `--paper` | `#FFFFFF` | card/page surface |
+| `--canvas` | `#FFFFFF` | app background |
+| `--cms-canvas` | `#F6F7F9` | CMS working background |
+| `--rule` | `#E5E7EB` | borders, dividers |
 | `--ai` | `#6D4FC4` | AI badges, AI drafts tab, auto-detected hotspots |
 | `--partial` | `#7A6A25` olive gold | pending / partially available |
 | `--success` | `#3B7D45` | linked hotspot, published state, toggles on |
 | `--info` | `#2F5E8C` | IN_REVIEW / SCHEDULED state, "see all" links |
 | `--placeholder` | `#E9E5DC` | reserved-height media boxes |
 
-The original mockup `1a` palette was brand-red; it was replaced in the UI
-upgrade with the teal-and-gold identity above (no red anywhere), and the dark
-palette lightens the teal, amber and gold so foregrounds on those fills become
-ink rather than white.
+The palette follows the logo (`frontend/public/logo.webp`): blue brand, red
+accent and breaking, clean white ground. It replaced the UI upgrade's
+teal-and-gold identity on 2026-09-24; migration `8e1c5a3f6d27` clears stored
+brand colours that still pinned the old defaults. The dark palette lightens
+the blue and red so foregrounds on those fills become ink rather than white.
 
 Type: headline `Noto Serif Telugu 700/800` 30-34px web / lh 1.5 · body `Noto Sans Telugu 400` 19px web,
 17sp app / **lh 1.7** · Latin display `Fraunces` · Latin chrome + numerals `Manrope`. Hit targets >= 44px.
@@ -63,7 +64,7 @@ Font switcher `A- / A / A+ / A++` persisted in localStorage — a **required fea
 | `1e` | Video hub | `/videos` | `Tabs` (sliding indicator) `ChipRail` `VideoCard` grid `VideoStrip` `ReactionBar` | `GET /public/videos` · `GET /public/videos/{id}/playback` | videos, video_sources, media |
 | `1f` | Mobile feed | `/` at <768px | same components, responsive. The Expo app ships the native twin: `TabBar` (5 tabs, spring pill) + a sectioned `FlatList` with a collapsing `ScreenHeader` | same | same |
 | `1g` | Mobile article | article route at <768px | `FontSizeSheet` (Sheet on web, `BottomSheet` in the app) | same | same |
-| `1m` | E-paper reader | `/epaper/:edition/:date`, `.../page-:n` | `EditionReader` `EpaperSheet` (transform zoom, sheet-bound swipe) `EpaperRadio` (`AudioPlayer`) `EpaperArchive` (`ChipRail`) `ShareSheet` | `GET /public/epaper/{edition}/{date}` · `.../pages/{n}` | epaper_editions, epaper_pages, epaper_hotspots |
+| `1m` | E-paper reader | `/epaper`, `/epaper/:date`, `/epaper/:date/page/:n` (+ `?clip=<short_id>`) | `EditionReader` (toolbar: date, search, first/prev/page-box/next/last, zoom, clips toggle, two-page spread, full screen, share) `EpaperSheetViewport` (fits the whole sheet, zoom 1-4x, pan) `EpaperSheet` (fixed 1200x1860 broadsheet drawn from the page JSON: folio, page-1 masthead, justified Telugu columns, captioned photos, hairline rules; modes reader / thumbnail / print) `EpaperRail` (Pages thumbnails + Page clips) `EpaperClipDialog` (one story, share, link to the full article) `EpaperDatePicker` (month calendar over the archive) `EpaperSearch` (client-side over the loaded edition) `EpaperRadio` (`AudioPlayer`) `ShareSheet` | `GET /epaper/today` · `GET /epaper/{date}` · `.../pages/{n}` · `GET /epaper/archive` (the calendar's available days) — **no public PDF route: readers see the paper, they do not download it** | epaper_editions, epaper_pages, epaper_page_articles |
 | — | Static / compliance (§12.5) | `/about` `/contact` `/editorial-policy` `/corrections` `/grievance` `/privacy` `/terms` `/ai-disclosure` | `PolicyPage` `GrievanceForm` | `GET /public/pages/{slug}` · `POST /public/grievance` | settings, grievance_tickets |
 
 ### Newsroom CMS
@@ -75,7 +76,7 @@ Font switcher `A- / A / A+ / A++` persisted in localStorage — a **required fea
 | `1i` | AI article writer | `/admin/ai/writer` | `IntakeTabs` (notes / press note / wire / **voice** / WhatsApp) `VoiceRecorder` + waveform `TranscriptPanel` `HeadlineOptions` (5) `TiptapPreview` `SuggestedMeta` `UnverifiedPanel` `SimilarityMeter` `SensitiveTopicNotice` — **no publish button exists on this screen** | `POST /cms/ai/run` · `POST /cms/articles` (DRAFT) · `.../submit` | ai_jobs, ai_task_configs, ai_prompts, articles |
 | `1j` | AI cost dashboard | `/admin/ai/usage` | `BudgetMeter` (80% amber / 100% red markers) `ProviderCard` x3 `TaskRoutingTable` + edit routing | `GET /cms/ai/usage` · `PATCH /cms/ai/task-configs/{id}` | ai_cost_ledger, ai_jobs, ai_providers, ai_models, ai_task_configs |
 | `1l` | Push pipeline | `/admin/notifications` | `PushComposer` (**live 65-char counter**) `TopicChips` `QuietHoursNotice` `PushApprovalCard` (audience, article state, CDN pre-warm) `DevicePreview` `ReaderPrefsPanel` | `POST /cms/push` · `.../approve` · `.../send` | push_campaigns, articles, audit_log |
-| `1n` | Hotspot editor | `/admin/epaper/:editionId/pages/:n` | `PageCanvas` `HotspotRect` (8 handles) `AutoDetectBox` (violet dashed) `HotspotInspector` (normalized x/y/w/h) `ArticleLinkSearch` `KeyboardLegend` (N / Enter / arrows / Tab / A / Del) `PageStatusStrip` `SendToPublishButton` | `GET/POST/PATCH/DELETE /cms/epaper/pages/{id}/hotspots` · `POST /cms/epaper/editions/{id}/submit` | epaper_pages, epaper_hotspots, articles |
+| `1n` | E-paper builder | `/admin/epaper`, `/admin/epaper/:date`, `/admin/epaper/:date/print` | `EpaperGenerateDialog` (date + page count, plan preview) `EpaperWorkspace` (page rail, editable `EpaperSheet` with slot chrome, `EpaperPageEditor` toolbar, `EpaperCandidates` picker with size badges) `EpaperPrintPage` (every sheet at scale 1 with `@page`, staff print / save as PDF; inside `RequireAuth`, outside `AdminLayout` so no chrome prints) `EpaperTemplates` (layout + category chips) | `GET /admin/epaper/plan` · `POST /admin/epaper/generate` · `POST .../{id}/regenerate` · `GET .../{id}/candidates` · `POST .../pages/{pid}/fill` · `POST .../{id}/fill` · `PATCH .../pages/{pid}` (slot-aligned `article_ids`) · `POST .../submit|approve|publish|withdraw|pdf` | epaper_editions, epaper_pages, epaper_page_articles, epaper_page_templates, epaper_assets |
 | — | Dashboard | `/admin/dashboard` | `AdminPage` + `StatCard` grid — **every count from the database, never hardcoded** (brief §26) | `GET /cms/dashboard` | aggregate |
 | — | Articles CRUD | `/admin/articles`, `/new`, `/:id/edit` | `DataTable` (stacks to cards < md) + `StatusPill` `WorkflowActions` (Approve hidden on your own story) `TiptapEditor` + Telugu toolbar `MediaPicker` (Dialog) `SeoPanel` | `CRUD /cms/articles` | articles, article_versions, article_tags, article_media |
 | — | Media / Users / Roles / Taxonomy / Audit / Settings | `/admin/media` `/users` `/roles` `/categories` `/districts` `/tags` `/glossary` `/audit` `/settings` | `MediaGrid` + presigned upload, `UserTable`, `RoleMatrix`, `AuditTable` (read-only) | respective `/cms/*` | media, users, roles, permissions, audit_log, settings |
@@ -107,8 +108,10 @@ Hard rules, enforced in the service layer only:
 
 ## E. Background jobs (Celery)
 
-`ai.run` · `epaper.split_render` (PDF -> WebP + DZI tiles + thumb + page PDF) · `epaper.ocr` ·
-`epaper.autodetect` · `video.transcode` (ffmpeg ladder) · `search.index` / `search.deindex` ·
+`ai.run` · `epaper.schedule` (Beat, daily draft edition) · `epaper.audio` (Beat) — the e-paper PDF is
+rendered by a FastAPI background task at publish (Pillow + Raqm, `epaper_pdf`) and is **staff-only**:
+it is reachable from the CMS edition and from a reader's own generated edition, never from a public
+route · `video.transcode` (ffmpeg ladder) · `search.index` / `search.deindex` ·
 `media.derivatives` (WebP/AVIF at 4 widths + blurhash + EXIF strip) · `push.send` (+ CDN pre-warm) ·
 `publish.scheduled` (Beat) · `ai.cost_rollup` (Beat, daily).
 
@@ -125,7 +128,7 @@ Bunny Stream + YouTube oEmbed · Sentry.
 
 P1 setup / docker / MySQL / Redis / FastAPI / React / Alembic · P2 auth + RBAC + sessions + audit ·
 P3 taxonomy + article CRUD + Tiptap · P4 workflow + approval · P5 public site + search + SEO ·
-P6 media · P7 AI gateway + tools + images · P8 e-paper Mode A · P9 video ·
+P6 media · P7 AI gateway + tools + images · P8 e-paper (generated daily edition, slot layouts) · P9 video ·
 P10 notifications + analytics · P11 security + performance + tests + deployment.
 
 

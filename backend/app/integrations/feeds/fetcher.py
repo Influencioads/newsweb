@@ -18,6 +18,7 @@ hand is a reliable way to silently drop stories.
 
 from __future__ import annotations
 
+import re
 import threading
 import time
 from dataclasses import dataclass, field
@@ -70,7 +71,11 @@ class FeedEntry:
     summary: str | None = None
     content_html: str | None = None
     author: str | None = None
+    #: The first candidate that survived filtering, unchanged in meaning.
     image_url: str | None = None
+    #: Every candidate the entry offered, in dialect order, so the service can
+    #: keep a gallery rather than only a hero.
+    image_urls: list[str] = field(default_factory=list)
     published_at: datetime | None = None
     language: str | None = None
 
@@ -155,25 +160,43 @@ def _to_datetime(struct) -> datetime | None:
         return None
 
 
-def _entry_image(entry) -> str | None:
-    """Feeds hide the image in four different places depending on the dialect."""
+_INLINE_IMG = re.compile(r"""<img[^>]+src=["']([^"']+)["']""", re.IGNORECASE)
+
+
+def _entry_images(entry) -> list[str]:
+    """Every image the entry offers, in dialect order.
+
+    All five locations are read rather than the first hit returned: the first
+    one is as likely to be a publisher logo as a photograph, and the filter
+    downstream needs alternatives to fall back to.
+
+    The fifth is `<img>` inside `content:encoded` / `description`, and it is
+    the only one most Telugu WordPress feeds populate at all — every one of
+    ntvtelugu, tv9telugu, 10tv and v6velugu ships the story photo there and
+    nothing in media:content or enclosure. It reads last because the structured
+    dialects are a publisher's explicit answer, while an inline `<img>` is
+    whatever the body happened to open with.
+    """
+    found: list[str] = []
     for media in getattr(entry, "media_content", None) or []:
-        url = media.get("url")
-        if url:
-            return url
+        if media.get("url"):
+            found.append(media["url"])
     for thumb in getattr(entry, "media_thumbnail", None) or []:
-        url = thumb.get("url")
-        if url:
-            return url
+        if thumb.get("url"):
+            found.append(thumb["url"])
     for link in getattr(entry, "links", None) or []:
         if str(link.get("type", "")).startswith("image/") and link.get("href"):
-            return link["href"]
+            found.append(link["href"])
     for enclosure in getattr(entry, "enclosures", None) or []:
         if str(enclosure.get("type", "")).startswith("image/") and enclosure.get(
             "href"
         ):
-            return enclosure["href"]
-    return None
+            found.append(enclosure["href"])
+    for html in (_entry_content(entry), getattr(entry, "summary", None)):
+        if html:
+            found.extend(_INLINE_IMG.findall(html))
+    # Feeds repeat the same URL across media:content and enclosure constantly.
+    return list(dict.fromkeys(found))
 
 
 def _entry_content(entry) -> str | None:
@@ -248,6 +271,7 @@ def fetch_feed(
             # Without a stable id or a headline there is nothing to dedup on
             # and nothing to show. Skipping beats storing a blank row.
             continue
+        images = _entry_images(raw)
         entries.append(
             FeedEntry(
                 guid=str(guid)[:500],
@@ -256,7 +280,8 @@ def fetch_feed(
                 summary=(getattr(raw, "summary", None) or None),
                 content_html=_entry_content(raw),
                 author=(getattr(raw, "author", None) or None),
-                image_url=_entry_image(raw),
+                image_url=(images[0] if images else None),
+                image_urls=images,
                 published_at=_to_datetime(
                     getattr(raw, "published_parsed", None)
                     or getattr(raw, "updated_parsed", None)

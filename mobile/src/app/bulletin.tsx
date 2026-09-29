@@ -4,10 +4,13 @@ import { View } from 'react-native';
 
 import { api } from '@/api/client';
 import { ArticleAudio } from '@/components/ArticleAudio';
+import { bulletinId, bulletinTrack } from '@/components/BulletinCard';
 import { EmptyState, ErrorState, LoadingState } from '@/components/Feedback';
+import { RadioDial } from '@/components/player/RadioDial';
 import { useI18n } from '@/lib/i18n';
 import { space } from '@/lib/theme';
 import { makeStyles, useColors } from '@/lib/useTheme';
+import { usePlayer } from '@/stores/player';
 import { Badge } from '@/ui/Badge';
 import { Card } from '@/ui/Card';
 import { Icon } from '@/ui/Icon';
@@ -16,13 +19,19 @@ import { Screen } from '@/ui/Screen';
 import { T } from '@/ui/Text';
 
 /**
- * Today's audio bulletins — six a day, 06:00 to 21:00 IST.
+ * Today's audio bulletins — seven a day, 07:00 to 21:00 IST, each with its own
+ * name (`slot_label_te`, set on the server) — tuned like a radio.
  *
- * Playback reuses `ArticleAudio` through its `endpoint` prop: the bulletin
- * route returns the same payload shape as an article's audio, so the scrubber,
- * the four speeds and the ±15s skips all work without a second player. One
- * player per card is the reason this screen does not use `BulletinCard`,
- * which is handed a single shared player by the home feed.
+ * The radio dial up top shows the day's seven slots on a frequency scale: the
+ * ones on air tune in (they start the day's queue at that bulletin), the rest
+ * are inert, and the needle rests on the bulletin playing — or the latest on
+ * air. "Play all" runs the day in order through the global player, which
+ * auto-advances and keeps going after the reader leaves this screen.
+ *
+ * Each card keeps its `ArticleAudio` (through its `endpoint` prop: the
+ * bulletin route returns the same payload shape as an article's audio), now a
+ * trigger and live status for that global player; handed the day's `queue`,
+ * its play starts the running order at that bulletin.
  *
  * Only bulletins that are actually on air appear. A reader has no use for the
  * difference between "not produced yet" and "an editor pulled it".
@@ -54,17 +63,45 @@ export default function BulletinScreen() {
   });
 
   const live = (day.data?.items ?? []).filter((b) => b.available);
+  // The day's running order, 07:00 first — the list comes back sorted by slot.
+  const queue = live.flatMap((b) => bulletinTrack(b, t('player.kindBulletin')) ?? []);
+  const currentId = usePlayer((s) => s.queue[s.index]?.id);
+  const { playQueue, toggle } = usePlayer.getState();
+  const playingSlot = live.find((b) => b.date && b.slot != null && bulletinId(b.date, b.slot) === currentId)?.slot;
+  const latestSlot = live[live.length - 1]?.slot;
+
+  function tuneTo(slot: number) {
+    const date = live.find((b) => b.slot === slot)?.date;
+    const at = date ? queue.findIndex((q) => q.id === bulletinId(date, slot)) : -1;
+    if (at < 0) return;
+    // Tuning to the station already on resumes it rather than starting over.
+    if (queue[at].id === currentId) {
+      if (!usePlayer.getState().playing) toggle();
+      return;
+    }
+    playQueue(queue, at);
+  }
 
   return (
     <Screen edges={['bottom']} scroll contentContainerStyle={styles.body}>
       <Stack.Screen options={{ title: t('screen.bulletin') }} />
       <T variant="bodySmall" color="muted" scaled style={styles.intro}>
         {L(
-          'ప్రతి మూడు గంటలకు మూడు నిమిషాల బులెటిన్ — ఉదయం ఆరు నుంచి రాత్రి తొమ్మిది వరకు.',
-          'A three-minute bulletin every three hours, from 6am to 9pm.',
+          'రోజుకు ఏడు బులెటిన్లు, ఒక్కొక్కటి మూడు నిమిషాలు — ఉదయం 7 నుంచి రాత్రి 9 వరకు.',
+          'Seven three-minute bulletins a day, from 7am to 9pm.',
           isTelugu,
         )}
       </T>
+
+      {day.data?.enabled ? (
+        <RadioDial
+          live={live.flatMap((b) => (b.slot != null ? [b.slot] : []))}
+          names={Object.fromEntries(live.map((b) => [b.slot, b.slot_label_te]))}
+          active={playingSlot ?? latestSlot ?? null}
+          onSelect={tuneTo}
+          onPlayAll={queue.length ? () => playQueue(queue, 0) : undefined}
+        />
+      ) : null}
 
       {day.isLoading ? <LoadingState /> : null}
       {day.isError ? (
@@ -80,6 +117,9 @@ export default function BulletinScreen() {
               size="xs"
               label={L('ప్రసారంలో', 'On air', isTelugu)}
             />
+            <T variant="meta" weight="bold" color="inkSoft" lang="en">
+              {`${String(bulletin.slot).padStart(2, '0')}:00`}
+            </T>
           </View>
           {bulletin.slot_label_te ? (
             <T variant="headlineSm" weight="bold" lang="te">
@@ -92,6 +132,7 @@ export default function BulletinScreen() {
             endpoint={`/public/bulletins/${bulletin.date}/${bulletin.slot}`}
             listenLabel={t('article.listen')}
             stopLabel={t('article.stopListening')}
+            queue={queue}
           />
 
           <View style={styles.items}>
@@ -131,8 +172,8 @@ export default function BulletinScreen() {
         <EmptyState
           icon="radio"
           body={L(
-            'ప్రస్తుతం బులెటిన్ ఏదీ లేదు. తదుపరిది మూడు గంటల తర్వాత వస్తుంది.',
-            'No bulletin on air right now — the next one lands in about three hours.',
+            'ప్రస్తుతం బులెటిన్ ఏదీ లేదు. బులెటిన్లు ఉదయం 7, 9, మధ్యాహ్నం 1, 3, సాయంత్రం 5, రాత్రి 7, 9 గంటలకు వస్తాయి.',
+            'No bulletin on air right now — they go out at 7am, 9am, 1pm, 3pm, 5pm, 7pm and 9pm.',
             isTelugu,
           )}
         />
@@ -145,7 +186,7 @@ const useStyles = makeStyles(() => ({
   body: { padding: space.lg, paddingBottom: space.xxl },
   intro: { marginBottom: space.md },
   card: { marginBottom: space.md, gap: space.sm },
-  head: { flexDirection: 'row', alignItems: 'center' },
+  head: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   items: { gap: space.xs },
   item: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   headline: { flex: 1, minWidth: 0 },

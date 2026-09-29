@@ -132,22 +132,36 @@ Coverage tab on the Content Sources screen shows it as a banner.
 per-host throttle are per *process*, so a second replica silently doubles the
 request rate presented to every publisher.
 
-### Pillow needs libraqm, or Telugu share cards are unreadable
+### Pillow needs libraqm, or Telugu share cards and e-paper PDFs are unreadable
 
 Pillow only performs complex text layout — the conjunct formation and mark
-positioning Telugu requires — when built against Raqm. Without it a card is a
-valid PNG full of unshaped, wrongly-ordered glyphs.
+positioning Telugu requires — when it can load Raqm. The PyPI wheel bundles
+Raqm and HarfBuzz and loads FriBiDi at runtime, so `infra/docker/api.Dockerfile`
+installs `libfribidi0 libharfbuzz0b libraqm0`; no Pillow rebuild is needed.
+Check after every image build:
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml \
-  exec api python -c "from PIL import features; print(features.check('raqm'))"
+docker compose --env-file .env.production -f docker-compose.prod.yml   exec api python -c "from PIL import features; print(features.check('raqm'))"
 ```
 
-`False` means share cards switch themselves off: `share_card_service.available()`
-checks this and declines, readers fall back to sharing text and a link, and the
-`telugu_shaping` line on the CMS settings screen says so. To enable them,
-install `libraqm0 libfribidi0 libharfbuzz0b` in the image and build Pillow
-against them.
+`False` means two features switch themselves off rather than ship garbage:
+share cards (`share_card_service.available()` declines and readers share text
+and a link) and the e-paper PDF (`epaper_service.generate_pdf` marks the asset
+`FAILED` with `Telugu shaping unavailable: install libfribidi0`, and the CMS
+shows that error on the edition). Fix the image, then press "Render PDF" on
+the edition again.
+
+Neither failure touches public reading. The e-paper is drawn in the browser
+from the edition JSON, not from the PDF, so readers see the paper whatever the
+renderer is doing — and they only ever see it: there is no public PDF route,
+and the printable sheets at `/admin/epaper/{date}/print` sit behind the CMS
+sign-in. That print page is also the fallback way for staff to produce a file
+when Raqm is unavailable, since the browser does the Telugu shaping itself.
+
+The role -> permission matrix lives in the database, so after a deploy that
+changes `ROLE_PERMISSIONS` (for example the desk editor grant for
+`epaper.upload`) re-run the seed from section 6; it adds and revokes grants to
+match the code.
 
 The Telugu and Latin fonts themselves are vendored at
 `backend/app/assets/fonts/` and need no host packages. Both are needed: Noto
@@ -192,6 +206,40 @@ time, watching `/cms/crawl/status` and the voice usage meter.
 
 For the crawl, switch on government, press-release and job-notification sources
 first: those are published *for* redistribution, which the others are not.
+
+### Push notifications setup
+
+The server sends pushes through Expo's push service; the `beat` and `worker`
+containers deliver them (`notify.dispatch`, every 30 s). Nothing is configured
+on the server. What Android needs is done once, outside the code:
+
+1. In the [Firebase console](https://console.firebase.google.com), create a
+   project and add an Android app with the package
+   `com.influencioweb.toptelugunews`. Download `google-services.json` into
+   `mobile/` (next to `app.json`). The repo is public, so the file is
+   gitignored and EAS never sees it on its own; hand it over once as a file
+   variable:
+   `cd mobile && npx eas-cli env:create --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json --visibility secret --environment production --environment preview`.
+   `mobile/app.config.js` uses that variable on EAS and the local file for
+   local builds; with neither, builds still work, just without push.
+2. In Firebase → Project settings → Service accounts, generate a private key
+   (the FCM V1 service-account JSON). Give it to Expo, not to our server, and
+   do not keep it in the repo (`*-firebase-adminsdk-*.json` is gitignored):
+   `cd mobile && npx eas-cli credentials` → Android → `apk` profile →
+   Google Service Account → "Manage your Google Service Account Key for Push
+   Notifications (FCM V1)" → upload the JSON.
+3. Rebuild and reinstall the APK: `npx eas-cli build -p android --profile apk`.
+   Expo Go cannot receive remote pushes on Android, so test on the built APK.
+4. Open the app once on a phone and allow notifications. **Notifications** in
+   the CMS then shows it under "Registered phones"; send a test to *Everyone*
+   and watch Phones / Delivered / Failed fill in within a minute.
+
+Optional: if "Enhanced push security" is switched on for the Expo project,
+create an access token at expo.dev and paste it into **Settings → Push
+notifications**. **Settings → Push notifications → Send push notifications**
+is the kill switch: off, alerts still reach the in-app inbox but no phone.
+iOS needs an APNs key through `eas credentials` and an iOS build profile, which
+this project does not have yet.
 
 ## 6. Seed reference data and create the first administrator
 

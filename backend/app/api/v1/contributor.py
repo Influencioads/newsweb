@@ -26,7 +26,13 @@ from app.core.deps import Principal, get_current_principal
 from app.core.errors import ConflictError, NotFoundError
 from app.core.ratelimit import rate_limit
 from app.db.session import get_db
-from app.models.enums import AuditAction, ContributorType, KycDocumentKind, KycStatus
+from app.models.enums import (
+    AuditAction,
+    ContributorType,
+    KycDocumentKind,
+    KycStatus,
+    Vertical,
+)
 from app.models.geo import District, Mandal
 from app.models.kyc import ContributorProfile, KycDocument
 from app.services import audit_service, kyc_service, secure_upload_service
@@ -36,10 +42,15 @@ router = APIRouter(prefix="/users/me/contributor", tags=["contributor"])
 
 class ContributorIn(BaseModel):
     contributor_type: ContributorType = ContributorType.CITIZEN
+    #: Which desk they write for; NULL for a general contributor.
+    vertical: Vertical | None = None
     display_name_te: str = Field(min_length=2, max_length=120)
     bio_te: str | None = Field(default=None, max_length=1000)
     district_slug: str | None = None
     mandal_slug: str | None = None
+    #: An id, not a slug: `localities.slug` is unique only within its mandal,
+    #: so a slug alone would not name one.
+    locality_id: int | None = None
     organisation: str | None = Field(default=None, max_length=200)
     portfolio_url: str | None = Field(default=None, max_length=500)
     course_year: int | None = Field(default=None, ge=1, le=8)
@@ -61,6 +72,7 @@ def _profile_row(db: Session, profile: ContributorProfile | None) -> dict:
         return {
             "status": KycStatus.NOT_STARTED,
             "contributor_type": None,
+            "vertical": None,
             "documents": [],
             "missing": [],
             "can_edit": True,
@@ -69,6 +81,7 @@ def _profile_row(db: Session, profile: ContributorProfile | None) -> dict:
         "id": profile.id,
         "status": profile.kyc_status,
         "contributor_type": profile.contributor_type,
+        "vertical": profile.vertical,
         "display_name_te": profile.display_name_te,
         "bio_te": profile.bio_te,
         "organisation": profile.organisation,
@@ -76,6 +89,7 @@ def _profile_row(db: Session, profile: ContributorProfile | None) -> dict:
         "course_year": profile.course_year,
         "district_id": profile.district_id,
         "mandal_id": profile.mandal_id,
+        "locality_id": profile.locality_id,
         "review_note": profile.review_note,
         "submitted_at": profile.submitted_at,
         "reviewed_at": profile.reviewed_at,
@@ -119,10 +133,12 @@ def start_application(
         db,
         user=p.user,
         contributor_type=payload.contributor_type,
+        vertical=payload.vertical,
         display_name_te=payload.display_name_te,
         bio_te=payload.bio_te,
         district_id=district_id,
         mandal_id=mandal_id,
+        locality_id=payload.locality_id,
         organisation=payload.organisation,
         portfolio_url=payload.portfolio_url,
         course_year=payload.course_year,

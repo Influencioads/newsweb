@@ -33,6 +33,7 @@ from app.models.content import (
 )
 from app.models.enums import ArticleStatus, TagType, WorkflowState
 from app.models.geo import District
+from app.models.setting import AppSetting
 from app.models.user import User
 from app.services import tiptap
 from app.telugu.normalize import normalize_headline, normalize_text
@@ -87,19 +88,36 @@ TAGS: tuple[tuple[str, str, str, TagType], ...] = (
 )
 
 
+#: `app_settings` row (outside settings_service.SPECS, so no settings screen
+#: shows it) listing the slugs an admin renamed away or deleted on the
+#: Taxonomy page — a re-seed must not bring them back.
+RETIRED_CATEGORY_SLUGS = "taxonomy.retired_slugs"
+
+
+def retired_category_slugs(db: Session) -> list[str]:
+    row = db.scalar(select(AppSetting).where(AppSetting.key == RETIRED_CATEGORY_SLUGS))
+    return list((row.value or {}).get("v") or []) if row else []
+
+
 def seed_categories(db: Session) -> dict[str, Category]:
+    """Insert-only: categories are admin-editable (Taxonomy page), so a
+    re-seed backfills missing rows and never overwrites a rename, reorder or
+    deactivation — nor re-creates a slug the admin retired."""
     existing = {c.slug: c for c in db.execute(select(Category)).scalars()}
+    retired = set(retired_category_slugs(db))
     for sort, (slug, name_te, name_en, in_nav) in enumerate(CATEGORIES):
-        cat = existing.get(slug)
-        if cat is None:
-            cat = Category(slug=slug)
-            db.add(cat)
-            existing[slug] = cat
-        cat.name_te = name_te
-        cat.name_en = name_en
-        cat.sort = sort
-        cat.is_active = True
-        cat.show_in_nav = in_nav
+        if slug in existing or slug in retired:
+            continue
+        cat = Category(
+            slug=slug,
+            name_te=name_te,
+            name_en=name_en,
+            sort=sort,
+            is_active=True,
+            show_in_nav=in_nav,
+        )
+        db.add(cat)
+        existing[slug] = cat
     db.flush()
     logger.info("seeded_categories", count=len(existing))
     return existing

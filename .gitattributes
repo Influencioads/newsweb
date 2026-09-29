@@ -1,0 +1,32 @@
+# Line endings.
+#
+# Every source file in this repo is LF, and it has to stay that way whatever
+# machine it is edited on. On Windows a plain `open(path, "w")` or
+# `pathlib.write_text()` translates "\n" to "\r\n", so a tool that rewrites a
+# whole file silently flips it — which shows up as a diff touching every line
+# and buries the three lines that actually changed.
+#
+# `text=auto eol=lf` makes git normalise on commit regardless of what wrote the
+# file, so the repository stays LF even when a working tree is not.
+* text=auto eol=lf
+
+# Binary, so git never touches the bytes. `text=auto` detects most of these on
+# its own; naming them is cheaper than trusting the heuristic on a font.
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.webp   binary
+*.avif   binary
+*.pdf    binary
+*.woff   binary
+*.woff2  binary
+*.ttf    binary
+*.otf    binary
+*.eot    binary
+*.db     binary
+*.7z     binary
+*.zip    binary
+*.mp3    binary
+*.mp4    binary

@@ -1,7 +1,10 @@
-import { lazy, Suspense, type ComponentType } from 'react';
+import { lazy, Suspense, useEffect, type ComponentType } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
 import { AppErrorBoundary, RouteFallback, ScrollToTop } from './components/app';
+import { useSiteConfig } from './components/layout/NavDrawer';
+import { PlayerHost } from './components/player/PlayerHost';
+import { applyBrand, brandCss } from './utils/brand';
 import AdminLayout from './layouts/AdminLayout';
 import PublicLayout from './layouts/PublicLayout';
 import { RequireAuth } from './routes/RequireAuth';
@@ -69,6 +72,7 @@ const VoicePage = lazy(() => import('./pages/admin/VoicePage'));
 const AiSuggestionsPage = lazy(() => import('./pages/admin/AiSuggestions'));
 const ContentSourcesPage = lazy(() => import('./pages/admin/ContentSources'));
 const PendingArticlesPage = lazy(() => import('./pages/admin/PendingArticles'));
+const CreativeStudio = lazy(() => import('./pages/admin/CreativeStudio'));
 
 const management = () => import('./pages/admin/ManagementPages');
 const AuditPage = named(management, 'AuditPage');
@@ -89,6 +93,8 @@ const VideosAdminPage = named(adminDiscovery, 'VideosAdminPage');
 
 const publishing = () => import('./pages/admin/PublishingPages');
 const AdminEpaperPage = named(publishing, 'AdminEpaperPage');
+const EpaperWorkspace = named(publishing, 'EpaperWorkspace');
+const EpaperPrintPage = named(publishing, 'EpaperPrintPage');
 const AdminPollsPage = named(publishing, 'AdminPollsPage');
 
 // ---------------------------------------------------------------------- QA
@@ -109,12 +115,22 @@ const TeluguRenderTest = lazy(() => import('./pages/qa/TeluguRenderTest'));
  * remounting the layouts, so header state and scroll survive a route change.
  * The Suspense below is the outer catch-all (admin login, QA pages); each
  * layout wraps its own <Outlet /> in Suspense so the chrome paints first.
+ *
+ * PlayerHost (the one audio element, the mini-player dock and the lazy Now
+ * Playing screen) sits beside the routes, outside the error boundary, so audio
+ * keeps playing across every navigation — public pages and CMS previews alike.
  */
 export default function App() {
   const { pathname } = useLocation();
+  // Admin-set colours (Settings → Branding) theme the reader site and the CMS alike.
+  const { data: config } = useSiteConfig();
+  useEffect(() => {
+    if (config) applyBrand(brandCss(config.brand ?? {}));
+  }, [config]);
   return (
     <>
       <ScrollToTop />
+      <PlayerHost />
       <AppErrorBoundary resetKey={pathname}>
         <Suspense fallback={<RouteFallback />}>
           <Routes>
@@ -167,6 +183,7 @@ export default function App() {
               <Route path="/privacy" element={<PolicyPage />} />
               <Route path="/terms" element={<PolicyPage />} />
               <Route path="/ai-disclosure" element={<PolicyPage />} />
+              <Route path="/ugc-terms" element={<PolicyPage />} />
 
               {/* Article. Must stay last among public routes: `/:category/:slugAndId`
                   is greedy and would otherwise swallow the static paths above. */}
@@ -179,6 +196,9 @@ export default function App() {
             {/* ----------------------------------------------------------- admin */}
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route element={<RequireAuth />}>
+              {/* Signed-in but shell-less: the print page is the document the browser prints, and
+                  the CMS sidebar and topbar must not come out of the printer with it. */}
+              <Route path="/admin/epaper/:date/print" element={<EpaperPrintPage />} />
               <Route element={<AdminLayout />}>
                 <Route path="/admin/dashboard" element={<Dashboard />} />
                 <Route path="/admin/articles" element={<Articles />} />
@@ -198,6 +218,7 @@ export default function App() {
                 <Route path="/admin/notifications" element={<NotificationsAdminPage />} />
                 <Route path="/admin/taxonomy" element={<TaxonomyPage />} />
                 <Route path="/admin/media" element={<MediaPage />} />
+                <Route path="/admin/creative" element={<CreativeStudio />} />
                 <Route path="/admin/users" element={<UsersPage />} />
                 <Route path="/admin/roles" element={<RolesPage />} />
                 <Route path="/admin/audit" element={<AuditPage />} />
@@ -206,6 +227,7 @@ export default function App() {
                 <Route path="/admin/kyc" element={<KycPage />} />
                 <Route path="/admin/settings" element={<SettingsPage />} />
                 <Route path="/admin/epaper" element={<AdminEpaperPage />} />
+                <Route path="/admin/epaper/:date" element={<EpaperWorkspace />} />
                 <Route path="/admin/polls" element={<AdminPollsPage />} />
               </Route>
             </Route>

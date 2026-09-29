@@ -51,6 +51,13 @@ class StockImage:
     width: int | None = None
     height: int | None = None
 
+    subject_text: str | None = None
+    """Whatever the provider knows about *what is in the picture* beyond its
+    title — Commons categories, in practice. `openlicence.depicts_subject`
+    matches against it to decide whether a photo is of the named person or
+    only on the topic, which is the difference between a caption and a
+    "representative image" label."""
+
     @property
     def license_label(self) -> str:
         """Human-readable licence, e.g. 'CC BY 2.0' or 'Public domain'."""

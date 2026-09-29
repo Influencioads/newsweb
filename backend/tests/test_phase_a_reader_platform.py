@@ -32,12 +32,24 @@ from app.db.seed import (  # noqa: E402
     seed_roles,
     seed_states,
 )
+from app.db import seed_content  # noqa: E402
 from app.db.seed_content import seed_categories  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.content import Article, Category  # noqa: E402
-from app.models.enums import ArticleStatus, RoleKey, ScopeType, UserStatus, WorkflowState  # noqa: E402
+from app.models.engagement import Follow  # noqa: E402
+from app.models.enums import (  # noqa: E402
+    ArticleStatus,
+    FollowTargetType,
+    RoleKey,
+    ScopeType,
+    UserStatus,
+    WorkflowState,
+)
+from app.models.epaper import EpaperUserEdition, EpaperUserEditionPreference  # noqa: E402
 from app.models.geo import District, Locality, Mandal  # noqa: E402
+from app.models.notify import NotificationCampaign  # noqa: E402
+from app.models.reader import UserPreference  # noqa: E402
 from app.models.site import HomepageSection  # noqa: E402
 from app.models.user import Role, User, UserRole  # noqa: E402
 from app.services import auth_service  # noqa: E402
@@ -418,3 +430,356 @@ class TestReaderAccounts:
 
     def test_preferences_require_auth(self, client: TestClient) -> None:
         assert client.get("/api/v1/users/me/preferences").status_code == 401
+
+
+# --------------------------------------------------------------------------- #
+# category CRUD (admin Taxonomy page)
+# --------------------------------------------------------------------------- #
+class TestCategoryAdmin:
+    """Each test makes its own categories: TestConfig relies on the seeded ones."""
+
+    @pytest.fixture(scope="class")
+    def auth(self, db: Session) -> dict[str, str]:
+        # Editor-in-Chief holds taxonomy.manage and isn't used elsewhere here
+        # (staff_token's email is per role).
+        return {"Authorization": f"Bearer {staff_token(db, role=RoleKey.EDITOR_IN_CHIEF)}"}
+
+    def _create(self, client: TestClient, auth: dict, slug: str, **extra) -> int:
+        r = client.post(
+            "/api/v1/cms/taxonomy/categories",
+            json={"slug": slug, "name_te": f"{slug} te", "name_en": slug, **extra},
+            headers=auth,
+        )
+        assert r.status_code == 201, r.text
+        return r.json()["id"]
+
+    def _reader(self, db: Session, email: str, slugs: list[str]) -> UserPreference:
+        user = User(email=email, name_te="పాఠకుడు", name_en="Reader", status=UserStatus.ACTIVE)
+        db.add(user)
+        db.flush()
+        prefs = UserPreference(user_id=user.id, category_slugs=slugs)
+        db.add(prefs)
+        db.commit()
+        return prefs
+
+    def test_create_top_level_appends_a_home_section(
+        self, client: TestClient, db: Session, auth: dict
+    ) -> None:
+        cat_id = self._create(client, auth, "cat-agri", description_te="వ్యవసాయం")
+        section = db.execute(
+            select(HomepageSection).where(HomepageSection.key == "cat-agri")
+        ).scalar_one()
+        assert section.category_id == cat_id
+        assert section.sort == max(db.execute(select(HomepageSection.sort)).scalars())
+
+        rows = client.get("/api/v1/cms/taxonomy", headers=auth).json()["categories"]
+        row = next(c for c in rows if c["id"] == cat_id)
+        assert row["parent_id"] is None
+        assert row["article_count"] == 0
+        assert row["description_te"] == "వ్యవసాయం"
+        assert row["sort"] == max(c["sort"] for c in rows)
+
+        dup = client.post(
+            "/api/v1/cms/taxonomy/categories",
+            json={"slug": "cat-agri", "name_te": "x", "name_en": "x"},
+            headers=auth,
+        )
+        assert dup.status_code == 422
+
+    def test_sub_category_is_two_levels_only(
+        self, client: TestClient, db: Session, auth: dict
+    ) -> None:
+        parent = self._create(client, auth, "cat-parent")
+        sub = self._create(client, auth, "cat-sub", parent_id=parent)
+        # A sub-category gets no home block of its own.
+        assert db.execute(
+            select(HomepageSection).where(HomepageSection.category_id == sub)
+        ).scalar_one_or_none() is None
+        # Its parent must be top-level, and a parent can't itself be nested.
+        grandchild = client.post(
+            "/api/v1/cms/taxonomy/categories",
+            json={"slug": "cat-grand", "name_te": "x", "name_en": "x", "parent_id": sub},
+            headers=auth,
+        )
+        assert grandchild.status_code == 422
+        other = self._create(client, auth, "cat-other")
+        nest = client.patch(
+            f"/api/v1/cms/taxonomy/categories/{parent}",
+            json={"parent_id": other},
+            headers=auth,
+        )
+        assert nest.status_code == 422
+        self_parent = client.patch(
+            f"/api/v1/cms/taxonomy/categories/{other}",
+            json={"parent_id": other},
+            headers=auth,
+        )
+        assert self_parent.status_code == 422
+
+    def test_reparent_refiles_its_stories(
+        self, client: TestClient, db: Session, auth: dict
+    ) -> None:
+        parent = self._create(client, auth, "cat-p2")
+        sub = self._create(client, auth, "cat-s2", parent_id=parent)
+        story = make_article(db, title_te="ఉప విభాగ కథనం", category=db.get(Category, parent))
+        story.subcategory_id = sub
+        db.commit()
+        # Promoted: the story is filed under it, with no sub-section.
+        r = client.patch(
+            f"/api/v1/cms/taxonomy/categories/{sub}",
+            json={"parent_id": None},
+            headers=auth,
+        )
+        assert r.status_code == 200, r.text
+        db.refresh(story)
+        assert (story.category_id, story.subcategory_id) == (sub, None)
+        # Nested again: section = the new parent, sub-section = it.
+        r = client.patch(
+            f"/api/v1/cms/taxonomy/categories/{sub}",
+            json={"parent_id": parent},
+            headers=auth,
+        )
+        assert r.status_code == 200, r.text
+        db.refresh(story)
+        assert (story.category_id, story.subcategory_id) == (parent, sub)
+
+    def test_sub_category_stays_out_of_nav_and_its_page_lists_its_stories(
+        self, client: TestClient, db: Session, auth: dict
+    ) -> None:
+        parent = self._create(client, auth, "cat-p5")
+        sub = self._create(client, auth, "cat-s5", parent_id=parent)
+        assert db.get(Category, sub).show_in_nav is False
+        story = make_article(db, title_te="ఉప పేజీ కథనం", category=db.get(Category, parent))
+        story.subcategory_id = sub
+        db.commit()
+        for slug in ("cat-s5", "cat-p5"):
+            r = client.get("/api/v1/public/articles", params={"category": slug})
+            assert r.status_code == 200, r.text
+            assert story.short_id in [a["short_id"] for a in r.json()["articles"]]
+
+    def test_delete_sub_category_moves_stories_and_follows_to_sibling(
+        self, client: TestClient, db: Session, auth: dict
+    ) -> None:
+        parent = self._create(client, auth, "cat-p7")
+        gone = self._create(client, auth, "cat-s7a", parent_id=parent)
+        keep = self._create(client, auth, "cat-s7b", parent_id=parent)
+        story = make_article(db, title_te="తరలింపు", category=db.get(Category, parent))
+        story.subcategory_id = gone
+        a = self._reader(db, "follow-a@test.example.com", []).user_id
+        b = self._reader(db, "follow-b@test.example.com", []).user_id
+        kind = FollowTargetType.CATEGORY
+        for uid, cid in ((a, gone), (b, gone), (b, keep)):
+            db.add(Follow(user_id=uid, target_type=kind, target_id=cid, created_at=utcnow()))
+        edition = EpaperUserEdition(user_id=a, name="నా పత్రిక")
+        db.add(edition)
+        db.flush()
+        db.add(EpaperUserEditionPreference(
+            user_edition_id=edition.id, preference_type="category", target_id=gone
+        ))
+        db.commit()
+
+        r = client.delete(
+            f"/api/v1/cms/taxonomy/categories/{gone}",
+            params={"move_to": keep},
+            headers=auth,
+        )
+        assert r.status_code == 200, r.text
+        db.expire_all()
+        assert (story.category_id, story.subcategory_id) == (parent, keep)
+        follows = db.execute(
+            select(Follow.user_id, Follow.target_id).where(Follow.user_id.in_([a, b]))
+        ).all()
+        assert sorted(follows) == sorted([(a, keep), (b, keep)])
+        pref = db.execute(
+            select(EpaperUserEditionPreference).where(
+                EpaperUserEditionPreference.user_edition_id == edition.id
+            )
+        ).scalar_one()
+        assert pref.target_id == keep
+
+    def test_retired_slug_is_not_reseeded(
+        self, client: TestClient, db: Session, auth: dict, monkeypatch
+    ) -> None:
+        renamed = self._create(client, auth, "cat-seed-a")
+        assert client.patch(
+            f"/api/v1/cms/taxonomy/categories/{renamed}", json={"slug": "cat-seed-a2"}, headers=auth
+        ).status_code == 200
+        dropped = self._create(client, auth, "cat-seed-b")
+        assert client.delete(
+            f"/api/v1/cms/taxonomy/categories/{dropped}", headers=auth
+        ).status_code == 200
+        parent = self._create(client, auth, "cat-seed-p")
+        nav_sub = self._create(client, auth, "cat-seed-s", parent_id=parent, show_in_nav=True)
+
+        monkeypatch.setattr(
+            seed_content,
+            "CATEGORIES",
+            (
+                ("cat-seed-a", "అ", "A", True),
+                ("cat-seed-b", "బ", "B", True),
+                ("cat-seed-new", "కొ", "New", True),
+            ),
+        )
+        categories = seed_content.seed_categories(db)
+        seed_homepage_sections(db, categories)
+        db.commit()
+        slugs = set(db.execute(select(Category.slug)).scalars())
+        assert {"cat-seed-a", "cat-seed-b"}.isdisjoint(slugs)
+        assert "cat-seed-new" in slugs
+        # A sub-category in the nav still gets no home block of its own.
+        assert db.execute(
+            select(HomepageSection).where(HomepageSection.category_id == nav_sub)
+        ).scalar_one_or_none() is None
+
+    def test_patch_slug_rename_follows_section_and_reader_prefs(
+        self, client: TestClient, db: Session, auth: dict
+    ) -> None:
+        cat_id = self._create(client, auth, "cat-old")
+        prefs = self._reader(db, "rename-reader@test.example.com", ["cat-old", "cinema"])
+
+        base = f"/api/v1/cms/taxonomy/categories/{cat_id}"
+        assert client.patch(base, json={"name_te": ""}, headers=auth).status_code == 422
+        assert client.patch(base, json={"slug": "cinema"}, headers=auth).status_code == 422
+
+        r = client.patch(
+            base,
+            json={"slug": "cat-new", "name_en": "Renamed", "show_in_nav": False},
+            headers=auth,
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["slug"] == "cat-new"
+        section = db.execute(
+            select(HomepageSection).where(HomepageSection.category_id == cat_id)
+        ).scalar_one()
+        assert section.key == "cat-new"
+        db.refresh(prefs)
+        assert prefs.category_slugs == ["cat-new", "cinema"]
+
+    def test_scheduled_pushes_follow_a_rename_and_cancel_on_a_bare_delete(
+        self, client: TestClient, db: Session, auth: dict
+    ) -> None:
+        cat_id = self._create(client, auth, "cat-push")
+        push = NotificationCampaign(
+            title_te="షెడ్యూల్", audience="category:cat-push", status="scheduled"
+        )
+        db.add(push)
+        db.commit()
+        base = f"/api/v1/cms/taxonomy/categories/{cat_id}"
+        assert client.patch(base, json={"slug": "cat-push2"}, headers=auth).status_code == 200
+        db.refresh(push)
+        assert (push.audience, push.status) == ("category:cat-push2", "scheduled")
+
+        assert client.delete(base, headers=auth).status_code == 200
+        db.refresh(push)
+        assert push.status == "cancelled"
+
+    def test_reorder(self, client: TestClient, db: Session, auth: dict) -> None:
+        a = self._create(client, auth, "cat-ord-a")
+        b = self._create(client, auth, "cat-ord-b")
+        r = client.put(
+            "/api/v1/cms/taxonomy/categories/order",
+            json={"ordered_ids": [b, a]},
+            headers=auth,
+        )
+        assert r.status_code == 200, r.text
+        assert db.get(Category, b).sort == 0
+        assert db.get(Category, a).sort == 1
+        bad = client.put(
+            "/api/v1/cms/taxonomy/categories/order",
+            json={"ordered_ids": [999999]},
+            headers=auth,
+        )
+        assert bad.status_code == 422
+
+    def test_delete_refuses_content_then_moves_it(
+        self, client: TestClient, db: Session, auth: dict
+    ) -> None:
+        cat_id = self._create(client, auth, "cat-del")
+        cat = db.get(Category, cat_id)
+        stories = [make_article(db, title_te=f"తొలగింపు {i}", category=cat) for i in range(2)]
+        prefs = self._reader(db, "delete-reader@test.example.com", ["cat-del", "sports"])
+
+        r = client.delete(f"/api/v1/cms/taxonomy/categories/{cat_id}", headers=auth)
+        assert r.status_code == 409, r.text
+        assert r.json()["error"]["details"]["counts"]["articles"] == 2
+        assert db.get(Category, cat_id) is not None
+
+        cinema = db.execute(select(Category).where(Category.slug == "cinema")).scalar_one()
+        r = client.delete(
+            f"/api/v1/cms/taxonomy/categories/{cat_id}",
+            params={"move_to": cinema.id},
+            headers=auth,
+        )
+        assert r.status_code == 200, r.text
+        db.expire_all()
+        assert db.get(Category, cat_id) is None
+        assert all(db.get(Article, s.id).category_id == cinema.id for s in stories)
+        assert db.execute(
+            select(HomepageSection).where(HomepageSection.key == "cat-del")
+        ).scalar_one_or_none() is None
+        assert db.get(UserPreference, prefs.id).category_slugs == ["sports"]
+
+        # An empty category needs no destination.
+        empty = self._create(client, auth, "cat-empty")
+        r = client.delete(f"/api/v1/cms/taxonomy/categories/{empty}", headers=auth)
+        assert r.status_code == 200, r.text
+
+    def test_delete_refuses_a_parent_with_children(
+        self, client: TestClient, auth: dict
+    ) -> None:
+        parent = self._create(client, auth, "cat-p3")
+        self._create(client, auth, "cat-s3", parent_id=parent)
+        r = client.delete(f"/api/v1/cms/taxonomy/categories/{parent}", headers=auth)
+        assert r.status_code == 409
+        assert r.json()["error"]["details"]["children"] == 1
+
+    def test_panchayat_is_a_system_category(self, client: TestClient, auth: dict) -> None:
+        cat_id = self._create(client, auth, "panchayat")
+        base = f"/api/v1/cms/taxonomy/categories/{cat_id}"
+        assert client.delete(base, headers=auth).status_code == 409
+        assert client.patch(base, json={"slug": "gp"}, headers=auth).status_code == 409
+        parent = self._create(client, auth, "cat-p4")
+        assert client.patch(base, json={"parent_id": parent}, headers=auth).status_code == 409
+        # Its names are still the desk's to change.
+        assert client.patch(base, json={"name_en": "Village"}, headers=auth).status_code == 200
+
+    def test_writes_require_taxonomy_manage(self, client: TestClient, db: Session) -> None:
+        desk = {"Authorization": f"Bearer {staff_token(db, role=RoleKey.DESK_EDITOR)}"}
+        base = "/api/v1/cms/taxonomy/categories"
+        body = {"slug": "cat-nope", "name_te": "x", "name_en": "x"}
+        assert client.post(base, json=body, headers=desk).status_code == 403
+        assert client.patch(f"{base}/1", json={"name_en": "x"}, headers=desk).status_code == 403
+        assert client.delete(f"{base}/1", headers=desk).status_code == 403
+        order = client.put(f"{base}/order", json={"ordered_ids": [1]}, headers=desk)
+        assert order.status_code == 403
+        # Viewing stays open to taxonomy.view.
+        assert client.get("/api/v1/cms/taxonomy", headers=desk).status_code == 200
+
+    def test_stale_interest_is_dropped_not_rejected(
+        self, client: TestClient, db: Session, auth: dict
+    ) -> None:
+        cat_id = self._create(client, auth, "cat-hide")
+        prefs = self._reader(db, "stale-reader@test.example.com", ["cat-hide", "cinema"])
+        _s, access, _r, _e = auth_service.create_session(db, db.get(User, prefs.user_id))
+        db.commit()
+        reader = {"Authorization": f"Bearer {access}"}
+        hide = client.patch(
+            f"/api/v1/cms/taxonomy/categories/{cat_id}", json={"is_active": False}, headers=auth
+        )
+        assert hide.status_code == 200
+
+        # The client sends back what it stored, hidden category included.
+        r = client.patch(
+            "/api/v1/users/me/preferences",
+            json={"category_slugs": ["cat-hide", "cinema"]},
+            headers=reader,
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["category_slugs"] == ["cinema"]
+        # A newly added unknown slug is still the client's mistake.
+        bad = client.patch(
+            "/api/v1/users/me/preferences",
+            json={"category_slugs": ["cinema", "never-existed"]},
+            headers=reader,
+        )
+        assert bad.status_code == 422

@@ -59,6 +59,7 @@ function poster(video: VideoDetail): MediaOut {
     caption_te: null,
     credit: null,
     license_label: null,
+    representative: false,
     source_url: null,
     width: null,
     height: null,

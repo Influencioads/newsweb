@@ -281,6 +281,13 @@ class Article(PKMixin, TimestampMixin, SoftDeleteMixin, ActorMixin, Base):
         server_default="0",
         doc="Editor's pick — eligible for the featured rail (§1)",
     )
+    is_short: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="0",
+        doc="Short news — photo + short text, served by the swipe feed",
+    )
     article_type: Mapped[ArticleType] = mapped_column(
         Enum(ArticleType, native_enum=False, length=20, validate_strings=True),
         nullable=False,
@@ -373,6 +380,15 @@ class Article(PKMixin, TimestampMixin, SoftDeleteMixin, ActorMixin, Base):
     share_count: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
     )
+    #: Editorially seeded likes, added to `like_count` for readers and for
+    #: nothing else. Kept as a separate column rather than fabricated `likes`
+    #: rows because that table's primary key carries a real `users.id`: faking
+    #: rows would mean inventing accounts or liking on a real reader's behalf.
+    #: Ranking and analytics read `like_count` alone, so seeding cannot reach
+    #: trending or the for-you feed. Un-seeding is setting this to 0.
+    seed_like_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
     # --- timing ------------------------------------------------------------
@@ -388,6 +404,10 @@ class Article(PKMixin, TimestampMixin, SoftDeleteMixin, ActorMixin, Base):
         UTCDateTime, nullable=True, doc="Drives the 'సవరించబడింది: {date}' line (§12.5)"
     )
     correction_note_te: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: An editor's note shown beside the story — the desk's own reading of it.
+    #: Deliberately not `correction_note_te`, which drives the "సవరించబడింది"
+    #: line: a correction says we got something wrong, a critic note does not.
+    critic_note_te: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # --- approval (§6.3) ---------------------------------------------------
     approved_by: Mapped[int | None] = mapped_column(

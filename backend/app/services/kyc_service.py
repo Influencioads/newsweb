@@ -22,10 +22,16 @@ from sqlalchemy.orm import Session, selectinload
 from app.core import security
 from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.core.logging import get_logger
-from app.db.base import utcnow
+from app.db.base import desc_nulls_last, utcnow
 from app.integrations.kyc import KycDocumentRef, KycSubmission, get_kyc
 from app.integrations.kyc.base import KycDecision
-from app.models.enums import ContributorType, KycDocumentKind, KycStatus, RoleKey
+from app.models.enums import (
+    ContributorType,
+    KycDocumentKind,
+    KycStatus,
+    RoleKey,
+    Vertical,
+)
 from app.models.kyc import ContributorProfile, KycDocument
 from app.models.user import Role, User, UserRole
 from app.services import secure_upload_service, settings_service
@@ -56,6 +62,16 @@ REQUIRED_DOCS: dict[ContributorType, tuple[frozenset[KycDocumentKind], ...]] = {
         frozenset({KycDocumentKind.SELFIE}),
         frozenset({KycDocumentKind.STUDENT_ID, KycDocumentKind.COLLEGE_BONAFIDE}),
     ),
+}
+
+#: What a *vertical* adds on top of `REQUIRED_DOCS`, and only where there is a
+#: register a reviewer can look somebody up in. The other nine ask for nothing,
+#: which is the honest position: we cannot verify that somebody is a "news
+#: maker", and demanding a document we cannot check is theatre.
+VERTICAL_EXTRA_DOCS: dict[Vertical, frozenset[KycDocumentKind]] = {
+    Vertical.MEDICAL: frozenset({KycDocumentKind.PROFESSIONAL_REG}),
+    Vertical.LEGAL: frozenset({KycDocumentKind.PROFESSIONAL_REG}),
+    Vertical.PANCHAYAT: frozenset({KycDocumentKind.GOVT_ORDER}),
 }
 
 #: How long an approval lasts before the contributor checks in again.
@@ -115,7 +131,9 @@ def badge_for(db: Session, user_id: int) -> str | None:
     profile = profile_for(db, user_id)
     if profile is None or not profile.verified_badge or not is_approved(db, user_id):
         return None
-    return profile.contributor_type.value
+    # The desk they write for is what a reader recognises; the type they
+    # applied under is only interesting to the reviewer.
+    return (profile.vertical or profile.contributor_type).value
 
 
 # --------------------------------------------------------------------------- #
@@ -131,8 +149,10 @@ def start_or_update(
     contributor_type: ContributorType,
     display_name_te: str,
     bio_te: str | None = None,
+    vertical: Vertical | None = None,
     district_id: int | None = None,
     mandal_id: int | None = None,
+    locality_id: int | None = None,
     organisation: str | None = None,
     portfolio_url: str | None = None,
     course_year: int | None = None,
@@ -155,10 +175,12 @@ def start_or_update(
         )
 
     profile.contributor_type = contributor_type
+    profile.vertical = vertical
     profile.display_name_te = display_name_te.strip()[:120]
     profile.bio_te = (bio_te or "").strip() or None
     profile.district_id = district_id
     profile.mandal_id = mandal_id
+    profile.locality_id = locality_id
     profile.organisation = (organisation or "").strip() or None
     profile.portfolio_url = (portfolio_url or "").strip() or None
     profile.course_year = course_year
@@ -231,6 +253,9 @@ def missing_documents(
     """Which required groups are still unsatisfied, as lists of alternatives."""
     have = {d.kind for d in profile.documents}
     groups = REQUIRED_DOCS.get(profile.contributor_type, ())
+    extra = VERTICAL_EXTRA_DOCS.get(profile.vertical) if profile.vertical else None
+    if extra:
+        groups = (*groups, extra)
     return [sorted(k.value for k in group) for group in groups if not (group & have)]
 
 
@@ -394,6 +419,7 @@ def queue(
     *,
     status: KycStatus | None = None,
     contributor_type: ContributorType | None = None,
+    vertical: Vertical | None = None,
     offset: int = 0,
     limit: int = 50,
 ) -> tuple[list[ContributorProfile], int]:
@@ -406,10 +432,12 @@ def queue(
         stmt = stmt.where(ContributorProfile.kyc_status == status)
     if contributor_type is not None:
         stmt = stmt.where(ContributorProfile.contributor_type == contributor_type)
+    if vertical is not None:
+        stmt = stmt.where(ContributorProfile.vertical == vertical)
     total = int(db.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
     rows = list(
         db.scalars(
-            stmt.order_by(ContributorProfile.submitted_at.desc().nullslast())
+            stmt.order_by(*desc_nulls_last(ContributorProfile.submitted_at))
             .offset(offset)
             .limit(limit)
         ).all()

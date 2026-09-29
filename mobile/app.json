@@ -7,14 +7,11 @@
     "icon": "./assets/images/icon.png",
     "scheme": "toptelugunews",
     "userInterfaceStyle": "automatic",
-    "ios": {
-      "icon": "./assets/expo.icon"
-    },
     "android": {
       "package": "com.influencioweb.toptelugunews",
-      "versionCode": 5,
+      "versionCode": 6,
       "adaptiveIcon": {
-        "backgroundColor": "#0F5F57",
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -30,19 +27,30 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0F5F57",
+          "backgroundColor": "#FFFFFF",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76,
-          "dark": {
-            "backgroundColor": "#121615",
-            "image": "./assets/images/splash-icon.png"
-          }
+          "imageWidth": 260
         }
       ],
       "expo-secure-store",
       "expo-font",
-      "expo-audio",
-      "expo-sharing"
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": true
+        }
+      ],
+      "expo-sharing",
+      "expo-image",
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-monochrome.png",
+          "color": "#0D47A1",
+          "defaultChannel": "default"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -111,7 +111,14 @@ def compute_trending(db: Session) -> int:
             Comment.user_id,
             func.max(Comment.created_at).label("last_at"),
         )
-        .where(Comment.created_at >= cutoff, Comment.status == CommentStatus.VISIBLE)
+        .where(
+            Comment.created_at >= cutoff,
+            Comment.status == CommentStatus.VISIBLE,
+            # Seeded comments are editorial furniture, not reader behaviour.
+            # Letting them score would make trending measure what the desk
+            # typed rather than what readers did.
+            Comment.is_seeded.is_(False),
+        )
         .group_by(Comment.article_id, Comment.user_id)
     ).all()
     for article_id, _user_id, last_at in comment_rows:

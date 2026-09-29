@@ -21,8 +21,11 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { ApiError } from '@/api/client';
 import { AppErrorBoundary } from '@/components/AppErrorBoundary';
+import { MiniPlayer } from '@/components/player/MiniPlayer';
+import { PlayerHost } from '@/components/player/PlayerHost';
 import { useI18n } from '@/lib/i18n';
 import { useMotion } from '@/lib/motion';
+import { PushBridge } from '@/lib/push';
 import { makeStyles, useColors, useThemeName } from '@/lib/useTheme';
 import { useAuth } from '@/stores/auth';
 import { usePrefs } from '@/stores/prefs';
@@ -115,9 +118,27 @@ export default function RootLayout() {
             <Stack.Screen name="section/[slug]" options={{ title: t('screen.section') }} />
             <Stack.Screen name="epaper/[date]" options={{ title: t('epaper.title') }} />
             <Stack.Screen name="my-epaper" options={{ title: t('epaper.myEpaper') }} />
+            {/* Now Playing slides up over whatever was open; back, the chevron
+                or a swipe down minimises it to the dock again. */}
+            <Stack.Screen
+              name="player"
+              options={{
+                title: t('player.nowPlaying'),
+                headerShown: false,
+                presentation: 'modal',
+                animation: m.reduce ? 'none' : 'slide_from_bottom',
+                contentStyle: { backgroundColor: color.inkDeep },
+              }}
+            />
             {/* The route draws its own ScreenHeader; the title still names it in the navigator. */}
             <Stack.Screen name="+not-found" options={{ title: t('state.notFound'), headerShown: false }} />
           </Stack>
+          {/* The audio dock for stack routes, in flow under the stack (tab
+              routes get it inside the TabBar instead), and the one player. */}
+          <MiniPlayer placement="stack" />
+          <PlayerHost />
+          {/* Push registration and taps; after the Stack so a tap can navigate. */}
+          <PushBridge />
           <ToastHost />
         </QueryClientProvider>
       </AppErrorBoundary>

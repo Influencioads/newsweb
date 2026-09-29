@@ -37,7 +37,7 @@ the build (Sep 2026). The backend suite is `backend/tests/` (133 tests).
 | Item | Blocked on |
 |---|---|
 | Real SMS OTP | MSG91 credentials (`MSG91_*`); until then email/dev-echo |
-| Push delivery to devices | `FCM_SERVICE_ACCOUNT_JSON` (tokens already collected) |
+| Push delivery to devices | Firebase `google-services.json` + FCM V1 key in EAS, then an APK rebuild (DEPLOYMENT.md "Push notifications setup") |
 | Server-side cached TTS audio | Telugu TTS provider decision (on-device TTS live now) |
 | LLM-backed assist | Provider API keys (heuristic-v1 live now, same response shape) |
 | §15.4 device matrix render pass | Physical devices (Samsung/Xiaomi/…); `/qa/telugu-render` ships |

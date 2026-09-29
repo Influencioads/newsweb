@@ -12,6 +12,7 @@ import {
   Megaphone,
   Mic,
   Newspaper,
+  Palette,
   Pin,
   Radio,
   Rss,
@@ -80,6 +81,9 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { to: '/admin/sources', labelKey: 'admin.page.sources', icon: Rss, permission: 'article.review' },
       { to: '/admin/taxonomy', labelKey: 'admin.page.taxonomy', icon: Tags, permission: 'taxonomy.view' },
       { to: '/admin/media', labelKey: 'admin.page.media', icon: Image, permission: 'media.view' },
+      // `ai.use`: every role that may make a news card holds it; the API still
+      // checks article.edit / edit_own and district scope per story.
+      { to: '/admin/creative', labelKey: 'admin.page.creative', icon: Palette, permission: 'ai.use' },
       { to: '/admin/videos', labelKey: 'admin.page.videos', icon: Video, permission: 'video.view' },
       { to: '/admin/bulletins', labelKey: 'admin.page.bulletins', icon: Radio, permission: 'voice.manage' },
       { to: '/admin/voice', labelKey: 'admin.page.voice', icon: Mic, permission: 'voice.manage' },

@@ -1,7 +1,8 @@
-"""The three-hourly audio newspaper.
+"""The audio newspaper.
 
-Six bulletins a day — 06, 09, 12, 15, 18 and 21 IST — each about three minutes
-long, assembled from stories an editor has already approved and published.
+Seven bulletins a day — 07, 09, 13, 15, 17, 19 and 21 IST — each about three
+minutes long, assembled from stories an editor has already approved and
+published.
 
 **Why this is a new table rather than an `AudioAsset`.** `AudioAsset.article_id`
 is NOT NULL and the row is keyed `(article_id, content_hash)`, which is what
@@ -12,7 +13,7 @@ until the bill arrived. The character accounting is recovered explicitly —
 `tts_service.month_chars_used` sums both tables, so there is still one budget.
 
 **Why not `EpaperAsset(kind="AUDIO")`**, which already exists unused: it is
-unique on `(edition_id, kind, revision)`, so six bulletins a day cannot coexist,
+unique on `(edition_id, kind, revision)`, so seven bulletins a day cannot coexist,
 and it would tie the 09:00 bulletin to an e-paper edition generated at 05:00.
 
 `headline_te` and `spoken_te` on the item rows are **frozen copies**. Once the
@@ -53,7 +54,7 @@ class AudioBulletin(PKMixin, TimestampMixin, Base):
     #: The IST calendar day, not UTC — a 21:00 bulletin belongs to its own
     #: evening, and in UTC that is already tomorrow.
     bulletin_date: Mapped[date] = mapped_column(Date, nullable=False)
-    #: The IST hour: 6, 9, 12, 15, 18 or 21.
+    #: The IST hour, one of `bulletin_service.SLOTS` (7, 9, 13, 15, 17, 19, 21).
     slot: Mapped[int] = mapped_column(Integer, nullable=False)
     slot_label_te: Mapped[str] = mapped_column(String(60), nullable=False, default="")
 

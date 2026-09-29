@@ -19,6 +19,8 @@ import { cn } from '@/utils/cn';
  * Shared behaviour: portal into `#overlay-root`, role=dialog + aria-modal,
  * focus trap (Tab / Shift+Tab wrap), Esc closes, body scroll lock with
  * scrollbar-width compensation, focus restored to the opener on close.
+ * `useModal` + `overlayRoot` are exported for a full-screen surface that draws
+ * its own panel (the audio player's Now Playing) and needs the same behaviour.
  *
  *     <Dialog open={open} onClose={close} title={t('ui.readerSettings')}>…</Dialog>
  *     const { confirm, dialog } = useConfirm();
@@ -30,7 +32,7 @@ const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),' +
   'textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
-function overlayRoot(): HTMLElement {
+export function overlayRoot(): HTMLElement {
   let el = document.getElementById('overlay-root');
   if (!el) {
     el = document.createElement('div');
@@ -66,7 +68,7 @@ function unlockBody(): void {
  * Initial focus: `initialFocusRef`, else the first `[data-autofocus]`, else the
  * first focusable, else the panel.
  */
-function useModal(
+export function useModal(
   open: boolean,
   onClose: () => void,
   panelRef: RefObject<HTMLElement>,

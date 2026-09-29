@@ -11,6 +11,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     Enum,
@@ -48,6 +49,11 @@ class CreatorSubmission(PKMixin, TimestampMixin, Base):
     district_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("districts.id", ondelete="SET NULL"), nullable=True
     )
+    #: Photographs a verified contributor attached, in the order they sent
+    #: them; the first becomes the hero on approval. JSON rather than a join
+    #: table because nothing but this row ever reads it and the cap is four —
+    #: `Media.variants` and `IngestedRewrite.body` store lists the same way.
+    media_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
     status: Mapped[SubmissionStatus] = mapped_column(
         Enum(SubmissionStatus, native_enum=False, length=10, validate_strings=True),
         nullable=False,

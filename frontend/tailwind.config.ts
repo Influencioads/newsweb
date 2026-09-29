@@ -169,6 +169,8 @@ export default {
         tap: '44px', // §1a: hit targets >= 44px
         'tap-lg': '48px',
         header: 'var(--header-h)',
+        /** Height of the audio player dock while it is up (0 otherwise): `bottom-dock` for sticky bottom bars. */
+        dock: 'var(--player-dock-h, 0px)',
       },
       maxWidth: {
         site: '1200px',
@@ -238,6 +240,16 @@ export default {
           from: { transform: 'translate3d(0,0,0)' },
           to: { transform: 'translate3d(-50%,0,0)' },
         },
+        // Audio player (components/player): equalizer / waveform bars bounce
+        // from their base height; broadcast rings swell out and fade.
+        eq: {
+          '0%, 100%': { transform: 'scaleY(.35)' },
+          '50%': { transform: 'scaleY(1)' },
+        },
+        ring: {
+          from: { opacity: '.55', transform: 'scale(1)' },
+          to: { opacity: '0', transform: 'scale(1.6)' },
+        },
       },
       animation: {
         'fade-up': 'fade-up 320ms cubic-bezier(.2,.8,.2,1) both',
@@ -248,6 +260,11 @@ export default {
         shimmer: 'shimmer 1.6s linear infinite',
         pop: 'pop 320ms cubic-bezier(.32,.72,0,1)',
         marquee: 'marquee var(--marquee-duration, 40s) linear infinite',
+        // Paused with `[animation-play-state:paused]`, never removed, so a
+        // paused player freezes mid-motion instead of snapping.
+        eq: 'eq 900ms ease-in-out infinite',
+        ring: 'ring 2.4s cubic-bezier(.2,.8,.2,1) infinite',
+        'spin-slow': 'spin 14s linear infinite',
       },
       zIndex: {
         header: '40',

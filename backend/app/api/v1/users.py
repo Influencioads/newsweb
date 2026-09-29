@@ -98,10 +98,14 @@ def update_preferences(
     if "category_slugs" in changes:
         slugs = changes["category_slugs"] or []
         known = {c.slug for c in article_repo.nav_categories(db)}
-        unknown = [s for s in slugs if s not in known]
+        # Clients send the stored list back as-is, so a slug the desk has since
+        # renamed, hidden or deleted is dropped quietly; only a newly added
+        # unknown slug is the client's mistake.
+        had = set(prefs.category_slugs or [])
+        unknown = [s for s in slugs if s not in known and s not in had]
         if unknown:
             raise ValidationError(details={"category_slugs": f"unknown: {unknown}"})
-        prefs.category_slugs = slugs
+        prefs.category_slugs = [s for s in slugs if s in known]
 
     # --- location, top-down so each level validates against its parent -----
     if "state_code" in changes:

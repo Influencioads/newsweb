@@ -85,6 +85,7 @@ function nodeMedia(node: TiptapNode, src: string): MediaOut {
     caption_te: node.attrs?.caption ? String(node.attrs.caption) : null,
     credit: node.attrs?.credit ? String(node.attrs.credit) : null,
     license_label: null,
+    representative: false,
     source_url: null,
     width,
     height,

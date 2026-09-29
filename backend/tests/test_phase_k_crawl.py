@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterator
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 from sqlalchemy import create_engine, select
@@ -24,6 +24,7 @@ os.environ.setdefault("APP_ENV", "test")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+from app.core.config import SITE_NAME_TE  # noqa: E402
 from app.core.deps import build_principal  # noqa: E402
 from app.core.errors import ValidationError  # noqa: E402
 from app.db.base import Base, utcnow  # noqa: E402
@@ -236,6 +237,7 @@ class FakeAi(AiProvider):
 
     def __init__(self, result: RewriteText | None = None) -> None:
         self.calls = 0
+        self.last_kwargs: dict = {}
         self.result = result or RewriteText(
             title_te="మన సొంత మాటల్లో శీర్షిక",
             summary_te="మన సొంత సారాంశం.",
@@ -251,6 +253,7 @@ class FakeAi(AiProvider):
 
     def rewrite_item(self, **kwargs) -> RewriteText:
         self.calls += 1
+        self.last_kwargs = kwargs
         return self.result
 
 
@@ -666,6 +669,46 @@ class TestLicenceAndHtmlFallback:
         assert item.content_html is None, "unlicensed text must never be persisted"
         assert item.word_count == 0
 
+    def test_excerpt_only_source_still_gets_the_page_picture(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A photograph is not an excerpt of a text.
+
+        The capture used to sit inside the `may_store_full_text` branch, so
+        every RSS_PUBLIC source — which is all of the live ones — got no
+        picture however the admin set `images_enabled`. `_attach_media` is
+        where the licence rule for images lives: one credited hero, no gallery.
+        """
+        configure(db, **{"crawl.html_fallback_enabled": True})
+        install_ai(monkeypatch, FakeAi())
+        monkeypatch.setattr(
+            "app.services.crawl_service.extract_article",
+            lambda *_a, **_k: PageText(
+                status="ok",
+                text="The publisher's full article body. " * 40,
+                method="jsonld",
+                word_count=200,
+                image_url="https://publisher.example.com/2026/09/flood-relief.jpg",
+                image_urls=["https://publisher.example.com/2026/09/flood-relief.jpg"],
+            ),
+        )
+        source = make_source(
+            db,
+            slug="l-excerpt-pic",
+            licence=SourceLicence.RSS_PUBLIC,
+            policy=ContentPolicy.EXCERPT_ONLY,
+            html_fallback=True,
+            note="checked terms",
+        )
+        item = make_item(db, source, guid="pic1", summary="short stub", language="en")
+        db.commit()
+
+        crawl_service.rewrite_one(db, item)
+        db.commit()
+        db.refresh(item)
+        assert item.content_html is None, "unlicensed text must still never be persisted"
+        assert item.image_url == "https://publisher.example.com/2026/09/flood-relief.jpg"
+
     def test_a_licensed_source_does_store_the_extracted_body(
         self, db: Session, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -713,6 +756,264 @@ class TestLicenceAndHtmlFallback:
         make_item(db, source, guid="z1", summary="short")
         db.commit()
         assert calls["n"] == 0
+
+    def _fetched(
+        self,
+        db: Session,
+        monkeypatch: pytest.MonkeyPatch,
+        slug: str,
+        *,
+        body: str = "The publisher's full article body. " * 400,
+    ) -> IngestedItem:
+        """An item rewritten from a page the fallback really fetched."""
+        install_ai(monkeypatch, FakeAi())
+        monkeypatch.setattr(
+            "app.services.crawl_service.extract_article",
+            lambda *_a, **_k: PageText(
+                status="ok", text=body, method="jsonld", word_count=2000
+            ),
+        )
+        source = make_source(
+            db, slug=slug, html_fallback=True, note="checked terms"
+        )
+        item = make_item(db, source, guid=f"{slug}-1", summary="stub", language="en")
+        db.commit()
+        crawl_service.rewrite_one(db, item)
+        db.commit()
+        return item
+
+    def test_a_logo_scraped_from_the_page_never_becomes_the_item_image(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """og:image is the single richest source of publisher logos.
+
+        This path used to write whatever the page said straight onto the item,
+        past every rule in `feeds.images`, and `_attach_media` then trusted it —
+        which made the host rule decorative for exactly the sources that trigger
+        the fallback.
+        """
+        configure(db, **{"crawl.html_fallback_enabled": True})
+        install_ai(monkeypatch, FakeAi())
+        monkeypatch.setattr(
+            "app.services.crawl_service.extract_article",
+            lambda *_a, **_k: PageText(
+                status="ok",
+                text="The publisher's full article body. " * 400,
+                method="jsonld",
+                word_count=2000,
+                image_url="https://publisher.example.com/assets/site-logo.png",
+            ),
+        )
+        source = make_source(
+            db,
+            slug="sx-logo",
+            licence=SourceLicence.AGENCY_CONTRACT,
+            policy=ContentPolicy.FULL_TEXT,
+            html_fallback=True,
+            note="checked terms",
+        )
+        item = make_item(db, source, guid="sx-logo-1", summary="stub", language="en")
+        db.commit()
+        crawl_service.rewrite_one(db, item)
+        db.commit()
+        db.refresh(item)
+
+        assert item.image_url is None, (
+            "a logo reached the item, so the download would credit it as news"
+        )
+
+    def test_a_real_photo_scraped_from_the_page_is_kept(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The control: the filter must not simply reject everything."""
+        configure(db, **{"crawl.html_fallback_enabled": True})
+        install_ai(monkeypatch, FakeAi())
+        photo = "https://publisher.example.com/uploads/2026/flood-1600x900.jpg"
+        monkeypatch.setattr(
+            "app.services.crawl_service.extract_article",
+            lambda *_a, **_k: PageText(
+                status="ok",
+                text="The publisher's full article body. " * 400,
+                method="jsonld",
+                word_count=2000,
+                image_url=photo,
+            ),
+        )
+        source = make_source(
+            db,
+            slug="sx-photo",
+            licence=SourceLicence.AGENCY_CONTRACT,
+            policy=ContentPolicy.FULL_TEXT,
+            html_fallback=True,
+            note="checked terms",
+        )
+        item = make_item(db, source, guid="sx-photo-1", summary="stub", language="en")
+        db.commit()
+        crawl_service.rewrite_one(db, item)
+        db.commit()
+        db.refresh(item)
+        assert item.image_url == photo
+
+    def test_the_reviewer_gets_the_original_when_a_page_was_fetched(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Without this the reviewer approves Telugu copy against a stub."""
+        configure(db, **{"crawl.html_fallback_enabled": True})
+        item = self._fetched(db, monkeypatch, "sx-on")
+
+        rewrite = item.latest_rewrite
+        assert rewrite is not None and rewrite.status == RewriteStatus.READY
+        assert rewrite.source_text is not None
+        assert "The publisher's full article body." in rewrite.source_text
+        # Capped, so the column never becomes an archive of someone else's site.
+        assert len(rewrite.source_text) == crawl_service.MAX_SOURCE_TEXT_CHARS
+        # And still nothing on the item itself — this source has no licence.
+        db.refresh(item)
+        assert item.content_html is None
+
+    def test_no_original_is_kept_when_the_setting_is_off(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        configure(
+            db,
+            **{
+                "crawl.html_fallback_enabled": True,
+                "crawl.keep_source_for_review": False,
+            },
+        )
+        item = self._fetched(db, monkeypatch, "sx-off")
+
+        rewrite = item.latest_rewrite
+        assert rewrite is not None and rewrite.status == RewriteStatus.READY
+        assert rewrite.source_text is None
+
+    def test_the_original_survives_import_because_the_review_is_still_to_come(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Importing a rewrite is where its review STARTS, not where it ends.
+
+        This used to drop at import, which meant the editor who actually has to
+        approve the article never got the comparison — it was thrown away one
+        screen earlier, by the person who only decided it was worth importing.
+        """
+        configure(db, **{"crawl.html_fallback_enabled": True})
+        item = self._fetched(db, monkeypatch, "sx-import")
+        assert item.latest_rewrite.source_text is not None
+
+        ingestion_service.import_item(db, item, actor_id=None)
+        db.commit()
+        db.refresh(item)
+        assert item.latest_rewrite.source_text is not None
+
+    def test_the_original_is_dropped_once_the_article_is_rejected(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        configure(db, **{"crawl.html_fallback_enabled": True})
+        item = self._fetched(db, monkeypatch, "sx-art-reject")
+        article = ingestion_service.import_item(db, item, actor_id=None)
+        db.commit()
+
+        assert staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="sx-rej@test.local")
+        editor = db.scalar(select(User).where(User.email == "sx-rej@test.local"))
+        workflow_service.transition(
+            db, build_principal(editor, "test-session"), article, "reject", "no"
+        )
+        db.commit()
+        db.refresh(item)
+        assert item.latest_rewrite.source_text is None
+
+    def test_the_original_is_dropped_once_the_article_is_published(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The decision has landed, so the working copy goes — the honest half
+        of holding it at all."""
+        configure(db, **{"crawl.html_fallback_enabled": True})
+        item = self._fetched(db, monkeypatch, "sx-art-publish")
+        article = ingestion_service.import_item(db, item, actor_id=None)
+        db.commit()
+
+        # Two people, because a machine article has no author to compare the
+        # approver against — the same rule this file tests elsewhere.
+        assert staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="sx-a@test.local")
+        assert staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="sx-b@test.local")
+        alice = db.scalar(select(User).where(User.email == "sx-a@test.local"))
+        bob = db.scalar(select(User).where(User.email == "sx-b@test.local"))
+
+        workflow_service.transition(
+            db, build_principal(alice, "s-a"), article, "approve", None
+        )
+        workflow_service.transition(
+            db, build_principal(bob, "s-b"), article, "publish", None
+        )
+        db.commit()
+        db.refresh(item)
+        assert article.status == ArticleStatus.PUBLISHED
+        assert item.latest_rewrite.source_text is None
+
+    def test_the_review_screen_can_read_the_original_beside_our_copy(
+        self, db: Session, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The endpoint the comparison panel calls, on the article rather than
+        the queue item."""
+        configure(db, **{"crawl.html_fallback_enabled": True})
+        item = self._fetched(db, monkeypatch, "sx-origin")
+        article = ingestion_service.import_item(db, item, actor_id=None)
+        db.commit()
+
+        headers = staff_headers(
+            db, role=RoleKey.EDITOR_IN_CHIEF, email="sx-origin@test.local"
+        )
+        response = client.get(
+            f"/api/v1/cms/articles/{article.id}/origin", headers=headers
+        )
+        assert response.status_code == 200
+        body = response.json()
+        # Held, so no network call was needed to answer.
+        assert body["original"]["held"] is True
+        assert body["original"]["fetched_live"] is False
+        assert "The publisher's full article body." in body["original"]["text"]
+        assert body["ours"]["title_te"] == article.title_te
+        assert body["ours"]["edited_since_import"] is False
+        assert body["rewrite"]["engine"] == "fake"
+        assert body["rewrite"]["similarity_percent"] is not None
+        assert body["source"]["licence"] == SourceLicence.RSS_PUBLIC.value
+
+    def test_an_article_that_was_never_crawled_has_no_original(
+        self, db: Session, client: TestClient
+    ) -> None:
+        """Desk copy has no publisher to compare against, and the panel must be
+        told so rather than shown an empty column."""
+        headers = staff_headers(
+            db, role=RoleKey.EDITOR_IN_CHIEF, email="sx-desk@test.local"
+        )
+        article = Article(
+            short_id="sxdesk",
+            slug="sx-desk",
+            title_te="డెస్క్ కథనం",
+            status=ArticleStatus.DRAFT,
+            workflow_state=WorkflowState.DRAFT,
+        )
+        db.add(article)
+        db.commit()
+
+        response = client.get(
+            f"/api/v1/cms/articles/{article.id}/origin", headers=headers
+        )
+        assert response.status_code == 404
+
+    def test_the_original_is_dropped_once_the_item_is_rejected(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The honest half of the bargain: a reject must forget it too."""
+        configure(db, **{"crawl.html_fallback_enabled": True})
+        item = self._fetched(db, monkeypatch, "sx-reject")
+        assert item.latest_rewrite.source_text is not None
+
+        ingestion_service.reject_item(db, item.id, actor_id=None, note="not for us")
+        db.commit()
+        db.refresh(item)
+        assert item.status == IngestStatus.REJECTED
+        assert item.latest_rewrite.source_text is None
 
     def test_html_fallback_requires_a_written_licence_note(
         self, db: Session, client: TestClient
@@ -1024,3 +1325,343 @@ def test_an_article_imported_without_a_credit_cannot_publish(db: Session) -> Non
         workflow_service.transition(
                 db, principal, article, "publish", None
             )
+
+
+class TestOurOwnMasthead:
+    """A source that requires no credit publishes under our name.
+
+    `ContentSource.attribution_required` already governed what `_body_document`
+    prints; the rewrite path used to credit unconditionally regardless of it.
+    What changes is the reader's copy — our own Telugu expression of facts,
+    under our masthead. What does not change is the provenance, or a
+    photograph: no rewrite makes somebody else's picture ours.
+    """
+
+    def _item(self, db, monkeypatch, slug, *, credit: bool):
+        fake = FakeAi()
+        install_ai(monkeypatch, fake)
+        source = make_source(db, slug=slug)
+        source.attribution_required = credit
+        item = make_item(db, source, guid=f"{slug}-1")
+        db.commit()
+        crawl_service.rewrite_one(db, item)
+        db.commit()
+        return item, fake
+
+    def test_the_flag_reaches_the_provider(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The prompt is where the model is told not to name anyone, so the
+        flag has to arrive there — a credit the model volunteers is prose we
+        never see coming."""
+        _item, fake = self._item(db, monkeypatch, "mast-flag", credit=False)
+        assert fake.last_kwargs["credit_source"] is False
+
+        _item, fake = self._item(db, monkeypatch, "mast-flag-on", credit=True)
+        assert fake.last_kwargs["credit_source"] is True
+
+    def test_no_credit_paragraph_is_appended(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        item, _fake = self._item(db, monkeypatch, "mast-body", credit=False)
+        rewrite = item.latest_rewrite
+        assert rewrite.status == RewriteStatus.READY
+        assert "మూలం:" not in (rewrite.body_plain or "")
+        assert item.source.name not in (rewrite.body_plain or "")
+        # The provenance is still recorded, it is simply not printed.
+        assert rewrite.attribution_te
+        assert item.source.name in rewrite.attribution_te
+
+    def test_the_credit_paragraph_survives_when_the_source_requires_it(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        item, _fake = self._item(db, monkeypatch, "mast-body-on", credit=True)
+        assert "మూలం:" in (item.latest_rewrite.body_plain or "")
+
+    def test_an_uncredited_rewrite_imports_under_our_byline(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        item, _fake = self._item(db, monkeypatch, "mast-import", credit=False)
+        article = ingestion_service.import_item(db, item, actor_id=None)
+        db.commit()
+
+        assert article.byline_te == SITE_NAME_TE
+        assert article.source_credit is None
+        assert article.source_type == "own"
+        # Provenance, still: the link back is not the credit line.
+        assert article.canonical_url == item.canonical_url
+
+    def test_a_borrowed_photograph_keeps_its_credit(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The line I will not cross: our words do not make their picture ours.
+
+        A story carrying a publisher's photo stays syndicated and credited,
+        whatever the flag says. Generate our own hero and the same story
+        qualifies for the masthead.
+        """
+        item, _fake = self._item(db, monkeypatch, "mast-photo", credit=False)
+        article = ingestion_service.import_item(db, item, actor_id=None)
+        db.commit()
+        # Same article, but now with the publisher's picture hung off it.
+        article.hero_media_id = 12345
+        article.source_type, article.source_credit = "syndicated", item.source.name
+        ingestion_service._apply_masthead(db, article, item.source, True)
+
+        assert article.source_type == "syndicated"
+        assert article.source_credit == item.source.name
+
+    def test_an_excerpt_import_is_untouched(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Not a rewrite, not our words — the old excerpt-and-link behaviour
+        keeps its credit regardless of the flag."""
+        item, _fake = self._item(db, monkeypatch, "mast-excerpt", credit=False)
+        article = ingestion_service.import_item(
+            db, item, actor_id=None, use_rewrite=False
+        )
+        db.commit()
+        assert article.source_type == "syndicated"
+        assert article.source_credit == item.source.name
+
+
+# --------------------------------------------------------------------------- #
+# Crawl settings: hours, cadence, districts, caps, extra guards
+# --------------------------------------------------------------------------- #
+def _ist(hour: int, minute: int = 0) -> datetime:
+    return datetime(2026, 9, 28, hour, minute, tzinfo=crawl_service.IST)
+
+
+class TestCrawlSettings:
+    def test_breaking_cap_is_not_used_up_by_other_beats(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The :20 pass rewriting national news must not stop breaking news."""
+        national = make_source(db, slug="cs-national", beat=SourceBeat.NATIONAL)
+        for i in range(5):
+            item = make_item(db, national, guid=f"csn{i}", title=f"జాతీయ వార్త {i} ఇక్కడ")
+            crawl_service._record(db, item, status=RewriteStatus.SKIPPED)
+        breaking = make_source(db, slug="cs-breaking", beat=SourceBeat.BREAKING)
+        for i in range(4):
+            make_item(db, breaking, guid=f"csb{i}", title=f"బ్రేకింగ్ వార్త {i} ఇక్కడ")
+        db.commit()
+
+        chosen = crawl_service.select_for_rewrite(
+            db,
+            cap=3,
+            beat_quota={"breaking": 10},
+            default_source_cap=10,
+            beats={SourceBeat.BREAKING},
+        )
+        assert len(chosen) == 3
+
+        # A breaking cap of 0 means none, not "use the hourly cap".
+        monkeypatch.setattr(crawl_service, "rewrite_enabled", lambda _db: True)
+        fake = FakeAi()
+        install_ai(monkeypatch, fake)
+        out = crawl_service.run_rewrite_pass(db, beats={SourceBeat.BREAKING}, cap_override=0)
+        assert out["selected"] == 0 and fake.calls == 0
+
+    def test_daily_cap_counts_every_beat(self, db: Session) -> None:
+        other = make_source(db, slug="cs-day-other", beat=SourceBeat.SPORTS)
+        done = make_item(db, other, guid="csd0", title="క్రీడా వార్త ఇక్కడ ఉంది")
+        crawl_service._record(db, done, status=RewriteStatus.SKIPPED)
+        source = make_source(db, slug="cs-day", beat=SourceBeat.NATIONAL)
+        for i in range(5):
+            make_item(db, source, guid=f"csd{i + 1}", title=f"రోజు వార్త {i} ఇక్కడ")
+        db.commit()
+        chosen = crawl_service.select_for_rewrite(
+            db, cap=10, beat_quota={"national": 10}, default_source_cap=10, daily_cap=3
+        )
+        assert len(chosen) == 2
+
+    def test_old_published_at_with_fresh_fetch_is_ignored(self, db: Session) -> None:
+        """A feed that republishes its archive gets fetched_at = now."""
+        source = make_source(db, slug="cs-archive", beat=SourceBeat.NATIONAL)
+        old = make_item(db, source, guid="csa1", title="పాత కథనం మళ్లీ వచ్చింది")
+        old.published_at = utcnow() - timedelta(hours=40)
+        undated = make_item(db, source, guid="csa2", title="తేదీ లేని కథనం ఇక్కడ")
+        undated.published_at = None
+        db.commit()
+        chosen = crawl_service.select_for_rewrite(
+            db, cap=10, beat_quota={"national": 10}, default_source_cap=10, max_age_hours=18
+        )
+        assert [item.id for item in chosen] == [undated.id]
+
+    def test_district_filter_keeps_items_with_no_district(self, db: Session) -> None:
+        first, second = db.scalars(select(District).order_by(District.id).limit(2)).all()
+        source = make_source(db, slug="cs-where", beat=SourceBeat.DISTRICT_LOCAL)
+        inside = make_item(db, source, guid="csw1", title="మొదటి జిల్లా వార్త ఇక్కడ")
+        inside.matched_district_id = first.id
+        outside = make_item(db, source, guid="csw2", title="రెండో జిల్లా వార్త ఇక్కడ")
+        outside.matched_district_id = second.id
+        nowhere = make_item(db, source, guid="csw3", title="జిల్లా లేని వార్త ఇక్కడ")
+        db.commit()
+
+        chosen = crawl_service.select_for_rewrite(
+            db,
+            cap=10,
+            beat_quota={"district_local": 10},
+            default_source_cap=10,
+            districts=[first.id],
+        )
+        assert {item.id for item in chosen} == {inside.id, nowhere.id}
+
+        # A source pinned to a district outside the choice is not polled at all;
+        # an unpinned one still is.
+        make_source(db, slug="cs-pinned-out", district_id=second.id)
+        db.commit()
+        configure(db, **{"crawl.districts": [first.id]})
+        due = {s.slug for s in crawl_service.due_crawl_sources(db)}
+        assert "cs-where" in due and "cs-pinned-out" not in due
+
+    def test_active_hours_wrap_past_midnight(self, db: Session) -> None:
+        assert settings_service.crawl_active_now(db, _ist(3)), "default is round the clock"
+        configure(db, **{"crawl.active_from_hour": 22, "crawl.active_to_hour": 6})
+        assert settings_service.crawl_active_now(db, _ist(23))
+        assert settings_service.crawl_active_now(db, _ist(5, 59))
+        assert not settings_service.crawl_active_now(db, _ist(6))
+        assert not settings_service.crawl_active_now(db, _ist(12))
+        configure(db, **{"crawl.active_from_hour": 6, "crawl.active_to_hour": 24})
+        assert settings_service.crawl_active_now(db, _ist(23, 59))
+        assert not settings_service.crawl_active_now(db, _ist(5))
+
+    def test_cadence_gate(self, db: Session) -> None:
+        tick = crawl_service.last_due_tick
+        # Hourly keeps the old clock positions: fetch :05, rewrite :20.
+        assert tick(60, offset=5, now=_ist(10, 8)) == _ist(10, 5)
+        assert tick(60, offset=5, now=_ist(10, 4)) == _ist(9, 5)
+        assert tick(60, offset=20, now=_ist(10, 20)) == _ist(10, 20)
+        assert tick(15, offset=5, now=_ist(10, 44)) == _ist(10, 35)
+        assert tick(5, offset=5, now=_ist(10, 7)) == _ist(10, 5)
+        assert tick(120, offset=5, now=_ist(3, 5)) == _ist(2, 5)
+        assert tick(60, offset=5, now=_ist(0, 2)) == _ist(0, 5) - timedelta(hours=1)
+
+        claim = crawl_service.claim_tick
+        key = "crawl.fetch_every_minutes"
+        assert claim(db, key, offset=5, now=_ist(10, 5))
+        # A fetch queued behind a long rewrite pass on the one ingest worker
+        # starts 12 minutes late: it still runs, once, for the tick it missed.
+        assert claim(db, key, offset=5, now=_ist(11, 17)), "a late start still runs"
+        assert not claim(db, key, offset=5, now=_ist(11, 20)), "never twice for one tick"
+        assert not claim(db, key, offset=5, now=_ist(12, 4))
+        assert claim(db, key, offset=5, now=_ist(12, 5))
+        configure(db, **{key: 15})
+        assert claim(db, key, offset=5, now=_ist(12, 20))
+
+    def test_per_source_cap_holds_across_passes_in_one_hour(self, db: Session) -> None:
+        """Rewriting every 15 minutes must not let one feed take a whole beat."""
+        busy = make_source(db, slug="cs-busy", per_hour=3)
+        for i in range(8):
+            make_item(db, busy, guid=f"csbusy{i}", title=f"రద్దీ వార్త {i} ఇక్కడ")
+        db.commit()
+        pick = lambda: crawl_service.select_for_rewrite(  # noqa: E731
+            db, cap=50, beat_quota={"district_local": 50}, default_source_cap=8
+        )
+        first = pick()
+        assert len(first) == 3
+        for item in first:
+            crawl_service._record(db, item, status=RewriteStatus.SKIPPED)
+        db.commit()
+        assert pick() == [], "the source already used its hour"
+
+    def test_breaking_pass_stays_under_the_hourly_ceiling(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        configure(db, **{"crawl.hourly_item_cap": 4, "crawl.breaking_hourly_cap": 20})
+        national = make_source(db, slug="cs-ceiling-nat", beat=SourceBeat.NATIONAL)
+        for i in range(3):
+            item = make_item(db, national, guid=f"csc{i}", title=f"జాతీయ వార్త {i} ఇక్కడ")
+            crawl_service._record(db, item, status=RewriteStatus.SKIPPED)
+        breaking = make_source(db, slug="cs-ceiling-brk", beat=SourceBeat.BREAKING)
+        for i in range(5):
+            make_item(db, breaking, guid=f"cscb{i}", title=f"బ్రేకింగ్ వార్త {i} ఇక్కడ")
+        db.commit()
+        monkeypatch.setattr(crawl_service, "rewrite_enabled", lambda _db: True)
+        install_ai(monkeypatch, FakeAi())
+        out = crawl_service.run_rewrite_pass(
+            db, beats={SourceBeat.BREAKING}, cap_override=20
+        )
+        assert out["selected"] == 1, "3 used of a ceiling of 4 leaves room for one"
+
+    def test_run_now_is_queued_not_run_in_the_request(
+        self, db: Session, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from app.workers.tasks import crawl as crawl_tasks
+
+        queued: list[dict] = []
+        monkeypatch.setattr(
+            crawl_tasks.crawl_run_now, "delay", lambda **kw: queued.append(kw)
+        )
+        fake = FakeAi()
+        install_ai(monkeypatch, fake)
+        make_item(db, make_source(db, slug="cs-run-now"), guid="csr1")
+        configure(db, **{"crawl.enabled": True})
+        headers = staff_headers(db, role=RoleKey.ADMIN, email="crawl-admin@test.local")
+        response = client.post(
+            "/api/v1/cms/crawl/run", headers=headers, json={"beat": "breaking"}
+        )
+        assert response.status_code == 202 and response.json()["queued"] is True
+        assert queued and queued[0]["beat"] == "breaking" and queued[0]["rewrite"] is True
+        assert fake.calls == 0
+
+    def test_tasks_gate_on_hours_and_breaking_ignores_them(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from app.workers.tasks.crawl import _skip
+
+        assert _skip(db, None) == "disabled"
+        configure(db, **{"crawl.enabled": True})
+        monkeypatch.setattr(settings_service, "crawl_active_now", lambda *_a: False)
+        assert _skip(db, "crawl.fetch_every_minutes", offset=5) == "outside_hours"
+        assert _skip(db, None) is None, "breaking runs all day by default"
+        configure(db, **{"crawl.breaking_all_day": False})
+        assert _skip(db, None) == "outside_hours"
+
+    def test_coerce_ids_str_list_and_bounds(self) -> None:
+        coerce = settings_service._coerce
+        assert coerce("crawl.districts", [3, 1, 3]) == [1, 3]
+        for bad in ("1", [0], [True], ["a"]):
+            with pytest.raises(ValidationError):
+                coerce("crawl.districts", bad)
+        assert coerce("crawl.sensitive_extra_terms", [" foo ", "", "foo", "bar"]) == ["foo", "bar"]
+        for bad in ("foo", [1]):
+            with pytest.raises(ValidationError):
+                coerce("crawl.sensitive_extra_terms", bad)
+        assert coerce("crawl.active_from_hour", 23) == 23
+        with pytest.raises(ValidationError):
+            coerce("crawl.active_from_hour", 24)
+        assert coerce("crawl.fetch_every_minutes", 15) == 15
+        with pytest.raises(ValidationError):
+            coerce("crawl.fetch_every_minutes", 7)
+        # Older keys stay unbounded, or a stored value could no longer be saved.
+        assert coerce("crawl.hourly_item_cap", 100_000) == 100_000
+        specs = {s["key"]: s for s in settings_service.describe()}
+        assert (specs["crawl.daily_item_cap"]["min"], specs["crawl.daily_item_cap"]["max"]) == (0, 5000)
+        assert specs["crawl.hourly_item_cap"]["max"] is None
+
+    def test_an_extra_sensitive_term_routes_to_a_person(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        headline = "Police encounter near the highway"
+        assert not crawl_service.is_sensitive(headline), "not on the built-in list"
+        configure(db, **{"crawl.sensitive_extra_terms": ["Encounter"]})
+        fake = FakeAi()
+        install_ai(monkeypatch, fake)
+        source = make_source(db, slug="cs-extra")
+        item = make_item(db, source, guid="cse1", title=headline, language="en")
+        db.commit()
+
+        rewrite = crawl_service.rewrite_one(db, item)
+        db.commit()
+        assert rewrite.status == RewriteStatus.HUMAN_ONLY
+        assert fake.calls == 0
+
+    def test_status_reports_the_day_and_stopped_sources(self, db: Session) -> None:
+        source = make_source(db, slug="cs-broken")
+        source.consecutive_failures = 8
+        db.commit()
+        snap = crawl_service.status_snapshot(db)
+        assert snap["active_now"] is True
+        assert snap["daily_cap"] == 0 and snap["used_today"] == 0
+        assert snap["failing_sources"] == 1 and snap["failure_limit"] == 8

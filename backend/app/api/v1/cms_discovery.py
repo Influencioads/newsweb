@@ -11,6 +11,7 @@ from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
 
 from app.core.deps import Principal, require_permission
+from app.core.permissions import LEVEL_PIN_PLACEMENT
 from app.core.errors import NotFoundError, ValidationError
 from app.core.redis_client import cache_delete_prefix
 from app.db.base import utcnow
@@ -80,7 +81,7 @@ def _pin_row(pin: Pin) -> dict:
 def list_pins(
     include_expired: bool = Query(default=False),
     db: Session = Depends(get_db),
-    _p: Principal = Depends(require_permission("article.publish")),
+    _p: Principal = Depends(require_permission("article.publish", min_level=LEVEL_PIN_PLACEMENT)),
 ) -> dict:
     rows = discovery_repo.all_pins(db, include_expired=include_expired)
     return {"items": [_pin_row(p) for p in rows], "total": len(rows)}
@@ -91,7 +92,7 @@ def create_pin(
     payload: PinIn,
     request: Request,
     db: Session = Depends(get_db),
-    p: Principal = Depends(require_permission("article.publish")),
+    p: Principal = Depends(require_permission("article.publish", min_level=LEVEL_PIN_PLACEMENT)),
 ) -> dict:
     article = db.get(Article, payload.article_id)
     if article is None:
@@ -151,7 +152,7 @@ def unpin(
     pin_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    p: Principal = Depends(require_permission("article.publish")),
+    p: Principal = Depends(require_permission("article.publish", min_level=LEVEL_PIN_PLACEMENT)),
 ) -> dict:
     pin = db.get(Pin, pin_id)
     if pin is None:
@@ -204,7 +205,7 @@ def trending_scores(
 @router.post("/trending/recompute")
 def recompute_trending(
     db: Session = Depends(get_db),
-    _p: Principal = Depends(require_permission("article.publish")),
+    _p: Principal = Depends(require_permission("article.publish", min_level=LEVEL_PIN_PLACEMENT)),
 ) -> dict:
     count = trending_service.compute_trending(db)
     _purge_feeds()

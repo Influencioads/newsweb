@@ -10,6 +10,7 @@ import { timeAgo, useI18n } from '@/lib/i18n';
 import { space, TAP } from '@/lib/theme';
 import { makeStyles } from '@/lib/useTheme';
 import { useAuth } from '@/stores/auth';
+import { Badge } from '@/ui/Badge';
 import { ConfirmSheet } from '@/ui/BottomSheet';
 import { Button, IconButton } from '@/ui/Button';
 import { Card } from '@/ui/Card';
@@ -63,6 +64,11 @@ function CommentRow({
         <T variant="meta" color="muted">
           {pending ? t('comments.posting') : timeAgo(comment.created_at, language)}
         </T>
+        {/* The server already sorts pinned comments first; without a mark the
+            reader just sees an old comment inexplicably at the top. */}
+        {comment.is_pinned ? (
+          <Badge tone="brand" size="xs" icon="pin" label={t('comments.pinned')} />
+        ) : null}
         {comment.is_mine && !pending ? (
           <IconButton name="trash2" label={t('ui.delete')} onPress={() => onDelete(comment)} />
         ) : null}
@@ -103,6 +109,7 @@ export function Comments({ shortId }: { shortId: string }) {
         author_name_te: me?.user.name_te ?? '',
         author_name_en: me?.user.name_en ?? '',
         is_mine: true,
+        is_pinned: false,
         created_at: new Date().toISOString(),
       };
       queryClient.setQueryData<CommentList>(key, (old) => ({

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { ChevronDown, ExternalLink, FileInput, Sparkles, X } from 'lucide-react';
 
 import { Badge, StatusPill } from '@/components/ui/Badge';
@@ -5,6 +6,7 @@ import { Button, ButtonLink } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { REWRITE_STATUS } from '@/features/cms/status';
+import { useScript } from '@/i18n';
 import type { ContentPolicy, IngestedItem, SourceLicence } from '@/types/cms';
 import { cn } from '@/utils/cn';
 
@@ -30,29 +32,43 @@ export function LicenceBadge({ source }: { source: { licence: SourceLicence; con
   );
 }
 
+/** Heading for one side of the comparison. Shared with the editor's OriginCompare,
+ *  which is this same comparison one screen later. */
+export function ColumnHead({ children }: { children: ReactNode }) {
+  const s = useScript();
+  return (
+    <h4 lang={s.language} className={cn(s.body, 'text-meta font-bold uppercase tracking-wide text-muted')}>
+      {children}
+    </h4>
+  );
+}
+
 /** The rewrite, the refusal, or nothing — whichever actually happened.
  *
  * A refusal is shown rather than hidden. "The model declined because the
  * source had three sentences" is something an editor acts on; hiding it would
  * make the queue look like nothing had been tried.
+ *
+ * When a rewrite is ready, opening the row puts the original beside our words.
+ * Two columns and the similarity percentage rather than a word-level diff: the
+ * reviewer's question is "is this our reporting or theirs", and a highlighted-
+ * word view answers that worse than reading both. Collapsed by default because
+ * the queue lists fifty of these.
+ *
+ * `source_text` is kept only while the item is undecided, and only when the
+ * page was actually fetched, so for most rows the left column is a pointer at
+ * the publisher rather than their text. That is the licence working, not a gap.
  */
 function RewritePanel({ item, onRewrite, busy }: { item: IngestedItem; onRewrite: () => void; busy: boolean }) {
   const L = useL();
   const rewrite = item.rewrite;
   const ready = rewrite !== null && item.rewrite_status === 'ready';
+  const sourceLink = item.canonical_url ?? item.url;
 
   return (
     <div className="mt-3 rounded-xl border border-rule-soft bg-paper-sub p-3">
       <div className="flex flex-wrap items-center gap-2">
         <StatusPill status={item.rewrite_status} registry={REWRITE_STATUS} />
-        {ready ? (
-          <span className="font-sans text-meta text-muted">
-            {rewrite.engine}
-            {rewrite.model ? ` · ${rewrite.model}` : ''}
-            {` · ${Math.round(rewrite.confidence * 100)}%`}
-            {rewrite.unverified ? ` · ${L('ధృవీకరించని అంశాలు', 'has unverified claims')}` : ''}
-          </span>
-        ) : null}
         {rewrite?.refusal_reason ? <span className="font-sans text-meta text-muted">{rewrite.refusal_reason}</span> : null}
         {item.rewrite_status !== 'ready' && item.rewrite_status !== 'human_only' ? (
           <Button variant="secondary" size="sm" icon={Sparkles} disabled={busy} onClick={onRewrite} className="ml-auto text-ai-text">
@@ -69,9 +85,69 @@ function RewritePanel({ item, onRewrite, busy }: { item: IngestedItem; onRewrite
             </span>
             <Icon icon={ChevronDown} size="sm" className="text-muted transition-transform duration-base ease-standard group-open:rotate-180" />
           </summary>
-          <p lang="te" className="te mt-2 whitespace-pre-line text-te-body-xs text-ink-soft">
-            {rewrite.body_plain}
-          </p>
+
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            <section className="min-w-0">
+              <ColumnHead>{L('మూలం', 'Original')}</ColumnHead>
+              {rewrite.source_text ? (
+                <>
+                  <p lang="te" className="th mt-1 text-ui-sm font-bold text-ink">{item.title}</p>
+                  {item.summary ? (
+                    <p lang="te" className="te mt-1 text-te-body-xs text-ink-soft">{item.summary}</p>
+                  ) : null}
+                  <p lang="te" className="te mt-2 whitespace-pre-line text-te-body-xs text-ink-soft">
+                    {rewrite.source_text}
+                  </p>
+                </>
+              ) : (
+                <>
+                  {sourceLink ? (
+                    <ButtonLink to={sourceLink} external variant="link" size="sm" iconRight={ExternalLink} className="-ml-1 text-info">
+                      {L('అసలు కథనం తెరవండి', 'Open the original')}
+                    </ButtonLink>
+                  ) : null}
+                  <p className="mt-1">
+                    <Badge tone="partial" size="xs">{L('సారాంశం మాత్రమే', 'excerpt only')}</Badge>
+                  </p>
+                  <p className="mt-1 font-sans text-meta text-muted">
+                    {L(
+                      'ఈ ప్రచురణకర్త పూర్తి పాఠ్యం మా దగ్గర లేదు. పోల్చే ముందు అసలు కథనాన్ని తెరిచి చదవండి.',
+                      'We do not hold this publisher\u2019s full text. Open the original and read it before you compare.',
+                    )}
+                  </p>
+                  <p lang="te" className="th mt-2 text-ui-sm font-bold text-ink">{item.title}</p>
+                  {item.summary ? (
+                    <p lang="te" className="te mt-1 text-te-body-xs text-ink-soft">{item.summary}</p>
+                  ) : null}
+                </>
+              )}
+            </section>
+
+            <section className="min-w-0 sm:border-l sm:border-rule sm:pl-4">
+              <ColumnHead>{L('మా పాఠ్యం', 'Our rewrite')}</ColumnHead>
+              <p lang="te" className="th mt-1 text-ui-sm font-bold text-ai-text">{rewrite.title_te}</p>
+              {rewrite.summary_te ? (
+                <p lang="te" className="te mt-1 text-te-body-xs text-ink-soft">{rewrite.summary_te}</p>
+              ) : null}
+              <p lang="te" className="te mt-2 whitespace-pre-line text-te-body-xs text-ink-soft">
+                {rewrite.body_plain}
+              </p>
+              {rewrite.attribution_te ? (
+                <p lang="te" className="te mt-2 text-te-body-xs text-muted">{rewrite.attribution_te}</p>
+              ) : null}
+              <p className="mt-2 flex flex-wrap items-center gap-2 font-sans text-meta text-muted">
+                <span>
+                  {rewrite.engine}
+                  {rewrite.model ? ` · ${rewrite.model}` : ''}
+                  {` · ${Math.round(rewrite.confidence * 100)}%`}
+                  {` · ${L('పోలిక', 'similarity')} ${rewrite.similarity_percent}%`}
+                </span>
+                {rewrite.unverified ? (
+                  <Badge tone="partial" size="xs">{L('ధృవీకరించని అంశాలు', 'unverified claims')}</Badge>
+                ) : null}
+              </p>
+            </section>
+          </div>
         </details>
       ) : null}
     </div>

@@ -1,12 +1,13 @@
-"""The three-hourly audio bulletin tasks.
+"""The audio bulletin tasks.
 
-`crontab(minute=0, hour="6,9,12,15,18,21")` rather than the e-paper's
-tick-and-compare idiom, because the six slots are a product decision and not an
-admin setting. Celery's timezone is already Asia/Kolkata, so the entry fires on
-the IST hour, wakes the worker six times a day instead of 288, and cannot
-double-produce because `(bulletin_date, slot)` is unique.
+`crontab(minute=0, hour="7,9,13,15,17,19,21")` — built from
+`bulletin_service.SLOTS` — rather than the e-paper's tick-and-compare idiom,
+because the seven slots are a product decision and not an admin setting.
+Celery's timezone is already Asia/Kolkata, so the entry fires on the IST hour,
+wakes the worker seven times a day instead of 288, and cannot double-produce
+because `(bulletin_date, slot)` is unique.
 
-`bulletin.retry` exists because a provider 502 at 06:00 would otherwise mean no
+`bulletin.retry` exists because a provider 502 at 07:00 would otherwise mean no
 morning bulletin at all. Re-rendering at :15 and :45 turns a transient failure
 into a fifteen-minute delay.
 """

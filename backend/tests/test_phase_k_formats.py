@@ -32,12 +32,27 @@ from app.db.seed import (  # noqa: E402
 )
 from app.db.seed_content import seed_categories, seed_tags  # noqa: E402
 from app.db.session import get_db  # noqa: E402
+from app.models.audio import AudioAsset  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.content import Article, Category  # noqa: E402
-from app.models.enums import ArticleStatus, WorkflowState  # noqa: E402
+from app.models.media import Media  # noqa: E402
+from app.models.enums import (  # noqa: E402
+    ArticleStatus,
+    AudioStatus,
+    RoleKey,
+    ScopeType,
+    UserStatus,
+    WorkflowState,
+)
 from app.models.setting import AppSetting  # noqa: E402
+from app.models.user import Role, User, UserRole  # noqa: E402
 from app.models.video import Video  # noqa: E402
-from app.services import settings_service, share_card_service  # noqa: E402
+from app.services import (  # noqa: E402
+    auth_service,
+    settings_service,
+    share_card_service,
+    tts_service,
+)
 
 engine = create_engine(
     "sqlite://",
@@ -90,6 +105,7 @@ def _isolate(db: Session) -> Iterator[None]:
 
 
 def _purge(db: Session) -> None:
+    db.query(AudioAsset).delete()
     db.query(Article).delete()
     db.query(Video).delete()
     db.query(AppSetting).delete()
@@ -124,6 +140,25 @@ def make_article(db: Session, *, short_id: str = "fmt001", video_id=None) -> Art
     db.add(article)
     db.flush()
     return article
+
+
+def staff_headers(db: Session, *, role: RoleKey, email: str) -> dict[str, str]:
+    user = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+    if user is None:
+        role_row = db.execute(select(Role).where(Role.key == role.value)).scalar_one()
+        user = User(
+            email=email, name_te="సిబ్బంది", name_en="Staff", status=UserStatus.ACTIVE
+        )
+        db.add(user)
+        db.flush()
+        db.add(
+            UserRole(user_id=user.id, role_id=role_row.id, scope_type=ScopeType.GLOBAL)
+        )
+        db.flush()
+    db.refresh(user)
+    _s, access, _r, _e = auth_service.create_session(db, user)
+    db.commit()
+    return {"Authorization": f"Bearer {access}"}
 
 
 def make_video(db: Session, *, published: bool = True) -> Video:
@@ -181,6 +216,58 @@ class TestFormats:
         body = client.get(f"/api/v1/public/articles/{article.short_id}/formats").json()
         for key in ("available", "url", "duration_sec", "voice_enabled", "fallback"):
             assert key in body["audio"], key
+
+    def _ready_audio(self, db: Session, article: Article, *, upload: bool) -> None:
+        """A READY rendition `existing_ready` will find: an editor's upload, or
+        a generated file whose hash matches the story as it reads now."""
+        db.add(
+            AudioAsset(
+                article_id=article.id,
+                content_hash="upload-1"
+                if upload
+                else tts_service.content_hash(tts_service.spoken_text(article)),
+                status=AudioStatus.READY,
+                provider=tts_service.UPLOAD_PROVIDER if upload else "local",
+                url=f"https://cdn.example/audio/{article.short_id}.mp3",
+            )
+        )
+        db.commit()
+
+    def test_a_story_whose_voice_is_off_advertises_no_audio(
+        self, db: Session, client: TestClient
+    ) -> None:
+        """§20. Switching a story's voice off clears neither its upload nor its
+        cached rendition, so /formats has to ask the switch itself — otherwise
+        the reader's headphones play a file /audio refuses to hand out."""
+        article = make_article(db, short_id="fmt007")
+        self._ready_audio(db, article, upload=True)
+        url = f"/api/v1/public/articles/{article.short_id}/formats"
+        assert client.get(url).json()["audio"]["url"].endswith("fmt007.mp3")
+
+        article.voice_enabled = False
+        db.commit()
+        audio = client.get(url).json()["audio"]
+        public = client.get(f"/api/v1/public/articles/{article.short_id}/audio").json()
+        assert audio == public
+        assert (audio["available"], audio["url"], audio["voice_enabled"]) == (
+            False,
+            None,
+            False,
+        )
+
+    def test_the_site_wide_switch_hides_generated_audio(
+        self, db: Session, client: TestClient
+    ) -> None:
+        """The other half of §20: `voice.enabled` governs generated audio even
+        when a rendition for the current text is already sitting in storage."""
+        article = make_article(db, short_id="fmt008")
+        self._ready_audio(db, article, upload=False)
+        url = f"/api/v1/public/articles/{article.short_id}/formats"
+        assert client.get(url).json()["audio"]["url"] is None  # off by default
+
+        settings_service.set_many(db, {"voice.enabled": True}, actor_id=None)
+        db.commit()
+        assert client.get(url).json()["audio"]["url"].endswith("fmt008.mp3")
 
     def test_a_draft_story_has_no_formats(self, db: Session, client: TestClient) -> None:
         article = make_article(db, short_id="fmt005")
@@ -254,6 +341,69 @@ class TestShareCard:
         db.flush()
         assert share_card_service.card_hash(article, None) != first
 
+    def test_the_hero_photograph_reaches_the_card(self, db: Session) -> None:
+        """The regression guard for the defect that shipped.
+
+        `Article` has no `hero_media` relationship, so the old
+        `getattr(article, "hero_media", None)` evaluated to None forever: every
+        card drew a flat brand band instead of the photo, and og:image never
+        carried it. Nothing asserted the photo, which is exactly why nobody
+        noticed. Assert the URL and assert it changes the digest.
+        """
+        article = make_article(db, short_id="card05")
+        media = Media(
+            type="image",
+            filename="hero.jpg",
+            mime="image/jpeg",
+            bytes=1234,
+            storage_provider="local",
+            storage_key="media/hero.jpg",
+            cdn_url="https://cdn.example/hero.jpg",
+            width=1600,
+            height=900,
+        )
+        db.add(media)
+        db.flush()
+
+        assert share_card_service.hero_media_url(db, article) is None
+        without = share_card_service.card_hash(article, None)
+
+        article.hero_media_id = media.id
+        db.flush()
+
+        assert (
+            share_card_service.hero_media_url(db, article)
+            == "https://cdn.example/hero.jpg"
+        )
+        assert (
+            share_card_service.card_hash(article, "https://cdn.example/hero.jpg")
+            != without
+        )
+
+    def test_a_soft_deleted_hero_does_not_come_back_through_a_preview(
+        self, db: Session
+    ) -> None:
+        """An editor removing a photo must remove it from the link preview too."""
+        article = make_article(db, short_id="card06")
+        media = Media(
+            type="image",
+            filename="pulled.jpg",
+            mime="image/jpeg",
+            bytes=99,
+            storage_provider="local",
+            storage_key="media/pulled.jpg",
+            cdn_url="https://cdn.example/pulled.jpg",
+        )
+        db.add(media)
+        db.flush()
+        article.hero_media_id = media.id
+        db.flush()
+        assert share_card_service.hero_media_url(db, article) is not None
+
+        media.deleted_at = utcnow()
+        db.flush()
+        assert share_card_service.hero_media_url(db, article) is None
+
     def test_the_key_is_content_addressed(self, db: Session) -> None:
         """No database column and no invalidation logic: the bucket is the
         cache, so the key has to carry the content digest."""
@@ -263,6 +413,94 @@ class TestShareCard:
         key = share_card_service.storage_key(article, digest)
         assert key.startswith("share-cards/card04/")
         assert digest[:16] in key
+
+
+class TestGenerateCardFromTheCms:
+    """The staff button behind "చిత్రంగా మార్చండి".
+
+    It mirrors generate-audio: same permissions, and an answer rather than an
+    error when the host cannot draw the card.
+    """
+
+    def test_it_needs_the_same_permission_generate_audio_does(
+        self, db: Session, client: TestClient
+    ) -> None:
+        article = make_article(db, short_id="gcard1")
+        db.commit()
+        headers = staff_headers(
+            db, role=RoleKey.MODERATOR, email="k-mod@test.example.com"
+        )
+        response = client.post(
+            f"/api/v1/cms/articles/{article.id}/generate-card", headers=headers
+        )
+        assert response.status_code == 403
+
+    def test_an_unavailable_host_says_why_instead_of_failing(
+        self, db: Session, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A Windows desk has no Raqm. That is an environment limit, and the
+        reason has to say so — otherwise staff retry a button that cannot work."""
+        monkeypatch.setattr(
+            "app.services.share_card_service.telugu_shaping_available", lambda: False
+        )
+        article = make_article(db, short_id="gcard2")
+        db.commit()
+        headers = staff_headers(
+            db, role=RoleKey.SUB_EDITOR, email="k-sub@test.example.com"
+        )
+        body = client.post(
+            f"/api/v1/cms/articles/{article.id}/generate-card", headers=headers
+        ).json()
+        assert body["available"] is False
+        assert body["url"] is None
+        assert "Raqm" in body["reason"]
+
+    def test_a_rendered_card_comes_back_with_its_url(
+        self, db: Session, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "app.services.share_card_service.telugu_shaping_available", lambda: True
+        )
+        monkeypatch.setattr(
+            "app.services.share_card_service.ensure_card",
+            lambda *_a, **_k: "https://cdn.example.com/share-cards/gcard3/abc.png",
+        )
+        article = make_article(db, short_id="gcard3")
+        db.commit()
+        headers = staff_headers(
+            db, role=RoleKey.SUB_EDITOR, email="k-sub@test.example.com"
+        )
+        body = client.post(
+            f"/api/v1/cms/articles/{article.id}/generate-card", headers=headers
+        ).json()
+        assert body["available"] is True
+        assert body["url"].endswith("abc.png")
+        assert body["reason"] is None
+
+    def test_force_reaches_the_service(
+        self, db: Session, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Without this the regenerate button is a no-op: the key is content
+        addressed, so an unchanged headline would keep hitting the same object."""
+        seen: dict[str, object] = {}
+        monkeypatch.setattr(
+            "app.services.share_card_service.telugu_shaping_available", lambda: True
+        )
+
+        def _capture(_db, _article, *, force=False):
+            seen["force"] = force
+            return "https://cdn.example.com/card.png"
+
+        monkeypatch.setattr("app.services.share_card_service.ensure_card", _capture)
+        article = make_article(db, short_id="gcard4")
+        db.commit()
+        headers = staff_headers(
+            db, role=RoleKey.SUB_EDITOR, email="k-sub@test.example.com"
+        )
+        client.post(
+            f"/api/v1/cms/articles/{article.id}/generate-card?force=true", headers=headers
+        )
+        assert seen["force"] is True
 
 
 class TestFontFallback:
@@ -333,6 +571,16 @@ class TestCrawlerSurface:
         assert 'type="application/ld+json"' in html
         assert "NewsArticle" in html
 
+    def test_a_short_id_with_a_hyphen_still_resolves(
+        self, db: Session, client: TestClient
+    ) -> None:
+        """nanoid's alphabet includes '-': the id is the last six characters,
+        not the last hyphen-separated segment."""
+        article = make_article(db, short_id="og-0_3")
+        db.commit()
+        html = client.get(f"/_og/article/{article.slug}-{article.short_id}").text
+        assert article.title_te in html
+
     def test_an_unknown_story_still_returns_a_valid_preview(
         self, client: TestClient
     ) -> None:
@@ -384,3 +632,45 @@ class TestCrawlerSurface:
         assert "Disallow: /_og/" in text
         assert "Disallow: /admin" in text
         assert "Sitemap:" in text
+
+
+class TestTheCmsArticleListSurvivesTags:
+    """`/cms/articles` handed the ORM rows straight to its response model, and
+    `Article.tags` holds ArticleTag *links* while the schema's `tags` holds
+    resolved references. Any article carrying a tag made pydantic reject the
+    whole page, so the list 500s and the CMS shows nothing — a seeded tag was
+    enough to do it."""
+
+    def _tagged(self, db: Session, short_id: str) -> Article:
+        from app.models.content import ArticleTag, Tag
+
+        article = make_article(db, short_id=short_id)
+        tag = db.scalars(select(Tag).limit(1)).first()
+        assert tag is not None, "seed_tags should have run"
+        db.add(ArticleTag(article_id=article.id, tag_id=tag.id, sort=0))
+        db.flush()
+        db.commit()
+        return article
+
+    def test_a_tagged_article_does_not_break_either_list(
+        self, db: Session, client: TestClient
+    ) -> None:
+        article = self._tagged(db, "tagged1")
+        headers = staff_headers(
+            db, role=RoleKey.SUPER_ADMIN, email="listtags@seed.example.com"
+        )
+        response = client.get("/api/v1/cms/articles", headers=headers)
+        assert response.status_code == 200, response.text
+        rows = {row["id"]: row for row in response.json()["articles"]}
+        assert article.id in rows
+        tags = rows[article.id]["tags"]
+        assert tags and isinstance(tags[0], dict)
+        assert set(tags[0]) >= {"id", "slug", "name_te", "name_en"}
+
+        # The review queue builds its rows the same way and broke the same way.
+        article.workflow_state = WorkflowState.SUBMITTED
+        db.commit()
+        pending = client.get("/api/v1/cms/articles/pending", headers=headers)
+        assert pending.status_code == 200, pending.text
+        queued = {row["id"]: row for row in pending.json()["articles"]}
+        assert queued[article.id]["tags"][0]["slug"]

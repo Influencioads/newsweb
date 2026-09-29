@@ -19,11 +19,17 @@
         "frontend",
         "--",
         "--port",
-        "5175",
+        "5174",
         "--strictPort",
         "false"
       ],
-      "port": 5175
+      "port": 5174
+    },
+    {
+      "name": "web-alt",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "frontend", "--", "--port", "5176", "--strictPort"],
+      "port": 5176
     },
     {
       "name": "app",
@@ -35,9 +41,23 @@
         "web",
         "--",
         "--port",
-        "8085"
+        "8097"
       ],
-      "port": 8085
+      "port": 8097
+    },
+    {
+      "name": "android",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "mobile",
+        "run",
+        "start",
+        "--",
+        "--port",
+        "8082"
+      ],
+      "port": 8082
     }
   ]
 }

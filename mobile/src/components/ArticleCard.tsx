@@ -1,17 +1,20 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { memo, type ReactNode } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { absoluteMediaUrl } from '@/api/client';
 import type { ArticleCard as ArticleCardType } from '@/api/types';
+import { ArticleActions } from '@/components/ArticleActions';
 import { timeAgo, useI18n } from '@/lib/i18n';
 import { useMotion } from '@/lib/motion';
 import { alpha, radius, space } from '@/lib/theme';
 import { makeStyles } from '@/lib/useTheme';
 import { Badge } from '@/ui/Badge';
 import { Card } from '@/ui/Card';
+import { Divider } from '@/ui/Divider';
+import { PressableScale } from '@/ui/PressableScale';
 import { T } from '@/ui/Text';
 
 /**
@@ -59,13 +62,23 @@ function Flags({ article }: { article: ArticleCardType }) {
   );
 }
 
+/**
+ * The category, as a tinted chip rather than coloured text.
+ *
+ * A chip is what makes a feed scannable at arm's length — it gives the eye
+ * something to sort by before it reads a word. Deliberately one tone for every
+ * category: a hue per section would mean a dozen new colours in `theme.ts`,
+ * which the linter would allow and the identity would not survive.
+ */
 function Kicker({ article }: { article: ArticleCardType }) {
   const { pick } = useI18n();
   if (!article.category) return null;
   return (
-    <T variant="meta" weight="semibold" color="brand" numberOfLines={1}>
-      {pick(article.category.name_te, article.category.name_en)}
-    </T>
+    <Badge
+      tone="brand"
+      size="xs"
+      label={pick(article.category.name_te, article.category.name_en)}
+    />
   );
 }
 
@@ -112,6 +125,8 @@ function useCardLabel(article: ArticleCardType): string {
     article.ai_generated && t('ui.ai'),
     article.category && pick(article.category.name_te, article.category.name_en),
     pick(article.title_te, article.title_en),
+    // The alt text deliberately leaves this out, so the card says it once.
+    article.hero?.ai_generated && t('article.aiImage'),
     article.district && pick(article.district.name_te, article.district.name_en),
     timeAgo(article.published_at, language),
   ]
@@ -119,21 +134,75 @@ function useCardLabel(article: ArticleCardType): string {
     .join(', ');
 }
 
+/**
+ * The picture, and — §7.4, non-optional — the label when it was drawn by a
+ * model. That flag lives on the media, not on the article: a human-written
+ * story illustrated by AI has `article.ai_generated === false`, so the badge
+ * in `Flags` never speaks for it. The label is decorative here because
+ * `useCardLabel` already says it once for the whole card.
+ */
 function Thumb({ article, style }: { article: ArticleCardType; style: object }) {
   const styles = useStyles();
   const m = useMotion();
+  const { t } = useI18n();
   const uri = absoluteMediaUrl(article.hero?.url ?? null);
   if (!uri) return <View style={[style, styles.fallback]} />;
   return (
-    <Image
-      source={{ uri }}
-      style={style}
-      contentFit="cover"
-      placeholder={article.hero?.blurhash ? { blurhash: article.hero.blurhash } : undefined}
-      transition={m.imageTransition}
-      recyclingKey={article.short_id}
-      accessibilityLabel={article.hero?.alt_te ?? ''}
-    />
+    <View style={[style, styles.thumbBox]}>
+      <Image
+        source={{ uri }}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+        placeholder={article.hero?.blurhash ? { blurhash: article.hero.blurhash } : undefined}
+        transition={m.imageTransition}
+        recyclingKey={article.short_id}
+        accessibilityLabel={article.hero?.alt_te ?? ''}
+      />
+      {article.hero?.ai_generated ? (
+        <View style={styles.aiTag} aria-hidden>
+          <Badge tone="ai" icon="sparkles" size="xs" label={t('article.aiImage')} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * Card chrome shared by the lead and row variants.
+ *
+ * The content is the press target and the action strip sits *outside* it, as
+ * a sibling. That restructure is not cosmetic: the whole card used to be one
+ * `<Card onPress>`, and buttons nested inside a pressable collapse into it for
+ * TalkBack and double-fire on Android. Two siblings give the reader one focus
+ * stop for "open the story" and one per action.
+ */
+function CardShell({
+  article,
+  a11y,
+  style,
+  actions = true,
+  children,
+}: {
+  article: ArticleCardType;
+  a11y: string;
+  style?: StyleProp<ViewStyle>;
+  actions?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card padding="none" elevated style={style}>
+      <PressableScale onPress={() => openArticle(article)} accessibilityLabel={a11y}>
+        {children}
+      </PressableScale>
+      {actions ? (
+        <>
+          <Divider />
+          {/* `flags="cache"` — a mounted row must never issue its own request,
+              or a 20-card page costs 20 of them on every scroll. */}
+          <ArticleActions article={article} size="card" flags="cache" />
+        </>
+      ) : null}
+    </Card>
   );
 }
 
@@ -145,7 +214,7 @@ export const LeadCard = memo(function LeadCard({ article, index }: ArticleCardPr
   const a11y = useCardLabel(article);
   return (
     <Stagger index={index}>
-      <Card padding="none" elevated onPress={() => openArticle(article)} accessibilityLabel={a11y} style={styles.card}>
+      <CardShell article={article} a11y={a11y} style={styles.card}>
         <View>
           <Thumb article={article} style={styles.leadImage} />
           {hasFlags(article) ? (
@@ -166,7 +235,7 @@ export const LeadCard = memo(function LeadCard({ article, index }: ArticleCardPr
           ) : null}
           <MetaLine article={article} />
         </View>
-      </Card>
+      </CardShell>
     </Stagger>
   );
 });
@@ -180,7 +249,7 @@ export const RowCard = memo(function RowCard({ article, index }: ArticleCardProp
   const hasThumb = !!absoluteMediaUrl(article.hero?.url ?? null);
   return (
     <Stagger index={index}>
-      <Card elevated onPress={() => openArticle(article)} accessibilityLabel={a11y} style={styles.card}>
+      <CardShell article={article} a11y={a11y} style={styles.card}>
         <View style={styles.row}>
           <View style={styles.rowText}>
             <Topline article={article} />
@@ -191,7 +260,7 @@ export const RowCard = memo(function RowCard({ article, index }: ArticleCardProp
           </View>
           {hasThumb ? <Thumb article={article} style={styles.rowImage} /> : null}
         </View>
-      </Card>
+      </CardShell>
     </Stagger>
   );
 });
@@ -221,6 +290,12 @@ const useStyles = makeStyles((color) => ({
   card: { marginHorizontal: space.lg, marginTop: space.md },
   topline: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm },
   fallback: { backgroundColor: color.placeholder },
+  /* The image fills this box absolutely so the AI label can sit on top of it. */
+  thumbBox: { overflow: 'hidden' },
+  /* Top of the frame: the foot of the lead image already carries the flag
+     strip. Both insets are set so a narrow row thumb ellipsizes the label
+     instead of clipping it mid-word. */
+  aiTag: { position: 'absolute', top: space.xs, left: space.xs, right: space.xs },
 
   leadImage: {
     width: '100%',
@@ -244,9 +319,13 @@ const useStyles = makeStyles((color) => ({
   },
   leadBody: { padding: space.lg, gap: space.xs },
 
-  row: { flexDirection: 'row', alignItems: 'flex-start', gap: space.md },
+  /* CardShell is padding="none" for the lead's edge-to-edge image, so the
+     row brings its own — same inset as leadBody. */
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: space.md, padding: space.lg },
   rowText: { flex: 1, minWidth: 0, gap: space.xs },
-  rowImage: { width: 96, height: 72, borderRadius: radius.sm, backgroundColor: color.placeholder },
+  // 112x80 rather than 96x72: a denser-reading strip for the same row height,
+  // and it is two numbers.
+  rowImage: { width: 112, height: 80, borderRadius: radius.sm, backgroundColor: color.placeholder },
 
   compact: { gap: space.xs },
 }));

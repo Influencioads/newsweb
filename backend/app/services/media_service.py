@@ -22,6 +22,7 @@ from datetime import datetime
 from typing import Any
 
 from PIL import Image, ImageOps
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.errors import FileTooLargeError, UnsupportedMediaTypeError
@@ -48,6 +49,34 @@ ALLOWED_IMAGE_MIMES = frozenset(
 ALLOWED_FORMATS = frozenset({"JPEG", "PNG", "WEBP", "GIF", "TIFF", "MPO", "AVIF"})
 
 WEBP_QUALITY = 82
+
+#: What the creative studio keeps in the library for itself: the desk's design
+#: references and the AI backdrops drawn in their style. Neither is a picture
+#: of anything, so the hero picker must never offer one as a story's image.
+STUDIO_ONLY = ("design_reference", "creative_backdrop")
+
+
+def meta_flag(key: str):
+    """SQL for `Media.meta[key]` being true.
+
+    SQLAlchemy's JSON path compiles to JSON_EXTRACT on MySQL and SQLite alike;
+    `coalesce` turns a missing key or a NULL `meta` (NULL on both) into false.
+    """
+    return func.coalesce(Media.meta[key].as_boolean(), False)
+
+#: §12.5 makes a credit mandatory for any photograph that is not ours. Two
+#: source types are exempt, and only two:
+#:
+#:   `own`            — we took it, commissioned it, or drew it.
+#:   `public_domain`  — CC0 / PDM, where the licence positively waives
+#:                      attribution. `story_image_service` proves that from the
+#:                      provider's own metadata before it may use this value,
+#:                      and records the licence on `Media.copyright` and
+#:                      `Media.meta` so the absent credit is auditable rather
+#:                      than merely absent.
+#:
+#: Anything else — syndicated, licensed, contributed — still needs a name.
+CREDIT_EXEMPT = frozenset({"own", "public_domain"})
 
 
 @dataclass
@@ -205,6 +234,7 @@ def create_image_media(
     ai_generated: bool = False,
     ai_prompt: str | None = None,
     ai_model: str | None = None,
+    meta: dict | None = None,
 ) -> Media:
     """Ingest an image and persist its `media` row.
 
@@ -214,7 +244,7 @@ def create_image_media(
     if mime not in ALLOWED_IMAGE_MIMES:
         raise UnsupportedMediaTypeError(details={"mime": mime})
 
-    if source_type != "own" and not credit:
+    if source_type not in CREDIT_EXEMPT and not credit:
         from app.core.errors import ValidationError
 
         raise ValidationError(
@@ -252,6 +282,7 @@ def create_image_media(
         ai_prompt=ai_prompt,
         ai_model=ai_model,
         variants=processed.variants,
+        meta=meta,
         uploaded_by=uploaded_by,
     )
     db.add(media)

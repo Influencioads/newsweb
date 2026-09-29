@@ -50,6 +50,20 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def desc_nulls_last(column: Any) -> tuple[Any, Any]:
+    """Newest first, rows with no date last — on MySQL as well as anywhere else.
+
+    `column.desc().nullslast()` emits literal `NULLS LAST`, which MySQL has
+    never supported: it is a **syntax error**, not a slower plan, so every query
+    using it works on SQLite in tests and 500s on the deployed database. Sorting
+    on `IS NULL` first says the same thing in plain SQL that all three engines
+    accept.
+
+    Use as `.order_by(*desc_nulls_last(Model.published_at), Model.id.desc())`.
+    """
+    return column.is_(None), column.desc()
+
+
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 

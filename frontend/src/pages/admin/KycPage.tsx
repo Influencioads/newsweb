@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, ExternalLink, FileText, FolderOpen, MessageCircleQuestion, X } from 'lucide-react';
+import { Check, ExternalLink, FileText, FolderOpen, MessageCircleQuestion, ShieldOff, X } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { AdminPage } from '@/components/admin/AdminPage';
@@ -9,16 +9,19 @@ import { KycPill } from '@/components/admin/StatusPill';
 import { Badge } from '@/components/ui/Badge';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
+import { Switch } from '@/components/ui/Choice';
+import { ConfirmDialog, Dialog, useConfirm } from '@/components/ui/Dialog';
+import { Field, Select } from '@/components/ui/Field';
 import { PromptDialog } from '@/components/ui/PromptDialog';
 import { EmptyState, ErrorState, QueryState, Skeleton } from '@/components/ui/State';
 import { Tabs } from '@/components/ui/Tabs';
 import { useToast } from '@/components/ui/Toast';
 import * as cmsApi from '@/features/cms/api';
 import { KYC_STATUS } from '@/features/cms/status';
+import { VERTICALS, verticalLabel } from '@/features/cms/verticals';
 import { useI18n, useScript } from '@/i18n';
 import { useAuth } from '@/stores/auth';
-import type { KycDocumentRow, KycProfileRow, KycStatus } from '@/types/cms';
+import type { KycDocumentRow, KycProfileRow, KycStatus, Vertical } from '@/types/cms';
 import { cn } from '@/utils/cn';
 
 import { useL } from './useL';
@@ -109,6 +112,101 @@ function DocumentDialog({ profileId, document: doc, onClose }: {
   );
 }
 
+/**
+ * The one exception to per-article review (§0): a panchayat secretary whose
+ * copy goes live unread.
+ *
+ * Shown only for an APPROVED profile whose vertical is `panchayat`, and only
+ * to level 90 and above — the same bar the route enforces, so nobody is handed
+ * a switch that 403s. The consequence is spelled out next to the control
+ * rather than in a tooltip, because it is the only place in this product where
+ * something reaches readers without an editor.
+ */
+function PanchayatGrant({ profile, grantedAt, onChanged }: {
+  profile: KycProfileRow;
+  grantedAt: string | null;
+  onChanged: () => void;
+}) {
+  const L = useL();
+  const s = useScript();
+  const toast = useToast();
+  const { confirm, dialog } = useConfirm();
+  const granted = grantedAt !== null;
+
+  const grant = useMutation({
+    mutationFn: (next: boolean) => cmsApi.setPanchayatPublish(profile.id, next),
+    onSuccess: (row, next) => {
+      toast.success(
+        next
+          ? L('నేరుగా ప్రచురణ అనుమతి ఇచ్చారు', 'Direct publishing allowed')
+          : L(
+              `అనుమతి ఉపసంహరించారు · ${row.unpublished_article_ids.length} కథనాలు తొలగించారు`,
+              `Revoked · ${row.unpublished_article_ids.length} article(s) taken down`,
+            ),
+      );
+      onChanged();
+    },
+    onError: (e) => toast.error(e),
+  });
+
+  const ask = async (next: boolean) => {
+    const ok = await confirm(
+      next
+        ? {
+            title: L('నేరుగా ప్రచురణ అనుమతి ఇవ్వాలా?', 'Allow direct publishing?'),
+            body: L(
+              'ఇది ఇచ్చాక ఈ వ్యక్తి పంపే కథనాలు ఎడిటర్ చదవకుండానే పాఠకులకు కనిపిస్తాయి. ఈ ఉత్పత్తిలో సమీక్ష లేకుండా ప్రచురణ జరిగే ఏకైక దారి ఇదే.',
+              "Once granted, this person's stories go live without an editor reading them. This is the only path in this product that publishes without review.",
+            ),
+            confirmLabel: L('అనుమతి ఇవ్వండి', 'Allow'),
+          }
+        : {
+            title: L('అనుమతి ఉపసంహరించి, ప్రచురణలు తొలగించాలా?', 'Revoke and take down?'),
+            body: L(
+              'అనుమతి వెంటనే ఆగిపోతుంది, ఇప్పటికే ప్రచురితమైన వారి కథనాలు కూడా వెనక్కి తీసుకుంటాం.',
+              'The grant stops immediately, and their already-published stories are pulled back as well.',
+            ),
+            confirmLabel: L('ఉపసంహరించండి', 'Revoke'),
+            tone: 'danger' as const,
+          },
+    );
+    if (ok) grant.mutate(next);
+  };
+
+  return (
+    <Card tone="warm" padding="md" className="border-l-4 border-l-breaking">
+      <Switch
+        checked={granted}
+        disabled={grant.isPending}
+        onChange={(next) => void ask(next)}
+        label={L('నేరుగా ప్రచురణ అనుమతి', 'Allow direct publishing')}
+        hint={L(
+          'ఆన్ చేస్తే ఈ వ్యక్తి కథనాలు ఎడిటర్ సమీక్ష లేకుండా నేరుగా ప్రచురితమవుతాయి.',
+          'When on, this person’s articles go live with no review.',
+        )}
+      />
+      {granted ? (
+        <>
+          <p className={cn(s.body, 'mt-1 text-meta text-muted')}>
+            {L('ఇచ్చినది', 'Granted')}: {new Date(grantedAt).toLocaleString('en-IN')}
+          </p>
+          <Button
+            variant="danger"
+            size="sm"
+            icon={ShieldOff}
+            className="mt-3"
+            pending={grant.isPending}
+            onClick={() => void ask(false)}
+          >
+            {L('ఉపసంహరించి ప్రచురణలు తొలగించండి', 'Revoke and take down')}
+          </Button>
+        </>
+      ) : null}
+      {dialog}
+    </Card>
+  );
+}
+
 function ApplicationDialog({ profile, onClose, onChanged }: {
   profile: KycProfileRow | null;
   onClose: () => void;
@@ -118,6 +216,7 @@ function ApplicationDialog({ profile, onClose, onChanged }: {
   const s = useScript();
   const toast = useToast();
   const can = useAuth((st) => st.can);
+  const hasLevel = useAuth((st) => st.hasLevel);
   const mayOpen = can('kyc.view_document');
   const [viewing, setViewing] = useState<KycDocumentRow | null>(null);
   const [decision, setDecision] = useState<Decision | null>(null);
@@ -149,6 +248,9 @@ function ApplicationDialog({ profile, onClose, onChanged }: {
   });
 
   const type = profile ? TYPE_LABEL[profile.contributor_type ?? 'citizen'] : undefined;
+  const vertical = verticalLabel(profile?.vertical);
+  // The freshest grant state: the detail refetch after a decision carries it.
+  const grantedAt = detail.data?.panchayat_publish_granted_at ?? profile?.panchayat_publish_granted_at ?? null;
   const notePlaceholder = L(
     'దరఖాస్తుదారుకు కనిపించే గమనిక — ఏమి లేదో చెప్పండి.',
     'A note the applicant will see — say what is missing, not just no.',
@@ -191,6 +293,7 @@ function ApplicationDialog({ profile, onClose, onChanged }: {
             <div className="flex flex-wrap items-center gap-2">
               <KycPill status={profile.status} />
               {type ? <Badge tone="district" size="xs">{L(type.te, type.en)}</Badge> : null}
+              {vertical ? <Badge tone="brand" size="xs">{L(vertical.te, vertical.en)}</Badge> : null}
               {!profile.phone_verified ? (
                 <Badge tone="partial" size="xs">{L('ఫోన్ ధృవీకరించలేదు', 'phone unverified')}</Badge>
               ) : null}
@@ -231,6 +334,17 @@ function ApplicationDialog({ profile, onClose, onChanged }: {
                 </div>
               )}
             </QueryState>
+
+            {profile.vertical === 'panchayat' && profile.status === 'approved' && hasLevel(90) ? (
+              <PanchayatGrant
+                profile={profile}
+                grantedAt={grantedAt}
+                onChanged={() => {
+                  void detail.refetch();
+                  onChanged();
+                }}
+              />
+            ) : null}
 
             {!mayOpen ? (
               <p className={cn(s.body, 'text-meta text-muted')}>
@@ -287,11 +401,12 @@ export default function KycPage() {
   const L = useL();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<KycStatus>('submitted');
+  const [vertical, setVertical] = useState<Vertical | ''>('');
   const [selected, setSelected] = useState<KycProfileRow | null>(null);
 
   const applications = useQuery({
-    queryKey: ['cms', 'kyc-queue', tab],
-    queryFn: () => cmsApi.fetchKycQueue(tab),
+    queryKey: ['cms', 'kyc-queue', tab, vertical],
+    queryFn: () => cmsApi.fetchKycQueue(tab, vertical || null),
   });
 
   const refresh = () => {
@@ -324,12 +439,25 @@ export default function KycPage() {
       },
     },
     {
+      key: 'vertical',
+      header: L('రంగం', 'Vertical'),
+      hideBelow: 'md',
+      render: (p) => {
+        const v = verticalLabel(p.vertical);
+        return v ? L(v.te, v.en) : '—';
+      },
+    },
+    {
       key: 'status',
       header: L('స్థితి', 'Status'),
       render: (p) => (
         <span className="flex flex-wrap gap-1">
           <KycPill status={p.status} />
           {!p.phone_verified ? <Badge tone="partial" size="xs">{L('ఫోన్ ధృవీకరించలేదు', 'phone unverified')}</Badge> : null}
+          {/* The desk must be able to see, from the list, who publishes unread. */}
+          {p.panchayat_publish_granted_at ? (
+            <Badge tone="breaking" size="xs">{L('నేరుగా ప్రచురణ', 'publishes direct')}</Badge>
+          ) : null}
         </span>
       ),
     },
@@ -371,6 +499,17 @@ export default function KycPage() {
         value={tab}
         onChange={(key) => setTab(key as KycStatus)}
       />
+
+      <Field label={L('రంగం ప్రకారం వడపోత', 'Filter by vertical')} className="max-w-72">
+        <Select value={vertical} onChange={(e) => setVertical(e.target.value as Vertical | '')}>
+          <option value="">{L('అన్ని రంగాలు', 'All verticals')}</option>
+          {VERTICALS.map((v) => (
+            <option key={v.value} value={v.value}>
+              {L(v.te, v.en)}
+            </option>
+          ))}
+        </Select>
+      </Field>
 
       <div role="tabpanel" aria-label={L(KYC_STATUS[tab].te, KYC_STATUS[tab].en)}>
         <QueryState

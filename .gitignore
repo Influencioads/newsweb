@@ -41,3 +41,7 @@ backend/.mysql-local/
 
 # local sqlite dev databases
 *.db
+
+# Firebase: the app config and the FCM service-account key never go in this public repo
+google-services.json
+*-firebase-adminsdk-*.json

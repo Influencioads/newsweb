@@ -56,6 +56,7 @@ class ArticleWrite(BaseModel):
     is_breaking: bool = False
     is_exclusive: bool = False
     is_featured: bool = False
+    is_short: bool = False
     voice_enabled: bool = True
 
     # SEO (§1)
@@ -107,6 +108,7 @@ class ArticlePatch(BaseModel):
     is_breaking: bool | None = None
     is_exclusive: bool | None = None
     is_featured: bool | None = None
+    is_short: bool | None = None
     voice_enabled: bool | None = None
 
     slug: str | None = Field(
@@ -132,10 +134,23 @@ class TransitionIn(BaseModel):
 
 
 class CmsMediaRef(BaseModel):
+    """What the approver sees about a picture before they publish it.
+
+    `caption_te`, `source_type` and `licence` are here because without them an
+    open-licence Commons photo on an imported story is indistinguishable from
+    a staff photograph: no credit, no licence, no indication of whether the
+    page will print "file photo" or "representative image". The audit trail
+    lives in `Media.meta`, which is on no screen. Admin-side only — none of
+    this reaches the reader.
+    """
+
     id: int
     url: str
     alt_te: str | None = None
+    caption_te: str | None = None
     credit: str | None = None
+    source_type: str | None = None
+    licence: str | None = None
     width: int | None = None
     height: int | None = None
 
@@ -191,6 +206,7 @@ class CmsArticleOut(BaseModel):
     is_breaking: bool
     is_exclusive: bool
     is_featured: bool = False
+    is_short: bool = False
     voice_enabled: bool = True
     ai_generated: bool
     hero_media_id: int | None = None
@@ -210,6 +226,11 @@ class CmsArticleOut(BaseModel):
     breaking_until: datetime | None = None
     pin_home_minutes: int | None = None
     pin_trending_minutes: int | None = None
+    #: The desk's own note, so the editor form can show what is already set.
+    critic_note_te: str | None = None
+    #: Editorially seeded likes. Shown so the control reads as a *setting*
+    #: rather than a blind increment.
+    seed_like_count: int = 0
     updated_at: datetime
 
     # Resolved for the editor form; not columns.

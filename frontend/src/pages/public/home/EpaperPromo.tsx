@@ -1,6 +1,5 @@
-import { BookOpen, Download, FilePlus2, Newspaper, Radio, Share2 } from 'lucide-react';
+import { BookOpen, FilePlus2, Newspaper, Radio, Share2 } from 'lucide-react';
 
-import { API_BASE } from '@/api/client';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
@@ -12,8 +11,8 @@ import { formatDate } from '@/utils/time';
 
 /**
  * E-paper promo panel on the home page — the dark card that sells the two
- * ways to consume today's edition (read it, hear it) plus the share, PDF and
- * "make your own" paths.
+ * ways to consume today's edition (read it, hear it) plus the share and
+ * "make your own" paths. The public never gets a PDF.
  *
  * Every control is a 44px Button/ButtonLink on the ink surface (`inverse` is
  * the ghost look on a constant-dark panel), and every label comes from the
@@ -79,16 +78,6 @@ export function EpaperPromo({ epaper }: { epaper: EpaperTeaser }) {
         <Button variant="inverse" icon={Share2} onClick={() => void share()} className={ghost}>
           {t('epaper.sharePage')}
         </Button>
-        <ButtonLink
-          to={`${API_BASE}/epaper/${date}/pdf`}
-          external
-          download
-          variant="inverse"
-          icon={Download}
-          className={ghost}
-        >
-          {t('epaper.download')}
-        </ButtonLink>
         <ButtonLink to="/my-epaper" variant="inverse" icon={FilePlus2} className={ghost}>
           {t('epaper.createMine')}
         </ButtonLink>

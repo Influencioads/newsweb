@@ -56,10 +56,20 @@ class Principal:
     mandal_ids: frozenset[int] = field(default_factory=frozenset)
     desk_ids: frozenset[int] = field(default_factory=frozenset)
     is_global: bool = False
+    #: The role keys actually assigned. Authorisation is by permission
+    #: everywhere in this codebase and should stay that way — this exists
+    #: for the one question a permission cannot answer: *is this account
+    #: the panchayat secretary the publish exception was written for*, as
+    #: opposed to a desk editor who happens to hold the same grant.
+    role_keys: frozenset[str] = field(default_factory=frozenset)
 
     @property
     def id(self) -> int:
         return self.user.id
+
+    def has_role(self, role: str) -> bool:
+        """Prefer `has()`. Only use this where the *role* is the subject."""
+        return str(role) in self.role_keys
 
     def has(self, permission: str) -> bool:
         return permission in self.permissions
@@ -121,6 +131,7 @@ def build_principal(user: User, session_key: str) -> Principal:
     desk_ids: set[int] = set()
     is_global = False
     level = 0
+    role_keys: set[str] = set()
 
     for assignment in user.roles:
         role = assignment.role
@@ -128,6 +139,7 @@ def build_principal(user: User, session_key: str) -> Principal:
             continue
         permissions |= role.permission_keys
         level = max(level, role.level)
+        role_keys.add(role.key)
 
         match assignment.scope_type:
             case ScopeType.GLOBAL:
@@ -152,6 +164,7 @@ def build_principal(user: User, session_key: str) -> Principal:
         mandal_ids=frozenset(mandal_ids),
         desk_ids=frozenset(desk_ids),
         is_global=is_global,
+        role_keys=frozenset(role_keys),
     )
 
 

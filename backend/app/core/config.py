@@ -144,8 +144,6 @@ class Settings(BaseSettings):
     MSG91_SENDER_ID: str = ""
     MSG91_TEMPLATE_ID: str = ""
     OTP_DEV_ECHO: bool = True
-    FCM_SERVICE_ACCOUNT_JSON: str = ""
-    APNS_KEY_ID: str = ""
     SMTP_URL: str = ""
     MAIL_FROM: str = "no-reply@localhost"
     MAIL_FROM_NAME: str = "Top Telugu News"
@@ -273,3 +271,10 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+
+
+#: The masthead. Every byline on copy nobody else is credited for is this name,
+#: and `/public/config` serves it to the reader shell — one definition, because
+#: two copies of a publication's own name drift.
+SITE_NAME_TE = "టాప్ తెలుగు న్యూస్"
+SITE_NAME_EN = "Top Telugu News"

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { View, type LayoutChangeEvent, type ScrollView } from 'react-native';
+import { Linking, View, type LayoutChangeEvent, type ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   runOnJS,
@@ -11,7 +11,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 
-import { api } from '@/api/client';
+import { absoluteMediaUrl, api, API_ORIGIN } from '@/api/client';
 import * as publicApi from '@/api/public';
 import { ArticleAudio } from '@/components/ArticleAudio';
 import { RowCard } from '@/components/ArticleCard';
@@ -19,8 +19,8 @@ import { ArticleActionBar, ACTION_BAR_HEIGHT } from '@/components/article/Articl
 import { ArticleHeader } from '@/components/article/ArticleHeader';
 import { ArticleHero } from '@/components/article/ArticleHero';
 import { BodyRenderer } from '@/components/BodyRenderer';
+import { ArticleGallery } from '@/components/article/ArticleGallery';
 import { Comments } from '@/components/Comments';
-import { EngagementRow } from '@/components/EngagementRow';
 import { ErrorState, LoadingState } from '@/components/Feedback';
 import { FollowChip } from '@/components/FollowChip';
 import { PollCard } from '@/components/PollCard';
@@ -34,6 +34,7 @@ import { makeStyles, useColors } from '@/lib/useTheme';
 import { Badge } from '@/ui/Badge';
 import { Divider } from '@/ui/Divider';
 import { Icon } from '@/ui/Icon';
+import { PressableScale } from '@/ui/PressableScale';
 import { Screen } from '@/ui/Screen';
 import { T } from '@/ui/Text';
 
@@ -154,6 +155,30 @@ export default function ArticleScreen() {
     ? pick(data.category.name_te, data.category.name_en)
     : t('screen.article');
 
+  // §16/§19 listen, directly under the photo — under the headline when there
+  // is none, as on the web. Always a direct child of the scroll, so its layout
+  // y is what the header's headphones button jumps to, and it keeps playing
+  // while the reader reads.
+  const listenBlock = data ? (
+    <View style={styles.audio} onLayout={onAudioLayout}>
+      <ArticleAudio
+        shortId={data.short_id}
+        deviceSpeaking={tts.speaking}
+        onToggleDevice={tts.toggle}
+        listenLabel={t('article.listen')}
+        stopLabel={t('article.stopListening')}
+        meta={{
+          title: data.title_te,
+          subtitle: data.category
+            ? `${t('player.kindArticle')} · ${pick(data.category.name_te, data.category.name_en)}`
+            : t('player.kindArticle'),
+          href: { pathname: '/article/[shortId]', params: { shortId: data.short_id } },
+          artwork: absoluteMediaUrl(data.hero?.url ?? null),
+        }}
+      />
+    </View>
+  ) : null;
+
   return (
     <Screen edges={['top']} background="paper" keyboard>
       <Stack.Screen options={{ headerShown: false, title: t('screen.article') }} />
@@ -162,6 +187,10 @@ export default function ArticleScreen() {
         subtitle={data ? timeAgo(data.published_at, language) : undefined}
         scrollY={scrollY}
         progress={progress}
+        shortId={shortId}
+        speaking={tts.speaking}
+        onToggleSpeech={tts.toggle}
+        onListen={() => scrollToOffset(audioY.value)}
       />
 
       {article.isLoading ? <LoadingState variant="article" /> : null}
@@ -184,6 +213,7 @@ export default function ArticleScreen() {
             contentContainerStyle={{ paddingBottom: ACTION_BAR_HEIGHT + insets.bottom + space.xl }}
           >
             {data.hero?.url ? <ArticleHero media={data.hero} scrollY={scrollY} /> : null}
+            {data.hero?.url ? listenBlock : null}
 
             <View style={styles.head}>
               {data.is_breaking || data.is_exclusive || data.ai_generated ? (
@@ -229,19 +259,7 @@ export default function ArticleScreen() {
                 </T>
               </View>
             </View>
-
-            {/* §16/§19 listen — a direct child of the scroll, so its layout y is
-                what the action bar's headphones button jumps to, and it keeps
-                playing while the reader reads. */}
-            <View style={styles.audio} onLayout={onAudioLayout}>
-              <ArticleAudio
-                shortId={data.short_id}
-                deviceSpeaking={tts.speaking}
-                onToggleDevice={tts.toggle}
-                listenLabel={t('article.listen')}
-                stopLabel={t('article.stopListening')}
-              />
-            </View>
+            {data.hero?.url ? null : listenBlock}
 
             <View style={styles.body}>
               {/* §7 corrections — the note travels with the story, never silently. */}
@@ -254,7 +272,58 @@ export default function ArticleScreen() {
                 </View>
               ) : null}
 
-              <BodyRenderer doc={data.body} />
+              {/* The desk's own reading of the story. Styled apart from the
+                  correction above it on purpose: a correction says we got
+                  something wrong, an editor's note does not, so giving them the
+                  same amber bar would say the wrong thing. */}
+              {data.critic_note_te ? (
+                <View style={styles.criticNote}>
+                  <Icon name="quote" size={20} color={color.brand} />
+                  <View style={styles.criticBody}>
+                    <T variant="meta" weight="bold" color="brand">
+                      {t('article.criticNote')}
+                    </T>
+                    <T variant="bodySmall" scaled color="inkSoft">
+                      {data.critic_note_te}
+                    </T>
+                  </View>
+                </View>
+              ) : null}
+
+              {/* §0 / IT Rules — derived from the byline badge, never a column
+                  of its own: a disclaimer that depends on somebody remembering
+                  to tick a box goes missing on the one story that needed it. */}
+              {data.byline_badge === 'panchayat' ? (
+                <View style={styles.ugcNotice}>
+                  <Icon name="alertCircle" size={20} color={color.breaking} />
+                  <View style={styles.ugcBody}>
+                    <T variant="meta" weight="bold" color="breaking">
+                      {t('article.notPreReviewed')}
+                    </T>
+                    <T variant="bodySmall" scaled color="inkSoft">
+                      {t('article.ugcNotice')}
+                    </T>
+                    <PressableScale
+                      accessibilityRole="link"
+                      minHeight={44}
+                      onPress={() => void Linking.openURL(`${API_ORIGIN}/ugc-terms`).catch(() => undefined)}
+                    >
+                      <T variant="meta" weight="semibold" color="brand">
+                        {t('article.ugcTerms')}
+                      </T>
+                    </PressableScale>
+                  </View>
+                </View>
+              ) : null}
+
+              {/* A body-less short item: its short text is the story. */}
+              <BodyRenderer
+                doc={
+                  data.reading_time_sec === 0 && data.summary_te
+                    ? { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: data.summary_te }] }] }
+                    : data.body
+                }
+              />
 
               {data.source_credit ? (
                 <T variant="meta" scaled color="muted" style={styles.credit}>
@@ -262,8 +331,8 @@ export default function ArticleScreen() {
                 </T>
               ) : null}
 
-              {/* Like · save · share · report (§5) */}
-              <EngagementRow article={data} cardAvailable={formats.data?.card.available ?? false} />
+              {/* Renders nothing when the story has no extra pictures. */}
+              <ArticleGallery images={data.gallery} />
 
               {/* Follow the threads this story belongs to (§12) */}
               <View style={styles.followRow}>
@@ -315,9 +384,6 @@ export default function ArticleScreen() {
           <ArticleActionBar
             article={data}
             cardAvailable={formats.data?.card.available ?? false}
-            speaking={tts.speaking}
-            onToggleSpeech={tts.toggle}
-            onListen={() => scrollToOffset(audioY.value)}
             hidden={barHidden}
             onComments={() => scrollToOffset(commentsY.value)}
           />
@@ -347,6 +413,28 @@ const useStyles = makeStyles((color) => ({
     marginBottom: space.lg,
   },
   correctionText: { flex: 1 },
+  criticNote: {
+    flexDirection: 'row',
+    gap: space.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: color.brand,
+    backgroundColor: color.brandTint,
+    borderRadius: radius.sm,
+    padding: space.md,
+    marginBottom: space.lg,
+  },
+  criticBody: { flex: 1, gap: space.xs },
+  ugcNotice: {
+    flexDirection: 'row',
+    gap: space.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: color.breaking,
+    backgroundColor: color.breakingTint,
+    borderRadius: radius.sm,
+    padding: space.md,
+    marginBottom: space.lg,
+  },
+  ugcBody: { flex: 1, gap: space.xs },
   credit: { marginTop: space.sm },
   followRow: {
     flexDirection: 'row',

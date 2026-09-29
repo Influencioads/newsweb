@@ -9,9 +9,11 @@ import Animated, {
 
 import { absoluteMediaUrl } from '@/api/client';
 import type { MediaOut } from '@/api/types';
+import { useI18n } from '@/lib/i18n';
 import { useMotion } from '@/lib/motion';
 import { space } from '@/lib/theme';
 import { makeStyles } from '@/lib/useTheme';
+import { Badge } from '@/ui/Badge';
 import { T } from '@/ui/Text';
 
 /**
@@ -34,6 +36,7 @@ const DRIFT = OVERSCAN;
 
 export function ArticleHero({ media, scrollY }: ArticleHeroProps) {
   const styles = useStyles();
+  const { t } = useI18n();
   const m = useMotion();
   const reduce = m.reduce;
   const uri = absoluteMediaUrl(media.url);
@@ -49,7 +52,11 @@ export function ArticleHero({ media, scrollY }: ArticleHeroProps) {
   });
 
   if (!uri) return null;
-  const caption = [media.caption_te, media.credit].filter(Boolean).join(' · ');
+  // §7.4 — an AI illustration is labelled on the picture and in the caption,
+  // off the media's own flag: a human-written story can carry a drawn image.
+  const caption = [media.caption_te, media.credit, media.ai_generated ? t('article.aiImage') : null]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <View>
@@ -67,6 +74,9 @@ export function ArticleHero({ media, scrollY }: ArticleHeroProps) {
             accessibilityLabel={media.alt_te ?? undefined}
           />
         </Animated.View>
+        {media.ai_generated ? (
+          <Badge tone="ai" icon="sparkles" size="xs" label={t('article.aiImage')} style={styles.aiTag} />
+        ) : null}
       </View>
       {caption ? (
         <T variant="meta" scaled color="muted" style={styles.caption}>
@@ -86,5 +96,6 @@ const useStyles = makeStyles((color) => ({
   },
   layer: { position: 'absolute', left: 0, right: 0, top: -OVERSCAN, bottom: -OVERSCAN },
   image: { flex: 1, backgroundColor: color.placeholder },
+  aiTag: { position: 'absolute', left: space.lg, bottom: space.sm },
   caption: { paddingHorizontal: space.lg, paddingTop: space.sm },
 }));

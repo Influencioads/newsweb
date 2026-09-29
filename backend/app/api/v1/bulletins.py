@@ -1,4 +1,4 @@
-"""The three-hourly audio bulletin — public playback and the editor's desk.
+"""The audio bulletin — public playback and the editor's desk.
 
     GET   /public/bulletins/latest
     GET   /public/bulletins?date=
@@ -39,7 +39,7 @@ from app.services import audit_service, bulletin_service, settings_service
 router = APIRouter(tags=["bulletins"])
 
 #: Same shape as the article audio route: revalidate at the browser, cache at
-#: the edge for two minutes. A bulletin changes at most six times a day, but
+#: the edge for two minutes. A bulletin changes at most seven times a day, but
 #: when it is pulled it must disappear quickly.
 _CACHE = "public, max-age=0, must-revalidate"
 _CDN_CACHE = "public, s-maxage=120, stale-while-revalidate=600"
@@ -148,6 +148,8 @@ def list_bulletins(
         # Slots that have not been produced yet, so the screen can offer
         # "Run now" rather than simply showing nothing.
         "missing_slots": [s for s in bulletin_service.SLOTS if s not in have],
+        # Each slot's name, so those "Run now" buttons can say which bulletin they make.
+        "slot_labels": {s: bulletin_service.slot_label_te(s) for s in bulletin_service.SLOTS},
     }
 
 

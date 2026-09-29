@@ -2,12 +2,18 @@ import * as Speech from 'expo-speech';
 import { useCallback, useEffect, useState } from 'react';
 
 import type { TiptapNode } from '@/api/types';
+import { usePlayer } from '@/stores/player';
 
 /**
  * Audio news (updated doc §16), v1: the platform's own Telugu voice via
  * expo-speech — Android and iOS both ship te-IN TTS. The §16 server pipeline
  * (generate once → cache → CDN) is the later upgrade; this hook is the player
  * surface either sits behind.
+ *
+ * One voice at a time: speaking pauses the global audio player, and the
+ * player starting a track stops this voice from outside — `onStopped` (and
+ * `onError`, which is how the web reports a cancel) keep `speaking` truthful
+ * when that happens.
  */
 
 export function extractPlainText(doc: TiptapNode | null): string {
@@ -46,6 +52,7 @@ export function useTts(text: string): { speaking: boolean; toggle: () => void } 
       return;
     }
     if (!text) return;
+    usePlayer.getState().pause();
     setSpeaking(true);
     // expo-speech caps utterance length; speak in sentence-grouped chunks.
     const chunks = text.match(/[\s\S]{1,3500}(?:\.|$)/g) ?? [text];
@@ -54,6 +61,7 @@ export function useTts(text: string): { speaking: boolean; toggle: () => void } 
         language: 'te-IN',
         rate: 0.95,
         onDone: index === chunks.length - 1 ? () => setSpeaking(false) : undefined,
+        onStopped: () => setSpeaking(false),
         onError: () => setSpeaking(false),
       });
     });

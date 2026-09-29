@@ -13,30 +13,32 @@ import { Platform, type ViewStyle } from 'react-native';
  * mobile/scripts/audit-ui.mjs blocks hex/rgba literals outside this file.
  */
 export const lightColor = {
-  brand: '#0F5F57',
-  brandDark: '#0B4841',
-  brandDeep: '#08362F',
-  brandTint: '#E4F1EE',
-  breaking: '#9A5B0B',
-  breakingTint: '#FBF0DC',
-  ink: '#191C1C',
-  inkSoft: '#4A4E4C',
+  /** The logo's blue: buttons, links, active tabs. */
+  brand: '#0D47A1',
+  brandDark: '#0A3780',
+  brandDeep: '#072659',
+  brandTint: '#E8EFFB',
+  breaking: '#BE0A14',
+  breakingTint: '#FDEAEB',
+  ink: '#17191E',
+  inkSoft: '#484C54',
   /** Constant-dark panel (footer / ink cards) — the same in both themes. */
-  inkDeep: '#111414',
-  muted: '#6A6E6B',
-  mutedLight: '#8C918D',
-  paper: '#FBF9F4',
-  paperSub: '#F5F2EB',
-  canvas: '#F2EFE8',
-  rule: '#E4E0D6',
-  ruleSoft: '#EFECE4',
-  ruleStrong: '#D5D0C4',
+  inkDeep: '#101216',
+  muted: '#666B75',
+  mutedLight: '#8A8F99',
+  paper: '#FFFFFF',
+  paperSub: '#F6F7F9',
+  canvas: '#FFFFFF',
+  rule: '#E5E7EB',
+  ruleSoft: '#EFF1F4',
+  ruleStrong: '#D1D5DB',
   ai: '#6D4FC4',
   aiTint: '#F4F0FB',
-  exclusive: '#B48A2A',
-  exclusiveTint: '#FBF3DC',
-  /** Text / glyph on exclusiveTint — the gold fill itself is too light for AA there (web --tn-exclusive-text). */
-  exclusiveText: '#7C5D1C',
+  /** The logo's red — the accent. */
+  exclusive: '#D0101A',
+  exclusiveTint: '#FDECED',
+  /** Text / glyph on exclusiveTint (web --tn-exclusive-text). */
+  exclusiveText: '#A80C14',
   success: '#2F703A',
   successTint: '#E8F2E9',
   info: '#2F5E8C',
@@ -45,17 +47,17 @@ export const lightColor = {
   partial: '#7A6A25',
   partialTint: '#F6F2E1',
   highlight: '#F7E9BC',
-  placeholder: '#E9E5DC',
-  /** Card / sheet fill — white in light, warm charcoal in dark. */
+  placeholder: '#ECEEF1',
+  /** Card / sheet fill — white in light, charcoal in dark. */
   surface: '#FFFFFF',
   /** Input / textarea fill. */
   field: '#FFFFFF',
   /** Scrim behind sheets; use with an alpha via `rgba(palette.overlay, .55)` → see `alpha()`. */
-  overlay: '#111414',
+  overlay: '#101216',
   /** Foreground on top of an overlay / image scrim / ink panel (always light). */
   onOverlay: '#FFFFFF',
-  /** Foreground on a brand-filled surface. Light on the deep teal here; ink on
-   *  the lightened teal the dark palette uses, where white would not contrast. */
+  /** Foreground on a brand-filled surface. White on the logo blue here; ink on
+   *  the lightened blue the dark palette uses, where white would not contrast. */
   onBrand: '#FFFFFF',
 } as const;
 
@@ -151,35 +153,34 @@ export const MAX_FONT_MULTIPLIER = 1.3;
 /**
  * Dark palette.
  *
- * Not an inversion: the peacock teal is lightened so it still reads as the
- * masthead colour on a dark ground rather than sinking into it,
- * and the neutrals carry the same warm bias as the light set so the two
- * themes feel like one publication. Values are the web `.dark` tokens
- * (frontend/src/assets/index.css) converted to hex.
+ * Not an inversion: the logo red and blue are lightened so they still read
+ * on a dark ground rather than sinking into it, over cool neutral greys.
+ * Values are the web `.dark` tokens (frontend/src/assets/index.css) converted
+ * to hex.
  */
 export const darkColor: Palette = {
-  brand: '#4DB6A6',
-  brandDark: '#3C9C8E',
-  brandDeep: '#1B5F55',
-  brandTint: '#1E3330',
-  breaking: '#D9A055',
-  breakingTint: '#3B2C17',
-  ink: '#ECEAE3',
-  inkSoft: '#C6C3BA',
-  inkDeep: '#0E1111',
-  muted: '#A9ADA6',
-  mutedLight: '#8C918D',
-  paper: '#1A1F1E',
-  paperSub: '#242A29',
-  canvas: '#121615',
-  rule: '#313837',
-  ruleSoft: '#283030',
-  ruleStrong: '#43494A',
+  brand: '#6EA0FF',
+  brandDark: '#588CF0',
+  brandDeep: '#072659',
+  brandTint: '#1B263E',
+  breaking: '#FF6E6E',
+  breakingTint: '#3E1C1D',
+  ink: '#ECEDF0',
+  inkSoft: '#C5C8CE',
+  inkDeep: '#0E1013',
+  muted: '#A4A8B0',
+  mutedLight: '#8A8F99',
+  paper: '#16181C',
+  paperSub: '#212429',
+  canvas: '#101114',
+  rule: '#2F333A',
+  ruleSoft: '#26292F',
+  ruleStrong: '#42464E',
   ai: '#A48FE0',
   aiTint: '#2D273E',
-  exclusive: '#D4B061',
-  exclusiveTint: '#362E1E',
-  exclusiveText: '#E2C480',
+  exclusive: '#FF5C62',
+  exclusiveTint: '#3A1A1D',
+  exclusiveText: '#FF969A',
   success: '#79BE84',
   successTint: '#1E3022',
   info: '#7FA9DA',
@@ -187,12 +188,12 @@ export const darkColor: Palette = {
   partial: '#C9B25A',
   partialTint: '#342E1A',
   highlight: '#5A4C1E',
-  placeholder: '#2A302F',
-  surface: '#202625',
-  field: '#171C1B',
+  placeholder: '#282B31',
+  surface: '#1C1E23',
+  field: '#14161A',
   overlay: '#000000',
   onOverlay: '#FFFFFF',
-  onBrand: '#0E1111',
+  onBrand: '#101216',
 };
 
 export type Palette = { -readonly [K in keyof typeof lightColor]: string };

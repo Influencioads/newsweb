@@ -1,4 +1,5 @@
-import type { LucideIcon } from 'lucide-react';
+import type { ComponentType } from 'react';
+import type { LucideIcon, LucideProps } from 'lucide-react';
 
 import { cn } from '@/utils/cn';
 
@@ -14,10 +15,18 @@ import { cn } from '@/utils/cn';
  */
 export type { LucideIcon };
 
+/**
+ * Anything this system will render as a glyph: a lucide icon, or one of the
+ * house marks in `./glyphs`. Widened from `LucideIcon` because lucide ships no
+ * brand icons, so a few marks have to be drawn here and still sit in an
+ * `icon={...}` slot like every other one.
+ */
+export type GlyphIcon = ComponentType<LucideProps>;
+
 export type IconSize = 'xs' | 'sm' | 'md' | 'lg';
 
 export interface IconProps {
-  icon: LucideIcon;
+  icon: GlyphIcon;
   size?: IconSize;
   /** Accessible name. Omit for decorative icons (they get `aria-hidden`). */
   label?: string;

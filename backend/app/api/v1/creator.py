@@ -11,26 +11,35 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.deps import (
     Principal,
     get_current_principal,
     require_any_permission,
     require_permission,
 )
-from app.core.errors import NotFoundError
+from app.core.errors import ConflictError, NotFoundError
 from app.core.ratelimit import rate_limit
 from app.db.session import get_db
 from app.models.content import Article, Category
 from app.models.creator import CreatorSubmission
-from app.models.enums import AuditAction, SubmissionStatus
+from app.models.enums import AuditAction, SubmissionStatus, Vertical
 from app.models.geo import District
+from app.models.media import Media
+from app.models.kyc import ContributorProfile
 from app.repositories import article_repo
-from app.services import ai_assist_service, audit_service, submission_service
+from app.services import (
+    ai_assist_service,
+    audit_service,
+    kyc_service,
+    media_service,
+    submission_service,
+)
 
 router = APIRouter(tags=["creator"])
 
@@ -106,6 +115,67 @@ def create_submission(
     return _submission_out(submission, None)
 
 
+@router.post(
+    "/users/me/submissions/{submission_id}/media",
+    status_code=201,
+    summary="Attach one photograph to a pending submission",
+)
+async def attach_submission_media(
+    submission_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+    _rl: None = Depends(rate_limit("submission_media", 6)),
+) -> dict:
+    """Photographs are what verification buys, and until now nothing spent it:
+    `kyc_service.may_attach_images` existed with no caller.
+
+    Deliberately not `media.upload`: granting a reader that permission would
+    hand them the whole CMS media API. This is their own photo on their own
+    submission, so it is scoped to `/users/me` like the avatar route.
+    """
+    profile = kyc_service.profile_for(db, principal.id)
+    if profile is None or not kyc_service.may_attach_images(db, principal.id):
+        raise ConflictError(
+            message_en="Only verified contributors can attach photographs.",
+            message_te="ధృవీకరించిన విలేకరులు మాత్రమే ఫోటోలు జోడించగలరు.",
+            details={"kyc": "approval required"},
+        )
+    submission = submission_service.check_can_attach(
+        db, submission_id=submission_id, user_id=principal.id
+    )
+
+    raw = await file.read()
+    media = media_service.create_image_media(
+        db,
+        raw=raw,
+        filename=file.filename or "photo",
+        mime=file.content_type or "application/octet-stream",
+        max_bytes=settings.UPLOAD_IMAGE_MAX_BYTES,
+        uploaded_by=principal.id,
+        # §12.5: a photograph that is not ours needs a credit, and the
+        # contributor's chosen byline is that credit.
+        source_type="contributed",
+        credit=profile.display_name_te,
+    )
+    submission_service.attach_media(db, submission=submission, media_id=media.id)
+    audit_service.record(
+        db,
+        action=AuditAction.MEDIA_UPLOAD,
+        entity_type="creator_submission",
+        entity_id=submission.id,
+        actor=principal.user,
+        after={"media_id": media.id, "bytes": media.bytes},
+        request=request,
+    )
+    return {
+        "id": media.id,
+        "url": media.cdn_url or f"/media/{media.storage_key}",
+        "media_ids": submission.media_ids,
+    }
+
+
 @router.get(
     "/users/me/submissions",
     response_model=list[SubmissionOut],
@@ -152,25 +222,44 @@ class RejectIn(BaseModel):
 @router.get("/cms/moderation/submissions", summary="Creator submission queue")
 def submission_queue(
     status: SubmissionStatus | None = Query(default=SubmissionStatus.PENDING),
+    vertical: Vertical | None = Query(default=None),
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=25, ge=1, le=100),
     db: Session = Depends(get_db),
     _p: Principal = Depends(_moderator),
 ) -> dict:
     where = [CreatorSubmission.status == status] if status else []
-    rows = list(
-        db.execute(
-            select(CreatorSubmission)
-            .where(*where)
-            .order_by(CreatorSubmission.created_at.asc())
-            .limit(limit)
-            .offset(offset)
+    if vertical is not None:
+        where.append(ContributorProfile.vertical == vertical)
+    # Outer-joined so the desk sees which vertical a story came from — and can
+    # work one desk's queue — while submissions from readers with no
+    # contributor profile at all still appear.
+    stmt = (
+        select(CreatorSubmission, ContributorProfile.vertical)
+        .outerjoin(
+            ContributorProfile,
+            ContributorProfile.user_id == CreatorSubmission.user_id,
         )
-        .unique()
-        .scalars()
+        .where(*where)
+        .order_by(CreatorSubmission.created_at.asc())
+        .limit(limit)
+        .offset(offset)
     )
+    rows = list(db.execute(stmt).unique().all())
     categories = {c.id: c for c in db.execute(select(Category)).scalars()}
     districts = {d.id: d for d in db.execute(select(District)).scalars()}
+    # Resolve the ids to URLs here. A moderator cannot look at an integer, and
+    # the whole point of letting a contributor attach a photograph is that
+    # somebody sees it before the story is approved.
+    photo_ids = {mid for s, _v in rows for mid in (s.media_ids or [])}
+    photos = (
+        {
+            m.id: m
+            for m in db.scalars(select(Media).where(Media.id.in_(photo_ids))).all()
+        }
+        if photo_ids
+        else {}
+    )
     return {
         "items": [
             {
@@ -179,6 +268,16 @@ def submission_queue(
                 "body_te": s.body_te,
                 "creator_name_te": s.user.name_te if s.user else None,
                 "creator_phone": s.user.phone if s.user else None,
+                "vertical": v,
+                "media": [
+                    {
+                        "id": m.id,
+                        "url": m.cdn_url,
+                        "alt_te": m.alt_te,
+                    }
+                    for m in (photos.get(i) for i in (s.media_ids or []))
+                    if m is not None and m.deleted_at is None
+                ],
                 "category_slug": categories[s.category_id].slug
                 if s.category_id in categories
                 else None,
@@ -190,7 +289,7 @@ def submission_queue(
                 "article_id": s.article_id,
                 "created_at": s.created_at,
             }
-            for s in rows
+            for s, v in rows
         ]
     }
 

@@ -24,18 +24,27 @@ Two rules are enforced here rather than trusted to a UI:
 from __future__ import annotations
 
 import hashlib
+import io
+import socket
+import ipaddress
 import re
 from datetime import timedelta
 from typing import Any
 
 import bleach
+import httpx
+from urllib.parse import urlsplit
+from PIL import Image
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import SITE_NAME_TE
 from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.core.logging import get_logger
 from app.db.base import utcnow
 from app.integrations.feeds import FeedEntry, FeedResult, fetch_feed
+from app.integrations.feeds import images as feed_images
+from app.integrations.feeds.fetcher import user_agent
 from app.models.content import Article
 from app.models.enums import (
     ArticleStatus,
@@ -45,7 +54,8 @@ from app.models.enums import (
     WorkflowState,
 )
 from app.models.ingestion import ContentSource, IngestedItem
-from app.services import gazetteer_service, settings_service, tiptap
+from app.models.media import ArticleMedia, Media
+from app.services import gazetteer_service, media_service, settings_service, tiptap
 
 logger = get_logger(__name__)
 
@@ -79,9 +89,17 @@ ALLOWED_ATTRIBUTES = {"a": ["href", "title"]}
 EXCERPT_WORDS = 40
 EXCERPT_MAX_CHARS = 400
 
-#: A source failing this many times in a row is left alone until an admin
-#: looks; hammering a broken endpoint every half hour is how you get blocked.
-MAX_CONSECUTIVE_FAILURES = 8
+#: How long before its interval a source may be polled again. The passes run
+#: on a five-minute grid and `last_fetched_at` is stamped after the network
+#: round trip, so without this an hourly source due at 11:05:00, last stamped
+#: at 10:05:03, would wait for 12:05.
+POLL_GRACE = timedelta(minutes=2)
+
+#: A news photograph is never this big. The cap is a memory guard, not a
+#: quality one — forty imports an hour each holding 50 MB is the failure.
+MAX_IMAGE_BYTES = 8 * 1024 * 1024
+#: Outside this window it is a banner strip or a portrait crop, not a hero.
+MIN_ASPECT, MAX_ASPECT = 0.5, 3.0
 
 
 #: Elements whose *contents* must go, not just their tags. `bleach` with
@@ -158,12 +176,17 @@ def content_hash(title: str, summary: str) -> str:
 # fetching
 # --------------------------------------------------------------------------- #
 def due_sources(db: Session) -> list[ContentSource]:
-    """Sources whose polling interval has elapsed."""
+    """Sources whose polling interval has elapsed.
+
+    A source that has failed `crawl.max_consecutive_failures` times in a row
+    is left alone until an admin fetches it by hand, which resets the count.
+    """
     now = utcnow()
+    limit = settings_service.get_int(db, "crawl.max_consecutive_failures")
     rows = db.scalars(
         select(ContentSource).where(
             ContentSource.is_active.is_(True),
-            ContentSource.consecutive_failures < MAX_CONSECUTIVE_FAILURES,
+            ContentSource.consecutive_failures < limit,
         )
     ).all()
     return [
@@ -171,7 +194,7 @@ def due_sources(db: Session) -> list[ContentSource]:
         for s in rows
         if s.last_fetched_at is None
         or (now - s.last_fetched_at)
-        >= timedelta(minutes=max(5, s.fetch_interval_minutes))
+        >= timedelta(minutes=max(5, s.fetch_interval_minutes)) - POLL_GRACE
     ]
 
 
@@ -201,6 +224,17 @@ def _store_entry(
 
     mandal_id, method, confidence = _resolve_mandal(db, source, entry.title, summary)
 
+    # The host to measure candidates against is the one an admin configured,
+    # not the one this feed claims for itself — see `images.publisher_url`.
+    publisher = feed_images.publisher_url(
+        source.homepage_url, source.feed_url, entry.url
+    )
+    picked = feed_images.pick(
+        entry.image_urls or ([entry.image_url] if entry.image_url else []),
+        article_url=publisher,
+        logo_url=source.logo_url,
+    )
+
     item = IngestedItem(
         source_id=source.id,
         guid=entry.guid,
@@ -210,7 +244,8 @@ def _store_entry(
         summary=summary or None,
         content_html=body,
         author=(entry.author or None),
-        image_url=entry.image_url,
+        image_url=(picked[0] if picked else None),
+        image_urls=(picked or None),
         language=(entry.language or source.language),
         word_count=words,
         published_at=entry.published_at,
@@ -262,7 +297,10 @@ def _resolve_mandal(
 def fetch_source(db: Session, source: ContentSource) -> dict[str, Any]:
     """Poll one source. Never raises — a bad feed is a recorded status."""
     result = fetch_feed(
-        source.feed_url, etag=source.etag, last_modified=source.last_modified
+        source.feed_url,
+        etag=source.etag,
+        last_modified=source.last_modified,
+        limit=settings_service.get_int(db, "crawl.max_entries_per_fetch"),
     )
     return apply_result(db, source, result)
 
@@ -374,6 +412,24 @@ def get_item(db: Session, item_id: int) -> IngestedItem:
     return item
 
 
+def drop_source_text(item: IngestedItem) -> None:
+    """Forget the publisher's own words now the decision has been made.
+
+    `IngestedRewrite.source_text` exists so a reviewer can read the original
+    beside our rewrite. The instant that review resolves — either way — the
+    reason to hold it is gone, so it goes. Held for the duration of one
+    review is a working copy; held afterwards is an archive of someone
+    else's site.
+
+    Two callers, and both are the end of a review: rejecting the item in the
+    queue, and the article reaching PUBLISHED or REJECTED in
+    `workflow_service.transition`. Importing is deliberately NOT one of them —
+    for an AI rewrite the import is where the review *starts*.
+    """
+    for rewrite in item.rewrites:
+        rewrite.source_text = None
+
+
 def reject_item(
     db: Session, item_id: int, *, actor_id: int, note: str | None
 ) -> IngestedItem:
@@ -381,6 +437,7 @@ def reject_item(
     item.status = IngestStatus.REJECTED
     item.reviewed_by, item.reviewed_at = actor_id, utcnow()
     item.review_note = note
+    drop_source_text(item)
     return item
 
 
@@ -412,6 +469,186 @@ def _body_document(item: IngestedItem, source: ContentSource) -> dict[str, Any]:
             for text in paragraphs
         ],
     }
+
+
+def _is_internal(url: str) -> bool:
+    """Does this URL point somewhere inside our own network?
+
+    The crawl worker sits in a private network with a cloud metadata endpoint
+    on it, and a publisher CMS with an open redirect (`/out?url=`, a click
+    tracker — ordinary furniture) turns "fetch this image" into "fetch whatever
+    the query string says". Resolving first is the point: a hostname under the
+    attacker's control can answer with 169.254.169.254 whatever it looks like.
+
+    Fails closed. A name that will not resolve is not one we were going to
+    download a photograph from anyway.
+    """
+    host = urlsplit(url).hostname
+    if not host:
+        return True
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except OSError:
+        return True
+    for info in infos:
+        try:
+            ip = ipaddress.ip_address(info[4][0])
+        except ValueError:
+            return True
+        if (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_reserved
+            or ip.is_multicast
+            or ip.is_unspecified
+        ):
+            return True
+    return False
+
+
+def _download_image(url: str) -> tuple[bytes, str, str] | None:
+    """`(bytes, mime, final_url)` for a URL that really is a usable photograph.
+
+    `Image.open` parses the header and stops, so the dimension check costs
+    nothing — the full decode happens later, once, inside `media_service`.
+
+    **Streamed, and stopped the moment it crosses the cap.** Reading
+    `response.content` first would pull the whole body into memory before the
+    size check could reject it, and this runs on a box with ~800 MB free and no
+    swap: one oversized file would take the worker down rather than be skipped.
+    The declared Content-Length is honoured when present and never trusted when
+    it is not.
+
+    Redirects are followed. That is deliberate and worth naming: the *starting*
+    URL always comes from the publisher's own feed or page (`images.is_usable`
+    enforces that), and where a publisher chooses to serve its own image from —
+    its CDN, usually on another domain — is the publisher's business. We never
+    go looking for an image anywhere; the final host is recorded on the media
+    row so an auditor can see where each one actually came from.
+    """
+    if _is_internal(url):
+        logger.warning("ingest_image_internal_address", url=url[:200])
+        return None
+    with httpx.stream(
+        "GET",
+        url,
+        headers={"User-Agent": user_agent()},
+        timeout=10.0,
+        follow_redirects=True,
+    ) as response:
+        if response.status_code != 200:
+            return None
+        # Where a redirect LANDED is not where we checked. A publisher serving
+        # its own pictures off a CDN on another domain is normal and stays
+        # allowed; an address inside the network, or a URL the cheap rules
+        # reject, is not.
+        final = str(response.url)
+        if final != url and (
+            _is_internal(final) or not feed_images.survives_redirect(final)
+        ):
+            logger.warning("ingest_image_redirect_refused", url=url[:120], final=final[:120])
+            return None
+        if not response.headers.get("content-type", "").lower().startswith("image/"):
+            return None
+        declared = response.headers.get("content-length")
+        if declared and declared.isdigit() and int(declared) > MAX_IMAGE_BYTES:
+            return None
+        chunks: list[bytes] = []
+        total = 0
+        for chunk in response.iter_bytes():
+            total += len(chunk)
+            if total > MAX_IMAGE_BYTES:
+                return None
+            chunks.append(chunk)
+        final_url = str(response.url)
+    raw = b"".join(chunks)
+
+    probe = Image.open(io.BytesIO(raw))
+    width, height = probe.size
+    if width < feed_images.MIN_WIDTH or height < feed_images.MIN_HEIGHT:
+        return None
+    if not MIN_ASPECT <= (width / height) <= MAX_ASPECT:
+        return None
+    fmt = (probe.format or "").upper()
+    # Servers say "image/jpg" often enough to matter; Pillow's answer is the
+    # one `media_service` will agree with.
+    mime = "image/jpeg" if fmt in ("JPEG", "MPO") else f"image/{fmt.lower()}"
+    return raw, mime, final_url
+
+
+def _attach_media(
+    db: Session, item: IngestedItem, article: Article, actor_id: int | None
+) -> None:
+    """Download the source article's own images and hang them off the article.
+
+    Only the publisher's own images reach here — `feeds.images` rejected
+    everything else at fetch time, and no open-web image search happens in
+    this function or any other.
+
+    Nothing else is attempted here. What happens when this finds nothing is
+    `story_image_service`'s decision, taken by the caller: an open-licence
+    photograph, then an AI drawing, then nothing. Both of those cost something
+    at up to sixty items an hour, so both sit behind admin switches that are
+    off by default, and hero-less remains a perfectly good outcome.
+    """
+    source = item.source
+    if source is None or not source.images_enabled:
+        return
+
+    urls = item.image_urls or ([item.image_url] if item.image_url else [])
+    sort = 0
+    for url in urls[: feed_images.MAX_IMAGES]:
+        try:
+            downloaded = _download_image(url)
+            if downloaded is None:
+                continue
+            raw, mime, final_url = downloaded
+            media = media_service.create_image_media(
+                db,
+                raw=raw,
+                filename=(url.rsplit("/", 1)[-1].split("?")[0] or "photo.jpg")[:255],
+                mime=mime,
+                max_bytes=MAX_IMAGE_BYTES,
+                uploaded_by=actor_id,
+                alt_te=item.title[:500],
+                # §12.5: the service refuses a non-own image with no credit,
+                # and that refusal is doing real work here.
+                credit=source.name,
+                source_type="syndicated",
+            )
+        except Exception:  # noqa: BLE001 — one bad picture, not one bad import
+            logger.warning(
+                "ingest_image_failed", item_id=item.id, url=url[:120], exc_info=True
+            )
+            continue
+
+        media.copyright = source.licence.value
+        media.meta = {"ingested_item_id": item.id, "origin_url": url}
+        # Only when a redirect moved it, so the common case stays quiet and an
+        # unexpected host is the thing that stands out in the row.
+        if final_url != url:
+            media.meta["fetched_from"] = final_url
+
+        if article.hero_media_id is None:
+            article.hero_media_id = media.id
+            db.add(
+                ArticleMedia(
+                    article_id=article.id, media_id=media.id, role="hero", sort=0
+                )
+            )
+            if not source.may_store_full_text:
+                # An excerpt licence buys one illustrating picture with a
+                # credit. A gallery of the publisher's photographs is not an
+                # excerpt of anything.
+                break
+            continue
+        sort += 1
+        db.add(
+            ArticleMedia(
+                article_id=article.id, media_id=media.id, role="gallery", sort=sort
+            )
+        )
 
 
 def import_item(
@@ -522,6 +759,24 @@ def import_item(
     db.add(article)
     db.flush()
 
+    try:
+        _attach_media(db, item, article, actor_id)
+        # Rung (a) above found nothing usable. `story_image_service` tries an
+        # open-licence photograph — CC0/PDM, no credit line — and returns None
+        # for "no picture", which stays a perfectly good outcome. It draws
+        # nothing and buys nothing; see its docstring. Behind
+        # `crawl.open_licence_images`, default off: with the flag unset this
+        # call returns immediately and the import behaves exactly as before.
+        if article.hero_media_id is None:
+            from app.services import story_image_service
+
+            story_image_service.resolve_hero(db, article, item, actor_id=actor_id)
+    except Exception:  # noqa: BLE001 — same reasoning as the notification
+        # fan-out in `workflow_service`: a picture must never fail an import.
+        logger.warning("ingest_media_attach_failed", item_id=item.id, exc_info=True)
+
+    _apply_masthead(db, article, source, rewrite is not None)
+
     if rewrite is not None:
         note = f"AI rewrite of {source.name} imported for review"
     elif auto:
@@ -547,6 +802,11 @@ def import_item(
     item.status = IngestStatus.IMPORTED
     item.article_id = article.id
     item.reviewed_by, item.reviewed_at = actor_id, utcnow()
+    # NOT dropped here. Importing a rewrite is not the end of its review — the
+    # article lands PENDING and an editor still has to read it, and that is the
+    # reader they were being held for. `workflow_service` drops them when the
+    # article reaches PUBLISHED or REJECTED, which is where the decision
+    # actually lands. An excerpt import (no rewrite) holds nothing either way.
     db.flush()
 
     logger.info(
@@ -557,6 +817,57 @@ def import_item(
         auto=auto,
     )
     return article
+
+
+
+def _apply_masthead(
+    db: Session, article: Article, source: ContentSource, is_rewrite: bool
+) -> None:
+    """Publish a rewrite under our own name when the source does not require a credit.
+
+    `ContentSource.attribution_required` is the admin's per-source answer and
+    already governs what `_body_document` prints; this makes the rewrite path
+    obey the same flag instead of crediting unconditionally. What it changes is
+    the *copy*: our own Telugu expression of facts, carrying our masthead. What
+    it does not change is the provenance — `canonical_url`, the `IngestedItem`
+    row and `IngestedRewrite.attribution_te` all still record the origin, and
+    the newsroom screens read them.
+
+    **A borrowed photograph is the exception, and it is not negotiable here.**
+    No rewrite makes somebody else's picture ours, so an article carrying one
+    stays `syndicated` with its credit; `media_service` demands `Media.credit`
+    for a non-own image separately, and that stays true either way.
+
+    What is tested is the hero's **licence, not its existence**. `resolve_hero`
+    runs before this and may have attached a CC0/PDM photograph that needs no
+    credit — ours to use, nothing borrowed — and a bare
+    `hero_media_id is not None` check read that as "their photograph" and put
+    the source publisher's name back on the page. The net effect was that
+    turning on `crawl.open_licence_images` credited *more* articles than
+    leaving it off, which is the exact outcome the feature exists to remove.
+    `media_service.CREDIT_EXEMPT` is the same set the credit rule uses, so the
+    two cannot drift apart. A hero we cannot load is treated as borrowed: the
+    safe direction is the credit line, not its absence.
+    """
+    if not is_rewrite or source.attribution_required:
+        return
+
+    # The byline goes first and unconditionally. `byline_te` was
+    # `item.author or source.name` — the feed's own journalist — so a rewrite
+    # nobody at that outlet wrote was going out under a named reporter there.
+    # That is a worse misattribution than the missing credit, and no
+    # photograph makes it right.
+    article.byline_te = SITE_NAME_TE
+
+    if article.hero_media_id is not None:
+        hero = db.get(Media, article.hero_media_id)
+        if hero is None or hero.source_type not in media_service.CREDIT_EXEMPT:
+            # Our words, their photograph. `source_credit` stays so the
+            # borrowed picture is credited and the publish gate keeps demanding
+            # it; only a story where nothing is borrowed becomes `own`.
+            return
+    article.source_type = "own"
+    article.source_credit = None
 
 
 def queue_counts(db: Session) -> dict[str, int]:

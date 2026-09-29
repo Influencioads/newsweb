@@ -58,16 +58,22 @@ import {
   Pause,
   Pencil,
   Phone,
+  Pin,
   Play,
+  Quote,
   Plus,
   Radio,
   RefreshCw,
+  RotateCcw,
   RotateCcwClock,
+  RotateCw,
   Search,
   Send,
   Settings,
   Share2,
   Shield,
+  SkipBack,
+  SkipForward,
   Sparkles,
   Star,
   Sun,
@@ -87,6 +93,7 @@ import {
 import type { StyleProp, ViewStyle } from 'react-native';
 
 import { useColors } from '@/lib/useTheme';
+import { CommentGlyph, PlaceGlyph, ShareGlyph, WhatsAppGlyph } from '@/ui/glyphs';
 
 /**
  * Icon — the only way glyphs enter the app (audit-ui rejects emoji and
@@ -98,7 +105,9 @@ import { useColors } from '@/lib/useTheme';
 const MAP = {
   home: House,
   mapPin: MapPin,
+  pin: Pin,
   play: Play,
+  quote: Quote,
   search: Search,
   user: User,
   bell: Bell,
@@ -173,6 +182,11 @@ const MAP = {
   playCircle: CirclePlay,
   bookOpen: BookOpen,
   history: RotateCcwClock,
+  // Audio transport: previous / next track and the 15-second skips.
+  skipBack: SkipBack,
+  skipForward: SkipForward,
+  rotateCcw: RotateCcw,
+  rotateCw: RotateCw,
   users: Users,
   shield: Shield,
   helpCircle: CircleQuestionMark,
@@ -180,6 +194,12 @@ const MAP = {
   checkCircle2: CircleCheck,
   xCircle: CircleX,
   loader2: LoaderCircle,
+  // The house's own marks — see ui/glyphs.tsx for why these four are not
+  // lucide. Same 24 grid and the same props, so they need no special casing.
+  whatsapp: WhatsAppGlyph,
+  share: ShareGlyph,
+  comment: CommentGlyph,
+  place: PlaceGlyph,
 } as const;
 
 export type IconName = keyof typeof MAP;

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { FileText, Globe, Image as ImageIcon, MapPin, Music, Pin, SlidersHorizontal, Sparkles, Volume2 } from 'lucide-react';
+import { FileText, Globe, Image as ImageIcon, MapPin, Music, Pin, SlidersHorizontal, Sparkles } from 'lucide-react';
 
 import { AudioAttachment } from '@/components/admin/AudioAttachment';
 import { CategoryPicker } from '@/components/admin/CategoryPicker';
@@ -9,7 +9,6 @@ import { MediaPicker } from '@/components/admin/MediaPicker';
 import { PlacementPicker } from '@/components/admin/PlacementPicker';
 import { TagInput } from '@/components/admin/TagInput';
 import { Badge, StatusPill } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Chip, ChipRail } from '@/components/ui/Chip';
 import { Field, Input, Switch } from '@/components/ui/Field';
@@ -29,8 +28,9 @@ import type { ArticleForm } from './form';
 /**
  * Sticky meta sidebar of the article editor: in-page anchors, workflow status,
  * flags, schedule, category / location / tags, front-page placement, media and
- * audio. Placement and audio generation have their own write paths (a
- * published article cannot be PATCHed), so those mutations live here.
+ * audio. Placement has its own write path (a published article cannot be
+ * PATCHed), so that mutation lives here. Generating a reading moved to the
+ * "ఈ కథనాన్ని మార్చండి" block under the body, next to the share card.
  */
 
 type Anchor = 'story' | 'media' | 'meta' | 'seo';
@@ -89,12 +89,6 @@ export function MetaSidebar({ form, set, errors, options, article, canPin }: Met
       setActivePins(a.active_pins ?? []);
       toast.success(t('state.updated'));
     },
-    onError: (e) => toast.error(e),
-  });
-
-  const generateAudio = useMutation({
-    mutationFn: () => cmsApi.generateArticleAudio(id!, false),
-    onSuccess: (r) => (r.available ? toast.success : toast.info)(r.available ? L('ఆడియో సిద్ధం', 'Audio ready') : L('ఆడియో తయారు కాలేదు', 'Audio was not generated')),
     onError: (e) => toast.error(e),
   });
 
@@ -158,6 +152,12 @@ export function MetaSidebar({ form, set, errors, options, article, canPin }: Met
             onChange={(v) => set({ isFeatured: v })}
             label={L('ఫీచర్డ్', 'Featured')}
             hint={L('ఎడిటర్ ఎంపిక రైలులో చూపుతుంది', 'Shows in the editor-selected rail')}
+          />
+          <Switch
+            checked={form.isShort}
+            onChange={(v) => set({ isShort: v })}
+            label={L('షార్ట్ న్యూస్', 'Short news')}
+            hint={L('ఫోటో + చిన్న వార్త, యాప్ స్వైప్ ఫీడ్‌లో', 'Photo + short text, in the app swipe feed')}
           />
         </div>
         <Field
@@ -247,23 +247,9 @@ export function MetaSidebar({ form, set, errors, options, article, canPin }: Met
           audio={audio}
           onChange={setAudio}
         />
-        {id != null && form.voiceEnabled ? (
-          <div className="space-y-2 border-t border-rule-soft pt-3">
-            <Button variant="secondary" size="sm" icon={Volume2} pending={generateAudio.isPending} onClick={() => generateAudio.mutate()}>
-              {L('ఇప్పుడే తయారు చేయండి', 'Generate now')}
-            </Button>
-            {generateAudio.data ? (
-              <p className={cn(s.body, 'text-meta text-muted')}>
-                {generateAudio.data.available
-                  ? `${L('సిద్ధం', 'Ready')} · ${generateAudio.data.duration_sec}s · ${generateAudio.data.provider ?? ''}`
-                  : L(
-                      'తయారు కాలేదు — సెట్టింగ్‌లలో వాయిస్, ప్రొవైడర్, నెలవారీ పరిమితి చూడండి.',
-                      'Not generated — check voice, provider and the monthly limit in settings.',
-                    )}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
+        {/* Generating the reading lives with generating the share card, under
+            the body ("ఈ కథనాన్ని మార్చండి"). Two buttons doing the same job in
+            two places is how one of them ends up stale. */}
       </section>
     </Card>
   );

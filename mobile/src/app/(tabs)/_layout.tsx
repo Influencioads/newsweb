@@ -4,13 +4,14 @@ import { useI18n } from '@/lib/i18n';
 import { TabIcon, type IconName } from '@/ui/Icon';
 import { TabBar } from '@/ui/TabBar';
 
-/** Bottom tab bar (DailyHunt-benchmarked): Home · Local · Video · Search · Profile. */
+/** Bottom tab bar (DailyHunt-benchmarked): Home · Local · Video · Shorts · Profile.
+ *  Search moved to the Home masthead (a stack screen at /search). */
 
-const TABS: { name: string; icon: IconName; title: 'tab.home' | 'tab.local' | 'tab.videos' | 'tab.search' | 'tab.profile' }[] = [
+const TABS: { name: string; icon: IconName; title: 'tab.home' | 'tab.local' | 'tab.videos' | 'tab.shorts' | 'tab.profile' }[] = [
   { name: 'index', icon: 'home', title: 'tab.home' },
   { name: 'local', icon: 'mapPin', title: 'tab.local' },
   { name: 'videos', icon: 'play', title: 'tab.videos' },
-  { name: 'search', icon: 'search', title: 'tab.search' },
+  { name: 'short-news', icon: 'zap', title: 'tab.shorts' },
   { name: 'profile', icon: 'user', title: 'tab.profile' },
 ];
 

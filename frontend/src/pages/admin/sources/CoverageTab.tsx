@@ -71,8 +71,8 @@ export function CoverageTab() {
             <Card padding="sm" tone="paper" role="status">
               <p className={cn(body, 'text-ink-soft')}>
                 {L(
-                  'గంటవారీ క్రాల్ ఆఫ్‌లో ఉంది. సెట్టింగ్స్‌లో ఆన్ చేయండి — అప్పటివరకు షెడ్యూల్‌లో ఏమీ జరగదు.',
-                  'The hourly crawl is switched off. Turn it on in Settings — nothing is fetched or rewritten on a schedule until you do.',
+                  'గంటవారీ క్రాల్ ఆఫ్‌లో ఉంది. క్రాల్ సెట్టింగ్స్ ట్యాబ్‌లో ఆన్ చేయండి — అప్పటివరకు షెడ్యూల్‌లో ఏమీ జరగదు.',
+                  'The hourly crawl is switched off. Turn it on in the Crawl settings tab — nothing is fetched or rewritten on a schedule until you do.',
                 )}
               </p>
             </Card>

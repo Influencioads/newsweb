@@ -10,6 +10,8 @@ export interface MediaOut {
   /** Attribution line, e.g. "Creator / Wikimedia Commons (CC BY 4.0)" (§12.5). */
   credit: string | null;
   license_label: string | null;
+  /** A stand-in, not a picture of the event — cards must badge it. */
+  representative: boolean;
   /** Original landing page — CC-BY requires a link back where practical. */
   source_url: string | null;
   width: number | null;
@@ -65,6 +67,10 @@ export interface ArticleCard {
   ai_generated: boolean;
   published_at: string | null;
   reading_time_sec: number;
+  /** Social proof on the card. `like_count` is the reader-facing total and
+   *  includes any editorial seed; ranking uses a different number server-side. */
+  like_count: number;
+  comment_count: number;
 }
 
 /** Tiptap/ProseMirror node. The body is the source of truth (§1). */
@@ -77,8 +83,7 @@ export interface TiptapNode {
 }
 
 export interface ArticleDetail extends ArticleCard {
-  like_count: number;
-  comment_count: number;
+  /** like_count and comment_count are inherited from ArticleCard. */
   share_count: number;
   sub_title_te: string | null;
   body: TiptapNode | null;
@@ -89,6 +94,15 @@ export interface ArticleDetail extends ArticleCard {
   updated_at: string | null;
   corrected_at: string | null;
   correction_note_te: string | null;
+  /** The desk's own note on the story. Not a correction. */
+  critic_note_te: string | null;
+  /**
+   * Verification standing printed on the byline — a `ContributorType` or, once
+   * the contributor has one, a `Vertical`. `'panchayat'` is what the UGC
+   * disclaimer is derived from, so no row can be published missing its notice.
+   * Optional because the reader schema does not serialise it yet.
+   */
+  byline_badge?: string | null;
   seo_title: string | null;
   seo_description: string | null;
   canonical_url: string | null;
@@ -276,6 +290,8 @@ export interface SiteConfig {
   categories: NavCategoryOut[];
   states: StateOut[];
   districts: DistrictOut[];
+  /** Admin-set #rrggbb colours; see utils/brand.ts. */
+  brand?: { primary?: string; breaking?: string; accent?: string };
 }
 
 /** What `GET /public/articles/{short_id}/formats` reports. */

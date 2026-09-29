@@ -3,14 +3,16 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.deps import Principal, require_any_permission, require_permission
 from app.core.errors import NotFoundError
+from app.core.permissions import LEVEL_PIN_PLACEMENT
+from app.core.ratelimit import rate_limit
 from app.db.base import utcnow
 from app.db.session import get_db
 from app.models.audio import AudioAsset
-from app.models.content import Article
+from app.models.content import Article, ArticleTag
 from app.models.discovery import Pin
 from app.models.enums import ArticleType, AuditAction, WorkflowState
 from app.models.media import ArticleMedia, Media
@@ -27,7 +29,7 @@ from app.schemas.cms import (
     PlacementIn,
     TransitionIn,
 )
-from app.services import audit_service, workflow_service
+from app.services import audit_service, seed_engagement_service, workflow_service
 
 router = APIRouter(prefix="/cms/articles", tags=["articles"])
 
@@ -40,11 +42,20 @@ def _get(db: Session, article_id: int) -> Article:
 
 
 def _media_ref(media: Media) -> CmsMediaRef:
+    open_licence = (media.meta or {}).get("open_licence") or {}
     return CmsMediaRef(
         id=media.id,
         url=media.cdn_url or f"/media/{media.storage_key}",
         alt_te=media.alt_te,
+        caption_te=media.caption_te,
         credit=media.credit,
+        source_type=media.source_type,
+        # Licence plus where it came from. The provider's name is fine here and
+        # nowhere else: this response is behind the newsroom login.
+        licence=" · ".join(
+            p for p in (media.copyright, open_licence.get("source")) if p
+        )
+        or None,
         width=media.width,
         height=media.height,
     )
@@ -57,6 +68,38 @@ def _media_ref(media: Media) -> CmsMediaRef:
 _COLUMN_FIELDS = tuple(
     c.name for c in Article.__table__.columns if c.name in CmsArticleOut.model_fields
 )
+
+
+#: Eager-load for the list endpoints: one extra query for the whole page
+#: instead of two per row, and it is what makes `_list_row` free of DB access.
+_LIST_LOADS = (selectinload(Article.tags).selectinload(ArticleTag.tag),)
+
+
+def _tag_refs(article: Article) -> list[CmsTagRef]:
+    return [
+        CmsTagRef(
+            id=link.tag.id,
+            slug=link.tag.slug,
+            name_te=link.tag.name_te,
+            name_en=link.tag.name_en,
+        )
+        for link in sorted(article.tags, key=lambda x: x.sort)
+        if link.tag
+    ]
+
+
+def _list_row(article: Article) -> CmsArticleOut:
+    """One row of a list response.
+
+    Handing the ORM object straight to `CmsArticleList` looks tempting and is a
+    trap: `Article.tags` holds ArticleTag *links*, the schema's `tags` holds
+    resolved tag references, and pydantic rejects the link objects — so the
+    whole list 500s as soon as any article on the page carries a tag. Columns
+    are copied by name for exactly that reason (see `_COLUMN_FIELDS`).
+    """
+    payload = CmsArticleOut(**{name: getattr(article, name) for name in _COLUMN_FIELDS})
+    payload.tags = _tag_refs(article)
+    return payload
 
 
 def _out(db: Session, article: Article) -> CmsArticleOut:
@@ -94,16 +137,7 @@ def _out(db: Session, article: Article) -> CmsArticleOut:
                 title_te=video.title_te,
                 thumbnail_url=video.thumbnail_url,
             )
-    payload.tags = [
-        CmsTagRef(
-            id=link.tag.id,
-            slug=link.tag.slug,
-            name_te=link.tag.name_te,
-            name_en=link.tag.name_en,
-        )
-        for link in sorted(article.tags, key=lambda x: x.sort)
-        if link.tag
-    ]
+    payload.tags = _tag_refs(article)
     if article.audio_asset_id:
         audio = db.get(AudioAsset, article.audio_asset_id)
         if audio is not None:
@@ -137,7 +171,9 @@ def _out(db: Session, article: Article) -> CmsArticleOut:
 
 @router.get("", response_model=CmsArticleList)
 def list_articles(
-    state: str | None = None,
+    # Typed as the enum, not a bare string: an unknown value reached the query
+    # and came back as a 500 instead of a 422 naming the bad parameter.
+    state: WorkflowState | None = None,
     search: str | None = Query(None, max_length=200),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
@@ -163,10 +199,28 @@ def list_articles(
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = list(
         db.execute(
-            stmt.order_by(Article.updated_at.desc()).offset(offset).limit(limit)
+            stmt.options(*_LIST_LOADS)
+            .order_by(Article.updated_at.desc())
+            .offset(offset)
+            .limit(limit)
         ).scalars()
     )
-    return CmsArticleList(articles=rows, total=total)
+    # The hero as a thumbnail (the creative studio's article picker): one
+    # query for the page, not one per row.
+    hero_ids = {a.hero_media_id for a in rows if a.hero_media_id}
+    heroes = (
+        {m.id: m for m in db.scalars(select(Media).where(Media.id.in_(hero_ids)))}
+        if hero_ids
+        else {}
+    )
+    out = []
+    for a in rows:
+        row = _list_row(a)
+        hero = heroes.get(a.hero_media_id) if a.hero_media_id else None
+        if hero is not None and hero.deleted_at is None:
+            row.hero_media = _media_ref(hero)
+        out.append(row)
+    return CmsArticleList(articles=out, total=total)
 
 
 @router.get("/pending", response_model=CmsArticleList)
@@ -221,10 +275,13 @@ def pending_articles(
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = list(
         db.execute(
-            stmt.order_by(Article.updated_at.asc()).offset(offset).limit(limit)
+            stmt.options(*_LIST_LOADS)
+            .order_by(Article.updated_at.asc())
+            .offset(offset)
+            .limit(limit)
         ).scalars()
     )
-    return CmsArticleList(articles=rows, total=total)
+    return CmsArticleList(articles=[_list_row(a) for a in rows], total=total)
 
 
 @router.post("", response_model=CmsArticleOut, status_code=201)
@@ -258,6 +315,112 @@ def get_article(
     article = _get(db, article_id)
     workflow_service._scope(principal, article)
     return _out(db, article)
+
+
+@router.get("/{article_id}/origin")
+def article_origin(
+    article_id: int,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(
+        require_any_permission("article.review", "article.view")
+    ),
+):
+    """The publisher's original beside our rewrite, for the person approving it.
+
+    The ingest queue has had this comparison since the rewrite feature shipped,
+    but it lives one screen earlier: by the time a story is an article awaiting
+    approval, the reviewer sees only our words and has to take "this really is
+    a rewrite" on trust. Same two columns, moved to where the decision is made.
+
+    `IngestedRewrite.source_text` is the held copy and is the cheap path. When
+    it is absent — the story predates the retention change, or the source is
+    excerpt-only and no page was ever fetched — the publisher's page is read
+    live and thrown away with the response. Nothing about the original is
+    stored by this endpoint; `held=false, fetched_live=true` says which
+    happened, because a reviewer comparing against a page that has since been
+    edited deserves to know that is what they are reading.
+    """
+    from app.integrations.feeds.extract import extract_article
+    from app.models.ingestion import IngestedItem
+    from app.services import crawl_service
+
+    article = _get(db, article_id)
+    workflow_service._scope(principal, article)
+
+    item = db.scalar(
+        select(IngestedItem)
+        .where(IngestedItem.article_id == article.id)
+        .options(selectinload(IngestedItem.source))
+    )
+    if item is None:
+        raise NotFoundError(
+            message_en="This article did not come from a crawled source.",
+        )
+
+    rewrite = item.latest_rewrite
+    source = item.source
+    target = item.canonical_url or item.url
+
+    held = rewrite.source_text if rewrite is not None else None
+    text, fetched_live = held, False
+    if not text and target and crawl_service._host_allowed(target):
+        page = extract_article(target)
+        if page.status == "ok" and page.text:
+            text, fetched_live = page.text, True
+
+    return {
+        "article_id": article.id,
+        "item_id": item.id,
+        "source": {
+            "name": source.name if source else None,
+            "slug": source.slug if source else None,
+            "licence": source.licence if source else None,
+            "content_policy": source.content_policy if source else None,
+            "url": target,
+        },
+        "original": {
+            "title": item.title,
+            "summary": item.summary,
+            "author": item.author,
+            "published_at": item.published_at,
+            "image_url": item.image_url,
+            "text": text,
+            # Which of the three things happened, so the UI can say so rather
+            # than showing an empty column that looks like a bug.
+            "held": bool(held),
+            "fetched_live": fetched_live,
+        },
+        # What the reader would get if this were published right now — the
+        # article as it stands, not the rewrite as the model first wrote it.
+        # An editor who has already touched the copy must be comparing their
+        # own latest version, or the check is theatre.
+        "ours": {
+            "title_te": article.title_te,
+            "summary_te": article.summary_te,
+            "body_plain": article.body_plain,
+            "word_count": article.word_count,
+            "edited_since_import": bool(
+                rewrite is not None and (article.body_plain or "") != (rewrite.body_plain or "")
+            ),
+        },
+        "rewrite": (
+            {
+                "title_te": rewrite.title_te or None,
+                "summary_te": rewrite.summary_te,
+                "body_plain": rewrite.body_plain,
+                "attribution_te": rewrite.attribution_te or None,
+                "similarity_percent": rewrite.similarity_percent,
+                "confidence": round(rewrite.confidence, 2),
+                "unverified": rewrite.unverified,
+                "engine": rewrite.engine,
+                "model": rewrite.model,
+                "word_count": rewrite.word_count,
+                "created_at": rewrite.created_at,
+            }
+            if rewrite is not None
+            else None
+        ),
+    }
 
 
 @router.patch("/{article_id}", response_model=CmsArticleOut)
@@ -310,7 +473,13 @@ def set_placement(
     payload: PlacementIn,
     request: Request,
     db: Session = Depends(get_db),
-    principal: Principal = Depends(require_permission("article.publish")),
+    principal: Principal = Depends(
+        # Deciding what leads the front page for two states is desk
+        # seniority, and `article.publish` stopped implying it the moment a
+        # level-15 panchayat secretary was given it. The same gate is on
+        # `_guard_flags` and on every route in cms_discovery.
+        require_permission("article.publish", min_level=LEVEL_PIN_PLACEMENT)
+    ),
 ):
     """§8 / §9 — "pin to home page" and "show in Top trending" from the article
     form.
@@ -414,6 +583,124 @@ def breaking_control(
     return _out(db, article)
 
 
+class CriticNoteIn(BaseModel):
+    """The desk's own note on a story. `null` clears it."""
+
+    note_te: str | None = Field(default=None, max_length=4000)
+
+
+@router.post("/{article_id}/critic-note", response_model=CmsArticleOut)
+def critic_note(
+    article_id: int,
+    payload: CriticNoteIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("article.critic_note")),
+):
+    """Attach or clear the editorial note shown beside a story.
+
+    Its own route rather than a field on PATCH, because `workflow_service.update`
+    refuses any article that is not DRAFT or CHANGES_REQUESTED — and a critic
+    note is by definition something you add to a story that is already live.
+    `set_placement` exists for the same reason.
+    """
+    article = _get(db, article_id)
+    workflow_service._scope(principal, article)
+
+    note = (payload.note_te or "").strip() or None
+    article.critic_note_te = note
+    db.flush()
+
+    audit_service.record(
+        db,
+        action=AuditAction.UPDATE,
+        entity_type="article",
+        entity_id=article.id,
+        actor=principal.user,
+        after={"critic_note_te": note},
+        request=request,
+    )
+    from app.core.redis_client import cache_delete_prefix
+
+    cache_delete_prefix("home:")
+    return _out(db, article)
+
+
+class SeedLikesIn(BaseModel):
+    """Set the seeded-like offset. Setting it to 0 un-seeds."""
+
+    count: int = Field(ge=0, le=seed_engagement_service.MAX_SEED_LIKES)
+
+
+class SeedCommentIn(BaseModel):
+    """One seeded comment. The name is an index into a fixed pool, never text —
+    see `seed_engagement_service.SEED_NAMES`."""
+
+    body_te: str = Field(min_length=1, max_length=2000)
+    name_index: int = Field(ge=0)
+
+
+@router.post("/{article_id}/seed-likes", response_model=CmsArticleOut)
+def seed_likes(
+    article_id: int,
+    payload: SeedLikesIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("engagement.seed")),
+):
+    """Fabricated engagement, audit-logged. See `seed_engagement_service`."""
+    article = _get(db, article_id)
+    before = article.seed_like_count
+    total = seed_engagement_service.seed_likes(db, article=article, count=payload.count)
+    audit_service.record(
+        db,
+        action=AuditAction.CREATE,
+        entity_type="seeded_like",
+        entity_id=article.id,
+        actor=principal.user,
+        before={"seed_like_count": before},
+        after={"seed_like_count": payload.count, "reader_total": total},
+        request=request,
+    )
+    from app.core.redis_client import cache_delete_prefix
+
+    cache_delete_prefix("home:")
+    return _out(db, article)
+
+
+@router.post("/{article_id}/seed-comment", response_model=CmsArticleOut)
+def seed_comment(
+    article_id: int,
+    payload: SeedCommentIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("engagement.seed")),
+):
+    """Fabricated engagement, audit-logged with the exact text and name.
+
+    Separate from seed-likes on purpose: one audit row per action reads better
+    in the log than one row describing two different things.
+    """
+    article = _get(db, article_id)
+    comment = seed_engagement_service.seed_comment(
+        db, article=article, body=payload.body_te, name_index=payload.name_index
+    )
+    audit_service.record(
+        db,
+        action=AuditAction.CREATE,
+        entity_type="seeded_comment",
+        entity_id=comment.id,
+        actor=principal.user,
+        after={
+            "article_id": article.id,
+            "body": comment.body,
+            "seed_author_name": comment.seed_author_name,
+        },
+        request=request,
+    )
+    return _out(db, article)
+
+
 @router.post("/{article_id}/{action}", response_model=CmsArticleOut)
 def change_state(
     article_id: int,
@@ -435,6 +722,13 @@ def change_state(
     if action not in _PERMISSION:
         raise NotFoundError()
     principal.require(_PERMISSION[action])
+    # The panchayat self-publish exception is the only way an account below
+    # desk-editor level reaches `publish`, and the only publish with no editor
+    # in front of it. Five a minute is generous for one panchayat and cheap
+    # enough that a stolen session cannot flood the section. Applied here
+    # rather than as a route dependency so no editor's queue is throttled.
+    if action == "publish" and principal.level < LEVEL_PIN_PLACEMENT:
+        rate_limit("panchayat_publish", 5, fail_closed=True)(request)
     article = workflow_service.transition(
         db, principal, _get(db, article_id), action, payload.note, payload.scheduled_at
     )

@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import Principal, require_permission
 from app.core.errors import NotFoundError, ValidationError
+from app.db.base import desc_nulls_last
 from app.db.session import get_db
 from app.models.enums import (
     AuditAction,
@@ -34,7 +35,7 @@ from app.models.enums import (
     SourceLicence,
 )
 from app.models.ingestion import ContentSource, IngestedItem
-from app.services import audit_service, crawl_service, ingestion_service
+from app.services import audit_service, crawl_service, ingestion_service, settings_service
 
 router = APIRouter(prefix="/cms", tags=["ingestion"])
 
@@ -63,6 +64,8 @@ class SourceWrite(BaseModel):
     max_items_per_hour: int = Field(default=8, ge=0, le=500)
     allow_html_fallback: bool = False
     rewrite_enabled: bool = False
+    #: Off by default, and left off unless an admin turns it on per source.
+    images_enabled: bool = False
     mandal_autotag: bool = True
 
 
@@ -79,6 +82,7 @@ class SourcePatch(BaseModel):
     auto_publish: bool | None = None
     default_category_id: int | None = None
     default_district_id: int | None = None
+    language: str | None = Field(default=None, min_length=2, max_length=10)
     fetch_interval_minutes: int | None = Field(default=None, ge=5, le=1440)
     is_active: bool | None = None
     beat: SourceBeat | None = None
@@ -86,6 +90,7 @@ class SourcePatch(BaseModel):
     max_items_per_hour: int | None = Field(default=None, ge=0, le=500)
     allow_html_fallback: bool | None = None
     rewrite_enabled: bool | None = None
+    images_enabled: bool | None = None
     mandal_autotag: bool | None = None
 
 
@@ -164,6 +169,7 @@ def _source_row(source: ContentSource, pending: int = 0) -> dict:
         "max_items_per_hour": source.max_items_per_hour,
         "allow_html_fallback": source.allow_html_fallback,
         "rewrite_enabled": source.rewrite_enabled,
+        "images_enabled": source.images_enabled,
         "mandal_autotag": source.mandal_autotag,
         "last_fetched_at": source.last_fetched_at,
         "last_status": source.last_status,
@@ -190,6 +196,8 @@ def list_sources(
         "items": [_source_row(s, int(pending.get(s.id, 0))) for s in rows],
         "total": len(rows),
         "queue": ingestion_service.queue_counts(db),
+        # A source at this many consecutive failures is no longer polled.
+        "failure_limit": settings_service.get_int(db, "crawl.max_consecutive_failures"),
     }
 
 
@@ -346,7 +354,7 @@ def ingestion_queue(
     total = int(db.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
     rows = db.scalars(
         stmt.order_by(
-            IngestedItem.published_at.desc().nullslast(), IngestedItem.fetched_at.desc()
+            *desc_nulls_last(IngestedItem.published_at), IngestedItem.fetched_at.desc()
         )
         .offset(offset)
         .limit(limit)
@@ -416,6 +424,10 @@ def _rewrite_row(item: IngestedItem) -> dict | None:
         "title_te": rewrite.title_te or None,
         "summary_te": rewrite.summary_te,
         "body_plain": rewrite.body_plain,
+        #: The original, for the side-by-side. NULL for most items — see
+        #: `crawl_service.gather_source_text`. The queue always carries the
+        #: item's own URL, so the reviewer has the publisher's page either way.
+        "source_text": rewrite.source_text,
         "attribution_te": rewrite.attribution_te or None,
         "word_count": rewrite.word_count,
         "engine": rewrite.engine,
@@ -538,25 +550,34 @@ def crawl_status(
     return crawl_service.status_snapshot(db)
 
 
-@router.post("/crawl/run")
+@router.post("/crawl/run", status_code=202)
 def crawl_run(
     payload: CrawlRunIn,
     request: Request,
     db: Session = Depends(get_db),
     p: Principal = Depends(require_permission("taxonomy.manage")),
 ):
+    """Queue a pass now, rather than waiting for the schedule.
+
+    Queued on the ingest worker, never run here: a rewrite pass is minutes of
+    model calls — past the client's and nginx's timeouts — and run beside a
+    scheduled pass it would rewrite (and pay for) the same items twice.
+    """
+    from app.workers.tasks.crawl import crawl_run_now
+
     if not crawl_service.crawl_enabled(db):
         raise ValidationError(
-            message_en="Turn the hourly crawl on in Settings first.",
-            message_te="ముందుగా సెట్టింగ్స్‌లో గంటవారీ క్రాల్‌ను ఆన్ చేయండి.",
+            message_en="Turn the crawl on in the Crawl settings tab first.",
+            message_te="ముందుగా క్రాల్ సెట్టింగ్స్ ట్యాబ్‌లో క్రాల్‌ను ఆన్ చేయండి.",
             details={"crawl.enabled": "is off"},
         )
-    beats = {payload.beat} if payload.beat else None
-    out: dict = {}
-    if payload.fetch:
-        out["fetch"] = crawl_service.run_fetch_pass(db, beats=beats)
-    if payload.rewrite:
-        out["rewrite"] = crawl_service.run_rewrite_pass(db, beats=beats, actor_id=p.id)
+    out = {
+        "fetch": payload.fetch,
+        "rewrite": payload.rewrite,
+        "beat": payload.beat.value if payload.beat else None,
+    }
+    crawl_run_now.delay(**out, actor_id=p.id)
+    out["queued"] = True
     audit_service.record(
         db,
         action=AuditAction.AI_RUN,

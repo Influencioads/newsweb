@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, ExternalLink, FileText, Pencil, Plus, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, FileText, Pencil, Plus, Search, Zap } from 'lucide-react';
 
 import { AdminPage } from '@/components/admin/AdminPage';
 import { DataTable, type DataTableColumn } from '@/components/admin/DataTable';
 import { WorkflowPill } from '@/components/admin/StatusPill';
+import { Badge } from '@/components/ui/Badge';
 import { Button, ButtonLink, IconButtonLink } from '@/components/ui/Button';
 import { Chip, ChipRail } from '@/components/ui/Chip';
 import { useConfirm } from '@/components/ui/Dialog';
@@ -223,8 +224,13 @@ export default function Articles() {
             >
               {title.text}
             </Link>
-            <span className="mt-0.5 block font-mono text-meta text-muted">
+            <span className="mt-0.5 flex flex-wrap items-center gap-2 font-mono text-meta text-muted">
               #{a.id} · {a.short_id}
+              {a.is_short ? (
+                <Badge tone="brand" size="xs" icon={Zap}>
+                  {L('షార్ట్', 'Short')}
+                </Badge>
+              ) : null}
             </span>
           </>
         );
@@ -250,9 +256,14 @@ export default function Articles() {
       subtitle={L('డ్రాఫ్ట్ నుంచి ప్రచురణ వరకు సంపాదకీయ వర్క్‌ఫ్లో', 'Editorial workflow from draft to publication')}
       actions={
         can('article.create') ? (
-          <ButtonLink to="/admin/articles/new" icon={Plus}>
-            {t('admin.page.newArticle')}
-          </ButtonLink>
+          <>
+            <ButtonLink to="/admin/articles/new?short=1" variant="secondary" icon={Zap}>
+              {t('admin.page.newShort')}
+            </ButtonLink>
+            <ButtonLink to="/admin/articles/new" icon={Plus}>
+              {t('admin.page.newArticle')}
+            </ButtonLink>
+          </>
         ) : null
       }
     >

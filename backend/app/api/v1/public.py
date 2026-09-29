@@ -19,7 +19,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
+from app.core.config import SITE_NAME_EN, SITE_NAME_TE, settings
 from app.core.deps import Principal, get_optional_principal
 from app.core.errors import NotFoundError
 from app.core.redis_client import cache_get, cache_set
@@ -29,7 +29,7 @@ from app.models.content import Article
 from app.models.video import Video
 from app.models.enums import HomeSectionKind, PinPlacement, TrendingScope
 from app.repositories import article_repo, discovery_repo, site_repo
-from app.services import trending_service
+from app.services import settings_service, trending_service
 from app.schemas.public import (
     ArticleCardOut,
     ArticleDetailOut,
@@ -95,6 +95,7 @@ def _media_out(media: Any) -> MediaOut | None:
         credit=media.credit,
         license_label=media.copyright,
         source_url=(media.meta or {}).get("landing_url"),
+        representative=bool((media.meta or {}).get("representative")),
         width=media.width,
         height=media.height,
         blurhash=media.blurhash,
@@ -120,9 +121,16 @@ def _card(article: Article) -> ArticleCardOut:
         byline_te=article.byline_te,
         is_breaking=article.is_breaking,
         is_exclusive=article.is_exclusive,
-        ai_generated=article.ai_generated,
+        # Editorial decision: readers never see that AI drafted a story. The
+        # column still drives the CMS review flow; only the public API hides it.
+        # (AI-made *pictures* keep their label — see _media_out.)
+        ai_generated=False,
         published_at=article.published_at,
         reading_time_sec=article.reading_time_sec,
+        # Readers see genuine likes plus any editorial seed; ranking and
+        # analytics read `like_count` alone, so a seed cannot reach trending.
+        like_count=article.like_count + article.seed_like_count,
+        comment_count=article.comment_count,
     )
 
 
@@ -184,8 +192,8 @@ def _decode_cursor(cursor: str | None) -> datetime | None:
 def get_config(response: Response, db: Session = Depends(get_db)) -> SiteConfigOut:
     _cache_headers(response, ttl=300)
     return SiteConfigOut(
-        site_name_te="టాప్ తెలుగు న్యూస్",
-        site_name_en="Top Telugu News",
+        site_name_te=SITE_NAME_TE,
+        site_name_en=SITE_NAME_EN,
         categories=[
             NavCategoryOut.model_validate(c) for c in article_repo.nav_categories(db)
         ],
@@ -193,6 +201,7 @@ def get_config(response: Response, db: Session = Depends(get_db)) -> SiteConfigO
         districts=[
             DistrictOut.model_validate(d) for d in article_repo.active_districts(db)
         ],
+        brand=settings_service.brand_colors(db),
     )
 
 
@@ -558,9 +567,10 @@ def get_article(
             author = AuthorOut.model_validate(user)
 
     return ArticleDetailOut(
+        # like_count and comment_count now ride on the card, which is also
+        # where the seeded-like offset is applied — passing them again here
+        # would be a duplicate keyword and would drop the seed.
         **card.model_dump(),
-        like_count=article.like_count,
-        comment_count=article.comment_count,
         share_count=article.share_count,
         sub_title_te=article.sub_title_te,
         body=article.body,
@@ -571,6 +581,7 @@ def get_article(
         updated_at=article.updated_at,
         corrected_at=article.corrected_at,
         correction_note_te=article.correction_note_te,
+        critic_note_te=article.critic_note_te,
         seo_title=article.seo_title,
         seo_description=article.seo_description,
         canonical_url=article.canonical_url,
@@ -689,9 +700,10 @@ def get_trending(
     response_model=CategoryFeedOut,
     summary="Quick-read cards — headline, image, 2–5 line summary",
     description=(
-        "The §14 swipe feed. Cards are articles whose editorial standfirst "
-        "(`summary_te`) exists; each opens the full story. `next_cursor` "
-        "carries the offset for the next page."
+        "The §14 swipe feed. Cards are articles an editor marked as short news "
+        "(`is_short`: hero photo + `summary_te`); one opens the full story only "
+        "when it has a body (`reading_time_sec > 0`). `next_cursor` carries the "
+        "offset for the next page."
     ),
 )
 def get_short_news(

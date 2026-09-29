@@ -12,12 +12,14 @@ from app.integrations.tts.base import Synthesis, TtsProvider
 from app.integrations.tts.bhashini import BhashiniTts
 from app.integrations.tts.google import GoogleTts
 from app.integrations.tts.local import LocalTts
+from app.integrations.tts.sarvam import SarvamTts
 
 __all__ = [
     "AimlapiTts",
     "BhashiniTts",
     "GoogleTts",
     "LocalTts",
+    "SarvamTts",
     "Synthesis",
     "TtsProvider",
     "get_tts",
@@ -28,11 +30,12 @@ _PROVIDERS: dict[str, type[TtsProvider]] = {
     "google": GoogleTts,
     "bhashini": BhashiniTts,
     "aimlapi": AimlapiTts,
+    "sarvam": SarvamTts,
 }
 
 #: Adapters that take their credentials from the caller (the editable settings)
 #: rather than reading the environment themselves.
-_CONFIGURABLE = {"aimlapi"}
+_CONFIGURABLE = {"aimlapi", "sarvam"}
 
 
 def get_tts(
@@ -42,6 +45,7 @@ def get_tts(
     base_url: str = "",
     model: str = "",
     voice: str = "",
+    speed: float = 1.0,
 ) -> TtsProvider:
     """An unknown name falls back to `local` rather than raising: a typo in a
     settings row must not take article pages down, it must only mean no audio.
@@ -52,5 +56,11 @@ def get_tts(
     name = (provider or "local").lower()
     chosen = _PROVIDERS.get(name, LocalTts)
     if name in _CONFIGURABLE:
-        return chosen(api_key=api_key, base_url=base_url, model=model, voice=voice)
+        return chosen(
+            api_key=api_key,
+            base_url=base_url,
+            model=model,
+            voice=voice,
+            speed=speed,
+        )
     return chosen()

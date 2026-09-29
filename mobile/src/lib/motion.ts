@@ -8,6 +8,7 @@ import {
   FadeOut,
   LinearTransition,
   ReduceMotion,
+  SlideInDown,
   useReducedMotion,
   withSpring,
   withTiming,
@@ -80,6 +81,8 @@ export interface Motion {
   /** Simple fade for overlays. */
   fadeIn: () => EntryOrExitLayoutType | undefined;
   exiting: () => EntryOrExitLayoutType | undefined;
+  /** A docked bar arriving from the bottom edge (the audio mini-player). */
+  slideUp: () => EntryOrExitLayoutType | undefined;
   /** Layout transition for reordering / expanding. */
   layout: BaseAnimationBuilder | undefined;
   /** expo-image `transition` ms. */
@@ -124,6 +127,7 @@ export function useMotion(): Motion {
               .withInitialValues({ opacity: 0, transform: [{ translateY: 12 }] }),
       fadeIn: () => (reduce ? undefined : FadeIn.duration(DUR.base)),
       exiting: () => (reduce ? undefined : FadeOut.duration(DUR.fast)),
+      slideUp: () => (reduce ? undefined : SlideInDown.duration(DUR.slow).easing(EASE.emphasized)),
       layout: reduce ? undefined : LinearTransition.duration(DUR.base),
       imageTransition: reduce ? 0 : DUR.base,
       haptic,

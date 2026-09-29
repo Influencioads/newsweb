@@ -48,6 +48,7 @@ from app.models.enums import HomeSectionKind, RoleKey, ScopeType, UserStatus
 from app.models.geo import District, Mandal, State
 from app.models.site import HomepageSection
 from app.models.user import Permission, Role, RolePermission, User, UserRole
+from app.services import panchayat_service
 
 logger = get_logger("seed")
 
@@ -148,6 +149,32 @@ def seed_states(db: Session) -> dict[str, State]:
     return existing
 
 
+def seed_panchayat_category(db: Session, categories: dict[str, "Category"]) -> None:
+    """The public section a gram-panchayat secretary's copy lands in.
+
+    Kept out of `CATEGORIES` because `panchayat_service.stamp_ugc` forces every
+    self-published article into this exact slug — the seed and the publish fork
+    must not be able to disagree about which row that is. Adding it to the
+    `categories` dict is all the homepage section needs: the loop below already
+    creates one per nav category, and its `min_items=3` floor keeps the section
+    hidden until three panchayat stories exist, which is right for launch.
+    Insert-only, like `seed_categories`: an admin's rename or reorder survives.
+    """
+    if panchayat_service.PANCHAYAT_CATEGORY_SLUG in categories:
+        return
+    cat = Category(
+        slug=panchayat_service.PANCHAYAT_CATEGORY_SLUG,
+        name_te="పంచాయతీ వార్తలు",
+        name_en="Panchayat News",
+        sort=len(CATEGORIES),
+        is_active=True,
+        show_in_nav=True,
+    )
+    db.add(cat)
+    categories[cat.slug] = cat
+    db.flush()
+
+
 def seed_homepage_sections(db: Session, categories: dict[str, "Category"]) -> int:
     """Create a default section row per nav category (updated doc §24).
 
@@ -155,6 +182,10 @@ def seed_homepage_sections(db: Session, categories: dict[str, "Category"]) -> in
     only backfills sections for categories that have none yet.
     """
     existing_keys = {s.key for s in db.execute(select(HomepageSection)).scalars()}
+    # A category whose block the admin re-keyed still has one.
+    has_section = {
+        s.category_id for s in db.execute(select(HomepageSection)).scalars()
+    }
     next_sort = (
         max((s.sort for s in db.execute(select(HomepageSection)).scalars()), default=-1)
         + 1
@@ -178,7 +209,13 @@ def seed_homepage_sections(db: Session, categories: dict[str, "Category"]) -> in
         next_sort += 1
         created += 1
     for cat in sorted(categories.values(), key=lambda c: c.sort):
-        if not cat.show_in_nav or cat.slug in existing_keys:
+        # Sub-sections get no block of their own (as on the Taxonomy page).
+        if (
+            not cat.show_in_nav
+            or cat.parent_id is not None
+            or cat.slug in existing_keys
+            or cat.id in has_section
+        ):
             continue
         db.add(
             HomepageSection(
@@ -547,6 +584,7 @@ def run(include_demo: bool = False, reset_passwords: bool = False) -> None:
         districts = seed_districts(db)
         mandals = seed_mandals(db, districts)
         categories = seed_categories(db)
+        seed_panchayat_category(db, categories)
         seed_homepage_sections(db, categories)
         tags = seed_tags(db)
 

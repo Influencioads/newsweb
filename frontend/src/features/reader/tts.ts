@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { usePlayer } from '@/stores/player';
 import type { TiptapNode } from '@/types/public';
 
 /**
@@ -12,6 +13,11 @@ import type { TiptapNode } from '@/types/public';
  * Voice availability is genuinely uneven (Chrome/Android ships Telugu, many
  * desktops do not), so the state machine includes `unavailable` and the UI
  * downgrades honestly instead of playing English-accented mojibake.
+ *
+ * One voice at a time: speaking (or resuming) pauses the global audio player
+ * (`stores/player`), and when that player starts it cancels speechSynthesis —
+ * so this hook drops back to idle itself. A cancelled utterance does not fire
+ * `end` in every browser, and never does while paused.
  */
 
 export function extractPlainText(doc: TiptapNode | null): string {
@@ -73,6 +79,18 @@ export function useTts(text: string): {
     return undefined;
   }, [state, voiceReady]);
 
+  // The global player cancelled the voice from outside: keep the state truthful.
+  useEffect(
+    () =>
+      usePlayer.subscribe((player, prev) => {
+        if (player.playing && !prev.playing) {
+          utteranceRef.current = null;
+          setState((current) => (current === 'speaking' || current === 'paused' ? 'idle' : current));
+        }
+      }),
+    [],
+  );
+
   // Leaving the page must not leave a ghost narrator running.
   useEffect(
     () => () => {
@@ -82,6 +100,9 @@ export function useTts(text: string): {
   );
 
   const stop = useCallback(() => {
+    // Android WebViews (in-app browsers) ship no speechSynthesis at all, and
+    // this runs as AudioPlayer's unmount cleanup there too.
+    if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
     utteranceRef.current = null;
     setState(voiceReady ? 'idle' : 'unavailable');
@@ -96,6 +117,7 @@ export function useTts(text: string): {
       setState('paused');
       return;
     }
+    usePlayer.getState().pause();
     if (state === 'paused') {
       synth.resume();
       setState('speaking');

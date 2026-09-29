@@ -1,10 +1,13 @@
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/api/client';
 import { Field, Select } from '@/components/ui/Field';
 import * as publicApi from '@/features/public/api';
+import * as readerApi from '@/features/reader/api';
 import { useI18n } from '@/i18n';
+import { useAuth } from '@/stores/auth';
+import { useReaderPrefs } from '@/stores/readerPrefs';
 import type { LocalityOut } from '@/types/public';
 import { cn } from '@/utils/cn';
 
@@ -234,4 +237,75 @@ export function LocationPicker({
       ))}
     </div>
   );
+}
+
+/**
+ * The reader's own place, bound to `readerPrefs` — the `value`/`onChange` pair
+ * the masthead dialog, reader settings and the Local page hand to
+ * `<LocationPicker>`. Every choice applies at once. A signed-in reader's is
+ * also mirrored to their server preferences (fire and forget), because local
+ * push targets the district stored there. Nothing here ever guesses a place.
+ *
+ * The state is hook-local: `readerPrefs` stores the district and below, and the
+ * picker derives the state from the district. The local state only counts while
+ * no district is chosen — another picker may have moved the district since.
+ */
+export function useReaderPlace(): Pick<LocationPickerProps, 'value' | 'onChange'> {
+  const queryClient = useQueryClient();
+  const authed = useAuth((a) => a.status === 'authenticated');
+  const { edition, mandal, locality, setEdition, setLocalLevels } = useReaderPrefs();
+  const [state, setState] = useState<string | null>(null);
+
+  return {
+    value: { state: edition ? null : state, district: edition, mandal, locality },
+    onChange: (next) => {
+      setState(next.state ?? null);
+      // Changing the district resets the levels beneath it (readerPrefs does
+      // that itself); otherwise only the mandal or locality moved.
+      if ((next.district ?? null) !== edition) setEdition(next.district ?? null);
+      else setLocalLevels(next.mandal ?? null, next.locality ?? null);
+
+      const p = useReaderPrefs.getState();
+      if (!authed || (p.edition === edition && p.mandal === mandal && p.locality === locality)) return;
+      readerApi
+        .updatePreferences({ district_slug: p.edition, mandal_slug: p.mandal, locality_slug: p.locality })
+        .then((data) => queryClient.setQueryData(['reader', 'preferences'], data))
+        .catch(() => undefined);
+    },
+  };
+}
+
+/** The finest place the reader has chosen, in the interface language, or null.
+ *  Same cache keys as the picker; the mandal and village lists are only asked
+ *  for when those levels are set. */
+export function useReaderPlaceName(): string | null {
+  const { pick } = useI18n();
+  const edition = useReaderPrefs((p) => p.edition);
+  const mandal = useReaderPrefs((p) => p.mandal);
+  const locality = useReaderPrefs((p) => p.locality);
+
+  const config = useQuery({
+    queryKey: ['public', 'config'],
+    queryFn: publicApi.fetchSiteConfig,
+    staleTime: 300_000,
+  });
+  const mandals = useQuery({
+    queryKey: ['public', 'mandals', edition],
+    queryFn: () => publicApi.fetchDistrictMandals(edition as string),
+    enabled: Boolean(edition && mandal),
+    staleTime: 3_600_000,
+  });
+  const mandalRow = mandals.data?.find((m) => m.slug === mandal);
+  const localities = useQuery({
+    queryKey: ['public', 'localities', mandalRow?.id ?? null],
+    queryFn: () => fetchMandalLocalities(mandalRow!.id),
+    enabled: Boolean(mandalRow && locality),
+    staleTime: 3_600_000,
+  });
+
+  const place =
+    localities.data?.find((l) => l.slug === locality) ??
+    mandalRow ??
+    config.data?.districts.find((d) => d.slug === edition);
+  return place ? pick(place.name_te, place.name_en) : null;
 }

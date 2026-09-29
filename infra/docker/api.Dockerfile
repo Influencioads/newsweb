@@ -17,6 +17,8 @@ ENV PYTHONUNBUFFERED=1 \
 #   tesseract-ocr + tesseract-ocr-tel -> Telugu OCR fallback for curve-converted PDFs
 #   ffmpeg         -> the transcode ladder
 #   libmagic1      -> real content-type sniffing on upload, not trusting the client
+#   libfribidi0 + libharfbuzz0b + libraqm0 -> Pillow shapes Telugu (e-paper PDF, share
+#                     cards); the PyPI wheel bundles Raqm/HarfBuzz and dlopen()s FriBiDi
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         curl \
@@ -24,6 +26,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg \
         libmagic1 \
         fonts-noto-core \
+        libfribidi0 \
+        libharfbuzz0b \
+        libraqm0 \
         poppler-utils \
         tesseract-ocr \
         tesseract-ocr-tel \

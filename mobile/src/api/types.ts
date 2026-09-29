@@ -73,6 +73,10 @@ export interface ArticleCard {
   ai_generated: boolean;
   published_at: string | null;
   reading_time_sec: number;
+  /** Social proof on the card. `like_count` is the reader-facing total and
+   *  includes any editorial seed; ranking uses a different number server-side. */
+  like_count: number;
+  comment_count: number;
 }
 
 export interface TiptapNode {
@@ -84,8 +88,7 @@ export interface TiptapNode {
 }
 
 export interface ArticleDetail extends ArticleCard {
-  like_count: number;
-  comment_count: number;
+  /** like_count and comment_count are inherited from ArticleCard. */
   share_count: number;
   sub_title_te: string | null;
   body: TiptapNode | null;
@@ -96,6 +99,14 @@ export interface ArticleDetail extends ArticleCard {
   updated_at: string | null;
   corrected_at: string | null;
   correction_note_te: string | null;
+  /** The desk's own note on the story. Not a correction. */
+  critic_note_te: string | null;
+  /**
+   * Verification standing on the byline. `'panchayat'` is what the UGC
+   * disclaimer is derived from, so no story can be published missing it.
+   * Optional because the reader schema does not serialise it yet.
+   */
+  byline_badge?: string | null;
   gallery: MediaOut[];
   related: ArticleCard[];
   poll: import('./epaper').Poll | null;

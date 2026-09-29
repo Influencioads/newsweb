@@ -5,6 +5,7 @@ import type {
   CategoryFeed,
   HomePayload,
   LocalFeedPayload,
+  LocalityOut,
   MandalOut,
   SearchMeta,
   SearchResults,
@@ -100,9 +101,19 @@ export async function fetchDistrictMandals(districtSlug: string): Promise<Mandal
   return data;
 }
 
+/** Cities, towns and villages under one mandal. Takes the mandal's **id**, not
+ *  its slug — a locality slug is only unique within its mandal. */
+export async function fetchMandalLocalities(mandalId: number): Promise<LocalityOut[]> {
+  const { data } = await api.get<LocalityOut[]>(
+    `/public/locations/mandals/${mandalId}/localities`,
+  );
+  return data;
+}
+
 export async function fetchLocalFeed(params: {
   district: string;
   mandal?: string;
+  locality?: string;
   offset?: number;
   limit?: number;
 }): Promise<LocalFeedPayload> {

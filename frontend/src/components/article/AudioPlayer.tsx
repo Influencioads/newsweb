@@ -1,12 +1,14 @@
-import { useEffect, useId, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useId } from 'react';
+import { queryOptions, useQuery } from '@tanstack/react-query';
 import { Pause, Play } from 'lucide-react';
 
 import { api } from '@/api/client';
+import { clock, Equalizer } from '@/components/player/parts';
 import { IconButton } from '@/components/ui/Button';
-import { Chip } from '@/components/ui/Chip';
+import type { GlyphIcon } from '@/components/ui/Icon';
 import { useI18n, useScript } from '@/i18n';
 import { type TtsState } from '@/features/reader/tts';
+import { selectTrack, usePlayer, type Track } from '@/stores/player';
 import type { AudioState } from '@/types/cms';
 import { cn } from '@/utils/cn';
 
@@ -15,27 +17,49 @@ import { cn } from '@/utils/cn';
  *
  * Three states, and the component picks between them rather than the caller:
  *
- *   * a server-generated file exists → a real `<audio>` element, so §19's seek
- *     and playback speed work and every listener hears the same voice
+ *   * a server-generated file exists → a trigger and live status for the one
+ *     global player (`stores/player`, rendered by `components/player`). Idle it
+ *     reads "Listen · 3:05"; while its own track is on air it shows the
+ *     equalizer, elapsed / length and pause, and tapping the status opens Now
+ *     Playing, where seek, speed and the queue live. Playback carries on when
+ *     the reader leaves the page — the dock takes over.
  *   * voice is on but there is no file → the device voice, unchanged from
- *     before this feature existed
+ *     before this feature existed (it pauses the global player when it starts)
  *   * voice is off site-wide or for this article (§20) → nothing renders
  *
- * The server decides which case applies; this only renders it.
+ * The server decides which case applies; this only renders it. A track is
+ * identified by its audio route, so the same story started from the e-paper
+ * radio shows as on air on its article page too.
  *
- *     <AudioPlayer shortId={a.short_id} readingLabel={readingTime(…)} deviceTts={tts} />
+ * `queue` starts a running order at this control's own track (the day's
+ * bulletins, the edition); without it the track plays alone. When the queue
+ * already carries this track's file, that is the payload and nothing is
+ * fetched. `track` names it in the dock, in Now Playing and on the lock screen.
+ *
+ *     <AudioPlayer shortId={a.short_id} readingLabel={readingTime(…)} deviceTts={tts}
+ *                  track={{ kind: 'article', title: a.title_te, href: a.url }} />
  */
 
-const SPEEDS = [0.75, 1, 1.25, 1.5] as const;
+export const PILL =
+  'flex w-fit max-w-full min-h-tap flex-wrap items-center gap-2 rounded-pill border border-brand/20 bg-brand-tint px-2 py-1';
 
-const PILL = 'flex min-h-tap flex-wrap items-center gap-2 rounded-pill border border-brand/20 bg-brand-tint px-2 py-1';
+/** What the caller knows about the track; the file and length come from the server. */
+export type TrackMeta = Pick<Track, 'kind' | 'title'> & Partial<Pick<Track, 'subtitle' | 'href' | 'artwork'>>;
 
-function format(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
+/**
+ * The audio payload for a route. Shared so every control on a page reads the
+ * one deduped, §20-gated answer (the article toolbar's headphones use it too).
+ * Generation happens server-side on first request and can take a moment; a
+ * failed fetch must not remove the device-voice fallback, so errors resolve to
+ * "no file" rather than propagating.
+ */
+export const audioQuery = (source: string) =>
+  queryOptions({
+    queryKey: ['audio', source],
+    queryFn: async () => (await api.get<AudioState>(source)).data,
+    retry: false,
+    staleTime: 5 * 60_000,
+  });
 
 export interface AudioPlayerProps {
   shortId: string;
@@ -44,58 +68,69 @@ export interface AudioPlayerProps {
   deviceTts: { state: TtsState; toggle: () => void; stop: () => void };
   /**
    * Where to fetch the audio payload from. Defaults to this article's own
-   * route; the three-hourly bulletin passes its own, which returns the same
-   * shape. Everything else in this component — the scrubber, the speeds, the
-   * `voice_enabled` short-circuit — works unchanged.
+   * route; the audio bulletin passes its own, which returns the same
+   * shape. It is also the track's identity in the global player.
    */
   endpoint?: string;
+  track?: TrackMeta;
+  /** The running order this track belongs to; playback starts there at this track. */
+  queue?: Track[];
+  /** The play button's icon while not playing (the article page shows headphones). */
+  idleIcon?: GlyphIcon;
 }
 
-export function AudioPlayer({ shortId, readingLabel, deviceTts, endpoint }: AudioPlayerProps) {
+export function AudioPlayer({
+  shortId,
+  readingLabel,
+  deviceTts,
+  endpoint,
+  track,
+  queue,
+  idleIcon = Play,
+}: AudioPlayerProps) {
   const { t, language } = useI18n();
   const s = useScript();
   // Page-specific copy with no strings.ts key yet (see neededStrings).
   const L = (te: string, en: string) => (language === 'te' ? te : en);
   const labelId = useId();
   const source = endpoint ?? `/public/articles/${shortId}/audio`;
+  // A running order that already holds this track's file (the day's bulletins,
+  // the edition) is its payload: no fetch per card, and no failed fetch to drop
+  // a card into the device-voice branch with nothing to speak.
+  const queued = queue?.find((item) => item.id === source && item.url);
 
-  const audioState = useQuery({
-    queryKey: ['audio', source],
-    queryFn: async () => (await api.get<AudioState>(source)).data,
-    // Generation happens server-side on first request and can take a moment;
-    // a failed fetch must not remove the device-voice fallback, so errors
-    // resolve to "no file" rather than propagating.
-    retry: false,
-    staleTime: 5 * 60_000,
+  const audioState = useQuery({ ...audioQuery(source), enabled: !queued });
+  const data = audioState.data;
+  const url = queued?.url ?? (data?.available ? data.url : null);
+
+  // Live status, only while this control's own file is the one on air — a
+  // replaced or regenerated file keeps the route but not the URL.
+  const onAir = usePlayer((p) => {
+    const current = selectTrack(p);
+    return current?.id === source && current.url === url;
   });
+  const playing = usePlayer((p) => onAir && p.playing);
+  const elapsed = usePlayer((p) => (onAir ? p.elapsed : 0));
+  const liveDuration = usePlayer((p) => (onAir ? p.duration : 0));
+  const failed = usePlayer((p) => onAir && p.error);
 
-  const ref = useRef<HTMLAudioElement>(null);
-  const [playing, setPlaying] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
-  const [total, setTotal] = useState(0);
-  const [speed, setSpeed] = useState<number>(1);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (el) el.playbackRate = speed;
-  }, [speed]);
-
-  // Leaving the article must stop both players; the device voice in
-  // particular keeps talking across a route change otherwise. Depend on the
-  // stable callback, not the object — useTts returns a fresh literal every
-  // render, and running this cleanup on each render would cancel the voice
-  // the moment it started.
+  // Leaving the article must stop the device voice, which keeps talking across
+  // a route change otherwise (the global player deliberately does not stop).
+  // Depend on the stable callback, not the object — useTts returns a fresh
+  // literal every render, and running this cleanup on each render would
+  // cancel the voice the moment it started.
   const stopDevice = deviceTts.stop;
   useEffect(() => () => stopDevice(), [stopDevice]);
 
-  const data = audioState.data;
+  if (!queued) {
+    // Nothing until the server has answered: the device-voice branch would
+    // flash "no voice" (or offer the wrong voice) for a story that has a file.
+    if (audioState.isLoading) return null;
+    // §20 — switched off means no control at all, not a disabled one.
+    if (data && !data.voice_enabled) return null;
+  }
 
-  // §20 — switched off means no control at all, not a disabled one.
-  if (data && !data.voice_enabled) return null;
-
-  const hasFile = Boolean(data?.available && data.url);
-
-  if (!hasFile) {
+  if (!url) {
     const { state } = deviceTts;
     const unavailable = state === 'unavailable';
     const speaking = state === 'speaking';
@@ -112,7 +147,7 @@ export function AudioPlayer({ shortId, readingLabel, deviceTts, endpoint }: Audi
     return (
       <div className={PILL}>
         <IconButton
-          icon={speaking ? Pause : Play}
+          icon={speaking ? Pause : idleIcon}
           label={speaking ? t('ui.pause') : t('reader.listen')}
           variant="primary"
           round
@@ -130,68 +165,64 @@ export function AudioPlayer({ shortId, readingLabel, deviceTts, endpoint }: Audi
     );
   }
 
-  const duration = total || data!.duration_sec;
+  const fileDuration = (queued ? queued.durationSec : data?.duration_sec) ?? 0;
+  const duration = liveDuration || fileDuration;
+
+  function listen(): void {
+    const player = usePlayer.getState();
+    if (onAir) {
+      player.toggle();
+      return;
+    }
+    const self: Track = {
+      id: source,
+      kind: track?.kind ?? (source.includes('/bulletins/') ? 'bulletin' : 'article'),
+      title: track?.title || readingLabel || t('player.label'),
+      subtitle: track?.subtitle,
+      href: track?.href,
+      artwork: track?.artwork,
+      url: url!,
+      durationSec: fileDuration,
+    };
+    const at = queue?.findIndex((item) => item.id === source) ?? -1;
+    if (queue && at >= 0) player.playQueue(queue, at);
+    else player.playTrack(self);
+  }
 
   return (
     <div className={PILL}>
-      <audio
-        ref={ref}
-        src={data!.url!}
-        preload="metadata"
-        onLoadedMetadata={(e) => setTotal(e.currentTarget.duration || data!.duration_sec)}
-        onTimeUpdate={(e) => setElapsed(e.currentTarget.currentTime)}
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
-        onEnded={() => { setPlaying(false); setElapsed(0); }}
-      />
       <IconButton
-        icon={playing ? Pause : Play}
+        icon={playing ? Pause : idleIcon}
         label={playing ? t('ui.pause') : t('reader.listen')}
         variant="primary"
         round
-        onClick={() => {
-          const el = ref.current;
-          if (!el) return;
-          if (playing) el.pause();
-          else void el.play();
-        }}
+        // Not while on air: the clock ticks every second, and a focused
+        // button's changing description is re-read on every tick.
+        aria-describedby={onAir ? undefined : labelId}
+        onClick={listen}
       />
-
-      {/* The floor sits on the control itself: a range input takes pointer
-          events across its whole box while the browser keeps the track thin. */}
-      <input
-        type="range"
-        min={0}
-        max={duration || 1}
-        step={1}
-        value={elapsed}
-        aria-label={L('ఆడియో స్థానం', 'Audio position')}
-        aria-valuetext={`${format(elapsed)} / ${format(duration)}`}
-        onChange={(e) => {
-          const el = ref.current;
-          if (el) { el.currentTime = Number(e.target.value); setElapsed(Number(e.target.value)); }
-        }}
-        className="min-h-tap min-w-28 flex-1 cursor-pointer accent-brand"
-      />
-
-      <span className="font-sans text-meta tabular-nums text-brand">
-        {format(elapsed)} / {format(duration)}
-      </span>
-
-      <div role="group" aria-label={t('ui.speed')} className="flex items-center gap-1">
-        {SPEEDS.map((rate) => (
-          <Chip
-            key={rate}
-            as="button"
-            lang="en"
-            selected={speed === rate}
-            onClick={() => setSpeed(rate)}
-            className="tabular-nums"
+      {onAir ? (
+        <button
+          type="button"
+          onClick={() => usePlayer.getState().setExpanded(true)}
+          className="flex min-h-tap items-center gap-2 rounded-pill pr-2 text-brand"
+        >
+          <Equalizer playing={playing} />
+          {/* The ticking clock is visual only (the Now Playing slider speaks
+              the position); a failure is part of the button's name. */}
+          <span
+            aria-hidden={failed ? undefined : true}
+            className={cn(failed ? `${s.body} text-ui-sm` : 'font-sans text-meta tabular-nums', 'font-semibold')}
           >
-            {rate}×
-          </Chip>
-        ))}
-      </div>
+            {failed ? t('player.error') : `${clock(elapsed)} / ${clock(duration)}`}
+          </span>
+          <span className="sr-only">{t('player.open')}</span>
+        </button>
+      ) : (
+        <span id={labelId} className={cn(s.body, 'pr-2 text-ui-sm font-semibold text-brand')}>
+          {t('reader.listen')} · <span className="font-sans tabular-nums">{duration ? clock(duration) : readingLabel}</span>
+        </span>
+      )}
     </div>
   );
 }

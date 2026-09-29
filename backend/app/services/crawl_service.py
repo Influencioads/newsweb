@@ -27,21 +27,24 @@ then — where a *second* person has to approve it. That is enforced in
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings as env_settings
 from app.core.errors import AiProviderError
 from app.core.logging import get_logger
-from app.db.base import utcnow
+from app.db.base import desc_nulls_last, utcnow
 from app.integrations.ai import get_ai
 from app.integrations.feeds import FeedResult, extract_article, fetch_feed
+from app.integrations.feeds import images as feed_images
 from app.models.enums import IngestStatus, RewriteStatus, SourceBeat
 from app.models.ingestion import ContentSource, IngestedItem, IngestedRewrite
+from app.models.setting import AppSetting
 from app.services import (
     ai_usage_service,
     ingestion_service,
@@ -56,6 +59,11 @@ logger = get_logger(__name__)
 #: help when sources span many hosts — and four simultaneous requests is a
 #: polite ceiling for an aggregator to present to the wider web.
 DEFAULT_WORKERS = 4
+
+#: Ceiling on the reviewer's copy of the original. Long enough to read a story
+#: against, short enough that the column is never an archive of someone else's
+#: site.
+MAX_SOURCE_TEXT_CHARS = 8_000
 
 #: Subjects where a wrong or careless summary does real harm, and where Indian
 #: reporting norms and the law both expect judgement. A hit here means a person
@@ -103,11 +111,20 @@ def rewrite_enabled(db: Session) -> bool:
 def due_crawl_sources(
     db: Session, *, beats: set[SourceBeat] | None = None
 ) -> list[ContentSource]:
-    """Sources due for a poll, optionally narrowed to some beats."""
+    """Sources due for a poll, optionally narrowed to some beats.
+
+    With `crawl.districts` set, a source pinned to a district outside it is not
+    polled at all. A source with no default district (national, film, a
+    state-wide paper) is always polled; its items are filtered at rewrite time.
+    """
     sources = ingestion_service.due_sources(db)
-    if beats is None:
-        return sources
-    return [s for s in sources if s.beat in beats]
+    districts = settings_service.crawl_districts(db)
+    return [
+        s
+        for s in sources
+        if (beats is None or s.beat in beats)
+        and not (districts and s.default_district_id and s.default_district_id not in districts)
+    ]
 
 
 def fetch_many(
@@ -128,10 +145,14 @@ def fetch_many(
         return []
 
     jobs = [(s.id, s.feed_url, s.etag, s.last_modified) for s in sources]
+    # Read here, on the calling thread: the threads must not touch the session.
+    limit = settings_service.get_int(db, "crawl.max_entries_per_fetch")
     results: dict[int, FeedResult] = {}
     with ThreadPoolExecutor(max_workers=max(1, workers), thread_name_prefix="crawl") as pool:
         futures = {
-            pool.submit(fetch_feed, url, etag=etag, last_modified=modified): source_id
+            pool.submit(
+                fetch_feed, url, etag=etag, last_modified=modified, limit=limit
+            ): source_id
             for source_id, url, etag, modified in jobs
         }
         for future in as_completed(futures):
@@ -164,15 +185,68 @@ def hour_window(now: datetime | None = None) -> tuple[datetime, datetime]:
     return start.astimezone(timezone.utc), moment.astimezone(timezone.utc)
 
 
+def day_start(now: datetime | None = None) -> datetime:
+    """Midnight IST today, in UTC — the start of the daily cap's window."""
+    moment = (now or utcnow()).astimezone(IST)
+    return moment.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+
+
+def last_due_tick(every_minutes: int, *, offset: int, now: datetime | None = None) -> datetime:
+    """The latest clock position, at or before `now`, of a pass every `every_minutes`.
+
+    `offset` keeps today's positions — fetch at :05, rewrite at :20 when
+    hourly. Every allowed cadence divides a day, so the grid is the same daily.
+    """
+    every = max(5, int(every_minutes or 60))
+    moment = (now or utcnow()).astimezone(IST)
+    minute = moment.hour * 60 + moment.minute
+    midnight = moment.replace(hour=0, minute=0, second=0, microsecond=0)
+    tick = midnight + timedelta(minutes=minute - (minute - offset) % every)
+    return tick.astimezone(timezone.utc)
+
+
+def claim_tick(
+    db: Session, every_key: str, *, offset: int, now: datetime | None = None
+) -> bool:
+    """Whether the pass paced by `every_key` is due, marking it run if so.
+
+    Beat fires both passes every five minutes; this is what spaces them out.
+    Due means "has not run since its latest clock position", not "the clock
+    is on it": the ingest worker runs one task at a time, so a fetch queued
+    behind a long rewrite starts late, and a clock-only check dropped it hour
+    after hour. The mark is an app_settings row outside SPECS (like
+    `taxonomy.retired_slugs`), committed with the pass.
+    """
+    moment = now or utcnow()
+    tick = last_due_tick(settings_service.get_int(db, every_key), offset=offset, now=moment)
+    key = f"{every_key}.last_run"
+    # ponytail: no row lock — one ingest worker (--concurrency=1) is the deploy;
+    # a second consumer would need with_for_update() here.
+    row = db.scalar(select(AppSetting).where(AppSetting.key == key))
+    last = (row.value or {}).get("v") if row else None
+    if last and datetime.fromisoformat(last) >= tick:
+        return False
+    if row is None:
+        row = AppSetting(key=key, value={})
+        db.add(row)
+    row.value = {"v": moment.isoformat()}
+    db.flush()
+    return True
+
+
 def rewrites_this_hour(db: Session, *, now: datetime | None = None) -> dict[str, int]:
-    """Rewrites produced so far this hour, per beat.
+    """Rewrites produced so far this hour, per beat."""
+    return rewrites_since(db, hour_window(now)[0])
+
+
+def rewrites_since(db: Session, start: datetime) -> dict[str, int]:
+    """Rewrites produced since `start`, per beat.
 
     Counted from the rows rather than kept in a counter, so it survives a
     restart, cannot drift, and is the same number the status screen shows. A
     counter here would eventually disagree with reality and nobody would know
     which was right.
     """
-    start, _ = hour_window(now)
     rows = db.execute(
         select(ContentSource.beat, func.count(IngestedRewrite.id))
         .join(IngestedItem, IngestedRewrite.item_id == IngestedItem.id)
@@ -185,6 +259,18 @@ def rewrites_this_hour(db: Session, *, now: datetime | None = None) -> dict[str,
         key = beat.value if isinstance(beat, SourceBeat) else str(beat)
         used[key] = int(count or 0)
     return used
+
+
+def rewrites_per_source_since(db: Session, start: datetime) -> dict[int, int]:
+    """Rewrites produced since `start`, per source — what the per-source cap spends."""
+    rows = db.execute(
+        select(IngestedItem.source_id, func.count(IngestedRewrite.id))
+        .select_from(IngestedRewrite)
+        .join(IngestedItem, IngestedRewrite.item_id == IngestedItem.id)
+        .where(IngestedRewrite.created_at >= start)
+        .group_by(IngestedItem.source_id)
+    ).all()
+    return {int(source_id): int(count or 0) for source_id, count in rows}
 
 
 def _beat_quota(db: Session) -> dict[str, int]:
@@ -203,6 +289,9 @@ def select_for_rewrite(
     default_source_cap: int,
     beats: set[SourceBeat] | None = None,
     max_age_hours: int = 18,
+    daily_cap: int = 0,
+    global_cap: int | None = None,
+    districts: Iterable[int] = (),
     now: datetime | None = None,
 ) -> list[IngestedItem]:
     """Choose which queued items get rewritten this hour.
@@ -211,14 +300,28 @@ def select_for_rewrite(
     items in pure recency order instead and a single high-volume feed fills the
     budget every hour; district coverage drops to nothing and the symptom looks
     exactly like the feature working.
+
+    `cap` is measured against the beats being selected only. The breaking pass
+    has its own cap; counting the hourly pass's rewrites against it stopped
+    breaking news for the rest of the hour once the :20 pass had run.
+    `global_cap` (the hourly spend ceiling) and `daily_cap` (0 = none) count
+    every beat. The per-source cap is per IST hour too, not per pass — with a
+    rewrite every 15 minutes a busy feed would otherwise take a whole beat.
     """
     used = rewrites_this_hour(db, now=now)
-    total_used = sum(used.values())
+    wanted = None if beats is None else {b.value for b in beats}
+    total_used = sum(n for key, n in used.items() if wanted is None or key in wanted)
     room_total = cap - total_used
+    if global_cap is not None:
+        room_total = min(room_total, global_cap - sum(used.values()))
+    if daily_cap > 0:
+        used_today = sum(rewrites_since(db, day_start(now)).values())
+        room_total = min(room_total, daily_cap - used_today)
     if room_total <= 0:
         return []
 
     cutoff = (now or utcnow()) - timedelta(hours=max(1, max_age_hours))
+    districts = list(districts)
 
     query = (
         select(IngestedItem)
@@ -228,13 +331,24 @@ def select_for_rewrite(
             IngestedItem.rewrite_status == RewriteStatus.NONE,
             IngestedItem.requires_human.is_(False),
             IngestedItem.fetched_at >= cutoff,
+            # A feed that republishes its archive gets a fresh fetched_at on
+            # every entry; the publisher's own date is the one that says old.
+            or_(IngestedItem.published_at.is_(None), IngestedItem.published_at >= cutoff),
             ContentSource.is_active.is_(True),
             ContentSource.rewrite_enabled.is_(True),
         )
-        .order_by(IngestedItem.published_at.desc().nullslast(), IngestedItem.id.desc())
+        .order_by(*desc_nulls_last(IngestedItem.published_at), IngestedItem.id.desc())
     )
     if beats is not None:
         query = query.where(ContentSource.beat.in_(list(beats)))
+    if districts:
+        # No district is national, state-wide or unplaced news — keep it.
+        query = query.where(
+            or_(
+                IngestedItem.matched_district_id.is_(None),
+                IngestedItem.matched_district_id.in_(districts),
+            )
+        )
 
     candidates = list(db.scalars(query).all())
     if not candidates:
@@ -249,12 +363,12 @@ def select_for_rewrite(
         by_beat.setdefault(source.beat.value, {}).setdefault(source.id, []).append(item)
 
     chosen: list[IngestedItem] = []
+    per_source_taken = rewrites_per_source_since(db, hour_window(now)[0])
     for beat_key, sources in by_beat.items():
         beat_room = max(0, int(beat_quota.get(beat_key, 0)) - used.get(beat_key, 0))
         if beat_room <= 0:
             continue
 
-        per_source_taken: dict[int, int] = {}
         queues = {sid: list(items) for sid, items in sources.items()}
         while beat_room > 0 and room_total > 0 and any(queues.values()):
             progressed = False
@@ -283,8 +397,12 @@ def select_for_rewrite(
 # --------------------------------------------------------------------------- #
 # Guards
 # --------------------------------------------------------------------------- #
-def is_sensitive(text: str) -> bool:
-    """Whether this item must be read by a person rather than a model."""
+def is_sensitive(text: str, extra: Iterable[str] = ()) -> bool:
+    """Whether this item must be read by a person rather than a model.
+
+    `extra` is `crawl.sensitive_extra_terms`: an admin can widen the net, never
+    narrow it — the built-in lists are always checked first.
+    """
     lowered = normalize_text(text or "").casefold()
     if any(phrase in lowered for phrase in SENSITIVE_EN):
         return True
@@ -293,7 +411,11 @@ def is_sensitive(text: str) -> bool:
         return True
     # Telugu compounds attach case endings, so a substring check is needed for
     # the Telugu set too — "ఆత్మహత్యకు" must trip "ఆత్మహత్య".
-    return any(term in lowered for term in SENSITIVE_TE)
+    if any(term in lowered for term in SENSITIVE_TE):
+        return True
+    return any(
+        term and normalize_text(term).casefold() in lowered for term in extra
+    )
 
 
 def similarity_percent(rewritten: str, original: str) -> int:
@@ -331,48 +453,89 @@ def _host_allowed(url: str) -> bool:
     return any(netloc == h or netloc.endswith("." + h) for h in hosts)
 
 
-def gather_source_text(db: Session, item: IngestedItem) -> tuple[str, str]:
-    """The text to rewrite from, and how it was obtained.
+def gather_source_text(db: Session, item: IngestedItem) -> tuple[str, str, str | None]:
+    """The text to rewrite from, how it was obtained, and the reviewer's copy.
 
     The licence decides what survives this call:
 
       * a full-text licence means the extracted body is *stored* on the item,
         exactly as feed-supplied content already is;
       * anything else means the text is used to build the prompt and then
-        dropped. Nothing beyond the existing excerpt is ever written. A field
-        that exists is a field that leaks, which is the rule this whole module
-        inherits from `ingestion_service`.
+        dropped. Nothing beyond the existing excerpt is ever written to
+        `IngestedItem`. A field that exists is a field that leaks, which is the
+        rule this whole module inherits from `ingestion_service`.
+
+    The third return value is the one exception, and it is a narrow one. A
+    reviewer cannot honestly verify a Telugu rewrite against forty words of
+    feed stub — the approval becomes theatre — so when a page was actually
+    fetched the working copy is handed back for `IngestedRewrite.source_text`.
+    That column is defensible where `content_html` would not be: it lives on a
+    queue-only table no public serializer touches, whereas `_body_document`
+    *can* publish `content_html` verbatim. It is held inside the newsroom for
+    the duration of one review and NULLed on import or reject. Reaching here
+    at all requires `allow_html_fallback`, which `_guard_licence` only grants
+    against a written `licence_note` — so we only ever hold text for a
+    publisher an admin has recorded a reason for. `crawl.keep_source_for_review`
+    switches it off without a deploy.
     """
     source = item.source
     stored = ingestion_service.strip_html(item.content_html) if item.content_html else ""
     base = "\n\n".join(p for p in (item.title, item.summary or "", stored) if p).strip()
 
-    if len(base.split()) >= 45:
-        return base, "feed"
+    # The same floor `rewrite_one` applies, so "enough text" means one thing.
+    if len(base.split()) >= max(10, settings_service.get_int(db, "crawl.rewrite_min_words")):
+        return base, "feed", None
 
     if not (source and source.allow_html_fallback):
-        return base, "feed"
+        return base, "feed", None
     if not settings_service.get_bool(db, "crawl.html_fallback_enabled"):
-        return base, "feed"
+        return base, "feed", None
     target = item.canonical_url or item.url
     if not target or not _host_allowed(target):
-        return base, "feed"
+        return base, "feed", None
 
     page = extract_article(target)
     if page.status != "ok" or not page.text:
-        return base, f"page_{page.status}"
+        return base, f"page_{page.status}", None
 
     if source.may_store_full_text:
         item.content_html = ingestion_service.sanitise_body(
             "".join(f"<p>{p}</p>" for p in page.text.split("\n\n") if p.strip())
         ) or None
         item.word_count = page.word_count
-        if page.image_url and not item.image_url:
-            item.image_url = page.image_url
     # else: page.text stays in this function's locals and is never persisted.
 
+    # og:image and the JSON-LD image are the single richest source of publisher
+    # logos, and this path used to write them straight onto the item — past
+    # every rule in `feeds.images`, which `_attach_media` then trusted. Filter
+    # here or the host rule is decorative.
+    #
+    # This sits OUTSIDE the full-text branch on purpose. A picture is not an
+    # excerpt of a text: `_attach_media` already gives an excerpt-only source
+    # exactly one credited hero and breaks before the gallery, which is the
+    # licence rule for images. Nesting the capture inside `may_store_full_text`
+    # meant every RSS_PUBLIC source — which is all of them — silently got no
+    # picture at all, however the admin set `images_enabled`.
+    if not item.image_url:
+        publisher = feed_images.publisher_url(
+            source.homepage_url, source.feed_url, item.url
+        )
+        usable = feed_images.pick(
+            page.image_urls or ([page.image_url] if page.image_url else []),
+            article_url=publisher,
+            logo_url=source.logo_url,
+        )
+        if usable:
+            item.image_url = usable[0]
+            item.image_urls = usable
+
     combined = "\n\n".join(p for p in (item.title, page.text) if p).strip()
-    return combined, f"page_{page.method}"
+    keep = (
+        combined[:MAX_SOURCE_TEXT_CHARS]
+        if settings_service.get_bool(db, "crawl.keep_source_for_review")
+        else None
+    )
+    return combined, f"page_{page.method}", keep
 
 
 # --------------------------------------------------------------------------- #
@@ -447,7 +610,7 @@ def rewrite_one(
     preview = f"{headline}\n{item.summary or ''}"
 
     # --- guards, all before any provider call ------------------------------
-    if is_sensitive(preview):
+    if is_sensitive(preview, settings_service.get(db, "crawl.sensitive_extra_terms") or ()):
         item.requires_human = True
         logger.info("crawl_rewrite_sensitive", item_id=item.id, source=source.slug)
         return _record(
@@ -458,7 +621,7 @@ def rewrite_one(
             actor_id=actor_id,
         )
 
-    body_text, method = gather_source_text(db, item)
+    body_text, method, source_text = gather_source_text(db, item)
     min_words = settings_service.get_int(db, "crawl.rewrite_min_words")
     if len(body_text.split()) < max(10, min_words):
         return _record(
@@ -469,10 +632,12 @@ def rewrite_one(
             actor_id=actor_id,
         )
 
-    provider = get_ai(**settings_service.ai_credentials(db))
+    provider = get_ai(**settings_service.ai_credentials(db, bulk=True))
     # The rewrite pass is the highest-volume spender: hourly, up to
-    # crawl.hourly_item_cap items a run. It bills to the newsroom, not to the
-    # editor who happened to trigger it, so only the budget is checked here.
+    # crawl.hourly_item_cap items a run — which is the whole reason ai.bulk_model
+    # exists, because the editorial model at this volume costs twice the monthly
+    # budget on its own. It bills to the newsroom, not to the editor who
+    # happened to trigger it, so only the budget is checked here.
     if provider.key != "heuristic":
         ai_usage_service.check_budget(db)
     try:
@@ -482,6 +647,7 @@ def rewrite_one(
             publisher=source.name,
             source_url=item.canonical_url or item.url or "",
             language_in=(item.language or source.language or "te"),
+            credit_source=source.attribution_required,
         )
     except AiProviderError as exc:
         logger.warning("crawl_rewrite_failed", item_id=item.id, error=str(exc.details)[:200])
@@ -538,6 +704,10 @@ def rewrite_one(
             engine=provider.key,
         )
 
+    # Still computed and still stored on the row below even when it is not
+    # printed: `attribution_te` is how the newsroom answers "where did this
+    # come from" after the fact. Dropping the printed credit is an editorial
+    # decision; dropping the provenance would be losing the audit trail.
     credit = attribution_line(item)
     paragraphs = [normalize_text(p) for p in result.paragraphs_te if p and p.strip()]
     # Measured before the credit is appended. Our own attribution line adds
@@ -545,7 +715,7 @@ def rewrite_one(
     # near-verbatim rewrite slip under the threshold — the guard would then be
     # measuring how long our credit line is.
     model_plain = "\n\n".join(paragraphs)
-    if credit not in paragraphs:
+    if source.attribution_required and credit not in paragraphs:
         paragraphs.append(credit)
 
     body = {
@@ -561,7 +731,7 @@ def rewrite_one(
     similarity = 0
     if (item.language or source.language or "te").startswith("te"):
         similarity = similarity_percent(model_plain, body_text)
-        threshold = int(env_settings.AI_SIMILARITY_BLOCK_PERCENT or 0)
+        threshold = settings_service.get_int(db, "crawl.similarity_block_percent")
         if threshold and similarity >= threshold:
             logger.warning(
                 "crawl_rewrite_too_similar", item_id=item.id, similarity=similarity
@@ -584,6 +754,7 @@ def rewrite_one(
         summary_te=(normalize_text(result.summary_te) or None),
         body=body,
         body_plain=plain,
+        source_text=source_text,
         attribution_te=credit,
         word_count=words,
         engine=provider.key,
@@ -633,14 +804,18 @@ def run_rewrite_pass(
     if not rewrite_enabled(db):
         return {"rewritten": 0, "skipped": "rewrite_disabled"}
 
-    cap = cap_override or settings_service.get_int(db, "crawl.hourly_item_cap")
+    # `is not None`: an admin who sets the breaking cap to 0 means none.
+    hourly_cap = settings_service.get_int(db, "crawl.hourly_item_cap")
     items = select_for_rewrite(
         db,
-        cap=cap,
+        cap=cap_override if cap_override is not None else hourly_cap,
         beat_quota=_beat_quota(db),
         default_source_cap=settings_service.get_int(db, "crawl.per_source_default_cap"),
         beats=beats,
         max_age_hours=settings_service.get_int(db, "crawl.max_age_hours"),
+        daily_cap=settings_service.get_int(db, "crawl.daily_item_cap"),
+        global_cap=hourly_cap,
+        districts=settings_service.crawl_districts(db),
     )
 
     counts = {status.value: 0 for status in RewriteStatus}
@@ -662,11 +837,27 @@ def status_snapshot(db: Session) -> dict[str, Any]:
     used = rewrites_this_hour(db)
     quota = _beat_quota(db)
     last_fetch = db.scalar(select(func.max(ContentSource.last_fetched_at)))
+    failure_limit = settings_service.get_int(db, "crawl.max_consecutive_failures")
+    active_now = settings_service.crawl_active_now(db)
     return {
         "enabled": crawl_enabled(db),
         "rewrite_enabled": rewrite_enabled(db),
+        "active_now": active_now,
         "hourly_cap": settings_service.get_int(db, "crawl.hourly_item_cap"),
         "used_this_hour": sum(used.values()),
+        "daily_cap": settings_service.get_int(db, "crawl.daily_item_cap"),
+        "used_today": sum(rewrites_since(db, day_start()).values()),
+        # Active sources the crawl has stopped polling; a manual fetch resets them.
+        "failing_sources": int(
+            db.scalar(
+                select(func.count(ContentSource.id)).where(
+                    ContentSource.is_active.is_(True),
+                    ContentSource.consecutive_failures >= failure_limit,
+                )
+            )
+            or 0
+        ),
+        "failure_limit": failure_limit,
         "beats": [
             {
                 "beat": beat.value,
@@ -685,7 +876,8 @@ def status_snapshot(db: Session) -> dict[str, Any]:
             for beat in SourceBeat
         ],
         "last_fetch_at": last_fetch.isoformat() if last_fetch else None,
-        "stale": (
+        # Outside the crawl hours nothing is fetched on purpose; not an outage.
+        "stale": active_now and (
             last_fetch is None or (utcnow() - last_fetch) > timedelta(hours=2)
         ),
         "queue": ingestion_service.queue_counts(db),

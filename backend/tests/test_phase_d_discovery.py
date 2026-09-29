@@ -382,7 +382,7 @@ class TestNotifications:
         headers, _uid = reader_headers(client, "9848020006")
         r = client.post(
             "/api/v1/users/me/devices",
-            json={"token": "fcm-token-abcdef123456", "platform": "android"},
+            json={"token": "ExponentPushToken[abcdef123456]", "platform": "android"},
             headers=headers,
         )
         assert r.status_code == 200

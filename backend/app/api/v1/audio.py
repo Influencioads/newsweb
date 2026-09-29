@@ -55,6 +55,22 @@ def _payload(article: Article, asset) -> dict:
     }
 
 
+def _disabled_payload() -> dict:
+    """§20: switched off means the player is hidden entirely — not that the
+    reader silently gets the device voice instead. Every route that describes
+    article audio answers with this when `tts_service.is_enabled` says no."""
+    return {
+        "available": False,
+        "url": None,
+        "mime": None,
+        "duration_sec": 0,
+        "voice": None,
+        "provider": None,
+        "fallback": None,
+        "voice_enabled": False,
+    }
+
+
 @router.get("/public/articles/{short_id}/audio")
 def public_audio(short_id: str, response: Response, db: Session = Depends(get_db)):
     article = db.scalar(
@@ -68,18 +84,7 @@ def public_audio(short_id: str, response: Response, db: Session = Depends(get_db
         raise NotFoundError()
 
     if not tts_service.is_enabled(db, article):
-        # §20: switched off means the player is hidden entirely — not that the
-        # reader silently gets the device voice instead.
-        return {
-            "available": False,
-            "url": None,
-            "mime": None,
-            "duration_sec": 0,
-            "voice": None,
-            "provider": None,
-            "fallback": None,
-            "voice_enabled": False,
-        }
+        return _disabled_payload()
 
     asset = tts_service.existing_ready(db, article)
     if asset is None:

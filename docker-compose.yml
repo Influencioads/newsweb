@@ -85,9 +85,11 @@ services:
       MEILISEARCH_URL: http://meilisearch:7700
     ports:
       - "8000:8000"
+    # No named volume over /app/var/storage in dev: host-run scripts (crawl,
+    # run_dev.py) write media to backend/var/storage, and a volume there hid
+    # all of it from the API — every crawled image 404'd.
     volumes:
       - ./backend:/app
-      - storage_data:/app/var/storage
     depends_on:
       mysql: {condition: service_healthy}
       redis: {condition: service_healthy}
@@ -111,7 +113,6 @@ services:
       MEILISEARCH_URL: http://meilisearch:7700
     volumes:
       - ./backend:/app
-      - storage_data:/app/var/storage
     depends_on:
       api: {condition: service_started}
     # solo pool: ffmpeg/PDF work is CPU-bound and must never starve the API (§2)
@@ -138,7 +139,6 @@ services:
       MEILISEARCH_URL: http://meilisearch:7700
     volumes:
       - ./backend:/app
-      - storage_data:/app/var/storage
     depends_on:
       api: {condition: service_started}
     # solo pool is fine: the concurrency lives in the task's own thread pool,
@@ -169,4 +169,3 @@ volumes:
   mysql_data:
   redis_data:
   meili_data:
-  storage_data:

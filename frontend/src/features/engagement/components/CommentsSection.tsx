@@ -91,6 +91,11 @@ function CommentRow({
           <time dateTime={comment.created_at} lang={language} className={cn(s.body, 'text-meta text-muted')}>
             {relativeTime(comment.created_at, language)}
           </time>
+          {/* The server already sorts pinned comments first; without a mark the
+              reader just sees an old comment inexplicably at the top. */}
+          {comment.is_pinned ? (
+            <Badge tone="brand" size="xs">{L('పిన్ చేసినది', 'Pinned')}</Badge>
+          ) : null}
           <span className="ml-auto flex items-center">
             {comment.is_mine ? (
               <IconButton
@@ -168,6 +173,7 @@ export function CommentsSection({ shortId }: { shortId: string }) {
         author_name_te: me?.name_te ?? '',
         author_name_en: me?.name_en ?? '',
         is_mine: true,
+        is_pinned: false,
         created_at: new Date().toISOString(),
       };
       queryClient.setQueryData<CommentList>(queryKey, (prev) => ({

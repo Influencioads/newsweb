@@ -57,7 +57,7 @@ _counter = 0
 
 def make_article(db: Session, *, title_te: str, category: Category | None = None,
                  district_id: int | None = None, minutes_ago: int = 60,
-                 summary_te: str | None = None) -> Article:
+                 summary_te: str | None = None, is_short: bool = False) -> Article:
     global _counter
     _counter += 1
     article = Article(
@@ -65,6 +65,7 @@ def make_article(db: Session, *, title_te: str, category: Category | None = None
         slug=f"phase-e-{_counter}",
         title_te=title_te,
         summary_te=summary_te,
+        is_short=is_short,
         category_id=category.id if category else None,
         district_id=district_id,
         status=ArticleStatus.PUBLISHED,
@@ -213,30 +214,48 @@ class TestVideos:
 # short news (§14)
 # --------------------------------------------------------------------------- #
 class TestShortNews:
-    def test_only_summarised_stories_appear(self, client: TestClient, db: Session) -> None:
+    def test_only_short_items_appear(self, client: TestClient, db: Session) -> None:
         cinema = cat(db, "cinema")
-        with_summary = make_article(
-            db, title_te="సారాంశ కథనం", category=cinema,
+        short = make_article(
+            db, title_te="షార్ట్ కథనం", category=cinema, is_short=True,
             summary_te="రెండు లైన్ల సంక్షిప్త సారాంశం ఇక్కడ ఉంటుంది.",
         )
-        without_summary = make_article(db, title_te="సారాంశం లేని కథనం", category=cinema)
+        # A summary alone no longer makes a story short news — crawled
+        # rewrites all carry one, which turned the feed into the newswire.
+        summary_only = make_article(
+            db, title_te="సారాంశం మాత్రమే", category=cinema, summary_te="సాధారణ సారాంశం.",
+        )
         db.commit()
 
         r = client.get("/api/v1/public/short-news")
         assert r.status_code == 200
         ids = [a["short_id"] for a in r.json()["articles"]]
-        assert with_summary.short_id in ids
-        assert without_summary.short_id not in ids
+        assert short.short_id in ids
+        assert summary_only.short_id not in ids
 
     def test_category_filter(self, client: TestClient, db: Session) -> None:
         sports = cat(db, "sports")
         s = make_article(db, title_te="క్రీడల షార్ట్", category=sports,
-                         summary_te="క్రీడా సారాంశం.")
+                         summary_te="క్రీడా సారాంశం.", is_short=True)
         db.commit()
         r = client.get("/api/v1/public/short-news", params={"category": "sports"})
         ids = [a["short_id"] for a in r.json()["articles"]]
         assert s.short_id in ids
         assert all(a["category"]["slug"] == "sports" for a in r.json()["articles"])
+
+    def test_publish_refused_without_hero_photo(self, client: TestClient, db: Session) -> None:
+        editor = staff_headers(db, role=RoleKey.DESK_EDITOR, email="shorts@test.example.com")
+        article = make_article(db, title_te="ఫోటో లేని షార్ట్", is_short=True,
+                               summary_te="చిన్న వార్త.")
+        article.status = ArticleStatus.PENDING
+        article.workflow_state = WorkflowState.APPROVED
+        db.commit()
+
+        r = client.post(f"/api/v1/cms/articles/{article.id}/publish", json={}, headers=editor)
+        assert r.status_code == 422, r.text
+        assert "hero photo" in r.json()["error"]["message_en"]
+        db.refresh(article)
+        assert article.workflow_state == WorkflowState.APPROVED
 
 
 # --------------------------------------------------------------------------- #

@@ -54,6 +54,12 @@ class RoleKey(StrEnum):
     #: CMS access at all — the role carries verified standing and a higher
     #: submission quota, not the ability to write into the newsroom.
     CONTRIBUTOR = "contributor"
+    #: A gram-panchayat secretary the desk has separately trusted to file for
+    #: their own panchayat. The role only carries the ordinary write keys; what
+    #: lets their copy skip review is a dated grant on their contributor
+    #: profile, checked in `panchayat_service.may_self_publish`, never a
+    #: permission. See the README blockquote.
+    PANCHAYAT_SECRETARY = "panchayat_secretary"
     SUBSCRIBER = "subscriber"
 
 
@@ -111,6 +117,11 @@ class AuditAction(StrEnum):
     PUSH_SENT = "push_sent"
 
     SETTING_CHANGED = "setting_changed"
+
+    #: The one publish exception, granted and taken away. 25 characters, and
+    #: `audit_log.action` is 30, so these need no migration.
+    PANCHAYAT_PUBLISH_GRANTED = "panchayat_publish_granted"
+    PANCHAYAT_PUBLISH_REVOKED = "panchayat_publish_revoked"
 
 
 class LoginMethod(StrEnum):
@@ -477,7 +488,7 @@ class JobState(StrEnum):
 
 
 class BulletinStatus(StrEnum):
-    """Where a three-hourly audio bulletin has got to.
+    """Where an audio bulletin has got to.
 
     `SKIPPED` is a real outcome, not a failure: a slot with no published
     stories in its window should produce nothing rather than a bulletin that
@@ -504,6 +515,31 @@ class ContributorType(StrEnum):
     CITIZEN = "citizen"
     FREELANCE = "freelance"
     STUDENT = "student"
+
+
+class Vertical(StrEnum):
+    """Which desk a contributor writes for — a different question from
+    `ContributorType`, which is what proof they owe.
+
+    Kept out of `ContributorType` because that enum keys
+    `kyc_service.REQUIRED_DOCS` and feeds `Article.byline_badge`, whose column
+    is 12 characters wide and whose meaning is *verification standing*. A badge
+    reading "medical" would tell a reader we had checked somebody is a doctor
+    when all we checked was a PAN card.
+    """
+
+    INDUSTRY = "industry"
+    MEDICAL = "medical"
+    BUSINESS = "business"
+    TECH = "tech"
+    BANKING = "banking"
+    LEGAL = "legal"
+    PANCHAYAT = "panchayat"
+    REAL_ESTATE = "real_estate"
+    NEWSMAKER = "newsmaker"
+    CITIZEN_JOURNALISM = "citizen_journalism"
+    SPIRITUAL = "spiritual"
+    SPORTS = "sports"
 
 
 class KycStatus(StrEnum):
@@ -541,3 +577,9 @@ class KycDocumentKind(StrEnum):
     STUDENT_ID = "student_id"
     COLLEGE_BONAFIDE = "college_bonafide"
     SELFIE = "selfie"
+    #: A register a reviewer can actually look somebody up in: a state medical
+    #: council number, a bar enrolment. Abbreviated because the column persists
+    #: the member *name* into VARCHAR(24) and PROFESSIONAL_REGISTRATION is 25.
+    PROFESSIONAL_REG = "professional_reg"
+    #: The order appointing somebody to a panchayat post.
+    GOVT_ORDER = "govt_order"

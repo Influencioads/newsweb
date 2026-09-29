@@ -29,7 +29,13 @@ from app.core.deps import Principal, require_permission
 from app.core.errors import NotFoundError
 from app.db.session import get_db
 from app.integrations.kyc.base import KycDecision
-from app.models.enums import AuditAction, ContributorType, KycDocumentKind, KycStatus
+from app.models.enums import (
+    AuditAction,
+    ContributorType,
+    KycDocumentKind,
+    KycStatus,
+    Vertical,
+)
 from app.models.kyc import ContributorProfile, KycDocument
 from app.services import audit_service, kyc_service, secure_upload_service
 
@@ -59,6 +65,7 @@ def _row(db: Session, profile: ContributorProfile, *, detail: bool = False) -> d
         "phone": user.phone if user else None,
         "phone_verified": bool(user and user.phone_verified_at),
         "contributor_type": profile.contributor_type,
+        "vertical": profile.vertical,
         "status": profile.kyc_status,
         "display_name_te": profile.display_name_te,
         "organisation": profile.organisation,
@@ -70,6 +77,9 @@ def _row(db: Session, profile: ContributorProfile, *, detail: bool = False) -> d
         "reviewed_at": profile.reviewed_at,
         "review_note": profile.review_note,
         "verified_badge": profile.verified_badge,
+        # Whether this profile currently holds the publish exception. Read-only
+        # here; POST /{id}/panchayat-publish is the only thing that moves it.
+        "panchayat_publish_granted_at": profile.panchayat_publish_granted_at,
         "expires_at": profile.expires_at,
         "provider": profile.provider,
         "document_count": len(profile.documents),
@@ -86,6 +96,7 @@ def _row(db: Session, profile: ContributorProfile, *, detail: bool = False) -> d
 def list_applications(
     status: KycStatus | None = KycStatus.SUBMITTED,
     contributor_type: ContributorType | None = None,
+    vertical: Vertical | None = None,
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -95,6 +106,7 @@ def list_applications(
         db,
         status=status,
         contributor_type=contributor_type,
+        vertical=vertical,
         offset=offset,
         limit=limit,
     )
@@ -172,6 +184,82 @@ class ApproveIn(DecisionIn):
 
 class RequestMoreIn(DecisionIn):
     kinds: list[KycDocumentKind] = Field(default_factory=list)
+
+
+class PanchayatPublishIn(BaseModel):
+    granted: bool
+    note: str | None = Field(default=None, max_length=500)
+    #: Revoking is a takedown, so their live copy comes down with the grant
+    #: unless somebody deliberately says otherwise.
+    unpublish_live: bool = True
+
+
+@router.post("/{profile_id}/panchayat-publish")
+def panchayat_publish(
+    profile_id: int,
+    payload: PanchayatPublishIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    p: Principal = Depends(require_permission("kyc.review", min_level=90)),
+):
+    """Grant or revoke the one exception to per-article review (§0).
+
+    Level 90, not the 60 that decides a KYC: checking that somebody is who they
+    say they are and trusting what they will file unread are different
+    decisions, and only the second one puts unreviewed copy in front of
+    readers.
+
+    **Revocation is instant and there is nothing to invalidate**, because
+    `panchayat_service.may_self_publish` reads this column from the database on
+    every publish. Do not move the grant into the JWT or a cache "for
+    performance": that would open a window between an admin taking the trust
+    away and it actually stopping, which is the whole property this buys.
+    """
+    from app.services import panchayat_service
+
+    profile = kyc_service.get_profile(db, profile_id)
+    taken_down = panchayat_service.set_publish_grant(
+        db,
+        profile,
+        granted=payload.granted,
+        actor_id=p.id,
+        unpublish_live=payload.unpublish_live,
+    )
+    audit_service.record(
+        db,
+        action=AuditAction.PANCHAYAT_PUBLISH_GRANTED
+        if payload.granted
+        else AuditAction.PANCHAYAT_PUBLISH_REVOKED,
+        entity_type="contributor_profile",
+        entity_id=profile.id,
+        actor=p.user,
+        note=payload.note,
+        after={"granted": payload.granted, "unpublished": len(taken_down)},
+        request=request,
+    )
+    for article in taken_down:
+        audit_service.record(
+            db,
+            action=AuditAction.UNPUBLISH,
+            entity_type="article",
+            entity_id=article.id,
+            actor=p.user,
+            note="panchayat publish grant revoked",
+            request=request,
+        )
+    if taken_down:
+        # §10.1 — a takedown that leaves the story in the home cache has not
+        # taken anything down.
+        from app.core.redis_client import cache_delete_prefix
+
+        cache_delete_prefix("home:")
+        cache_delete_prefix("trending:")
+    return {
+        "id": profile.id,
+        "granted_at": profile.panchayat_publish_granted_at,
+        "granted_by": profile.panchayat_publish_granted_by,
+        "unpublished_article_ids": [a.id for a in taken_down],
+    }
 
 
 def _decide(

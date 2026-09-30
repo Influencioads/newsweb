@@ -1,9 +1,9 @@
 """aimlapi.com image generation (updated doc §15–18).
 
-An editorial illustration is the one thing the stock-photo providers in
+A representative news picture is the one thing the stock-photo providers in
 `integrations/images` cannot supply: there is no Wikimedia photograph of a
 budget announcement, and the desk ends up publishing a story with no art. The
-same key an admin pastes for the text features draws one, which is why this
+same key an admin pastes for the text features makes one, which is why this
 adapter sits beside the chat adapter rather than in a package of its own.
 
 What it refuses to do:
@@ -270,8 +270,8 @@ def get_image(
     """The configured image provider, or None when there is not one.
 
     None rather than a raise, and None rather than a keyless fallback: nothing
-    draws an illustration without a paid key, so the honest answer to "no key"
-    is "this install cannot draw". The CMS screen stays usable and simply hides
+    makes an AI picture without a paid key, so the honest answer to "no key"
+    is "this install cannot make one". The CMS screen stays usable and simply hides
     the button, the same way `get_ai` degrades to the heuristic instead of
     taking the AI screens down.
 

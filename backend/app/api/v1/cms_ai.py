@@ -7,7 +7,7 @@
     GET    /cms/ai/drafts                 — AI copy awaiting a decision
     POST   /cms/ai/drafts/{id}/convert    — becomes an Article at SUBMITTED
     POST   /cms/ai/drafts/{id}/discard
-    POST   /cms/ai/articles/{id}/image    — draw an illustration (article.edit)
+    POST   /cms/ai/articles/{id}/image    — make an AI picture (article.edit)
     POST   /cms/ai/articles/{id}/social-card/text — the card's words (article.edit)
     POST   /cms/ai/articles/{id}/social-card      — render a news card (article.edit)
     GET    /cms/ai/creative/references        — the studio's design references (media.view)
@@ -277,7 +277,7 @@ def generate_image(
     db: Session = Depends(get_db),
     p: Principal = Depends(require_any_permission("article.edit", "article.edit_own")),
 ):
-    """Draw an illustration for a story that has no picture.
+    """Make a realistic, representative AI picture for a story that has none.
 
     `article.edit_own` is scoped the way `audio._article` scopes it: the
     permission says a story may be edited, the scope says which one. Without

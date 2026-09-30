@@ -102,9 +102,20 @@ def _resolve_placement(db: Session, article: Article, values: dict[str, Any]) ->
             )
 
 
-def _apply_tags(db: Session, article: Article, names: list[str]) -> None:
+def _apply_tags(
+    db: Session,
+    article: Article,
+    names: list[str],
+    *,
+    types: dict[str, TagType] | None = None,
+    create_inactive: bool = False,
+) -> None:
     """Replace the tag set. Unknown names become topic tags — an editor typing
-    a new name should not have to leave the form to create it first."""
+    a new name should not have to leave the form to create it first.
+
+    `types` (name -> type) and `create_inactive` are for the crawl's AI tags
+    and apply only to a tag created here: an existing tag keeps its type and
+    its state. An inactive tag goes live when its story is published."""
     wanted: list[Tag] = []
     seen: set[str] = set()
     for raw in names:
@@ -121,7 +132,11 @@ def _apply_tags(db: Session, article: Article, names: list[str]) -> None:
         tag = db.scalar(select(Tag).where(Tag.slug == slug))
         if tag is None:
             tag = Tag(
-                slug=slug, name_te=name[:140], name_en=name[:140], type=TagType.TOPIC
+                slug=slug,
+                name_te=name[:140],
+                name_en=name[:140],
+                type=(types or {}).get(raw, TagType.TOPIC),
+                is_active=not create_inactive,
             )
             db.add(tag)
             db.flush()
@@ -489,6 +504,16 @@ def transition(
                 message_te="షార్ట్ న్యూస్ ప్రచురించే ముందు ఫోటో మరియు చిన్న వార్త తప్పనిసరి.",
                 details={"is_short": "hero_media_id and summary required"},
             )
+        # The owner's rule (2026-09-29): no story reaches a reader without its
+        # photo. Asked before the trusted branch below writes anything, and of
+        # the picture itself — a hero deleted from the library is no photo.
+        hero = db.get(Media, article.hero_media_id) if article.hero_media_id else None
+        if hero is None or hero.deleted_at is not None or not hero.mime.startswith("image/"):
+            raise ValidationError(
+                message_en="Add a hero photo before publishing: a story without a photo is never published.",
+                message_te="ప్రచురించే ముందు ప్రధాన ఫోటో జత చేయండి — ఫోటో లేని వార్త ప్రచురించబడదు.",
+                details={"hero_media_id": "a usable photo is required"},
+            )
         if trusted:
             # `approved_by` stays NULL on purpose. Stamping the secretary into
             # it would make the audit log claim an editor approved this when
@@ -558,6 +583,11 @@ def transition(
         article.published_by = principal.id
         article.published_at = utcnow()
         article.first_published_at = article.first_published_at or article.published_at
+        # Tags the crawl created for this story waited inactive for a person
+        # to let the story out; one just has.
+        for link in article.tags:
+            if not link.tag.is_active:
+                link.tag.is_active = True
         # §9 duration control: an explicit end time wins, otherwise the
         # configured default (24h out of the box) applies from now.
         if article.is_breaking and article.breaking_until is None:

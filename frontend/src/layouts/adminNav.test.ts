@@ -9,6 +9,7 @@ describe('adminNav', () => {
     expect(findAdminNav('/admin/settings')?.group.key).toBe('settings');
     expect(findAdminNav('/admin/epaper/2026-09-15')?.item.labelKey).toBe('admin.page.epaper');
     expect(findAdminNav('/admin/epaper/2026-09-15/print')?.item.labelKey).toBe('admin.page.epaper');
+    expect(findAdminNav('/admin/assistant')?.item.labelKey).toBe('admin.page.assistant');
     expect(findAdminNav('/admin/nope')).toBeNull();
   });
 

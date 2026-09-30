@@ -48,6 +48,7 @@ class HeuristicAi(AiProvider):
         language_in: str = "te",
         target_words: int = 220,
         credit_source: bool = True,
+        taxonomy: dict | None = None,  # no model, so nothing is classified
     ) -> RewriteText:
         """Degrade to an excerpt and a credit — never invent reporting.
 

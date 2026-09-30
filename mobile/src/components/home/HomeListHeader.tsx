@@ -4,10 +4,10 @@ import { Share, View } from 'react-native';
 import type { Topic } from '@/api/epaper';
 import type { BreakingItem, HomePayload } from '@/api/types';
 import { SectionHeader } from '@/components/SectionHeader';
+import { EditorialGradient } from '@/components/home/EditorialGradient';
 import { useI18n } from '@/lib/i18n';
-import { space } from '@/lib/theme';
+import { radius, space } from '@/lib/theme';
 import { makeStyles, useColors } from '@/lib/useTheme';
-import { Badge } from '@/ui/Badge';
 import { Button, IconButton } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { ChipRail } from '@/ui/Chip';
@@ -15,31 +15,33 @@ import { Icon } from '@/ui/Icon';
 import { T } from '@/ui/Text';
 
 /**
- * Everything above the first story on Home: the breaking rail, today's
- * e-paper promo (ink card) and the top-3 topics. Rendered once as the feed's
- * ListHeaderComponent; the masthead itself stays outside the list so it can
- * collapse against the scroll.
+ * The urgent rail stays above the lead story. E-paper and topics are rendered
+ * after the lead so readers encounter the main headline immediately.
  */
 export interface HomeListHeaderProps {
   breaking: BreakingItem[];
-  epaper: HomePayload['epaper'];
-  topics: Topic[];
 }
 
 function openArticle(shortId: string) {
   router.push({ pathname: '/article/[shortId]', params: { shortId } });
 }
 
-export function HomeListHeader({ breaking, epaper, topics }: HomeListHeaderProps) {
+export function HomeListHeader({ breaking }: HomeListHeaderProps) {
   const styles = useStyles();
   const color = useColors();
   const { t, pick } = useI18n();
 
+  if (!breaking.length) return null;
+
   return (
-    <View>
-      {breaking.length ? (
-        <ChipRail style={styles.rail}>
-          <Badge tone="breaking" icon="zap" label={t('home.breaking')} style={styles.breakingLabel} />
+    <View style={styles.breakingBand}>
+      <EditorialGradient tone="breaking" />
+      <View style={styles.breakingRow}>
+        <View style={styles.breakingLabel} aria-hidden>
+          <Icon name="zap" size={16} color={color.onOverlay} />
+          <T variant="ui" weight="bold" color="onOverlay">{t('home.breaking')}</T>
+        </View>
+        <ChipRail style={styles.rail} contentContainerStyle={styles.railContent}>
           {breaking.map((item) => {
             const title = pick(item.title_te, item.title_en);
             return (
@@ -47,7 +49,7 @@ export function HomeListHeader({ breaking, epaper, topics }: HomeListHeaderProps
                 key={item.short_id}
                 elevated
                 padding="sm"
-                accessibilityLabel={title}
+                accessibilityLabel={`${t('home.breaking')}: ${title}`}
                 onPress={() => openArticle(item.short_id)}
                 style={styles.breakingItem}
               >
@@ -58,7 +60,23 @@ export function HomeListHeader({ breaking, epaper, topics }: HomeListHeaderProps
             );
           })}
         </ChipRail>
-      ) : null}
+      </View>
+    </View>
+  );
+}
+
+export interface HomePromosProps {
+  epaper: HomePayload['epaper'];
+  topics: Topic[];
+}
+
+export function HomePromos({ epaper, topics }: HomePromosProps) {
+  const styles = useStyles();
+  const color = useColors();
+  const { t, pick } = useI18n();
+
+  return (
+    <View>
 
       {epaper ? (
         <Card tone="ink" style={styles.epaper}>
@@ -136,9 +154,19 @@ export function HomeListHeader({ breaking, epaper, topics }: HomeListHeaderProps
   );
 }
 
-const useStyles = makeStyles(() => ({
-  rail: { paddingVertical: space.sm },
-  breakingLabel: { alignSelf: 'center' },
+const useStyles = makeStyles((color) => ({
+  breakingBand: {
+    position: 'relative',
+    overflow: 'hidden',
+    marginHorizontal: space.lg,
+    marginTop: space.sm,
+    borderRadius: radius.md,
+    backgroundColor: color.inkDeep,
+  },
+  breakingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: space.sm },
+  breakingLabel: { flexDirection: 'row', alignItems: 'center', gap: space.xs, paddingLeft: space.md },
+  rail: { flex: 1, minWidth: 0 },
+  railContent: { paddingLeft: space.md, paddingRight: space.md },
   breakingItem: { maxWidth: 280 },
   epaper: { marginHorizontal: space.lg, marginTop: space.md, gap: space.xs },
   soft: { opacity: 0.8 },

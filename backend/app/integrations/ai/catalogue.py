@@ -59,6 +59,7 @@ __all__ = [
     "SARVAM_TTS",
     "TTS",
     "TTS_SPEED_RANGE",
+    "VISION_MODEL",
     "choices_for",
     "image_size_args",
     "sarvam_model",
@@ -160,17 +161,20 @@ IMAGE: tuple[Choice, ...] = (
         tier="best",
         usd_per_call=0.0066,
         note="Measured 2026-09-23: a third of the price of 1.5 at quality low, "
-        "~15 s, clean flat illustration. It can even letter Telugu — but in "
-        "the same test it invented price boards the story never mentioned, "
-        "which is why news cards typeset their text themselves.",
+        "~15 s. With the realistic prompt (2026-09-30) a convincing "
+        "natural-light photograph that looks like Andhra Pradesh and "
+        "Telangana. It can even letter Telugu — but it invented price boards "
+        "the story never mentioned, which is why news cards typeset their "
+        "text themselves.",
     ),
     Choice(
         id="openai/gpt-image-2.5-sunburst",
         label="GPT Image 2.5 Sunburst",
         tier="best",
         usd_per_call=0.0066,
-        note="Same price and speed as Flare; a textured, painterly finish "
-        "instead of flat colour.",
+        note="Same price, speed and photographic realism as Flare "
+        "(2026-09-30), but its ambulances and hospitals looked American, not "
+        "Indian.",
     ),
     Choice(
         id="openai/gpt-image-1.5",
@@ -226,6 +230,23 @@ DEFAULT_TEXT_MODEL = "google/gemini-3-8-flash"
 DEFAULT_BULK_MODEL = "google/gemini-3-5-flash-lite"
 DEFAULT_IMAGE_MODEL = "openai/gpt-image-2.5-flare"
 DEFAULT_TTS_MODEL = "openai/gpt-4o-mini-tts"
+#: The assistant's web search: a search-grounded model that answers with the
+#: pages it read (`citations` + `search_results` with dates and snippets).
+#: Measured 2026-09-29 on aimlapi: $0.007 and ~4 s per query, and it said
+#: plainly which prices its sources did not state instead of inventing them.
+#: aimlapi only - it is not an OpenAI model.
+DEFAULT_RESEARCH_MODEL = "perplexity/sonar"
+#: The crawl's photo check (`LlmAi.inspect_image`): a verdict per crawled
+#: photo, never an edit. Measured 2026-09-30 on aimlapi, 6 clean heroes + 12
+#: photos carrying a publisher's headline band, watermark or logo, at 1024 px:
+#: no branded photo judged clean, 4/6 clean accepted (one "logo" for a channel
+#: mic flag in the scene, one answer with no verdict), median 3.6 s, $0.00063 a
+#: call. gemini-3-8-flash (5/6, 5.5 s, $0.0023, three 5xx) and gpt-4o-mini
+#: (5/6, 3.1 s, $0.0049 - it bills an image like gpt-4o, and called jersey
+#: sponsors a logo) also passed, at 4-8x the price. 768 px cost flash-lite the
+#: same and changed no verdict; 1024 stays for small corner marks. aimlapi
+#: only: on any other provider `inspect_image` answers None (not scanned).
+VISION_MODEL = "google/gemini-3-5-flash-lite"
 
 # --------------------------------------------------------------------------- #
 # Text-to-speech — Sarvam AI

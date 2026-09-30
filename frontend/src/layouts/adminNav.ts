@@ -1,6 +1,7 @@
 import {
   BarChart3,
   Bell,
+  BotMessageSquare,
   ClipboardCheck,
   Clock,
   FileText,
@@ -60,6 +61,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     labelKey: 'admin.group.newsroom',
     items: [
       { to: '/admin/dashboard', labelKey: 'admin.page.dashboard', icon: LayoutDashboard },
+      { to: '/admin/assistant', labelKey: 'admin.page.assistant', icon: BotMessageSquare, permission: 'ai.use' },
       { to: '/admin/articles', labelKey: 'admin.page.articles', icon: FileText, match: '/admin/articles' },
     ],
   },

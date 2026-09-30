@@ -11,7 +11,7 @@ returns the licence, the artist and the licence URL — which is what makes prop
 
 Coverage matters too: Commons has deep photographic coverage of Indian places,
 infrastructure and civic subjects, which is exactly what a Telugu district paper
-needs illustrations for.
+needs photos of.
 """
 
 from __future__ import annotations

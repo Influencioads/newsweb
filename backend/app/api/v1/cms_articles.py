@@ -12,9 +12,10 @@ from app.core.ratelimit import rate_limit
 from app.db.base import utcnow
 from app.db.session import get_db
 from app.models.audio import AudioAsset
-from app.models.content import Article, ArticleTag
+from app.models.content import Article, ArticleTag, Category
 from app.models.discovery import Pin
-from app.models.enums import ArticleType, AuditAction, WorkflowState
+from app.models.enums import ArticleStatus, ArticleType, AuditAction, WorkflowState
+from app.models.geo import District, Mandal
 from app.models.media import ArticleMedia, Media
 from app.models.video import Video
 from app.schemas.cms import (
@@ -42,7 +43,8 @@ def _get(db: Session, article_id: int) -> Article:
 
 
 def _media_ref(media: Media) -> CmsMediaRef:
-    open_licence = (media.meta or {}).get("open_licence") or {}
+    meta = media.meta or {}
+    open_licence = meta.get("open_licence") or {}
     return CmsMediaRef(
         id=media.id,
         url=media.cdn_url or f"/media/{media.storage_key}",
@@ -58,7 +60,22 @@ def _media_ref(media: Media) -> CmsMediaRef:
         or None,
         width=media.width,
         height=media.height,
+        ai_generated=bool(media.ai_generated),
+        checked=(meta.get("photo_check") or {}).get("verdict") == "clean",
     )
+
+
+def _attach_heroes(db: Session, rows: list[Article], out: list[CmsArticleOut]) -> None:
+    """The hero on each list row — the studio's thumbnail and the review
+    queue's photo badges — in one query for the page, not one per row."""
+    hero_ids = {a.hero_media_id for a in rows if a.hero_media_id}
+    if not hero_ids:
+        return
+    heroes = {m.id: m for m in db.scalars(select(Media).where(Media.id.in_(hero_ids)))}
+    for article, row in zip(rows, out):
+        hero = heroes.get(article.hero_media_id) if article.hero_media_id else None
+        if hero is not None and hero.deleted_at is None:
+            row.hero_media = _media_ref(hero)
 
 
 #: Column names the response carries. Built from the model rather than
@@ -205,21 +222,8 @@ def list_articles(
             .limit(limit)
         ).scalars()
     )
-    # The hero as a thumbnail (the creative studio's article picker): one
-    # query for the page, not one per row.
-    hero_ids = {a.hero_media_id for a in rows if a.hero_media_id}
-    heroes = (
-        {m.id: m for m in db.scalars(select(Media).where(Media.id.in_(hero_ids)))}
-        if hero_ids
-        else {}
-    )
-    out = []
-    for a in rows:
-        row = _list_row(a)
-        hero = heroes.get(a.hero_media_id) if a.hero_media_id else None
-        if hero is not None and hero.deleted_at is None:
-            row.hero_media = _media_ref(hero)
-        out.append(row)
+    out = [_list_row(a) for a in rows]
+    _attach_heroes(db, rows, out)
     return CmsArticleList(articles=out, total=total)
 
 
@@ -281,7 +285,9 @@ def pending_articles(
             .limit(limit)
         ).scalars()
     )
-    return CmsArticleList(articles=[_list_row(a) for a in rows], total=total)
+    out = [_list_row(a) for a in rows]
+    _attach_heroes(db, rows, out)
+    return CmsArticleList(articles=out, total=total)
 
 
 @router.post("", response_model=CmsArticleOut, status_code=201)
@@ -420,6 +426,39 @@ def article_origin(
             if rewrite is not None
             else None
         ),
+        # Where the AI filed it and which photos it looked at, so the reviewer
+        # can see the machine's working. Null for items that predate either.
+        "ai": _ai_filing(db, rewrite.classification if rewrite is not None else None),
+        "photos": item.photo_check,
+    }
+
+
+def _ai_filing(db: Session, cls: dict | None) -> dict | None:
+    """`IngestedRewrite.classification` with its ids turned into names. The
+    ids were validated when written; `db.get` still tolerates a row deleted
+    since, which simply shows as nothing."""
+    if not cls:
+        return None
+
+    def named(model, row_id):
+        row = db.get(model, row_id) if row_id else None
+        return (
+            {"id": row.id, "name_te": row.name_te, "name_en": row.name_en}
+            if row is not None
+            else None
+        )
+
+    return {
+        "category": named(Category, cls.get("category_id")),
+        "subcategory": named(Category, cls.get("subcategory_id")),
+        "district": named(District, cls.get("district_id")),
+        "mandal": named(Mandal, cls.get("mandal_id")),
+        "tags": [
+            {"name": t.get("name"), "type": t.get("type")}
+            for t in cls.get("tags") or []
+        ],
+        "breaking": bool(cls.get("breaking")),
+        "glyph_warning": bool(cls.get("glyph_warning")),
     }
 
 
@@ -554,9 +593,18 @@ def breaking_control(
         article.breaking_until = None
     elif payload.minutes is not None:
         article.is_breaking = True
-        article.breaking_until = utcnow() + timedelta(minutes=payload.minutes)
+        # Not yet live (the review queue's "Mark breaking"): a window counted
+        # from now would be half spent by publication, so leave it open and
+        # let publish apply the configured default from the moment it goes out.
+        article.breaking_until = (
+            utcnow() + timedelta(minutes=payload.minutes)
+            if article.published_at is not None
+            else None
+        )
 
-    if payload.repush and article.is_breaking:
+    # Only a live story is pushed: marking one breaking while it still awaits
+    # review must not alert every reader to copy nobody has approved.
+    if payload.repush and article.is_breaking and article.status == ArticleStatus.PUBLISHED:
         from app.services.notification_service import fan_out_for_article
 
         fan_out_for_article(db, article)

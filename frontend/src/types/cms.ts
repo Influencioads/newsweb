@@ -1,6 +1,8 @@
 /** The three optional fields are the approver's provenance line: the article
  *  API always sends them, the media-library and AI-image responses do not. */
-export interface CmsMediaRef { id:number; url:string; alt_te:string|null; caption_te?:string|null; credit:string|null; source_type?:string|null; licence?:string|null; width:number|null; height:number|null }
+export interface CmsMediaRef { id:number; url:string; alt_te:string|null; caption_te?:string|null; credit:string|null; source_type?:string|null; licence?:string|null; width:number|null; height:number|null;
+  /** Made by a model: a realistic representative picture, not a photograph. `checked`: the crawl's vision scan found no publisher branding on it. */
+  ai_generated?:boolean; checked?:boolean }
 export interface CmsVideoRef { id:number; youtube_id:string; title_te:string; thumbnail_url:string }
 export interface CmsTagRef { id:number; slug:string; name_te:string; name_en:string }
 /** §19 — the rendition the article uses. `provider:'upload'` is an editor's own file. */
@@ -24,6 +26,8 @@ export interface CmsArticle {
   status:string; workflow_state:string;
   is_breaking:boolean; is_exclusive:boolean; is_featured:boolean; is_short:boolean; voice_enabled:boolean;
   ai_generated:boolean;
+  /** The crawl's AI thinks this is breaking. A hint only — never sets `is_breaking`. */
+  breaking_suggested:boolean;
   hero_media_id:number|null; video_id:number|null; audio_asset_id:number|null;
   seo_title:string|null; seo_description:string|null; canonical_url:string|null;
   approved_by:number|null; approved_at:string|null;
@@ -235,6 +239,29 @@ export interface ArticleOrigin {
     'title_te' | 'summary_te' | 'body_plain' | 'attribution_te' | 'similarity_percent'
     | 'confidence' | 'unverified' | 'engine' | 'model' | 'word_count' | 'created_at'
   > | null;
+  /** Where the AI filed the story, as names. Null for items from before it did. */
+  ai: AiFiling | null;
+  /** What the vision scan said about each candidate photo. Null when nothing was scanned. */
+  photos: PhotoCheck | null;
+}
+
+export type AiTagType = 'person' | 'place' | 'org' | 'topic' | 'event';
+export interface AiFiling {
+  category: Omit<CmsOption, 'slug'> | null;
+  subcategory: Omit<CmsOption, 'slug'> | null;
+  district: Omit<CmsOption, 'slug'> | null;
+  mandal: Omit<CmsOption, 'slug'> | null;
+  tags: Array<{ name: string; type: AiTagType }>;
+  breaking: boolean;
+  /** The rewrite kept stray foreign letters, so it was never auto-queued. */
+  glyph_warning: boolean;
+}
+
+export type PhotoVerdict = 'clean' | 'watermark' | 'logo' | 'text' | 'graphic' | 'unchecked';
+export interface PhotoCheck {
+  model: string | null;
+  candidates: Array<{ url: string; verdict: PhotoVerdict; reason: string }>;
+  hero: 'crawled' | 'open_licence' | 'ai_illustration' | 'none';
 }
 
 export type IngestQueueCounts = Record<IngestStatus, number>;
@@ -359,4 +386,113 @@ export interface KycProfileRow {
   internal_note?: string | null;
   documents?: KycDocumentRow[];
   missing?: string[][];
+}
+
+// --- Sanjaya, the newsroom assistant ----------------------------------------
+// A turn runs on the server (several model calls outlive the 20 s client
+// timeout); the page polls the conversation while `status` is `running`.
+
+/** Copy a tool writes: one string, or both languages for the page to pick from. */
+export type AssistantText = string | { te: string; en: string };
+
+export interface AssistantTool {
+  name: string;
+  label_te: string;
+  label_en: string;
+}
+
+export interface AssistantStatus {
+  name_en: string;
+  name_te: string;
+  ready: boolean;
+  reason_en: string | null;
+  reason_te: string | null;
+  ai_enabled: boolean;
+  research_enabled: boolean;
+  provider: string;
+  model: string | null;
+  tools: AssistantTool[];
+}
+
+export type AssistantTurnStatus = 'idle' | 'running' | 'failed';
+
+export interface AssistantConversationSummary {
+  id: number;
+  title: string;
+  status: AssistantTurnStatus;
+  updated_at: string;
+}
+
+type Titled = { title?: AssistantText };
+
+/** What a tool result asks the page to draw. Unknown `type`s are skipped by the page. */
+export type AssistantCard =
+  | (Titled & { type: 'stats'; items: Array<{ label: AssistantText; value: string | number; hint?: AssistantText }> })
+  | (Titled & { type: 'bars'; unit?: string; items: Array<{ label: AssistantText; value: number; display?: string }> })
+  | (Titled & {
+      type: 'table';
+      columns: Array<{ key: string; label: AssistantText; align?: 'left' | 'right' }>;
+      rows: Array<Record<string, string | number | null>>;
+    })
+  | (Titled & {
+      type: 'articles';
+      items: Array<{ id: number; short_id: string; title: string; workflow_state: string; note?: AssistantText }>;
+    })
+  | (Titled & { type: 'sources'; items: Array<{ title: string; url: string; date?: string; snippet?: string }> })
+  | { type: 'job'; job_id: number }
+  | {
+      type: 'bulletin';
+      id: number;
+      date: string;
+      slot: number;
+      slot_label_te: string;
+      status: string;
+      url: string | null;
+      duration_sec: number | null;
+    }
+  | AssistantActionCard
+  | { type: 'image'; url: string; alt: string };
+
+type ActionBase = { type: 'action'; label: AssistantText; summary: AssistantText };
+/** An outward step Sanjaya may only propose: a person presses the button, the existing route does it. */
+export type AssistantActionCard =
+  | (ActionBase & { action: 'approve_article' | 'publish_article'; params: { article_id: number; title: string } })
+  | (ActionBase & {
+      action: 'send_push';
+      params: { article_id: number; short_id: string; title_te: string; body_te: string; audience: string; send_at: string | null };
+    })
+  | (ActionBase & { action: 'publish_bulletin'; params: { bulletin_id: number } });
+
+export interface AssistantMessage {
+  id: number;
+  role: 'user' | 'assistant';
+  text: string;
+  /** Tools this reply called, in order. */
+  tools: AssistantTool[];
+  cards: AssistantCard[];
+  created_at: string;
+}
+
+export interface AssistantJob {
+  id: number;
+  kind: string;
+  title: string;
+  status: 'queued' | 'running' | 'done' | 'failed';
+  progress: number;
+  step_text: string | null;
+  result: {
+    summary?: string;
+    cards?: AssistantCard[];
+    error?: { code: string; message_en: string; message_te: string };
+  } | null;
+  error: string | null;
+  created_at: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface AssistantConversation extends AssistantConversationSummary {
+  error: string | null;
+  messages: AssistantMessage[];
+  jobs: AssistantJob[];
 }

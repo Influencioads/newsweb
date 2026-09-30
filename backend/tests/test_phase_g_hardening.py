@@ -21,7 +21,8 @@ from app.db.seed_content import seed_categories  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.content import Article  # noqa: E402
-from app.models.enums import ArticleStatus, RoleKey, ScopeType, UserStatus, WorkflowState  # noqa: E402
+from app.models.enums import ArticleStatus, MediaType, RoleKey, ScopeType, UserStatus, WorkflowState  # noqa: E402
+from app.models.media import Media  # noqa: E402
 from app.models.user import Role, User, UserRole  # noqa: E402
 from app.services import auth_service  # noqa: E402
 
@@ -158,10 +159,14 @@ class TestPublishCachePurge:
         db.flush()
         role = db.execute(select(Role).where(Role.key == RoleKey.DESK_EDITOR.value)).scalar_one()
         db.add(UserRole(user_id=editor.id, role_id=role.id, scope_type=ScopeType.GLOBAL))
+        hero = Media(type=MediaType.IMAGE, filename="hero.webp", mime="image/webp",
+                     storage_provider="test", storage_key="images/test/gpurge.webp")
+        db.add(hero)
+        db.flush()
         article = Article(
             short_id="gpurge", slug="purge-test", title_te="పర్జ్ పరీక్ష కథనం",
             status=ArticleStatus.PENDING, workflow_state=WorkflowState.APPROVED,
-            author_id=author.id, approved_by=editor.id,
+            author_id=author.id, approved_by=editor.id, hero_media_id=hero.id,
         )
         db.add(article)
         db.commit()

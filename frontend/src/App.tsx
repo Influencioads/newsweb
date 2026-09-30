@@ -73,6 +73,7 @@ const AiSuggestionsPage = lazy(() => import('./pages/admin/AiSuggestions'));
 const ContentSourcesPage = lazy(() => import('./pages/admin/ContentSources'));
 const PendingArticlesPage = lazy(() => import('./pages/admin/PendingArticles'));
 const CreativeStudio = lazy(() => import('./pages/admin/CreativeStudio'));
+const AssistantPage = lazy(() => import('./pages/admin/assistant/AssistantPage'));
 
 const management = () => import('./pages/admin/ManagementPages');
 const AuditPage = named(management, 'AuditPage');
@@ -201,6 +202,7 @@ export default function App() {
               <Route path="/admin/epaper/:date/print" element={<EpaperPrintPage />} />
               <Route element={<AdminLayout />}>
                 <Route path="/admin/dashboard" element={<Dashboard />} />
+                <Route path="/admin/assistant" element={<AssistantPage />} />
                 <Route path="/admin/articles" element={<Articles />} />
                 <Route path="/admin/articles/new" element={<ArticleEditor />} />
                 <Route path="/admin/articles/:id/edit" element={<ArticleEditor />} />

@@ -34,12 +34,14 @@ from app.models.engagement import ArticleEvent, ReadingSession  # noqa: E402
 from app.models.enums import (  # noqa: E402
     ArticleStatus,
     EventType,
+    MediaType,
     RoleKey,
     ScopeType,
     UserStatus,
     WorkflowState,
 )
 from app.models.geo import District  # noqa: E402
+from app.models.media import Media  # noqa: E402
 from app.models.user import Role, User, UserRole  # noqa: E402
 from app.services import auth_service  # noqa: E402
 from app.services.video_service import parse_youtube_id  # noqa: E402
@@ -256,6 +258,48 @@ class TestShortNews:
         assert "hero photo" in r.json()["error"]["message_en"]
         db.refresh(article)
         assert article.workflow_state == WorkflowState.APPROVED
+
+    def test_no_story_publishes_without_a_usable_hero_photo(
+        self, client: TestClient, db: Session
+    ) -> None:
+        """Every story, not only a short: no photo, or one deleted from the
+        library, is refused; a live image publishes."""
+        editor = staff_headers(db, role=RoleKey.DESK_EDITOR, email="shorts@test.example.com")
+        staff_headers(db, role=RoleKey.DESK_EDITOR, email="hero-approver@test.example.com")
+        approver = db.execute(
+            select(User).where(User.email == "hero-approver@test.example.com")
+        ).scalar_one()
+        article = make_article(db, title_te="ఫోటో లేని సాధారణ వార్త")
+        article.status = ArticleStatus.PENDING
+        article.workflow_state = WorkflowState.APPROVED
+        article.approved_by = approver.id
+        db.commit()
+
+        def publish():
+            return client.post(f"/api/v1/cms/articles/{article.id}/publish", json={}, headers=editor)
+
+        r = publish()
+        assert r.status_code == 422, r.text
+        assert "hero photo" in r.json()["error"]["message_en"]
+
+        hero = Media(type=MediaType.IMAGE, filename="hero.webp", mime="image/webp",
+                     storage_provider="test", storage_key="images/test/e-hero.webp",
+                     deleted_at=utcnow())
+        db.add(hero)
+        db.flush()
+        article.hero_media_id = hero.id
+        db.commit()
+        r = publish()
+        assert r.status_code == 422, r.text
+        assert "hero photo" in r.json()["error"]["message_en"]
+        db.refresh(article)
+        assert article.workflow_state == WorkflowState.APPROVED
+
+        hero.deleted_at = None
+        db.commit()
+        r = publish()
+        assert r.status_code == 200, r.text
+        assert r.json()["workflow_state"] == WorkflowState.PUBLISHED.value
 
 
 # --------------------------------------------------------------------------- #

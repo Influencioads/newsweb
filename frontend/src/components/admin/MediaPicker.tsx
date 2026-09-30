@@ -145,7 +145,7 @@ export function MediaPicker({ heroId, hero, gallery, onHeroChange, onGalleryChan
       // `available:false` is an answer, not a throw — the reason stays on
       // screen and the dialog stays open so the editor can edit the brief.
       if (!result.media) return;
-      // An illustration has no photographer, so the endpoint sends no credit.
+      // An AI picture has no photographer, so the endpoint sends no credit.
       onHeroChange({ ...result.media, credit: null });
       setOpen(null);
       setBriefOpen(false);
@@ -275,7 +275,7 @@ export function MediaPicker({ heroId, hero, gallery, onHeroChange, onGalleryChan
               {briefOpen ? (
                 <>
                   <Field
-                    label={L('ఏమి గీయాలో రాయండి', 'Describe the illustration')}
+                    label={L('ఏ దృశ్యం కావాలో రాయండి', 'Describe the scene')}
                     hint={L(
                       'కథనం సారాంశం ఒక్క వాక్యంలో. ఉన్న వ్యక్తుల ఫోటోలు తయారు చేయబడవు.',
                       'One sentence about the story. Photoreal images of real people are never made.',
@@ -308,7 +308,7 @@ export function MediaPicker({ heroId, hero, gallery, onHeroChange, onGalleryChan
                     <p role="status" className={cn(s.body, 'text-meta text-muted')}>
                       {L(
                         'చిత్రం తయారవుతోంది — సాధారణంగా 5–10 సెకన్లు. ఈ విండో మూసివేయకండి.',
-                        'Drawing the picture — usually five to ten seconds. Leave this window open.',
+                        'Making the picture — usually five to ten seconds. Leave this window open.',
                       )}
                     </p>
                   ) : null}

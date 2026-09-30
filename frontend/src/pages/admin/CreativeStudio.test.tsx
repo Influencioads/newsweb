@@ -95,6 +95,7 @@ describe('CreativeStudio', () => {
     await userEvent.click(screen.getByRole('radio', { name: /1080 × 1350/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Next' }));
 
+    expect(screen.getByRole('img', { name: 'Story photo' })).toHaveAttribute('src', 'https://cdn.example/p.webp');
     expect(screen.getByRole('switch', { name: /AI design backdrop/ })).toBeChecked();
     await userEvent.click(screen.getByRole('radio', { name: 'Full photo' }));
     expect(screen.getByRole('switch', { name: /AI design backdrop/ })).not.toBeChecked();
@@ -106,6 +107,30 @@ describe('CreativeStudio', () => {
       7,
       expect.objectContaining({ template: 'overlay', use_ai_backdrop: false, reference_media_ids: [], backdrop_media_id: null }),
     );
+  });
+
+  it('makes a batch from ticked stories: the design drawn once and shared, every card saved', async () => {
+    const other = { ...story, id: 8, title_te: 'పోలవరం పనులు', summary_te: null } as unknown as CmsArticle;
+    vi.mocked(cmsApi.fetchArticles).mockResolvedValue({ articles: [story, other], total: 2 });
+    vi.mocked(cmsApi.fetchCreativeRefs).mockResolvedValue([]);
+    vi.mocked(cmsApi.makeSocialCard).mockImplementation(async (id) => ({
+      available: true,
+      reason: null,
+      card: { url: `https://cdn.example/${id}.jpg`, width: 1080, height: 1080, aspect: '1:1', template: 'frame', filename: `${id}.jpg`, warnings: [], photo: null, backdrop: { media_id: 50, url: null }, media_id: id },
+    }));
+    renderPage();
+    for (const box of await screen.findAllByRole('checkbox', { name: /Add to batch/ })) await userEvent.click(box);
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await userEvent.click(screen.getByRole('radio', { name: /1080 × 1080/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByRole('switch', { name: /AI design backdrop/ })).toBeChecked();
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Generate 2 creatives' }));
+
+    expect(await screen.findByText('2 of 2 done')).toBeInTheDocument();
+    expect(cmsApi.makeSocialCard).toHaveBeenNthCalledWith(1, 7, expect.objectContaining({ headline: 'అసెంబ్లీలో బడ్జెట్', use_ai_backdrop: true, backdrop_media_id: null, save: true }));
+    expect(cmsApi.makeSocialCard).toHaveBeenNthCalledWith(2, 8, expect.objectContaining({ headline: 'పోలవరం పనులు', summary: '', use_ai_backdrop: false, backdrop_media_id: 50, save: true }));
   });
 
   it('never lets AI copy for a story left behind land on the one picked since', async () => {

@@ -7,7 +7,7 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import distinct, func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.deps import Principal, require_permission
@@ -18,13 +18,10 @@ from app.db.base import utcnow
 from app.db.session import get_db
 from app.models.content import Article, Category
 from app.models.discovery import Pin
-from app.models.engagement import Bookmark, Comment, Follow, Like, ReadingSession
-from app.models.enums import AuditAction, PinPlacement, RoleKey, TrendingScope
+from app.models.enums import AuditAction, PinPlacement, TrendingScope
 from app.models.geo import District
-from app.models.site import SearchQuery
-from app.models.user import Role, UserRole
 from app.repositories import discovery_repo
-from app.services import audit_service, trending_service
+from app.services import analytics_service, audit_service, trending_service
 
 router = APIRouter(prefix="/cms", tags=["cms-discovery"])
 
@@ -220,111 +217,33 @@ def analytics(
     db: Session = Depends(get_db),
     _p: Principal = Depends(require_permission("analytics.view")),
 ) -> dict:
-    now = utcnow()
-    day_ago = now - timedelta(days=1)
-    week_ago = now - timedelta(days=7)
-    month_ago = now - timedelta(days=30)
-
-    def distinct_viewers(since) -> int:
-        return int(
-            db.execute(
-                select(func.count(distinct(ReadingSession.viewer_key))).where(
-                    ReadingSession.updated_at >= since
-                )
-            ).scalar()
-            or 0
-        )
-
-    sessions_7d = db.execute(
-        select(
-            func.count(ReadingSession.id),
-            func.avg(ReadingSession.seconds),
-            func.avg(ReadingSession.max_scroll_pct),
-        ).where(ReadingSession.updated_at >= week_ago)
-    ).one()
-
-    top_articles = db.execute(
-        select(
-            Article.title_te,
-            Article.short_id,
-            func.count(ReadingSession.id).label("reads"),
-        )
-        .join(ReadingSession, ReadingSession.article_id == Article.id)
-        .where(ReadingSession.updated_at >= week_ago)
-        .group_by(Article.id)
-        .order_by(func.count(ReadingSession.id).desc())
-        .limit(10)
-    ).all()
-
-    top_categories = db.execute(
-        select(
-            Category.name_te,
-            Category.slug,
-            func.count(ReadingSession.id).label("reads"),
-        )
-        .join(Article, Article.category_id == Category.id)
-        .join(ReadingSession, ReadingSession.article_id == Article.id)
-        .where(ReadingSession.updated_at >= week_ago)
-        .group_by(Category.id)
-        .order_by(func.count(ReadingSession.id).desc())
-        .limit(8)
-    ).all()
-
-    top_districts = db.execute(
-        select(
-            District.name_te,
-            District.slug,
-            func.count(ReadingSession.id).label("reads"),
-        )
-        .join(Article, Article.district_id == District.id)
-        .join(ReadingSession, ReadingSession.article_id == Article.id)
-        .where(ReadingSession.updated_at >= week_ago)
-        .group_by(District.id)
-        .order_by(func.count(ReadingSession.id).desc())
-        .limit(8)
-    ).all()
-
-    top_searches = db.execute(
-        select(SearchQuery.normalized, func.count(SearchQuery.id).label("n"))
-        .where(SearchQuery.created_at >= week_ago)
-        .group_by(SearchQuery.normalized)
-        .order_by(func.count(SearchQuery.id).desc())
-        .limit(10)
-    ).all()
-
-    readers = int(
-        db.execute(
-            select(func.count(distinct(UserRole.user_id)))
-            .join(Role, Role.id == UserRole.role_id)
-            .where(Role.key == RoleKey.SUBSCRIBER.value)
-        ).scalar()
-        or 0
-    )
-
-    def table_count(model) -> int:
-        return int(db.execute(select(func.count()).select_from(model)).scalar() or 0)
-
+    """The §25 screen. The numbers live in `analytics_service` so Sanjaya reads
+    the same ones; this keeps the response keys the page was built against."""
+    s = analytics_service.audience(db, days=7)
     return {
-        "dau": distinct_viewers(day_ago),
-        "wau": distinct_viewers(week_ago),
-        "mau": distinct_viewers(month_ago),
-        "reads_7d": int(sessions_7d[0] or 0),
-        "avg_read_seconds_7d": round(float(sessions_7d[1] or 0), 1),
-        "avg_scroll_pct_7d": round(float(sessions_7d[2] or 0), 1),
-        "registered_readers": readers,
-        "likes_total": table_count(Like),
-        "bookmarks_total": table_count(Bookmark),
-        "comments_total": table_count(Comment),
-        "follows_total": table_count(Follow),
+        "dau": s["dau"],
+        "wau": s["wau"],
+        "mau": s["mau"],
+        "reads_7d": s["reads"],
+        "avg_read_seconds_7d": s["avg_read_seconds"],
+        "avg_scroll_pct_7d": s["avg_scroll_pct"],
+        "registered_readers": s["registered_readers"],
+        "likes_total": s["likes_total"],
+        "bookmarks_total": s["bookmarks_total"],
+        "comments_total": s["comments_total"],
+        "follows_total": s["follows_total"],
         "top_articles_7d": [
-            {"title_te": t, "short_id": s, "reads": int(n)} for t, s, n in top_articles
+            {"title_te": r["title_te"], "short_id": r["short_id"], "reads": r["reads"]}
+            for r in s["top_articles"]
         ],
         "top_categories_7d": [
-            {"name_te": t, "slug": s, "reads": int(n)} for t, s, n in top_categories
+            {"name_te": r["name_te"], "slug": r["slug"], "reads": r["reads"]}
+            for r in s["top_categories"]
         ],
         "top_districts_7d": [
-            {"name_te": t, "slug": s, "reads": int(n)} for t, s, n in top_districts
+            {"name_te": r["name_te"], "slug": r["slug"], "reads": r["reads"]}
+            for r in s["top_districts"]
         ],
-        "top_searches_7d": [{"query": q, "count": int(n)} for q, n in top_searches],
-        "generated_at": now,
+        "top_searches_7d": s["top_searches"],
+        "generated_at": s["generated_at"],
     }

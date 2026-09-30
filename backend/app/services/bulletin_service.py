@@ -57,8 +57,9 @@ SLOTS: tuple[int, ...] = (7, 9, 13, 15, 17, 19, 21)
 #: really four minutes long is not the product that was asked for.
 CHARS_PER_SECOND = 12.0
 
-#: Hard ceiling regardless of the configured target.
-MAX_SCRIPT_CHARS = 2_400
+#: Hard ceiling regardless of the configured target: five minutes at 12 cps,
+#: the longest bulletin a person can ask the assistant for.
+MAX_SCRIPT_CHARS = 3_600
 
 #: How late a slot may still be produced. Past this, a worker that was down
 #: declines rather than publishing a stale "1 o'clock bulletin" at three. Must
@@ -143,14 +144,31 @@ def _recent_article_ids(db: Session, day: date, slot: int, *, back: int = 2) -> 
     return {int(r[0]) for r in rows}
 
 
-def select_stories(db: Session, day: date, slot: int, *, limit: int) -> list[Article]:
+def select_stories(
+    db: Session,
+    day: date,
+    slot: int,
+    *,
+    limit: int,
+    category_ids: list[int] | None = None,
+    district_id: int | None = None,
+    since: datetime | None = None,
+) -> list[Article]:
     """The stories this bulletin reads.
 
     Only PUBLISHED rows are ever considered — that is the whole basis on which
     a bulletin may go live without another approval step.
+
+    `since` widens the window back from the slot (a topic or district bulletin
+    finds too little in two hours); the category is matched in SQL, the
+    district in Python over a window that is already small.
     """
-    since, until = window_for(day, slot)
-    candidates = epaper_service.ranked_articles(db, day, None, since=since, until=until)
+    start, until = window_for(day, slot)
+    candidates = epaper_service.ranked_articles(
+        db, day, category_ids, since=since or start, until=until
+    )
+    if district_id is not None:
+        candidates = [a for a in candidates if a.district_id == district_id]
 
     # A story repeated three bulletins running makes the service sound broken.
     # Breaking news is exempt: repetition is the point there.
@@ -162,8 +180,9 @@ def select_stories(db: Session, day: date, slot: int, *, limit: int) -> list[Art
 # --------------------------------------------------------------------------- #
 # Script
 # --------------------------------------------------------------------------- #
-def target_chars(db: Session) -> int:
-    seconds = settings_service.get_int(db, "bulletin.target_seconds")
+def target_chars(db: Session, seconds: int | None = None) -> int:
+    """`seconds` is a length a person asked for; the setting otherwise."""
+    seconds = seconds or settings_service.get_int(db, "bulletin.target_seconds")
     return min(MAX_SCRIPT_CHARS, int(seconds * CHARS_PER_SECOND))
 
 
@@ -243,42 +262,63 @@ def _ai_connectives(db: Session, headlines: list[str]) -> list[str] | None:
 
 
 def build_script(
-    db: Session, *, day: date, slot: int, articles: list[Article]
+    db: Session,
+    *,
+    day: date,
+    slot: int,
+    articles: list[Article],
+    seconds: int | None = None,
 ) -> tuple[str, list[tuple[Article, str]]]:
-    """`(script, [(article, spoken_text)])`."""
+    """`(script, [(article, spoken_text)])`, at most `target_chars` long.
+
+    Each story costs its headline twice (in the roll and before its text) plus
+    a connective, not only its body text. Budgeting the body alone overshot by
+    ~70 characters a story, and the old hard cut at the end then removed the
+    closing line and half the last story — while the transcript still listed
+    it. Now the whole cost is budgeted, a story that still does not fit is
+    dropped whole (from the roll too), and the close is always spoken.
+    """
     label = slot_label_te(slot)
     opening = _OPEN_TE.format(label=label)
     closing = _CLOSE_TE
+    budget = target_chars(db, seconds)
 
     headlines = [normalize_headline(a.title_te or "") for a in articles]
-    roll = " … ".join(h for h in headlines if h)
-
-    fixed = len(opening) + len(roll) + len(closing) + 8
-    budget = target_chars(db)
-    per_story = max(MIN_STORY_CHARS, (budget - fixed) // max(1, len(articles)))
-
     connectives = _ai_connectives(db, headlines) or list(_CONNECTIVES_TE)
+    joint = max(len(c) for c in connectives) + 4  # the connective and its two "\n\n"
+    fixed = len(opening) + len(closing) + 8
+    overhead = sum(2 * len(h) + 4 + joint for h in headlines)
+    per_story = max(MIN_STORY_CHARS, (budget - fixed - overhead) // max(1, len(articles)))
 
-    parts: list[str] = [opening]
-    if roll:
-        parts.append(roll)
-    spoken: list[tuple[Article, str]] = []
-    for index, article in enumerate(articles):
-        text = _story_text(article, per_story)
-        headline = headlines[index]
-        piece = " ".join(p for p in (headline, text) if p).strip()
-        if not piece:
-            continue
-        if index:
-            parts.append(connectives[index % len(connectives)])
-        parts.append(piece)
-        spoken.append((article, piece))
-    parts.append(closing)
+    stories: list[tuple[Article, str, str]] = []
+    for article, headline in zip(articles, headlines):
+        # A full stop after the headline: joined by a bare space the voice ran
+        # the headline straight into the story. ". " buys ~0.5 s (measured on
+        # Sarvam, see tts_text) — a headline that already ends a sentence keeps its own.
+        body = _story_text(article, per_story)
+        head = headline if not headline or headline[-1] in ".।?!" else f"{headline}."
+        piece = " ".join(p for p in (head, body) if p).strip() if body else headline
+        if piece:
+            stories.append((article, headline, piece))
 
-    script = "\n\n".join(p for p in parts if p).strip()
+    def assemble(chosen: list[tuple[Article, str, str]]) -> str:
+        parts = [opening, " … ".join(h for _a, h, _p in chosen if h)]
+        for index, (_article, _headline, piece) in enumerate(chosen):
+            if index:
+                parts.append(connectives[index % len(connectives)])
+            parts.append(piece)
+        parts.append(closing)
+        return "\n\n".join(p for p in parts if p).strip()
+
+    script = assemble(stories)
+    while len(script) > budget and len(stories) > 1:
+        stories.pop()
+        script = assemble(stories)
     if len(script) > MAX_SCRIPT_CHARS:
-        script = script[:MAX_SCRIPT_CHARS].rsplit(" ", 1)[0]
-    return script, spoken
+        # One story longer than the cap on its own: cut it, keep the close.
+        head = script[: MAX_SCRIPT_CHARS - len(closing) - 2].rsplit(" ", 1)[0]
+        script = f"{head}\n\n{closing}"
+    return script, [(article, piece) for article, _headline, piece in stories]
 
 
 # --------------------------------------------------------------------------- #
@@ -300,14 +340,24 @@ def get_or_create(db: Session, day: date, slot: int) -> AudioBulletin:
 
 
 def script_bulletin(
-    db: Session, bulletin: AudioBulletin, *, limit: int | None = None
+    db: Session,
+    bulletin: AudioBulletin,
+    *,
+    limit: int | None = None,
+    articles: list[Article] | None = None,
+    seconds: int | None = None,
 ) -> AudioBulletin:
-    """Choose the stories and write the script. No provider is called."""
+    """Choose the stories and write the script. No provider is called.
+
+    `articles` replaces the selection (stories a person picked, already
+    PUBLISHED); `seconds` replaces `bulletin.target_seconds` for this one.
+    """
     # The opener speaks the name from `_LABELS_TE`; a row made under an older
     # name must show the one it now says.
     bulletin.slot_label_te = slot_label_te(bulletin.slot)
-    story_limit = limit or settings_service.get_int(db, "bulletin.story_limit")
-    articles = select_stories(db, bulletin.bulletin_date, bulletin.slot, limit=story_limit)
+    if articles is None:
+        story_limit = limit or settings_service.get_int(db, "bulletin.story_limit")
+        articles = select_stories(db, bulletin.bulletin_date, bulletin.slot, limit=story_limit)
     if not articles:
         bulletin.status = BulletinStatus.SKIPPED
         bulletin.error = "no published stories in this window"
@@ -315,7 +365,7 @@ def script_bulletin(
         return bulletin
 
     script, spoken = build_script(
-        db, day=bulletin.bulletin_date, slot=bulletin.slot, articles=articles
+        db, day=bulletin.bulletin_date, slot=bulletin.slot, articles=articles, seconds=seconds
     )
 
     bulletin.items.clear()
@@ -517,6 +567,13 @@ def run_slot(
 
     `(bulletin_date, slot)` is unique, so a double-fire updates the same row
     rather than producing two bulletins for nine o'clock.
+
+    The beat (no slot, nobody asking) leaves alone a row that is live, and a
+    row a person made (`requested_by`: the assistant, Run now, Regenerate).
+    That one is theirs — held at READY for a human to publish, or already
+    reviewed by one — and the hour striking must neither re-record it with
+    other news nor put it on air. (Before the assistant, the beat re-scripted
+    a Run-now bulletin still awaiting approval; a person's work now stands.)
     """
     if not enabled(db):
         return None
@@ -527,7 +584,10 @@ def run_slot(
     resolved_day = day or today()
 
     bulletin = get_or_create(db, resolved_day, resolved_slot)
-    if bulletin.status == BulletinStatus.PUBLISHED and slot is None:
+    if slot is None and (
+        bulletin.status == BulletinStatus.PUBLISHED
+        or (requested_by is None and bulletin.requested_by is not None)
+    ):
         return bulletin
 
     script_bulletin(db, bulletin)

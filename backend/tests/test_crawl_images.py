@@ -13,6 +13,7 @@ from __future__ import annotations
 import io
 import os
 from collections.abc import Iterator
+from contextlib import contextmanager
 
 import httpx
 import pytest
@@ -23,13 +24,17 @@ from sqlalchemy.pool import StaticPool
 
 os.environ.setdefault("APP_ENV", "test")
 
+from app.core.errors import AiProviderError  # noqa: E402
 from app.db.base import Base, utcnow  # noqa: E402
+from app.integrations.ai.base import ImageVerdict  # noqa: E402
 from app.integrations.feeds import images as feed_images  # noqa: E402
 from app.integrations.storage import StoredObject  # noqa: E402
+from app.models.ai import AiUsage  # noqa: E402
 from app.models.enums import ContentPolicy, IngestStatus, SourceLicence  # noqa: E402
 from app.models.ingestion import ContentSource, IngestedItem  # noqa: E402
 from app.models.media import ArticleMedia, Media  # noqa: E402
-from app.services import ingestion_service  # noqa: E402
+from app.models.setting import AppSetting  # noqa: E402
+from app.services import ingestion_service, settings_service  # noqa: E402
 
 ARTICLE = "https://publisher.example.com/news/floods-in-the-district"
 LOGO = "https://publisher.example.com/static/brand-mark.png"
@@ -403,6 +408,270 @@ class TestAttachMedia:
         monkeypatch.setattr("app.services.ingestion_service.httpx.stream", _never)
         article = ingestion_service.import_item(db, item, actor_id=None)
         assert article.hero_media_id is None
+
+
+class _Vision:
+    """A vision model that answers from a script: a verdict, None, or a raise."""
+
+    key = "fake"
+
+    def __init__(self, *answers: object) -> None:
+        self.answers = list(answers)
+        self.calls = 0
+
+    def inspect_image(self, raw: bytes) -> ImageVerdict | None:
+        self.calls += 1
+        answer = self.answers.pop(0) if self.answers else None
+        if isinstance(answer, Exception):
+            raise answer
+        return ImageVerdict(answer, f"saw {answer}") if answer else None
+
+
+SECOND = "https://publisher.example.com/img/second.jpg"
+
+
+class TestPhotoScan:
+    """A branded photo is skipped, never cleaned, and never the hero."""
+
+    @pytest.fixture(autouse=True)
+    def _scan(
+        self,
+        db: Session,
+        monkeypatch: pytest.MonkeyPatch,
+        stub_storage: None,
+        public_dns: None,
+    ) -> Iterator[None]:
+        monkeypatch.setattr("app.core.config.settings.AI_ENABLED", True)
+        monkeypatch.setattr(ingestion_service, "_vision_failures", 0)
+        monkeypatch.setattr(ingestion_service, "_vision_paused_until", 0.0)
+
+        @contextmanager
+        def _apart() -> Iterator[Session]:
+            # With no actor the vision row is committed on its own session.
+            # This SQLite is one StaticPool connection, so a second session
+            # would share this transaction anyway; what is tested here is the
+            # scan (test_crawl_enrichment_import tests where the row goes).
+            yield db
+
+        monkeypatch.setattr(ingestion_service, "session_scope", _apart)
+        # Each URL downloads as itself, so the hero's origin says which won.
+        monkeypatch.setattr(
+            "app.services.ingestion_service.httpx.stream",
+            lambda _method, url, **_k: _Response(_png(), url=url),
+        )
+        settings_service.set_many(
+            db, {"ai.enabled": True, "crawl.image_scan": True}, actor_id=None
+        )
+        db.flush()
+        yield
+        db.query(AppSetting).delete()
+        db.flush()
+        settings_service.invalidate()
+
+    def _vision(self, monkeypatch: pytest.MonkeyPatch, *answers: object) -> _Vision:
+        vision = _Vision(*answers)
+        monkeypatch.setattr(
+            "app.services.ingestion_service.get_ai", lambda *_a, **_k: vision
+        )
+        return vision
+
+    def test_an_excerpt_source_skips_a_watermarked_photo_for_a_clean_one(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The excerpt path used to stop at its first photo, branded or not."""
+        item = make_item(db, "scan-watermark", images_enabled=True)
+        self._vision(monkeypatch, "watermark", "clean")
+        before = db.query(Media).count()
+        checks = db.query(AiUsage).filter_by(operation="image_check").count()
+
+        article = ingestion_service.import_item(db, item, actor_id=None)
+        db.flush()
+
+        assert db.query(Media).count() == before + 1, "a branded photo became Media"
+        hero = db.get(Media, article.hero_media_id)
+        assert hero.meta["origin_url"] == SECOND
+        assert hero.meta["photo_check"]["verdict"] == "clean"
+        assert [c["verdict"] for c in item.photo_check["candidates"]] == [
+            "watermark",
+            "clean",
+        ]
+        assert item.photo_check["hero"] == "crawled"
+        assert (
+            db.query(AiUsage).filter_by(operation="image_check").count() == checks + 2
+        ), "every vision call goes on the ledger"
+
+    def test_all_branded_means_no_crawled_hero(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        item = make_item(db, "scan-all-branded", images_enabled=True)
+        self._vision(monkeypatch, "logo", "text")
+        before = db.query(Media).count()
+
+        article = ingestion_service.import_item(db, item, actor_id=None)
+        db.flush()
+
+        assert article.hero_media_id is None
+        assert db.query(Media).count() == before
+        assert item.photo_check["hero"] == "none"
+
+    def test_the_scan_gives_up_at_its_limit(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        settings_service.set_many(db, {"crawl.image_scan_max": 1}, actor_id=None)
+        item = make_item(db, "scan-limit", images_enabled=True)
+        vision = self._vision(monkeypatch, "watermark", "clean")
+
+        article = ingestion_service.import_item(db, item, actor_id=None)
+        db.flush()
+
+        assert vision.calls == 1
+        assert article.hero_media_id is None, "an unseen photo is not used past the limit"
+
+    def test_a_scan_that_cannot_run_keeps_the_old_behaviour(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """No key, no image input: the first photo is used, marked unchecked."""
+        item = make_item(db, "scan-keyless", images_enabled=True)
+        self._vision(monkeypatch, None)
+
+        article = ingestion_service.import_item(db, item, actor_id=None)
+        db.flush()
+
+        hero = db.get(Media, article.hero_media_id)
+        assert hero.meta["origin_url"] == PHOTO
+        assert hero.meta["photo_check"] == {"verdict": "unchecked", "model": None}
+        assert item.photo_check["candidates"][0]["verdict"] == "unchecked"
+
+    def test_an_error_is_asked_again_and_the_retry_decides(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """One timeout used to wave the photo through unchecked."""
+        item = make_item(db, "scan-retry", images_enabled=True)
+        vision = self._vision(monkeypatch, AiProviderError(), "clean")
+        failed = db.query(AiUsage).filter_by(operation="image_check", ok=False).count()
+        passed = db.query(AiUsage).filter_by(operation="image_check", ok=True).count()
+
+        article = ingestion_service.import_item(db, item, actor_id=None)
+        db.flush()
+
+        assert vision.calls == 2
+        hero = db.get(Media, article.hero_media_id)
+        assert hero.meta["origin_url"] == PHOTO
+        assert hero.meta["photo_check"]["verdict"] == "clean"
+        assert db.query(AiUsage).filter_by(operation="image_check", ok=False).count() == failed + 1
+        assert db.query(AiUsage).filter_by(operation="image_check", ok=True).count() == passed + 1
+        assert ingestion_service._vision_failures == 0
+
+    def test_two_errors_leave_the_photo_unchecked(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        item = make_item(db, "scan-retry-fails", images_enabled=True)
+        vision = self._vision(monkeypatch, AiProviderError(), AiProviderError(), "clean")
+        failed = db.query(AiUsage).filter_by(operation="image_check", ok=False).count()
+
+        article = ingestion_service.import_item(db, item, actor_id=None)
+        db.flush()
+
+        assert vision.calls == 2
+        hero = db.get(Media, article.hero_media_id)
+        assert hero.meta["origin_url"] == PHOTO
+        assert hero.meta["photo_check"] == {"verdict": "unchecked", "model": None}
+        assert db.query(AiUsage).filter_by(operation="image_check", ok=False).count() == failed + 2
+        assert ingestion_service._vision_failures == 1, "one photo, one failure"
+
+    def test_repeated_errors_trip_the_breaker(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        vision = self._vision(
+            monkeypatch, *(AiProviderError() for _ in range(8))
+        )
+        for n in range(4):
+            item = make_item(db, f"scan-breaker-{n}", images_enabled=True)
+            article = ingestion_service.import_item(db, item, actor_id=None)
+            db.flush()
+            # An error is "unchecked", and unchecked is today's behaviour.
+            assert article.hero_media_id is not None
+        assert vision.calls == 6, "the fourth story should not have waited on vision"
+        assert (
+            db.query(AiUsage).filter_by(operation="image_check", ok=False).count() >= 6
+        )
+
+    def test_a_photo_too_big_to_scan_is_skipped_unbilled(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Refused before any call: the photo is the problem, not the provider,
+        so it is not used unscanned, not billed, and trips nothing."""
+        item = make_item(db, "scan-too-big", images_enabled=True)
+        refused = AiProviderError(
+            details={"error": "image too large to inspect", "refused_photo": True}
+        )
+        self._vision(monkeypatch, refused, "clean")
+        checks = db.query(AiUsage).filter_by(operation="image_check").count()
+
+        article = ingestion_service.import_item(db, item, actor_id=None)
+        db.flush()
+
+        assert db.get(Media, article.hero_media_id).meta["origin_url"] == SECOND
+        assert item.photo_check["candidates"][0] == {
+            "url": PHOTO, "verdict": "unchecked", "reason": "too large or unreadable to scan",
+        }
+        assert ingestion_service._vision_failures == 0
+        assert db.query(AiUsage).filter_by(operation="image_check").count() == checks + 1
+
+    def test_a_failed_call_counts_toward_the_limit(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """At most `crawl.image_scan_max` photos a story, paid failures included;
+        a photo's retry is the same photo."""
+        settings_service.set_many(db, {"crawl.image_scan_max": 1}, actor_id=None)
+        item = make_item(db, "scan-limit-failed", images_enabled=True)
+        item.source.licence = SourceLicence.PUBLISHER_PARTNER
+        item.source.content_policy = ContentPolicy.FULL_TEXT
+        item.image_urls = [PHOTO, SECOND, "https://publisher.example.com/img/third.jpg"]
+        vision = self._vision(
+            monkeypatch, AiProviderError(), AiProviderError(), "logo", "clean"
+        )
+
+        article = ingestion_service.import_item(db, item, actor_id=None)
+        db.flush()
+
+        assert vision.calls == 2
+        assert db.query(ArticleMedia).filter_by(article_id=article.id).count() == 1
+
+    def test_gallery_photos_are_scanned_too(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        item = make_item(db, "scan-gallery", images_enabled=True)
+        item.source.licence = SourceLicence.PUBLISHER_PARTNER
+        item.source.content_policy = ContentPolicy.FULL_TEXT
+        third = "https://publisher.example.com/img/third.jpg"
+        item.image_urls = [PHOTO, SECOND, third]
+        self._vision(monkeypatch, "clean", "logo", "clean")
+
+        article = ingestion_service.import_item(db, item, actor_id=None)
+        db.flush()
+
+        links = db.query(ArticleMedia).filter_by(article_id=article.id).all()
+        origins = {
+            link.role: db.get(Media, link.media_id).meta["origin_url"] for link in links
+        }
+        assert origins == {"hero": PHOTO, "gallery": third}
+
+    def test_scan_off_never_asks_a_model(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        settings_service.set_many(db, {"crawl.image_scan": False}, actor_id=None)
+        item = make_item(db, "scan-off", images_enabled=True)
+
+        def _never(*_a: object, **_k: object) -> None:
+            raise AssertionError("no provider may be built while the scan is off")
+
+        monkeypatch.setattr("app.services.ingestion_service.get_ai", _never)
+        article = ingestion_service.import_item(db, item, actor_id=None)
+        db.flush()
+
+        assert db.get(Media, article.hero_media_id).meta["origin_url"] == PHOTO
+        assert item.photo_check["candidates"][0]["verdict"] == "unchecked"
 
 
 class TestTheFeedDialects:

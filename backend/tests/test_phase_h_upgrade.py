@@ -44,12 +44,14 @@ from app.models.enums import (  # noqa: E402
     AiSuggestionStatus,
     ArticleStatus,
     ArticleType,
+    MediaType,
     RoleKey,
     ScopeType,
     UserStatus,
     WorkflowState,
 )
 from app.models.geo import District, Mandal  # noqa: E402
+from app.models.media import Media  # noqa: E402
 from app.models.user import Role, User, UserRole  # noqa: E402
 from app.services import auth_service, settings_service  # noqa: E402
 
@@ -134,6 +136,15 @@ BODY_TE = (
 def body_doc(text: str) -> dict:
     return {"type": "doc", "content": [
         {"type": "paragraph", "content": [{"type": "text", "text": text}]}]}
+
+
+def hero_id(db: Session) -> int:
+    """A usable photo: a story without one is never published."""
+    media = Media(type=MediaType.IMAGE, filename="hero.webp", mime="image/webp",
+                  storage_provider="local", storage_key="img/hero.webp")
+    db.add(media)
+    db.flush()
+    return media.id
 
 
 # --------------------------------------------------------------------------- #
@@ -395,7 +406,7 @@ class TestBreakingAndPins:
         author = staff_headers(db, role=RoleKey.SUB_EDITOR, email="h-author@test.example.com")
         chief = staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="h-chief@test.example.com")
         created = client.post("/api/v1/cms/articles", json={
-            "title_te": title, "body": body_doc(BODY_TE),
+            "title_te": title, "body": body_doc(BODY_TE), "hero_media_id": hero_id(db),
         }, headers=author).json()
         client.post(f"/api/v1/cms/articles/{created['id']}/submit", json={}, headers=author)
         client.post(f"/api/v1/cms/articles/{created['id']}/approve", json={}, headers=chief)
@@ -627,6 +638,7 @@ class TestDashboard:
         chief = staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="h-chief@test.example.com")
         created = client.post("/api/v1/cms/articles", json={
             "title_te": "షెడ్యూల్ పరీక్ష కథనం", "body": body_doc(BODY_TE),
+            "hero_media_id": hero_id(db),
         }, headers=author).json()
         aid = created["id"]
         client.post(f"/api/v1/cms/articles/{aid}/submit", json={}, headers=author)
@@ -657,7 +669,8 @@ class TestPlacementFromTheForm:
         chief = staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="h-chief@test.example.com")
         approver = staff_headers(db, role=RoleKey.ADMIN, email="h-approver@test.example.com")
         created = client.post("/api/v1/cms/articles", json={
-            "title_te": title, "body": body_doc(BODY_TE), **extra,
+            "title_te": title, "body": body_doc(BODY_TE), "hero_media_id": hero_id(db),
+            **extra,
         }, headers=chief).json()
         client.post(f"/api/v1/cms/articles/{created['id']}/submit", json={}, headers=chief)
         client.post(f"/api/v1/cms/articles/{created['id']}/approve", json={}, headers=approver)
@@ -740,7 +753,7 @@ class TestAudioAttachment:
         chief = staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="h-chief@test.example.com")
         approver = staff_headers(db, role=RoleKey.ADMIN, email="h-approver@test.example.com")
         created = client.post("/api/v1/cms/articles", json={
-            "title_te": title, "body": body_doc(BODY_TE),
+            "title_te": title, "body": body_doc(BODY_TE), "hero_media_id": hero_id(db),
         }, headers=chief).json()
         client.post(f"/api/v1/cms/articles/{created['id']}/submit", json={}, headers=chief)
         client.post(f"/api/v1/cms/articles/{created['id']}/approve", json={}, headers=approver)

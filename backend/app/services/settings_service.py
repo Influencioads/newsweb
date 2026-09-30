@@ -121,15 +121,17 @@ SPECS: dict[str, Spec] = {
     "ai.image_enabled": Spec(
         False,
         "bool",
-        "Allow generating an illustration for a story. Off like every other "
+        "Allow generating an AI picture for a story: a realistic, "
+        "representative scene labelled as AI — never the event or a real "
+        "person, and never for a sensitive story. Off like every other "
         "spending switch: one image costs about twelve rewrites.",
     ),
     "ai.image_model": Spec(
         catalogue.DEFAULT_IMAGE_MODEL,
         "str_optional",
-        "Which model draws that illustration, and the picture on a news card. "
+        "Which model makes that picture, and the picture on a news card. "
         "The default, GPT Image 2.5 Flare, measured a third of the price of "
-        "1.5 with clean, text-free illustrations.",
+        "1.5, with realistic, text-free photographs.",
     ),
     # --- §20 / §21 voice ----------------------------------------------------
     "voice.enabled": Spec(
@@ -408,10 +410,50 @@ SPECS: dict[str, Spec] = {
         "bool",
         "When an imported story has no usable picture of its own, look for one "
         "on Wikimedia Commons. Only CC0/PDM images are used — the two licences "
-        "that waive credit worldwide — and a stand-in is captioned as a "
-        "representative image. Nothing is drawn and nothing is bought: if no "
-        "such photo exists, and for most district stories none does, the story "
-        "runs without one. Off means it never looks.",
+        "that waive credit worldwide — and only a photo whose title names the "
+        "story's person or place, captioned as a file photo. Nothing is generated "
+        "and nothing is bought: if no such photo exists, and for most district "
+        "stories none does, the story runs without one. Off means it never looks.",
+    ),
+    "crawl.auto_import": Spec(
+        False,
+        "bool",
+        "Send every finished AI rewrite straight into the review queue, already "
+        "filed by the AI — section, place, tags and a checked photo. An editor "
+        "still approves and a second person still publishes. Keyless excerpt "
+        "'rewrites' and copy with stray foreign letters are never sent. Off "
+        "means an editor sends each one from the crawl queue by hand.",
+    ),
+    "crawl.image_scan": Spec(
+        False,
+        "bool",
+        "Before a crawled photo is used, the AI looks at it and rejects any the "
+        "publisher branded — a watermark, a channel logo, a headline burned in — "
+        "and anything unfit to print. Rejected photos are never used and never "
+        "cleaned. Costs a small AI call per photo checked. Off means the first "
+        "photo that downloads is used, as before.",
+    ),
+    "crawl.image_scan_max": Spec(
+        3,
+        "int",
+        "The most photos the AI checks for one story before giving up on the "
+        "crawled ones.",
+    ),
+    "crawl.ai_illustrations": Spec(
+        False,
+        "bool",
+        "When a crawled story has no usable photo and no free-licence one, the "
+        "AI makes a realistic representative picture, labelled as AI on the "
+        "site — never the event, a victim or a real person. Crime, death and "
+        "accident stories get only a generic scene (an ambulance, a police "
+        "cordon, a hospital gate); sensitive stories get none. Needs AI images "
+        "switched on. Off means the story waits for the desk to add a photo.",
+    ),
+    "crawl.ai_illustration_daily_cap": Spec(
+        20,
+        "int",
+        "The most AI pictures the crawl may make in one day. Each is a paid "
+        "image; the cap keeps a quiet Commons day from spending the month.",
     ),
     "crawl.max_age_hours": Spec(
         18,
@@ -502,6 +544,8 @@ _INT_BOUNDS: dict[str, tuple[int, int]] = {
     "crawl.max_entries_per_fetch": (1, 200),
     "crawl.max_consecutive_failures": (1, 100),
     "crawl.similarity_block_percent": (0, 100),
+    "crawl.image_scan_max": (1, 4),
+    "crawl.ai_illustration_daily_cap": (0, 500),
 }
 
 

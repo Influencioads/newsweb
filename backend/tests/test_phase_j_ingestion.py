@@ -40,6 +40,7 @@ from app.models.enums import (  # noqa: E402
     ArticleType,
     ContentPolicy,
     IngestStatus,
+    MediaType,
     RoleKey,
     ScopeType,
     SourceLicence,
@@ -47,6 +48,7 @@ from app.models.enums import (  # noqa: E402
     WorkflowState,
 )
 from app.models.ingestion import ContentSource, IngestedItem  # noqa: E402
+from app.models.media import Media  # noqa: E402
 from app.models.user import Role, User, UserRole  # noqa: E402
 from app.services import auth_service, ingestion_service  # noqa: E402
 
@@ -364,6 +366,12 @@ class TestImport:
                                  headers=editor).json()["article_id"]
         article = db.get(Article, article_id)
         article.source_credit = None
+        # It has its photo, so the credit is the one thing missing.
+        hero = Media(type=MediaType.IMAGE, filename="hero.webp", mime="image/webp",
+                     storage_provider="test", storage_key="images/test/credit-check.webp")
+        db.add(hero)
+        db.flush()
+        article.hero_media_id = hero.id
         db.commit()
 
         client.post(f"/api/v1/cms/articles/{article_id}/submit", json={}, headers=editor)

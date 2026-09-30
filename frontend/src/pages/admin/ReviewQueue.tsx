@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Clock, Undo2 } from 'lucide-react';
 
 import { AdminPage } from '@/components/admin/AdminPage';
+import { AiHintBadges } from '@/components/admin/AiHintBadges';
 import { WorkflowPill } from '@/components/admin/StatusPill';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -127,6 +128,7 @@ function ReviewTile({ article, column, busy, pending, selfAuthored, onAction, on
           </span>
         ) : null}
       </div>
+      <AiHintBadges article={article} className="mt-2" />
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {selfApprove ? (

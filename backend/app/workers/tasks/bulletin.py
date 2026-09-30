@@ -62,9 +62,16 @@ def retry() -> dict[str, int]:
             )
         ).all()
         for bulletin in rows:
-            bulletin_service.render(db, bulletin)
+            # Held: a bulletin a person prepared that has never been on air
+            # (the assistant's, kept for a desk editor) is re-recorded but
+            # stays READY. One that was live — a Run now or a Regenerate, then
+            # a hand edit or a failed render — goes back on, as it always did:
+            # `publish` stamps `published_at`, edits and renders keep it, and
+            # only Pull (or the assistant claiming the row) clears it.
+            bulletin_service.render(db, bulletin, requested_by=bulletin.requested_by)
             if (
                 bulletin.status == BulletinStatus.READY
+                and (bulletin.requested_by is None or bulletin.published_at is not None)
                 and not bulletin_service.requires_approval(db)
             ):
                 bulletin_service.publish(db, bulletin)

@@ -19,6 +19,14 @@ Two rules are enforced here rather than trusted to a UI:
     admin decision — and even then the article carries the same
     "auto-published from a feed, not reviewed by an editor" line the big
     aggregators use.
+
+The crawl's own automatic import (`crawl_service.auto_import_ready`, behind
+`crawl.auto_import`) is not that exception. It comes through `import_item`
+with no actor, lands SUBMITTED like any rewrite, and still needs one person to
+approve and a different one to publish. What it adds is the filing the AI
+suggested (section, place, typed tags, a *suggested* breaking flag) and a
+photo the vision model looked at first. A branded photo is rejected, never
+cleaned: no crawled picture is ever sent to an image edit or generation model.
 """
 
 from __future__ import annotations
@@ -28,6 +36,7 @@ import io
 import socket
 import ipaddress
 import re
+import time
 from datetime import timedelta
 from typing import Any
 
@@ -35,27 +44,47 @@ import bleach
 import httpx
 from urllib.parse import urlsplit
 from PIL import Image
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.core.config import SITE_NAME_TE
-from app.core.errors import ConflictError, NotFoundError, ValidationError
+from app.core.config import settings as env_settings
+from app.core.errors import (
+    AiBudgetExceededError,
+    AppError,
+    ConflictError,
+    NotFoundError,
+    ValidationError,
+)
 from app.core.logging import get_logger
 from app.db.base import utcnow
+from app.db.session import session_scope
+from app.integrations.ai import catalogue, get_ai
+from app.integrations.ai.base import AiProvider, ImageVerdict
 from app.integrations.feeds import FeedEntry, FeedResult, fetch_feed
 from app.integrations.feeds import images as feed_images
 from app.integrations.feeds.fetcher import user_agent
-from app.models.content import Article
+from app.models.ai import AiUsage
+from app.models.content import Article, ArticleTag, Category, Tag
 from app.models.enums import (
     ArticleStatus,
     ArticleType,
     IngestStatus,
     MandalMatchMethod,
+    TagType,
     WorkflowState,
 )
-from app.models.ingestion import ContentSource, IngestedItem
+from app.models.geo import Mandal
+from app.models.ingestion import ContentSource, IngestedItem, IngestedRewrite
 from app.models.media import ArticleMedia, Media
-from app.services import gazetteer_service, media_service, settings_service, tiptap
+from app.services import (
+    ai_usage_service,
+    gazetteer_service,
+    media_service,
+    settings_service,
+    tiptap,
+)
 
 logger = get_logger(__name__)
 
@@ -100,6 +129,21 @@ POLL_GRACE = timedelta(minutes=2)
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 #: Outside this window it is a banner strip or a portrait crop, not a hero.
 MIN_ASPECT, MAX_ASPECT = 0.5, 3.0
+#: One whole download, however slowly it arrives. The 10 s timeout bounds each
+#: read, not their sum, so a server trickling a byte every nine seconds would
+#: otherwise hold an import for as long as it liked.
+DOWNLOAD_DEADLINE_S = 20.0
+
+#: Vision errors in a row (an outage, a revoked key, a model that stopped
+#: taking images) before the photo scan pauses. Paused, photos are used
+#: unchecked — exactly as before the scan existed — rather than every story
+#: waiting out three timeouts first.
+# ponytail: per-process breaker, each worker trips on its own; move the two
+# counters to Redis if the fleet should share one.
+_VISION_TRIP = 3
+_VISION_PAUSE_S = 600.0
+_vision_failures = 0
+_vision_paused_until = 0.0
 
 
 #: Elements whose *contents* must go, not just their tags. `bleach` with
@@ -392,7 +436,10 @@ def _auto_import(db: Session, source: ContentSource) -> int:
     count = 0
     for item in items:
         try:
-            import_item(db, item, actor_id=None, auto=True)
+            # A savepoint, so a failure takes its claim and half-built article
+            # with it instead of leaving the item IMPORTED with nothing behind.
+            with db.begin_nested():
+                import_item(db, item, actor_id=None, auto=True)
             count += 1
         except Exception:  # noqa: BLE001 — one bad item must not stop the batch
             logger.warning("ingest_auto_import_failed", item_id=item.id, exc_info=True)
@@ -410,6 +457,44 @@ def get_item(db: Session, item_id: int) -> IngestedItem:
     if item is None:
         raise NotFoundError()
     return item
+
+
+def claim_item(
+    db: Session, item_id: int, *, to: IngestStatus = IngestStatus.IMPORTED
+) -> bool:
+    """Take a NEW item out of the queue, or learn that somebody else did.
+
+    One conditional UPDATE rather than read-then-write: the crawl's automatic
+    import and an editor's "Send to review" can reach the same item in the
+    same second, and only the one whose UPDATE changed the row may go on.
+    The row lock the UPDATE takes holds the loser until the winner commits,
+    and the loser's WHERE then no longer matches — on MySQL and SQLite alike,
+    with no `SELECT … FOR UPDATE` involved.
+
+    The winner holds that lock until it commits, and an import (downloads,
+    photo checks, a drawing) can outlast InnoDB's 50 s lock wait. The loser's
+    timeout (1205, which undoes only its own statement) is the same answer as
+    a row that no longer matched: somebody else has the item.
+    """
+    try:
+        result = db.execute(
+            update(IngestedItem)
+            .where(IngestedItem.id == item_id, IngestedItem.status == IngestStatus.NEW)
+            .values(status=to)
+        )
+    except OperationalError as exc:
+        if getattr(exc.orig, "args", (None,))[:1] == (1205,):
+            return False
+        raise
+    return result.rowcount == 1
+
+
+def already_in_review(item_id: int) -> ConflictError:
+    return ConflictError(
+        message_en="That story is already in review, or was taken off the queue.",
+        message_te="ఈ వార్త ఇప్పటికే సమీక్షలో ఉంది లేదా క్యూ నుంచి తీసివేయబడింది.",
+        details={"item_id": item_id},
+    )
 
 
 def drop_source_text(item: IngestedItem) -> None:
@@ -434,6 +519,10 @@ def reject_item(
     db: Session, item_id: int, *, actor_id: int, note: str | None
 ) -> IngestedItem:
     item = get_item(db, item_id)
+    # The same claim an import takes: a story already in review must not be
+    # marked rejected underneath the article it became.
+    if not claim_item(db, item_id, to=IngestStatus.REJECTED):
+        raise already_in_review(item_id)
     item.status = IngestStatus.REJECTED
     item.reviewed_by, item.reviewed_at = actor_id, utcnow()
     item.review_note = note
@@ -556,9 +645,10 @@ def _download_image(url: str) -> tuple[bytes, str, str] | None:
             return None
         chunks: list[bytes] = []
         total = 0
+        deadline = time.monotonic() + DOWNLOAD_DEADLINE_S
         for chunk in response.iter_bytes():
             total += len(chunk)
-            if total > MAX_IMAGE_BYTES:
+            if total > MAX_IMAGE_BYTES or time.monotonic() > deadline:
                 return None
             chunks.append(chunk)
         final_url = str(response.url)
@@ -577,33 +667,140 @@ def _download_image(url: str) -> tuple[bytes, str, str] | None:
     return raw, mime, final_url
 
 
+#: A photo the scan would not send — over the pixel cap, or undecodable. It is
+#: skipped like a branded one, but no call was made, so nothing is billed and
+#: the breaker does not count it: the photo is bad, not the provider.
+_UNSCANNABLE = ImageVerdict("unchecked", "too large or unreadable to scan")
+
+
+def _bill_vision(
+    db: Session, provider: AiProvider, actor_id: int | None, error: str | None = None
+) -> None:
+    """One `image_check` row per call sent.
+
+    With no actor this is a machine pass (the crawl's import), whose item can
+    still roll back after the vendor has billed — and would then be scanned,
+    and billed, again. So that row is committed on a session of its own, as
+    `ai_image_service` does for a failed drawing. A person's import stays in
+    their request.
+    """
+    row: dict[str, Any] = {
+        "operation": "image_check",
+        "provider": provider.key,
+        "model": getattr(catalogue, "VISION_MODEL", None),
+        "actor_id": actor_id,
+        "usage": getattr(provider, "last_usage", None),
+        "ok": error is None,
+        "error": error,
+    }
+    if actor_id is not None:
+        ai_usage_service.record(db, **row)
+        return
+    with session_scope() as ledger:
+        ai_usage_service.record(ledger, **row)
+
+
+def _inspect(
+    db: Session, provider: AiProvider, raw: bytes, actor_id: int | None
+) -> tuple[ImageVerdict | None, bool]:
+    """What the vision model saw in one photo, and whether a call was sent.
+
+    A verdict and nothing more: the bytes are looked at, never edited, and
+    never go to an image model. None — no key, a provider without image input,
+    the month's budget spent, two errors in a row, the breaker open — means
+    "unchecked", and the caller then uses the photo exactly as it did before
+    the scan. `_UNSCANNABLE` means skip this photo. An error is asked once
+    more, since one timeout would otherwise wave a branded photo through;
+    the breaker counts the photo only when both calls fail. Billed like every
+    sibling call: budget first, a ledger row after each, a failed one included.
+    """
+    global _vision_failures, _vision_paused_until
+    if time.monotonic() < _vision_paused_until:
+        return None, False
+    called = False
+    for _attempt in range(2):
+        try:
+            ai_usage_service.check_budget(db)
+            seen = provider.inspect_image(raw)
+        except AiBudgetExceededError:
+            return None, called
+        except Exception as exc:  # noqa: BLE001 — a photo check never fails an import
+            if (getattr(exc, "details", None) or {}).get("refused_photo"):
+                return _UNSCANNABLE, called
+            logger.warning("ingest_image_check_failed", error=str(exc)[:200])
+            _bill_vision(db, provider, actor_id, error=str(exc)[:300])
+            called = True
+            continue
+        if seen is None:
+            return None, called
+        _vision_failures = 0
+        _bill_vision(db, provider, actor_id)
+        return seen, True
+    _vision_failures += 1
+    if _vision_failures >= _VISION_TRIP:
+        _vision_failures, _vision_paused_until = 0, time.monotonic() + _VISION_PAUSE_S
+    return None, True
+
+
 def _attach_media(
     db: Session, item: IngestedItem, article: Article, actor_id: int | None
-) -> None:
+) -> dict[str, Any]:
     """Download the source article's own images and hang them off the article.
 
     Only the publisher's own images reach here — `feeds.images` rejected
     everything else at fetch time, and no open-web image search happens in
     this function or any other.
 
-    Nothing else is attempted here. What happens when this finds nothing is
-    `story_image_service`'s decision, taken by the caller: an open-licence
-    photograph, then an AI drawing, then nothing. Both of those cost something
-    at up to sixty items an hour, so both sit behind admin switches that are
-    off by default, and hero-less remains a perfectly good outcome.
+    **With `crawl.image_scan` on, a vision model looks at each photo first**,
+    at most `crawl.image_scan_max` per story. Anything but "clean" — a
+    watermark, a channel logo, a headline burned in, unfit content — is
+    skipped before it becomes Media, and the search goes on to the next
+    candidate (an excerpt source used to stop at its first photo, branded or
+    not). The first clean one is the hero; past the limit the crawled photos
+    are given up on. Rejected, never cleaned: nothing here crops, retouches or
+    redraws a publisher's mark, and no crawled photo is ever sent to an image
+    edit or generation model. When the scan cannot run (see `_inspect`) the
+    photo is used as before and recorded as "unchecked".
+
+    Returns what was seen, for `IngestedItem.photo_check`. What happens when
+    nothing usable is found is the caller's: an open-licence photograph
+    (`story_image_service`), then — on the automatic path only — an AI
+    drawing, then nothing. Hero-less remains a perfectly good outcome.
     """
+    scan: dict[str, Any] = {"model": None, "candidates": []}
     source = item.source
     if source is None or not source.images_enabled:
-        return
+        return scan
+
+    provider = None
+    if settings_service.get_bool(db, "crawl.image_scan") and settings_service.ai_enabled(db):
+        provider = get_ai(**settings_service.ai_credentials(db, bulk=True))
+    limit = settings_service.get_int(db, "crawl.image_scan_max")
+    checked = 0
 
     urls = item.image_urls or ([item.image_url] if item.image_url else [])
     sort = 0
     for url in urls[: feed_images.MAX_IMAGES]:
+        if provider is not None and checked >= limit:
+            break
         try:
             downloaded = _download_image(url)
             if downloaded is None:
                 continue
             raw, mime, final_url = downloaded
+            seen, called = (
+                _inspect(db, provider, raw, actor_id) if provider is not None else (None, False)
+            )
+            # Every photo a call went out for counts toward the limit, a
+            # failed one included; its retry does not count twice.
+            checked += called
+            if seen is not None and seen is not _UNSCANNABLE:
+                scan["model"] = getattr(catalogue, "VISION_MODEL", None)
+            verdict = seen.verdict[:20] if seen is not None else "unchecked"
+            reason = (seen.reason or "") if seen is not None else ""
+            scan["candidates"].append({"url": url, "verdict": verdict, "reason": reason[:200]})
+            if seen is not None and verdict != "clean":
+                continue
             media = media_service.create_image_media(
                 db,
                 raw=raw,
@@ -624,7 +821,11 @@ def _attach_media(
             continue
 
         media.copyright = source.licence.value
-        media.meta = {"ingested_item_id": item.id, "origin_url": url}
+        media.meta = {
+            "ingested_item_id": item.id,
+            "origin_url": url,
+            "photo_check": {"verdict": verdict, "model": scan["model"] if seen else None},
+        }
         # Only when a redirect moved it, so the common case stays quiet and an
         # unexpected host is the thing that stands out in the row.
         if final_url != url:
@@ -649,6 +850,126 @@ def _attach_media(
                 article_id=article.id, media_id=media.id, role="gallery", sort=sort
             )
         )
+    return scan
+
+
+def _illustrate(db: Session, article: Article, source: ContentSource) -> bool:
+    """The last rung, an AI picture — True when one became the hero.
+
+    Only ever asked on the automatic path, and only when every one of these
+    holds: the admin switch, image generation available, today's pictures
+    under `crawl.ai_illustration_daily_cap`, and the month's spend under the
+    budget-alert line (so they stop well before editors run out). A crime
+    story (by section, sub-section or the source's own default — the model's
+    filing can move a crime story elsewhere) or one with a death, violence or
+    disaster word anywhere in it is an incident: it gets the incident prompt,
+    a generic representative scene, never the event itself.
+    `generate_for_article` still refuses sensitive topics (sexual assault,
+    suicide, minors, communal, caste, religion) and bills the draw; the
+    picture is ours (`source_type="own"`) and labelled AI by `ai_generated`.
+    It comes from the headline alone — no crawled photo goes anywhere near the
+    model.
+    """
+    from app.services import ai_image_service
+
+    if not settings_service.get_bool(db, "crawl.ai_illustrations"):
+        return False
+    if ai_image_service.unavailable_reason(db) is not None:
+        return False
+    drawn_today = db.scalar(
+        select(func.count(AiUsage.id)).where(
+            AiUsage.operation == "crawl_image",
+            AiUsage.created_at >= ai_usage_service.day_start(),
+        )
+    )
+    if (drawn_today or 0) >= settings_service.get_int(db, "crawl.ai_illustration_daily_cap"):
+        return False
+    budget = ai_usage_service.budget_paise()
+    if budget and ai_usage_service.month_spend_paise(db) * 100 >= (
+        budget * env_settings.AI_BUDGET_ALERT_PERCENT
+    ):
+        return False
+    incident = ai_image_service.is_incident(db, article, source.default_category_id)
+    try:
+        media = ai_image_service.generate_for_article(
+            db, article, actor_id=None, operation="crawl_image", incident=incident
+        )
+    except AppError:  # a refused topic, the budget, a provider outage: no hero
+        logger.info("ingest_illustration_skipped", article_id=article.id, exc_info=True)
+        return False
+    # `generate_for_article` only swaps the hero on an editable story, and a
+    # rewrite lands SUBMITTED, so the hero is set here, as `_attach_media` does.
+    article.hero_media_id = media.id
+    db.add(ArticleMedia(article_id=article.id, media_id=media.id, role="hero", sort=0))
+    db.flush()
+    return True
+
+
+def _classified_place(
+    db: Session,
+    cls: dict[str, Any],
+    item: IngestedItem,
+    source: ContentSource,
+    mandal_id: int | None,
+    district_id: int | None,
+) -> tuple[int | None, int | None]:
+    """Mandal and district for a classified rewrite.
+
+    The mandal is the editor's, else the AI's filing. The district follows the
+    mandal, so the pair cannot disagree; the AI's own district is used only
+    when there is no mandal. An editor's district beats a mandal nobody chose
+    that sits in another district — the mandal goes.
+
+    A filing's `None` is an answer, not a gap: `_classify` already kept the
+    fetch-time guess wherever it stands, and dropped it only for a homonym.
+    Falling back to it put #128 (Singareni Collieries, 2026-09-30) back in
+    Singareni mandal, Khammam. Only a filing that failed (`{}` plus its
+    glyph flag) has no keys and still takes the fetch-time guess.
+    """
+    wanted = mandal_id if mandal_id is not None else (
+        cls["mandal_id"] if "mandal_id" in cls else item.matched_mandal_id
+    )
+    mandal = db.get(Mandal, wanted) if wanted else None
+    if district_id is not None:
+        if mandal is not None and mandal_id is None and mandal.district_id != district_id:
+            mandal = None
+        return (mandal.id if mandal else None), district_id
+    return (mandal.id if mandal else None), (
+        (mandal.district_id if mandal else None)
+        or (cls["district_id"] if "district_id" in cls else item.matched_district_id)
+        or source.default_district_id
+    )
+
+
+def _apply_classified_tags(
+    db: Session, article: Article, tags: list[dict[str, Any]]
+) -> None:
+    """The AI's tags: an existing tag by id, a new one created inactive.
+
+    Inactive until the story is published (`workflow_service.transition`), so
+    a rejected story leaves no tag on the site. A person is never created
+    from a model's say-so — only an existing person tag is reused — and an
+    existing tag's type is never changed.
+    """
+    from app.services import workflow_service
+
+    existing: list[Tag] = []
+    names: list[str] = []
+    types: dict[str, TagType] = {}
+    for entry in tags:
+        tag = db.get(Tag, entry["tag_id"]) if entry.get("tag_id") else None
+        if tag is not None:
+            existing.append(tag)
+        elif entry.get("type") != TagType.PERSON.value and entry.get("name"):
+            name = str(entry["name"])[:140]
+            names.append(name)
+            types[name] = TagType(entry.get("type") or TagType.TOPIC.value)
+    workflow_service._apply_tags(db, article, names, types=types, create_inactive=True)
+    have = {link.tag_id for link in article.tags}
+    for tag in existing:
+        if tag.id not in have:
+            have.add(tag.id)
+            article.tags.append(ArticleTag(tag_id=tag.id, sort=len(article.tags)))
 
 
 def import_item(
@@ -661,6 +982,9 @@ def import_item(
     mandal_id: int | None = None,
     district_id: int | None = None,
     category_id: int | None = None,
+    rewrite: IngestedRewrite | None = None,
+    illustrate: bool = False,
+    claimed: bool = False,
 ) -> Article:
     """Turn a queued item into an article awaiting review.
 
@@ -679,6 +1003,17 @@ def import_item(
 
     `author_id` is the importing editor either way, which is what makes the
     two-person rule bite: they cannot then approve their own import.
+
+    A rewrite that carries a `classification` (the crawl's AI filing) fills
+    what the editor did not: section and sub-section, place, typed tags and
+    `breaking_suggested`. Explicit arguments always win, and `is_breaking` is
+    never set — breaking is a person's call. Without a classification this
+    behaves exactly as it always has.
+
+    `rewrite` passes the READY row the caller already holds; `claimed` says
+    the caller took the item with `claim_item` (otherwise this does);
+    `illustrate` allows the paid AI drawing, which only the automatic path
+    asks for — never a web request.
     """
     from nanoid import generate
 
@@ -694,8 +1029,14 @@ def import_item(
     source = item.source
     if source is None:
         raise ValidationError(message_en="The item has no source.")
+    if not claimed and not claim_item(db, item.id):
+        raise already_in_review(item.id)
 
-    rewrite = item.ready_rewrite if use_rewrite else None
+    if not use_rewrite:
+        rewrite = None
+    elif rewrite is None:
+        rewrite = item.ready_rewrite
+    cls = (rewrite.classification if rewrite is not None else None) or None
 
     if rewrite is not None:
         title = normalize_headline(rewrite.title_te) or normalize_headline(item.title)
@@ -713,6 +1054,26 @@ def import_item(
         if district_id is not None
         else (item.matched_district_id or source.default_district_id)
     )
+    resolved_category = (
+        category_id if category_id is not None else source.default_category_id
+    )
+    subcategory_id = None
+    if cls:
+        resolved_mandal, resolved_district = _classified_place(
+            db, cls, item, source, mandal_id, district_id
+        )
+        if category_id is None and cls.get("category_id"):
+            picked = db.get(Category, cls["category_id"])
+            if picked is not None and picked.is_active:
+                resolved_category = picked.id
+        sub = db.get(Category, cls["subcategory_id"]) if cls.get("subcategory_id") else None
+        if (
+            sub is not None
+            and sub.is_active
+            and resolved_category is not None
+            and sub.parent_id == resolved_category
+        ):
+            subcategory_id = sub.id
 
     article = Article(
         short_id=generate(size=6),
@@ -725,9 +1086,8 @@ def import_item(
         body_html=html,
         word_count=words,
         reading_time_sec=seconds,
-        category_id=(
-            category_id if category_id is not None else source.default_category_id
-        ),
+        category_id=resolved_category,
+        subcategory_id=subcategory_id,
         district_id=resolved_district,
         mandal_id=resolved_mandal,
         author_id=actor_id,
@@ -755,25 +1115,45 @@ def import_item(
         ai_generated=rewrite is not None,
         ai_model=(rewrite.model if rewrite is not None else None),
         ai_confidence=(rewrite.confidence if rewrite is not None else None),
+        # A suggestion the desk sees, never the flag itself: `is_breaking`
+        # stays a person's decision.
+        breaking_suggested=bool(cls and cls.get("breaking") is True),
     )
     db.add(article)
     db.flush()
 
+    # Each block in its own savepoint: a failed write inside rolls back to
+    # here and the import goes on, instead of leaving the session unusable.
+    scan: dict[str, Any] = {"model": None, "candidates": []}
+    hero = "none"
     try:
-        _attach_media(db, item, article, actor_id)
-        # Rung (a) above found nothing usable. `story_image_service` tries an
-        # open-licence photograph — CC0/PDM, no credit line — and returns None
-        # for "no picture", which stays a perfectly good outcome. It draws
-        # nothing and buys nothing; see its docstring. Behind
-        # `crawl.open_licence_images`, default off: with the flag unset this
-        # call returns immediately and the import behaves exactly as before.
-        if article.hero_media_id is None:
-            from app.services import story_image_service
+        with db.begin_nested():
+            scan = _attach_media(db, item, article, actor_id)
+            if article.hero_media_id is not None:
+                hero = "crawled"
+            else:
+                # Rung (a) found nothing usable. `story_image_service` tries an
+                # open-licence photograph — CC0/PDM, no credit line — behind
+                # `crawl.open_licence_images`, and returns None for "no
+                # picture". Then, on the automatic path alone, an AI drawing.
+                from app.services import story_image_service
 
-            story_image_service.resolve_hero(db, article, item, actor_id=actor_id)
+                if story_image_service.resolve_hero(db, article, item, actor_id=actor_id):
+                    hero = "open_licence"
+                elif illustrate and _illustrate(db, article, source):
+                    hero = "ai_illustration"
     except Exception:  # noqa: BLE001 — same reasoning as the notification
         # fan-out in `workflow_service`: a picture must never fail an import.
+        hero = "none"
         logger.warning("ingest_media_attach_failed", item_id=item.id, exc_info=True)
+    item.photo_check = {**scan, "hero": hero}
+
+    if cls and cls.get("tags"):
+        try:
+            with db.begin_nested():
+                _apply_classified_tags(db, article, cls["tags"])
+        except Exception:  # noqa: BLE001 — tags are a convenience, not the story
+            logger.warning("ingest_tags_failed", item_id=item.id, exc_info=True)
 
     _apply_masthead(db, article, source, rewrite is not None)
 

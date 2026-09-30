@@ -110,8 +110,8 @@ describe('SocialCardDialog', () => {
     await waitFor(() => expect(cmsApi.makeSocialCard).toHaveBeenCalledTimes(2));
     expect(lastBody()).toMatchObject({ photo: 'ai', photo_media_id: 77, headline: 'అసెంబ్లీలో బడ్జెట్!' });
 
-    // Redraw drops the held picture and asks for a new one.
-    await userEvent.click(await screen.findByRole('button', { name: 'Redraw picture' }));
+    // "New picture" drops the held picture and asks for a new one.
+    await userEvent.click(await screen.findByRole('button', { name: 'New picture' }));
     await waitFor(() => expect(cmsApi.makeSocialCard).toHaveBeenCalledTimes(3));
     expect(lastBody()).toMatchObject({ photo: 'ai', photo_media_id: null });
   });

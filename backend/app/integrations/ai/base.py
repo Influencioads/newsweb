@@ -55,6 +55,25 @@ class RewriteText:
     unverified: bool = False
     refused: bool = False
     refusal_reason: str | None = None
+    #: Where the model would file the story — the raw strings it returned for
+    #: the extra keys `taxonomy` asked for (category, subcategory, district,
+    #: place, tags, breaking). Untrusted: `crawl_service._classify` validates
+    #: every value against our own tables before anything reaches an article.
+    #: None when no taxonomy was offered, or on a refusal.
+    classification: dict | None = None
+
+
+@dataclass(slots=True)
+class ImageVerdict:
+    """What a vision model saw in one crawled photo.
+
+    `verdict` is one of clean / watermark / logo / text / graphic. A verdict is
+    all it is: the pipeline rejects a branded photo, it never cleans one, and
+    the bytes are never handed to an image edit or generation model.
+    """
+
+    verdict: str
+    reason: str = ""
 
 
 @dataclass(slots=True)
@@ -111,8 +130,15 @@ class AiProvider(ABC):
         language_in: str = "te",
         target_words: int = 220,
         credit_source: bool = True,
+        taxonomy: dict | None = None,
     ) -> RewriteText:
         """Rewrite an external report as original Telugu copy.
+
+        `taxonomy`, when given, also asks where the story belongs:
+        `{"categories": [{"slug", "name", "children": [{"slug", "name"}]}],
+        "districts": [name_en, ...]}` read live from our tables. The answer
+        comes back raw on `RewriteText.classification`; providers that cannot
+        classify ignore it.
 
         `body_text` is somebody else's words. Implementations must instruct the
         model to reproduce none of them, to add no fact the input does not
@@ -147,3 +173,13 @@ class AiProvider(ABC):
             headline=_clip(headline, 90),
             summary=_clip(summary or body, 170),
         )
+
+    def inspect_image(self, raw: bytes) -> ImageVerdict | None:
+        """Look at one crawled photo and say whether the publisher branded it.
+
+        Not abstract: None means "cannot check" — no key, a provider without
+        image input — and the caller then behaves exactly as before the check
+        existed. `raw` is only looked at; it is never edited, cleaned or sent to
+        an image model.
+        """
+        return None

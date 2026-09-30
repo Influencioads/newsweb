@@ -1,15 +1,15 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ExternalLink } from 'lucide-react';
 
 import { Section } from '@/components/admin/FormControls';
-import { Badge } from '@/components/ui/Badge';
+import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { ButtonLink } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { QueryState, Skeleton } from '@/components/ui/State';
 import * as cmsApi from '@/features/cms/api';
 import { useScript } from '@/i18n';
-import type { ArticleOrigin } from '@/types/cms';
+import type { AiFiling, AiTagType, ArticleOrigin, PhotoCheck, PhotoVerdict } from '@/types/cms';
 import { cn } from '@/utils/cn';
 import { formatDate } from '@/utils/time';
 
@@ -165,7 +165,114 @@ function Compare({ data, ours }: { data: ArticleOrigin; ours: LiveText }) {
           </p>
         </section>
       </div>
+
+      {data.ai ? <AiFilingPanel ai={data.ai} /> : null}
+      {data.photos ? <PhotosChecked photos={data.photos} /> : null}
     </div>
+  );
+}
+
+const TAG_TYPE: Record<AiTagType, [string, string]> = {
+  person: ['వ్యక్తి', 'person'],
+  place: ['ప్రదేశం', 'place'],
+  org: ['సంస్థ', 'organisation'],
+  topic: ['అంశం', 'topic'],
+  event: ['ఘటన', 'event'],
+};
+
+/** Where the AI put the story. What the article carries now may differ — the desk can refile it. */
+function AiFilingPanel({ ai }: { ai: AiFiling }) {
+  const L = useL();
+  const s = useScript();
+  const rows: Array<[string, AiFiling['category']]> = [
+    [L('విభాగం', 'Section'), ai.category],
+    [L('ఉప విభాగం', 'Sub-section'), ai.subcategory],
+    [L('జిల్లా', 'District'), ai.district],
+    [L('మండలం', 'Mandal'), ai.mandal],
+  ];
+  return (
+    <section className="mt-4 border-t border-rule pt-3">
+      <ColumnHead>{L('AI ఇలా వర్గీకరించింది', 'AI filed it as')}</ColumnHead>
+      <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-ui-sm">
+        {rows.map(([label, row]) => {
+          const name = row ? s.text(row.name_te, row.name_en) : null;
+          return (
+            <Fragment key={label}>
+              <dt lang={s.language} className={cn(s.body, 'text-muted')}>{label}</dt>
+              <dd className="min-w-0 text-ink">
+                {name ? <span lang={name.lang} className={name.cls}>{name.text}</span> : '—'}
+              </dd>
+            </Fragment>
+          );
+        })}
+      </dl>
+      {ai.tags.length || ai.breaking || ai.glyph_warning ? (
+        <p className="mt-2 flex flex-wrap items-center gap-1.5">
+          {ai.tags.map((tag) => (
+            <Badge key={`${tag.type}:${tag.name}`} tone="district" size="xs" lang="te">
+              {tag.name}
+              <span lang={s.language} className={cn(s.body, 'text-muted')}>
+                {L(TAG_TYPE[tag.type]?.[0] ?? tag.type, TAG_TYPE[tag.type]?.[1] ?? tag.type)}
+              </span>
+            </Badge>
+          ))}
+          {ai.breaking ? (
+            <Badge tone="exclusive" size="xs">{L('AI: బ్రేకింగ్ కావచ్చు', 'AI suggests breaking')}</Badge>
+          ) : null}
+          {ai.glyph_warning ? (
+            <Badge tone="partial" size="xs">{L('పాఠ్యంలో వేరే లిపి అక్షరాలు', 'stray foreign letters in the text')}</Badge>
+          ) : null}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+const VERDICT: Record<PhotoVerdict, [BadgeTone, string, string]> = {
+  clean: ['success', 'బ్రాండింగ్ లేదు', 'clean'],
+  watermark: ['breaking', 'వాటర్‌మార్క్', 'watermark'],
+  logo: ['breaking', 'ఛానల్ లోగో', 'logo'],
+  text: ['breaking', 'అక్షరాలు ముద్రించారు', 'burned-in text'],
+  graphic: ['partial', 'గ్రాఫిక్ / అనుచితం', 'graphic / unfit'],
+  unchecked: ['muted', 'స్కాన్ చేయలేదు', 'not scanned'],
+};
+
+const HERO_FROM: Record<PhotoCheck['hero'], [string, string]> = {
+  crawled: ['ప్రచురణకర్త ఫోటోల్లో ఒకటి', 'one of the publisher’s photos'],
+  open_licence: ['ఉచిత లైసెన్స్ ఫోటో', 'a free-licence photo'],
+  ai_illustration: ['ప్రతీకాత్మక AI చిత్రం', 'a representative AI picture'],
+  none: ['ఏదీ లేదు — డెస్క్ ఫోటో జోడించాలి', 'nothing — the desk must add a photo'],
+};
+
+/** Every candidate the vision scan looked at. Rejected ones were never used, and never cleaned. */
+function PhotosChecked({ photos }: { photos: PhotoCheck }) {
+  const L = useL();
+  const s = useScript();
+  const from = HERO_FROM[photos.hero];
+  return (
+    <section className="mt-4 border-t border-rule pt-3">
+      <ColumnHead>{L('తనిఖీ చేసిన ఫోటోలు', 'Photos checked')}</ColumnHead>
+      <p lang={s.language} className={cn(s.body, 'mt-1 text-meta text-muted')}>
+        {`${L('హీరో ఫోటో', 'Hero photo')}: ${from ? L(from[0], from[1]) : photos.hero}`}
+        {photos.model ? ` · ${photos.model}` : ''}
+      </p>
+      {photos.candidates.length ? (
+        <ul className="mt-2 space-y-2">
+          {photos.candidates.map((c, i) => {
+            const v = VERDICT[c.verdict] ?? VERDICT.unchecked;
+            return (
+              <li key={`${i}:${c.url}`} className="flex items-center gap-3">
+                <a href={c.url} target="_blank" rel="noopener noreferrer" aria-label={L('ఫోటో తెరవండి', 'Open photo')} className="shrink-0">
+                  <img src={c.url} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-12 w-16 rounded-lg bg-rule-soft object-cover" />
+                </a>
+                <Badge tone={v[0]} size="xs">{L(v[1], v[2])}</Badge>
+                {c.reason ? <span lang="en" className="min-w-0 font-sans text-meta text-muted">{c.reason}</span> : null}
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+    </section>
   );
 }
 

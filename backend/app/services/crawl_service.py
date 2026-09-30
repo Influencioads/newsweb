@@ -19,14 +19,18 @@ after. Discovering that we should not have asked once the bill has arrived is
 not a guard.
 
 **Nothing here can publish.** A rewrite is a row in `ingested_rewrites`. It
-becomes an article only when an editor presses Import, and lands in review even
-then — where a *second* person has to approve it. That is enforced in
-`workflow_service`, and there is no path around it.
+becomes an article when an editor presses Import — or, with `crawl.auto_import`
+on, when `auto_import_ready` sends it with no author — and lands in review
+either way, where one person has to approve it and a *different* one publish.
+That is enforced in `workflow_service`, and there is no path around it. The
+AI's filing (section, place, tags, a *suggested* breaking flag) rides the
+rewrite call and is checked against our own tables in `_classify`.
 """
 
 from __future__ import annotations
 
 import re
+import time
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
@@ -36,22 +40,38 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings as env_settings
-from app.core.errors import AiProviderError
+from app.core.errors import AiBudgetExceededError, AiProviderError
 from app.core.logging import get_logger
 from app.db.base import desc_nulls_last, utcnow
+from app.db.seed_content import retired_category_slugs
 from app.integrations.ai import get_ai
+from app.integrations.ai.base import AiProvider, RewriteText
+from app.integrations.ai.sensitive import _matcher
 from app.integrations.feeds import FeedResult, extract_article, fetch_feed
 from app.integrations.feeds import images as feed_images
-from app.models.enums import IngestStatus, RewriteStatus, SourceBeat
+from app.models.content import Article, Category, Tag, TermGlossary
+from app.models.enums import (
+    ArticleType,
+    IngestStatus,
+    MandalMatchMethod,
+    RewriteStatus,
+    SourceBeat,
+    TagType,
+)
+from app.models.geo import District, Mandal
 from app.models.ingestion import ContentSource, IngestedItem, IngestedRewrite
 from app.models.setting import AppSetting
 from app.services import (
     ai_usage_service,
+    gazetteer_service,
     ingestion_service,
     settings_service,
     tiptap,
 )
+from app.services.panchayat_service import PANCHAYAT_CATEGORY_SLUG
+from app.services.social_card_service import _foreign_glyph
 from app.telugu.normalize import normalize_headline, normalize_text
+from app.telugu.transliterate import slugify
 
 logger = get_logger(__name__)
 
@@ -72,26 +92,80 @@ MAX_SOURCE_TEXT_CHARS = 8_000
 #: Deliberately over-broad. A false positive costs one editor thirty seconds; a
 #: false negative puts a machine summary of a communal incident, a sexual
 #: assault or a child's identity in front of readers.
+#:
+#: Matched by `ai.sensitive._matcher`: a Telugu term must start a word and may
+#: carry any ending, an English one is a whole word. So the Telugu set holds
+#: stems cut before the vowel sign an inflection drops — `అత్యాచార` for
+#: అత్యాచారానికి, `బాలుడ` for బాలుడి, `చిన్నారుల` for చిన్నారులు (not `చిన్నార`,
+#: which starts చిన్నారెడ్డి) — and names the compounds whose sensitive half is
+#: not their front (`ఉపకుల`, `నిమ్నకుల`, `పరమత`, `వరకట్నవేధింపు`). The
+#: dictionary forms stay beside their stems because the assistant's
+#: `_screen_topic` reads these sets as whole words. English is enumerated, not
+#: suffixed: `rape\w*` would take "grape" back.
 SENSITIVE_TE: frozenset[str] = frozenset(
     {
-        "కులం", "కుల", "దళిత", "దళితుల", "ఎస్సీ", "ఎస్టీ", "బీసీ",
-        "మతం", "మత", "మతపరమైన", "ముస్లిం", "హిందూ", "క్రైస్తవ",
-        "మతఘర్షణ", "ఘర్షణలు", "అల్లర్లు",
-        "అత్యాచారం", "లైంగిక", "వేధింపులు",
-        "ఆత్మహత్య", "బలవన్మరణం",
-        "మైనర్", "బాలిక", "బాలుడు", "చిన్నారి",
+        "కులం", "కుల", "ఉపకుల", "అగ్రకుల", "నిమ్నకుల", "దళిత", "దళితుల", "ఎస్సీ", "ఎస్టీ", "బీసీ",
+        "మతం", "మత", "మతపరమైన", "అన్యమత", "పరమత", "ముస్లిం", "హిందూ", "క్రైస్తవ",
+        "మతఘర్షణ", "ఘర్షణలు", "ఘర్షణల", "అల్లర్లు", "అల్లర్ల",
+        "అత్యాచారం", "అత్యాచార", "అఘాయిత్య", "రేప్", "లైంగిక", "వేధింపులు", "వేధింపు",
+        "కట్నవేధింపు", "వరకట్నవేధింపు",
+        "ఆత్మహత్య", "బలవన్మరణం", "బలవన్మరణ",
+        "మైనర్", "పోక్సో", "బాలిక", "బాలుడు", "బాలుడ", "చిన్నారి", "చిన్నారుల",
     }
 )
 SENSITIVE_EN: frozenset[str] = frozenset(
     {
-        "caste", "dalit", "communal", "riot", "riots", "lynching",
-        "rape", "sexual assault", "molest", "molestation",
-        "suicide", "self-immolation",
-        "minor girl", "minor boy", "juvenile", "pocso",
+        "caste", "castes", "casteist", "casteism", "dalit", "dalits",
+        "communal", "communally", "communalism",
+        "riot", "riots", "rioted", "rioting", "rioters", "lynching", "lynched",
+        "rape", "raped", "rapes", "raping", "rapist", "rapists",
+        "gangrape", "gangrapes", "gangraped",
+        "sexual assault", "sexual assaults", "sexually assaulted", "sexual abuse",
+        "sexually abused", "sexual harassment", "sexually harassed",
+        "molest", "molests", "molested", "molesting", "molester", "molesters", "molestation",
+        "suicide", "suicides", "suicidal", "self-immolation",
+        "minor girl", "minor girls", "minor boy", "minor boys", "juvenile", "juveniles", "pocso",
     }
 )
+# ponytail: `మత` still fronts మత్స్యకారులు (fishermen) and `బీసీ` fronts బీసీసీఐ;
+# `_matcher` has no lookahead. Enumerate మతం/మతా/మతప… if the desk complains.
+_SENSITIVE = _matcher(tuple(SENSITIVE_TE | SENSITIVE_EN))
+_JOINERS = str.maketrans("", "", "\u200c\u200d")  # ZWNJ, ZWJ
 
 _WORD = re.compile(r"[^\wఀ-౿]+", re.UNICODE)
+
+#: One rewrite pass's wall clock. Past PASS_DEADLINE_S no new rewrite starts,
+#: past IMPORT_DEADLINE_S no new automatic import, so the imports always get
+#: some minutes; the task's 20-minute soft limit is the backstop behind both.
+# ponytail: fixed numbers; tie them to the task's soft_time_limit if the
+# cadence or the per-pass cap ever grows past what 12 minutes can rewrite.
+PASS_DEADLINE_S = 12 * 60
+IMPORT_DEADLINE_S = 17 * 60
+
+#: Headline overlap (`similarity_percent`) at which a rewrite is taken for a
+#: story already imported in the last DUPLICATE_WINDOW: two outlets' versions
+#: of one press note must not become two articles in the review queue.
+DUPLICATE_PERCENT = 60
+DUPLICATE_WINDOW = timedelta(hours=6)
+_DUPLICATE_NOTE = "likely duplicate of article #"
+#: An automatic import that failed once is left for a person: trying again
+#: every pass would pay for the same photo checks and drawing each time.
+_FAILED_NOTE = "auto-import failed: "
+
+#: Sections the model is never offered: the contributor desk, the columns, the
+#: shop, and the districts hub (place is filed as district and mandal).
+_NOT_OFFERED = frozenset({PANCHAYAT_CATEGORY_SLUG, "opinion", "best-deals", "districts"})
+
+#: A tag is a name: Telugu or Latin letters, digits, spaces and hyphens (ZWJ /
+#: ZWNJ are part of Telugu spelling). Stricter than `_foreign_glyph`.
+_TAG_TEXT = re.compile(r"[ఀ-౿A-Za-z0-9 \-‌‍]{2,40}")
+#: The types a model may create a tag under. A person, or a type we never
+#: offered ("Person", "politician", none at all), is only ever an existing tag.
+_CREATABLE_TAG_TYPES = frozenset(t.value for t in TagType) - {TagType.PERSON.value}
+#: The offered types that say "not a place" (`_named_otherwise`). A type we
+#: never offered — "location", "mandal", the template echoed back — says nothing.
+_NOT_A_PLACE = frozenset(t.value for t in TagType) - {TagType.PLACE.value}
+MAX_TAGS = 5
 
 
 # --------------------------------------------------------------------------- #
@@ -401,20 +475,24 @@ def is_sensitive(text: str, extra: Iterable[str] = ()) -> bool:
     """Whether this item must be read by a person rather than a model.
 
     `extra` is `crawl.sensitive_extra_terms`: an admin can widen the net, never
-    narrow it — the built-in lists are always checked first.
+    narrow it — the built-in lists are always checked first, and an extra term
+    is still a bare substring, as broad as the admin typed it.
+
+    The built-in lists used to be bare substrings too, and measured on the
+    1,157 items ingested by 2026-09-30 that fired on `కుల` inside ప్రయాణికులు,
+    ప్రేక్షకులు and every other -కులు plural, on `ఎస్సీ` inside డీఎస్సీ, on
+    `మత` inside అనుమతి — while a whole dictionary form missed its own
+    inflections (బాలుడు, not బాలుడి). Word-start stems fix both.
+
+    Joiners go first: a live outlet spells ఆత్మ‌హ‌త్య with a ZWNJ after each
+    syllable (#320, 2026-09-30), which no term matches.
     """
-    lowered = normalize_text(text or "").casefold()
-    if any(phrase in lowered for phrase in SENSITIVE_EN):
-        return True
-    words = {w for w in _WORD.split(lowered) if w}
-    if words & SENSITIVE_TE:
-        return True
-    # Telugu compounds attach case endings, so a substring check is needed for
-    # the Telugu set too — "ఆత్మహత్యకు" must trip "ఆత్మహత్య".
-    if any(term in lowered for term in SENSITIVE_TE):
+    lowered = normalize_text(text or "").casefold().translate(_JOINERS)
+    if _SENSITIVE.search(lowered):
         return True
     return any(
-        term and normalize_text(term).casefold() in lowered for term in extra
+        term and normalize_text(term).casefold().translate(_JOINERS) in lowered
+        for term in extra
     )
 
 
@@ -539,8 +617,274 @@ def gather_source_text(db: Session, item: IngestedItem) -> tuple[str, str, str |
 
 
 # --------------------------------------------------------------------------- #
+# The filing — where the model says a story belongs, checked against our tables
+# --------------------------------------------------------------------------- #
+def _taxonomy(db: Session) -> dict[str, Any]:
+    """What the model may file a story under, read live from our own tables.
+
+    Active top-level sections in the nav (less `_NOT_OFFERED` and the slugs an
+    admin retired) with their active children, and the active AP/TS districts
+    — the shape `AiProvider.rewrite_item(taxonomy=...)` documents, plus ids for
+    `_classify`. A pass builds it once; a single rewrite builds its own.
+    """
+    skip = _NOT_OFFERED | set(retired_category_slugs(db))
+    rows = db.scalars(
+        select(Category)
+        .where(Category.is_active.is_(True))
+        .order_by(Category.sort, Category.id)
+    ).all()
+
+    def entry(cat: Category) -> dict[str, Any]:
+        return {"id": cat.id, "slug": cat.slug, "name": cat.name_en}
+
+    categories = [
+        {
+            **entry(top),
+            "children": [entry(c) for c in rows if c.parent_id == top.id and c.slug not in skip],
+        }
+        for top in rows
+        if top.parent_id is None and top.show_in_nav and top.slug not in skip
+    ]
+    districts = db.scalars(
+        select(District.name_en)
+        .where(District.is_active.is_(True), District.state.in_(("AP", "TS")))
+        .order_by(District.state, District.sort)
+    ).all()
+    return {"categories": categories, "districts": list(districts)}
+
+
+def _district_named(db: Session, name: str) -> int | None:
+    """An offered district the model named exactly (English, Telugu or slug)."""
+    key = normalize_text(name).casefold()
+    if not key:
+        return None
+    for district in db.scalars(
+        select(District).where(District.is_active.is_(True), District.state.in_(("AP", "TS")))
+    ):
+        if key in (
+            normalize_text(district.name_en).casefold(),
+            normalize_text(district.name_te).casefold(),
+            district.slug.casefold(),
+        ):
+            return district.id
+    return None
+
+
+def _find_tag(db: Session, name: str) -> Tag | None:
+    """An existing tag by name (either language) or by the slug `_apply_tags`
+    would give this name — so the same person is not tagged twice."""
+    key = name.casefold()
+    return db.scalar(
+        select(Tag)
+        .where(
+            or_(
+                Tag.slug == (slugify(name)[:100] or "-"),
+                func.lower(Tag.name_te) == key,
+                func.lower(Tag.name_en) == key,
+            )
+        )
+        .limit(1)
+    )
+
+
+def _named_otherwise(db: Session, item: IngestedItem, raw: dict) -> bool:
+    """Whether the headline's keyword mandal is a name the model filed as
+    something else — a homonym, so the model's place stands instead.
+
+    Live 2026-09-30, article #128 "సింగరేణిలో భారీగా బొగ్గు మాయం: బాల్క
+    సుమన్" is about Singareni Collieries, which the model tagged
+    `{type: org, name_te: సింగరేణి}`; the keyword matcher filed it in Singareni
+    mandal, Khammam, and the model's place — హైదరాబాద్‌ — was never asked.
+    Only a keyword match is second-guessed: a source's pinned mandal is an
+    admin's decision, not a guess.
+    """
+    if item.mandal_match_method != MandalMatchMethod.KEYWORD or item.matched_mandal_id is None:
+        return False
+    mandal = db.get(Mandal, item.matched_mandal_id)
+    if mandal is None:
+        return False
+    name = normalize_text(mandal.name_te).casefold()
+    tags = raw.get("tags") if isinstance(raw.get("tags"), list) else []
+    return any(
+        isinstance(tag, dict)
+        and isinstance(tag.get("name_te"), str)
+        and normalize_text(tag["name_te"]).casefold() == name
+        and str(tag.get("type") or "").strip().casefold() in _NOT_A_PLACE
+        for tag in tags
+    )
+
+
+def _classify(
+    db: Session,
+    raw: dict | None,
+    tax: dict[str, Any],
+    item: IngestedItem,
+    rewrite_text: str,
+) -> dict[str, Any]:
+    """The model's filing, reduced to values we can stand behind.
+
+    The trust boundary: `raw` is whatever the model wrote, and every value is
+    checked against our own tables before it can reach an article.
+
+      * section: a slug we offered; a sub-section only when it is a child of it;
+      * place: what the fetch found (an admin's pinned mandal, one unambiguous
+        name in the headline) is never overruled — unless the model tagged
+        that headline name as something other than a place (`_named_otherwise`);
+        the model's place is only looked up, through the gazetteer and within
+        the district, when the fetch found none or several. The district
+        follows the mandal; the model's district is used only when there is no
+        mandal;
+      * tags: at most five short names that our own rewrite actually contains,
+        never a publisher's name, matched to an existing tag or glossary term
+        first. A person nobody tagged before is dropped — a model does not get
+        to create people — and so is any type we did not offer;
+      * breaking: only a literal true, and only ever a suggestion.
+    """
+    raw = raw if isinstance(raw, dict) else {}
+
+    def said(key: str) -> str:
+        value = raw.get(key)
+        return normalize_text(value) if isinstance(value, str) else ""
+
+    category_id = subcategory_id = None
+    section = next((c for c in tax.get("categories") or [] if c["slug"] == said("category")), None)
+    if section is not None:
+        category_id = section["id"]
+        child = next((c for c in section["children"] if c["slug"] == said("subcategory")), None)
+        subcategory_id = child["id"] if child else None
+
+    district_id = _district_named(db, said("district"))
+    mandal_id = None
+    homonym = _named_otherwise(db, item, raw)
+    fetched = (MandalMatchMethod.SOURCE_DEFAULT, MandalMatchMethod.KEYWORD)
+    if item.mandal_match_method in fetched and not homonym:
+        mandal_id = item.matched_mandal_id
+    elif said("place"):
+        found, method, _confidence = gazetteer_service.resolve(
+            db,
+            title=said("place"),
+            # A homonym's district is where the wrong place is, not a hint.
+            district_id=district_id or (None if homonym else item.matched_district_id),
+            min_name_len=settings_service.get_int(db, "crawl.mandal_min_name_len"),
+        )
+        mandal_id = found if method == MandalMatchMethod.KEYWORD else None
+    if mandal_id is not None:
+        mandal = db.get(Mandal, mandal_id)
+        district_id = mandal.district_id if mandal else None
+
+    haystack = normalize_text(rewrite_text).casefold()
+    outlets = {
+        str(name).casefold()
+        for row in db.execute(select(ContentSource.name, ContentSource.name_te, ContentSource.slug))
+        for name in row
+        if name
+    }
+    tags: list[dict[str, Any]] = []
+    seen: set[object] = set()
+    for offered in raw.get("tags") if isinstance(raw.get("tags"), list) else []:
+        if len(tags) >= MAX_TAGS:
+            break
+        if not isinstance(offered, dict) or not isinstance(offered.get("name_te"), str):
+            continue
+        name = normalize_text(offered["name_te"])
+        key = name.casefold()
+        if (
+            not _TAG_TEXT.fullmatch(name)
+            or len(name.split()) > 4
+            or key not in haystack
+            # An outlet inside the tag ("సాక్షి పత్రిక"), or the tag as an
+            # outlet's leading word ("టీవీ9" of "టీవీ9 తెలుగు"). Not any tag
+            # inside an outlet's name: "తెలంగాణ" is in "నమస్తే తెలంగాణ".
+            or any((len(o) >= 3 and o in key) or o.startswith(key) for o in outlets)
+        ):
+            continue
+        kind = str(offered.get("type") or "").strip().casefold()
+        tag = _find_tag(db, name)
+        if tag is None:
+            # The glossary's canonical spelling and type, as `suggest_tags` uses it.
+            term = db.scalar(
+                select(TermGlossary)
+                .where(or_(TermGlossary.term_te == name, func.lower(TermGlossary.term_en) == key))
+                .limit(1)
+            )
+            if term is not None:
+                name, kind = normalize_text(term.term_te), TagType(term.type).value
+                tag = _find_tag(db, name) or _find_tag(db, term.term_en)
+        if tag is None and kind not in _CREATABLE_TAG_TYPES:
+            continue
+        ident: object = tag.id if tag is not None else name.casefold()
+        if ident in seen:
+            continue
+        seen.add(ident)
+        tags.append(
+            {
+                "name": (tag.name_te if tag is not None else name)[:140],
+                "type": TagType(tag.type).value if tag is not None else kind,
+                "tag_id": tag.id if tag is not None else None,
+            }
+        )
+
+    return {
+        "category_id": category_id,
+        "subcategory_id": subcategory_id,
+        "district_id": district_id,
+        "mandal_id": mandal_id,
+        "tags": tags,
+        "breaking": raw.get("breaking") is True,
+        "glyph_warning": False,
+        "raw": raw,
+    }
+
+
+# --------------------------------------------------------------------------- #
 # The rewrite
 # --------------------------------------------------------------------------- #
+def _bill(
+    db: Session, provider: AiProvider, actor_id: int | None, error: str | None = None
+) -> None:
+    """One ledger row per provider call, a failed one included: a provider
+    that errors after consuming tokens must not make retries look free."""
+    if provider.key == "heuristic":
+        return
+    ai_usage_service.record(
+        db,
+        operation="rewrite",
+        provider=provider.key,
+        model=getattr(provider, "model_name", None),
+        actor_id=actor_id,
+        usage=getattr(provider, "last_usage", None),
+        ok=error is None,
+        error=error,
+    )
+
+
+def _words(result: RewriteText) -> str:
+    return "\n".join([result.title_te or "", result.summary_te or "", *result.paragraphs_te])
+
+
+def _retry_for_glyph(
+    db: Session, provider: AiProvider, request: dict[str, Any], actor_id: int | None
+) -> RewriteText | None:
+    """The one second call a stray foreign letter earns; None if it failed.
+
+    Measured on the bulk model, about one rewrite in five carries a letter
+    from another script (`ఎစ်భై` for `ఎనభై`) that reads as Telugu at a
+    glance. A second call usually comes back clean. Never raises — the first
+    rewrite is still there to keep.
+    """
+    try:
+        if provider.key != "heuristic":
+            ai_usage_service.check_budget(db)
+        retry = provider.rewrite_item(**request)
+    except AiBudgetExceededError:
+        return None
+    except Exception as exc:  # noqa: BLE001 — the first answer still stands
+        _bill(db, provider, actor_id, error=str(getattr(exc, "details", exc))[:300])
+        return None
+    _bill(db, provider, actor_id)
+    return retry
+
+
 def _record(
     db: Session,
     item: IngestedItem,
@@ -595,8 +939,12 @@ def rewrite_one(
     *,
     actor_id: int | None = None,
     force: bool = False,
+    taxonomy: dict[str, Any] | None = None,
 ) -> IngestedRewrite:
-    """Rewrite one queued item. Never raises."""
+    """Rewrite one queued item, and file it. Raises only AiBudgetExceededError.
+
+    `taxonomy` is the pass's `_taxonomy`; a single rewrite reads its own.
+    """
     source = item.source
     if source is None:
         return _record(db, item, status=RewriteStatus.FAILED, reason="item has no source")
@@ -633,6 +981,16 @@ def rewrite_one(
         )
 
     provider = get_ai(**settings_service.ai_credentials(db, bulk=True))
+    tax = taxonomy if taxonomy is not None else _taxonomy(db)
+    request: dict[str, Any] = {
+        "headline": headline,
+        "body_text": body_text,
+        "publisher": source.name,
+        "source_url": item.canonical_url or item.url or "",
+        "language_in": (item.language or source.language or "te"),
+        "credit_source": source.attribution_required,
+        "taxonomy": tax,
+    }
     # The rewrite pass is the highest-volume spender: hourly, up to
     # crawl.hourly_item_cap items a run — which is the whole reason ai.bulk_model
     # exists, because the editorial model at this volume costs twice the monthly
@@ -641,29 +999,10 @@ def rewrite_one(
     if provider.key != "heuristic":
         ai_usage_service.check_budget(db)
     try:
-        result = provider.rewrite_item(
-            headline=headline,
-            body_text=body_text,
-            publisher=source.name,
-            source_url=item.canonical_url or item.url or "",
-            language_in=(item.language or source.language or "te"),
-            credit_source=source.attribution_required,
-        )
+        result = provider.rewrite_item(**request)
     except AiProviderError as exc:
         logger.warning("crawl_rewrite_failed", item_id=item.id, error=str(exc.details)[:200])
-        if provider.key != "heuristic":
-            # Bill the failure too: a provider that errors after consuming
-            # tokens must not make retries look free.
-            ai_usage_service.record(
-                db,
-                operation="rewrite",
-                provider=provider.key,
-                model=getattr(provider, "model_name", None),
-                actor_id=actor_id,
-                usage=getattr(provider, "last_usage", None),
-                ok=False,
-                error=str(exc.details)[:300],
-            )
+        _bill(db, provider, actor_id, error=str(exc.details)[:300])
         return _record(
             db,
             item,
@@ -683,16 +1022,8 @@ def rewrite_one(
             engine=provider.key,
         )
 
-    if provider.key != "heuristic":
-        # A refusal still cost a call, so this is recorded before the branch.
-        ai_usage_service.record(
-            db,
-            operation="rewrite",
-            provider=provider.key,
-            model=getattr(provider, "model_name", None),
-            actor_id=actor_id,
-            usage=getattr(provider, "last_usage", None),
-        )
+    # A refusal still cost a call, so this is recorded before the branch.
+    _bill(db, provider, actor_id)
 
     if result.refused:
         return _record(
@@ -703,6 +1034,23 @@ def rewrite_one(
             actor_id=actor_id,
             engine=provider.key,
         )
+
+    # A stray letter from another script: one more try, and if it comes back
+    # the same the rewrite is kept for a person to fix — flagged, and never
+    # sent to review automatically.
+    glyph_warning = False
+    if _foreign_glyph(_words(result)):
+        retry = _retry_for_glyph(db, provider, request, actor_id)
+        if (
+            retry is not None
+            and not retry.refused
+            and retry.title_te
+            and retry.paragraphs_te
+            and not _foreign_glyph(_words(retry))
+        ):
+            result = retry
+        else:
+            glyph_warning = True
 
     # Still computed and still stored on the row below even when it is not
     # printed: `attribution_te` is how the newsroom answers "where did this
@@ -748,6 +1096,23 @@ def rewrite_one(
             db.flush()
             return row
 
+    classification = None
+    if result.classification is not None or glyph_warning:
+        try:
+            classification = _classify(
+                db,
+                result.classification,
+                tax,
+                item,
+                f"{result.title_te}\n{result.summary_te or ''}\n{model_plain}",
+            )
+        except Exception:  # noqa: BLE001 — the rewrite is paid for; filing is a bonus
+            # A gazetteer or DB hiccup must not throw away copy we already paid
+            # for or abort the pass: the story imports with its source's defaults.
+            logger.warning("crawl_classify_failed", item_id=item.id, exc_info=True)
+            classification = {}
+        classification["glyph_warning"] = glyph_warning
+
     row = IngestedRewrite(
         item_id=item.id,
         title_te=normalize_headline(result.title_te)[:400],
@@ -764,6 +1129,7 @@ def rewrite_one(
         similarity_percent=similarity,
         status=RewriteStatus.READY,
         created_by=actor_id,
+        classification=classification,
     )
     db.add(row)
     item.rewrite_status = RewriteStatus.READY
@@ -774,6 +1140,7 @@ def rewrite_one(
         engine=provider.key,
         words=words,
         similarity=similarity,
+        glyph_warning=glyph_warning,
     )
     return row
 
@@ -801,8 +1168,24 @@ def run_rewrite_pass(
     cap_override: int | None = None,
     actor_id: int | None = None,
 ) -> dict[str, Any]:
+    """Rewrite this tick's share of the queue, then send finished ones to review.
+
+    Committed item by item: the month's budget running out, or anything else
+    going wrong half-way, must not roll back rewrites already paid for — the
+    next tick would only pay for them again. Imports never carry `actor_id`
+    (an admin's "Run now" included): a machine story has no author, so it
+    still takes two different people to approve and publish.
+    """
     if not rewrite_enabled(db):
         return {"rewritten": 0, "skipped": "rewrite_disabled"}
+    try:
+        ai_usage_service.check_budget(db)
+    except AiBudgetExceededError:
+        return {"rewritten": 0, "skipped": "budget_exhausted"}
+    started = time.monotonic()
+    # What the caller already did — this tick's mark, a fetch pass — is kept
+    # whatever the rollbacks below undo.
+    db.commit()
 
     # `is not None`: an admin who sets the breaking cap to 0 means none.
     hourly_cap = settings_service.get_int(db, "crawl.hourly_item_cap")
@@ -818,13 +1201,140 @@ def run_rewrite_pass(
         districts=settings_service.crawl_districts(db),
     )
 
+    taxonomy = _taxonomy(db) if items else None
     counts = {status.value: 0 for status in RewriteStatus}
+    stopped = None
     for item in items:
-        row = rewrite_one(db, item, actor_id=actor_id)
+        if time.monotonic() - started > PASS_DEADLINE_S:
+            stopped = "deadline"
+            break
+        try:
+            row = rewrite_one(db, item, actor_id=actor_id, taxonomy=taxonomy)
+        except AiBudgetExceededError:
+            # Spent mid-pass. This item is untouched; the rest wait for money.
+            db.rollback()
+            stopped = "budget_exhausted"
+            break
         counts[row.status.value] = counts.get(row.status.value, 0) + 1
+        db.commit()
 
-    logger.info("crawl_rewrite_pass", selected=len(items), ready=counts.get("ready", 0))
-    return {"selected": len(items), **counts}
+    # The same beats: a breaking tick must not spend its minutes importing the
+    # hourly pass's leftovers ahead of the story it just rewrote.
+    imported = auto_import_ready(
+        db, limit=hourly_cap, deadline=started + IMPORT_DEADLINE_S, beats=beats
+    )
+    logger.info(
+        "crawl_rewrite_pass",
+        selected=len(items),
+        ready=counts.get("ready", 0),
+        imported=imported,
+        stopped=stopped,
+    )
+    return {"selected": len(items), **counts, "imported": imported, "stopped": stopped}
+
+
+def auto_import_ready(
+    db: Session,
+    *,
+    limit: int,
+    deadline: float | None = None,
+    beats: set[SourceBeat] | None = None,
+) -> int:
+    """Send finished rewrites into the review queue, when `crawl.auto_import` is on.
+
+    Only a model's rewrite (never the keyless excerpt engine), never one still
+    carrying a stray foreign letter, and never a story that already reached
+    review in the last few hours from another outlet — that one stays in the
+    queue with a note. Each item is claimed atomically first, so an editor's
+    "Send to review" on the same item cannot make it two articles, then
+    imported with no actor and without the unreviewed-feed notice: it lands
+    SUBMITTED like any rewrite and waits for a person. One item per commit; a
+    failure rolls back that item, its claim included, notes it, and the rest
+    go on. Newest first, so the backlog never holds up the latest story.
+    `limit` counts imports; `deadline` is a `time.monotonic()` value.
+    """
+    if not settings_service.get_bool(db, "crawl.auto_import"):
+        return 0
+    cutoff = utcnow() - timedelta(hours=max(1, settings_service.get_int(db, "crawl.max_age_hours")))
+    query = (
+        select(IngestedItem)
+        .where(
+            IngestedItem.status == IngestStatus.NEW,
+            IngestedItem.article_id.is_(None),
+            IngestedItem.rewrite_status == RewriteStatus.READY,
+            IngestedItem.fetched_at >= cutoff,
+        )
+        .order_by(IngestedItem.id.desc())
+    )
+    if beats is not None:
+        query = query.where(IngestedItem.source.has(ContentSource.beat.in_(list(beats))))
+    items = db.scalars(query).all()
+    recent = [
+        (article_id, title or "")
+        for article_id, title in db.execute(
+            select(Article.id, Article.title_te).where(
+                Article.article_type == ArticleType.AI_REWRITE,
+                Article.created_at >= utcnow() - DUPLICATE_WINDOW,
+            )
+        )
+    ]
+
+    imported = 0
+    for item in items:
+        if imported >= limit or (deadline is not None and time.monotonic() > deadline):
+            break
+        # Read per item, so switching it off stops a pass already running.
+        if not settings_service.get_bool(db, "crawl.auto_import"):
+            break
+        rewrite = item.ready_rewrite
+        if (
+            rewrite is None
+            or rewrite.engine == "heuristic"
+            or (rewrite.classification or {}).get("glyph_warning")
+            # Checked again on the stored words: a rewrite made before the
+            # stray-letter gate existed has no classification to carry it.
+            or _foreign_glyph(
+                f"{rewrite.title_te}\n{rewrite.summary_te or ''}\n{rewrite.body_plain or ''}"
+            )
+            or (item.review_note or "").startswith((_DUPLICATE_NOTE, _FAILED_NOTE))
+        ):
+            continue
+        try:
+            twin = next(
+                (aid for aid, title in recent if similarity_percent(rewrite.title_te, title) >= DUPLICATE_PERCENT),
+                None,
+            )
+            if twin is not None:
+                item.review_note = f"{_DUPLICATE_NOTE}{twin}"
+                db.commit()
+                continue
+            # Inside the try: a claim stuck behind an editor's import (a lock
+            # error other than the wait timeout `claim_item` answers) costs
+            # this item, not the rest of the pass.
+            if not ingestion_service.claim_item(db, item.id):
+                continue
+            with db.begin_nested():
+                article = ingestion_service.import_item(
+                    db,
+                    item,
+                    actor_id=None,
+                    auto=False,
+                    rewrite=rewrite,
+                    illustrate=True,
+                    claimed=True,
+                )
+            db.commit()
+        except Exception as exc:  # noqa: BLE001 — one bad item must not end the pass
+            db.rollback()
+            logger.warning("crawl_auto_import_failed", item_id=item.id, exc_info=True)
+            # Its paid calls are on the ledger already (committed apart);
+            # noted so the next pass does not pay for them again.
+            item.review_note = f"{_FAILED_NOTE}{type(exc).__name__}"
+            db.commit()
+            continue
+        recent.append((article.id, article.title_te))
+        imported += 1
+    return imported
 
 
 def status_snapshot(db: Session) -> dict[str, Any]:

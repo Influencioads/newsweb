@@ -11,7 +11,7 @@ import { useI18n, useScript } from '@/i18n';
 import { cn } from '@/utils/cn';
 
 /**
- * BreakingTicker — the amber breaking band under the nav (not sticky). Polls the cached
+ * BreakingTicker — the red breaking band under the nav (not sticky). Polls the cached
  * breaking endpoint every 25 s (§10.1) and renders nothing when it is empty.
  *
  * The track holds two visual copies so the loop is seamless; the second is
@@ -63,19 +63,19 @@ export function BreakingTicker() {
             tabIndex={hidden ? -1 : undefined}
             className={cn(
               f.cls,
-              'flex min-h-tap items-center font-medium hover:underline focus-visible:outline-on-brand',
+              'flex min-h-tap items-center font-medium hover:underline focus-visible:outline-on-ink',
               f.telugu ? 'text-te-body-xs' : 'text-ui',
             )}
           >
             {pick(item.title_te, item.title_en)}
           </Link>
-          <Icon icon={Dot} size="md" className="mx-1 text-on-brand/70" />
+          <Icon icon={Dot} size="md" className="mx-1 text-on-ink/70" />
         </span>
       );
     });
 
   return (
-    <div className={cn('bg-breaking text-on-brand', paused && 'marquee-paused')}>
+    <div className={cn('breaking-gradient-band text-on-ink', paused && 'marquee-paused')}>
       <PageContainer width="site" className="flex items-center gap-2">
         <span
           className={cn(
@@ -94,7 +94,7 @@ export function BreakingTicker() {
         <IconButton
           icon={paused ? Play : Pause}
           label={paused ? t('ui.tickerPlay') : t('ui.tickerPause')}
-          variant="on-fill"
+          variant="inverse"
           onClick={() => setPaused((p) => !p)}
           className="order-last"
         />

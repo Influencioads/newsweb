@@ -156,9 +156,10 @@ export function SectionBlock({
   columns = 3,
 }: {
   section: HomeSection;
-  to: string;
+  to?: string;
   columns?: 2 | 3;
 }) {
+  const { t } = useI18n();
   const s = useScript();
   const reveal = useReveal<HTMLDivElement>();
   const [first, ...rest] = section.articles;
@@ -168,10 +169,30 @@ export function SectionBlock({
   // With two columns every remaining headline goes in the single list column.
   const half = columns === 2 ? rest.length : Math.ceil(rest.length / 2);
   const listCls = 'min-w-0 md:border-l md:border-rule md:pl-7';
-
+  const bandTone: Record<string, string> = {
+    breaking: 'breaking',
+    national: 'national', world: 'international', international: 'international',
+    business: 'business', exclusive: 'exclusive', politics: 'politics',
+    cinema: 'cinema', sports: 'sports', jobs: 'jobs', health: 'health',
+    lifestyle: 'lifestyle', travel: 'travel', food: 'food', crime: 'crime',
+    devotional: 'devotional', inspiring: 'inspiring', 'zero-to-hero': 'inspiring',
+    'best-deals': 'business', 'andhra-pradesh': 'regional', telangana: 'regional',
+    districts: 'regional', opinion: 'politics', trending: 'exclusive',
+  };
+  const tone = section.key.startsWith('mandal-') ? 'regional' : (bandTone[section.key] ?? 'general');
   return (
-    <section>
-      <SectionHeader title={title.text} titleLang={title.lang} to={to} />
+    <section data-section-key={section.key}>
+      <div className="home-section-band mb-4 flex min-h-tap flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl px-4 py-2.5 md:px-5" data-band-tone={tone}>
+        <h2 lang={title.lang} className={cn(title.head, 'text-headline-md font-extrabold text-on-ink')}>
+          {title.text}
+        </h2>
+        {to ? (
+          <Link to={to} className={cn(s.body, 'inline-flex min-h-tap items-center gap-0.5 rounded-xl text-ui-sm font-semibold text-on-ink underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-on-ink')}>
+            {t('home.seeAll')}
+            <Icon icon={ChevronRight} size="sm" />
+          </Link>
+        ) : null}
+      </div>
       <div
         className={cn(
           'grid gap-x-7 gap-y-4',

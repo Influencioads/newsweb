@@ -86,6 +86,21 @@ describe('ArticleCard variants', () => {
     expect(screen.queryByText('0')).not.toBeInTheDocument();
   });
 
+  it('places a featured lead headline above the eager news image', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <LeadCard article={{ ...article, hero: { id: 1, url: '/news.jpg', srcset: null, alt_te: 'వార్త ఫోటో', caption_te: null, credit: null, license_label: null, representative: false, source_url: null, width: 1200, height: 675, blurhash: null, ai_generated: false } }} featured />
+      </MemoryRouter>,
+    );
+    const heading = screen.getByRole('heading', { name: TITLE_TE });
+    const image = screen.getByRole('img', { name: 'వార్త ఫోటో' });
+    expect(heading.closest('article')).toHaveClass('home-feature');
+    expect(heading.compareDocumentPosition(image) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(image).toHaveAttribute('loading', 'eager');
+    expect(image).toHaveAttribute('fetchpriority', 'high');
+    expect(container.querySelector('article a')).toHaveAttribute('href', article.url);
+  });
+
   it('keeps the counts out of the anchor, so the card stays one link', () => {
     // A <button> inside an <a> is invalid HTML and breaks keyboard order, so
     // these are text. If someone makes them interactive, this fails.

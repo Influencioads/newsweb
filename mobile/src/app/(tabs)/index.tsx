@@ -13,10 +13,11 @@ import type { ArticleCard, HomePayload } from '@/api/types';
 import { CompactCard, LeadCard, RowCard } from '@/components/ArticleCard';
 import { BulletinCard, useBulletin, type BulletinSummary } from '@/components/BulletinCard';
 import { EmptyState, ErrorState } from '@/components/Feedback';
-import { HomeListHeader } from '@/components/home/HomeListHeader';
+import { HomeListHeader, HomePromos } from '@/components/home/HomeListHeader';
+import { HomeSectionBand } from '@/components/home/HomeSectionBand';
+import { LeadSlider } from '@/components/home/LeadSlider';
 import { LocationSheet, usePlaceName } from '@/components/LocationSheet';
 import { PollCard } from '@/components/PollCard';
-import { SectionHeader } from '@/components/SectionHeader';
 import { VideoStrip } from '@/components/VideoStrip';
 import { useI18n } from '@/lib/i18n';
 import { space } from '@/lib/theme';
@@ -32,18 +33,19 @@ import { SkeletonFeed } from '@/ui/Skeleton';
 import { T } from '@/ui/Text';
 
 /**
- * Home feed: breaking strip, e-paper promo, top topics, lead story, secondary
- * rows, for-you rail, bulletin, big question, latest rail, mandal block, video
+ * Home feed: breaking strip, top-stories slider (lead + secondary), e-paper
+ * promo, top topics, for-you rail, bulletin, big question, latest rail, mandal block, video
  * strip, then the admin-configured section blocks — one `/public/home`
  * request (§23), flattened into a single FlatList so the masthead collapses
  * against one scroll offset.
  */
 type Row =
+  | { key: string; type: 'slider'; articles: ArticleCard[] }
   | { key: string; type: 'lead' | 'row' | 'compact'; article: ArticleCard }
-  | { key: string; type: 'section'; title: string; href?: Href }
+  | { key: string; type: 'section'; title: string; sectionKey: string; href?: Href }
   | { key: string; type: 'poll'; poll: Poll }
   | { key: string; type: 'bulletin'; bulletin: BulletinSummary }
-  | { key: string; type: 'video' | 'empty' };
+  | { key: string; type: 'video' | 'promos' | 'empty' };
 
 const STAGGER_MAX = 6;
 
@@ -55,18 +57,20 @@ function flatten(
   pick: (te: string | null, en: string | null) => string,
   forYouTitle: string,
   latestTitle: string,
+  exclusiveTitle: string,
 ): Row[] {
   const rows: Row[] = [];
   const article = (type: 'lead' | 'row' | 'compact', prefix: string, a: ArticleCard) =>
     rows.push({ key: `${prefix}-${a.short_id}`, type, article: a });
 
-  if (home.lead) article('lead', 'lead', home.lead);
-  home.secondary.forEach((a) => article('row', 'sec', a));
+  // The top stories slide — the lead, then the secondary stories — as on the web.
+  if (home.lead) rows.push({ key: 'lead-slider', type: 'slider', articles: [home.lead, ...home.secondary] });
+  rows.push({ key: 'promos', type: 'promos' });
   home.mid_column.forEach((a) => article('row', 'mid', a));
 
   // §3.2 personalised rail — only once there is enough to call it one.
   if (forYou.length >= 3) {
-    rows.push({ key: 'fy-h', type: 'section', title: forYouTitle });
+    rows.push({ key: 'fy-h', type: 'section', title: forYouTitle, sectionKey: 'default' });
     forYou.forEach((a) => article('row', 'fy', a));
   }
 
@@ -75,14 +79,36 @@ function flatten(
   if (poll) rows.push({ key: `poll-${poll.id}`, type: 'poll', poll });
 
   if (home.latest.length) {
-    rows.push({ key: 'latest-h', type: 'section', title: latestTitle });
+    rows.push({ key: 'latest-h', type: 'section', title: latestTitle, sectionKey: 'default' });
     home.latest.slice(0, 6).forEach((a) => article('compact', 'latest', a));
+  }
+
+  // A dedicated exclusive shelf makes the editorial flag discoverable even
+  // when the admin has not configured an "exclusive" homepage category.
+  const exclusivePool = [
+    ...home.secondary,
+    ...home.mid_column,
+    ...home.briefs,
+    ...home.latest,
+    ...(home.mandal_block?.articles ?? []),
+    ...home.sections.flatMap((section) => section.articles),
+  ];
+  const exclusives = exclusivePool
+    .filter((candidate, index) =>
+      candidate.is_exclusive &&
+      candidate.short_id !== home.lead?.short_id &&
+      exclusivePool.findIndex((article) => article.short_id === candidate.short_id) === index,
+    )
+    .slice(0, 4);
+  if (exclusives.length && !home.sections.some((section) => section.key === 'exclusive')) {
+    rows.push({ key: 'exclusive-h', type: 'section', title: exclusiveTitle, sectionKey: 'exclusive' });
+    exclusives.forEach((a) => article('row', 'exclusive', a));
   }
 
   // §3 what's happening in your mandal.
   const mandal = home.mandal_block;
   if (mandal?.articles.length) {
-    rows.push({ key: 'mandal-h', type: 'section', title: pick(mandal.title_te, mandal.title_en), href: '/local' });
+    rows.push({ key: 'mandal-h', type: 'section', title: pick(mandal.title_te, mandal.title_en), sectionKey: 'default', href: '/local' });
     article('lead', 'mandal', mandal.articles[0]);
     mandal.articles.slice(1, 5).forEach((a) => article('row', 'mandal', a));
   }
@@ -94,6 +120,7 @@ function flatten(
       key: `s-${section.key}-h`,
       type: 'section',
       title: pick(section.title_te, section.title_en),
+      sectionKey: section.key,
       href: section.key === 'trending' ? '/trending' : { pathname: '/section/[slug]', params: { slug: section.key } },
     });
     if (section.articles[0]) article('lead', `s-${section.key}`, section.articles[0]);
@@ -173,6 +200,8 @@ export default function HomeScreen() {
   const renderRow: ListRenderItem<Row> = ({ item, index }) => {
     const stagger = firstPaint && index < STAGGER_MAX ? index : undefined;
     switch (item.type) {
+      case 'slider':
+        return <LeadSlider articles={item.articles} index={stagger} />;
       case 'lead':
         return <LeadCard article={item.article} index={stagger} />;
       case 'row':
@@ -181,8 +210,10 @@ export default function HomeScreen() {
         return <CompactCard article={item.article} index={stagger} />;
       case 'section': {
         const href = item.href;
-        return <SectionHeader title={item.title} onSeeAll={href ? () => router.push(href) : undefined} />;
+        return <HomeSectionBand title={item.title} sectionKey={item.sectionKey} onSeeAll={href ? () => router.push(href) : undefined} />;
       }
+      case 'promos':
+        return <HomePromos epaper={home.data?.epaper ?? null} topics={topics.data?.items ?? []} />;
       case 'poll':
         return <PollCard poll={item.poll} />;
       case 'bulletin':
@@ -203,6 +234,7 @@ export default function HomeScreen() {
         pick,
         t('foryou.title'),
         t('home.latest'),
+        t('ui.exclusive'),
       )
     : [];
 
@@ -254,8 +286,6 @@ export default function HomeScreen() {
           ListHeaderComponent={
             <HomeListHeader
               breaking={home.data?.breaking ?? []}
-              epaper={home.data?.epaper ?? null}
-              topics={topics.data?.items ?? []}
             />
           }
           contentContainerStyle={styles.content}

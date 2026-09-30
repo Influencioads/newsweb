@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, Check, Download, ImageOff, ImagePlus, RefreshCw, RotateCcw, Save, Search, SearchX, Sparkles, Trash2 } from 'lucide-react';
 
@@ -6,10 +6,10 @@ import { ApiError } from '@/api/client';
 import { AdminPage } from '@/components/admin/AdminPage';
 import { Section } from '@/components/admin/FormControls';
 import { WorkflowPill } from '@/components/admin/StatusPill';
-import { Badge } from '@/components/ui/Badge';
+import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
 import { useConfirm } from '@/components/ui/Dialog';
-import { Field, FileDrop, Input, Radio, Switch, Textarea } from '@/components/ui/Field';
+import { Checkbox, Field, FileDrop, Input, Radio, Switch, Textarea } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, QueryState, Skeleton } from '@/components/ui/State';
 import { useToast } from '@/components/ui/Toast';
@@ -38,6 +38,11 @@ import { useL } from './useL';
  * Drawing costs money and takes 15–60 s, so nothing is drawn until Generate.
  * The drawn backdrop is held by media id and sent back on every later render,
  * so a text fix, a template change or "Save" re-renders for free.
+ *
+ * Ticking several stories makes a batch: one size and one design for all,
+ * each story's own photo and words. The design is drawn once and shared, then
+ * the cards are made two at a time from this page and filed in the media
+ * library, so a closed tab loses only the cards not yet started.
  */
 
 const PRESETS = [
@@ -63,11 +68,20 @@ const STEPS = [
 ];
 
 const MAX_REFS = 4;
+const PARALLEL = 2;
 const ACCEPT = 'image/jpeg,image/png,image/webp';
 const MIN_SIDE = 320;
 const MAX_SIDE = 4096;
 
 type Size = { w: number; h: number };
+type Job = { article: CmsArticle; status: 'waiting' | 'running' | 'done' | 'failed'; card?: SocialCard; error?: string };
+
+const JOB_STATUS: Record<Job['status'], { tone: BadgeTone; te: string; en: string }> = {
+  waiting: { tone: 'muted', te: 'వరుసలో', en: 'Waiting' },
+  running: { tone: 'info', te: 'తయారవుతోంది', en: 'Making' },
+  done: { tone: 'success', te: 'పూర్తి', en: 'Done' },
+  failed: { tone: 'breaking', te: 'విఫలం', en: 'Failed' },
+};
 
 function customSize(w: string, h: string): Size | null {
   const x = Number(w);
@@ -98,7 +112,9 @@ export default function CreativeStudio() {
 
   const [step, setStep] = useState(0);
   const [q, setQ] = useState('');
-  const [article, setArticle] = useState<CmsArticle | null>(null);
+  const [picked, setPicked] = useState<CmsArticle[]>([]);
+  const article = picked.length === 1 ? picked[0] : null;
+  const batch = picked.length > 1;
   const [tag, setTag] = useState('');
   const [headline, setHeadline] = useState('');
   const [text, setText] = useState('');
@@ -113,15 +129,19 @@ export default function CreativeStudio() {
   /** The backdrop already drawn, and the design settings it was drawn for. */
   const [held, setHeld] = useState<{ id: number; design: string } | null>(null);
   const [renderedKey, setRenderedKey] = useState('');
+  const [jobs, setJobs] = useState<Job[]>([]);
+  /** Bumped by every batch run and every selection change; an older run stops. */
+  const runId = useRef(0);
 
   const size: Size | null =
     preset === 'custom' ? customSize(customW, customH) : (PRESETS.find((p) => p.key === preset) ?? null);
-  // Which steps may be opened: each needs everything before it.
-  const hasCopy = !!article && !!headline.trim();
-  const ready = [true, !!article, hasCopy, hasCopy && !!size, hasCopy && !!size];
+  // Which steps may be opened: each needs everything before it. A batch takes
+  // each story's own words, so it has no copy to approve.
+  const hasCopy = batch || (!!article && !!headline.trim());
+  const ready = [true, picked.length > 0, hasCopy, hasCopy && !!size, hasCopy && !!size];
   // The full-photo layout is all photo when the story has one: a design under
   // it would be paid for and never seen (the server draws none either).
-  const covered = template === 'overlay' && !!article?.hero_media_id;
+  const covered = template === 'overlay' && picked.length > 0 && picked.every((a) => !!a.hero_media_id);
   const aiOn = useAi && !covered;
 
   // ------------------------------------------------------------ queries --
@@ -157,11 +177,21 @@ export default function CreativeStudio() {
   };
 
   function pick(a: CmsArticle) {
-    setArticle(a);
+    setPicked([a]);
     resetCopy(a);
     write.reset();
     make.reset();
     setRenderedKey('');
+    setJobs([]);
+    runId.current++;
+  }
+  // The tick adds a story to the batch; a batch down to one is the single flow.
+  function toggle(a: CmsArticle) {
+    const next = picked.some((x) => x.id === a.id) ? picked.filter((x) => x.id !== a.id) : [...picked, a];
+    if (next.length === 1 && next[0]) return pick(next[0]);
+    setPicked(next);
+    setJobs([]);
+    runId.current++;
   }
 
   const write = useMutation({
@@ -252,6 +282,58 @@ export default function CreativeStudio() {
   const run = (b: SocialCardBody) => {
     if (article) make.mutate({ id: article.id, b });
   };
+
+  // -------------------------------------------------------------- batch --
+  const canSave = can('media.upload');
+  async function runQueue(list: Job[]) {
+    const mine = ++runId.current;
+    setJobs(list);
+    const set = (i: number, patch: Partial<Job>) => {
+      if (runId.current === mine) setJobs((cur) => cur.map((j, k) => (k === i ? { ...j, ...patch } : j)));
+    };
+    const todo = list.flatMap((j, i) => (j.status === 'done' ? [] : [{ i, a: j.article }]));
+    const take = () => (runId.current === mine ? todo.shift() : undefined);
+    let backdrop = backdropId;
+    const one = async ({ i, a }: { i: number; a: CmsArticle }) => {
+      set(i, { status: 'running', error: undefined });
+      try {
+        const r = await cmsApi.makeSocialCard(a.id, {
+          ...body(canSave),
+          headline: a.title_te.slice(0, 160),
+          summary: (a.summary_te ?? '').slice(0, 400),
+          tag: null,
+          use_ai_backdrop: aiOn && backdrop === null,
+          backdrop_media_id: backdrop,
+        });
+        if (r.card?.backdrop) {
+          backdrop = r.card.backdrop.media_id;
+          setHeld({ id: backdrop, design });
+        }
+        set(i, r.card ? { status: 'done', card: r.card } : { status: 'failed', error: r.reason ?? undefined });
+      } catch (e) {
+        // Paid for before a later step failed: keep it, as the single flow does.
+        if (e instanceof ApiError && typeof e.details.backdrop_media_id === 'number') {
+          backdrop = e.details.backdrop_media_id;
+          setHeld({ id: backdrop, design });
+        }
+        set(i, { status: 'failed', error: e instanceof ApiError ? e.displayMessage : undefined });
+      }
+    };
+    // One story at a time until one has drawn the design, then all share it.
+    while (aiOn && backdrop === null) {
+      const job = take();
+      if (!job) return;
+      await one(job);
+    }
+    await Promise.all(
+      Array.from({ length: PARALLEL }, async () => {
+        for (let job = take(); job; job = take()) await one(job);
+      }),
+    );
+  }
+  const doneJobs = jobs.filter((j) => j.card);
+  const failedCount = jobs.filter((j) => j.status === 'failed').length;
+  const queueBusy = jobs.some((j) => j.status === 'waiting' || j.status === 'running');
   // A 422 is a refusal (sensitive topic, a model without references) — the
   // feature working, so shown in place rather than as a red toast.
   const refusal = make.error instanceof ApiError && make.error.status === 422 ? make.error.displayMessage : null;
@@ -282,6 +364,14 @@ export default function CreativeStudio() {
     'flex h-full flex-col items-center gap-1 rounded-xl border-2 border-rule bg-surface p-2 text-center',
     'transition-colors duration-base ease-standard hover:border-brand peer-checked:border-brand peer-checked:bg-brand-tint',
     'peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand',
+  );
+  const noPhoto = (
+    <p role="note" className={alert}>
+      {L(
+        'ఈ కథనానికి ప్రధాన ఫోటో లేదు — క్రియేటివ్ డిజైన్‌పై పాఠ్యం మాత్రమే ఉంటుంది. AI ఎప్పుడూ వార్తా ఫోటోను గీయదు.',
+        'This story has no main photo — the creative will be text over the design only. The AI never draws a news photo.',
+      )}
+    </p>
   );
 
   const nav = (next?: ReactNode) => (
@@ -367,6 +457,9 @@ export default function CreativeStudio() {
           subtitle={L('క్రియేటివ్‌లో కథనం ప్రధాన ఫోటో, దాని పాఠ్యం మాత్రమే ఉంటాయి.', 'The creative carries only this story’s main photo and its words.')}
         >
           <Input leading={Search} value={q} onChange={(e) => setQ(e.target.value)} placeholder={L('శీర్షిక లేదా ID తో వెతకండి', 'Search by headline or ID')} aria-label={t('ui.search')} />
+          <p className={note}>
+            {L('ఒకేసారి చాలా క్రియేటివ్‌లు కావాలంటే కథనాల పక్కన టిక్ పెట్టండి.', 'Tick several stories to make all their creatives in one go.')}
+          </p>
           <QueryState
             query={articles}
             isEmpty={(d) => d.articles.length === 0}
@@ -381,45 +474,55 @@ export default function CreativeStudio() {
           >
             {(d) => (
               <ul className="grid gap-3 sm:grid-cols-2">
-                {d.articles.map((a) => (
-                  <li key={a.id}>
-                    <button
-                      type="button"
-                      onClick={() => pick(a)}
-                      aria-pressed={article?.id === a.id}
-                      className={cn(
-                        'flex w-full items-center gap-3 rounded-xl border-2 bg-surface p-2 text-left',
-                        'transition-colors duration-base ease-standard hover:border-brand',
-                        article?.id === a.id ? 'border-brand bg-brand-tint' : 'border-rule',
-                      )}
-                    >
-                      {a.hero_media ? (
-                        <img src={a.hero_media.url} alt="" loading="lazy" className="aspect-[4/3] w-24 shrink-0 rounded-lg object-cover" />
-                      ) : (
-                        <span aria-hidden className="flex aspect-[4/3] w-24 shrink-0 items-center justify-center rounded-lg bg-placeholder text-muted">
-                          <Icon icon={ImageOff} size="sm" />
+                {d.articles.map((a) => {
+                  const on = picked.some((x) => x.id === a.id);
+                  return (
+                    <li key={a.id} className="relative">
+                      <button
+                        type="button"
+                        onClick={() => pick(a)}
+                        aria-pressed={on}
+                        className={cn(
+                          'flex w-full items-center gap-3 rounded-xl border-2 bg-surface p-2 pr-12 text-left',
+                          'transition-colors duration-base ease-standard hover:border-brand',
+                          on ? 'border-brand bg-brand-tint' : 'border-rule',
+                        )}
+                      >
+                        {a.hero_media ? (
+                          <img src={a.hero_media.url} alt="" loading="lazy" className="aspect-[4/3] w-24 shrink-0 rounded-lg object-cover" />
+                        ) : (
+                          <span aria-hidden className="flex aspect-[4/3] w-24 shrink-0 items-center justify-center rounded-lg bg-placeholder text-muted">
+                            <Icon icon={ImageOff} size="sm" />
+                          </span>
+                        )}
+                        <span className="min-w-0 flex-1 space-y-1">
+                          <span lang="te" className="te te-clamp-2 block text-te-body-xs font-semibold text-ink">
+                            {a.title_te}
+                          </span>
+                          <span className="flex flex-wrap items-center gap-1.5">
+                            <WorkflowPill status={a.workflow_state} />
+                            {a.hero_media_id ? null : <Badge tone="partial" size="xs">{L('ఫోటో లేదు', 'No photo')}</Badge>}
+                          </span>
                         </span>
-                      )}
-                      <span className="min-w-0 flex-1 space-y-1">
-                        <span lang="te" className="te te-clamp-2 block text-te-body-xs font-semibold text-ink">
-                          {a.title_te}
-                        </span>
-                        <span className="flex flex-wrap items-center gap-1.5">
-                          <WorkflowPill status={a.workflow_state} />
-                          {a.hero_media_id ? null : <Badge tone="partial" size="xs">{L('ఫోటో లేదు', 'No photo')}</Badge>}
-                        </span>
-                      </span>
-                    </button>
-                  </li>
-                ))}
+                      </button>
+                      <Checkbox
+                        checked={on}
+                        onChange={() => toggle(a)}
+                        className="absolute right-1 top-1 gap-0 px-2"
+                        label={<span className="sr-only">{`${L('బ్యాచ్‌లో చేర్చండి', 'Add to batch')}: ${a.title_te}`}</span>}
+                      />
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </QueryState>
-          {article && !article.hero_media_id ? (
-            <p role="note" className={alert}>
+          {article && !article.hero_media_id ? noPhoto : null}
+          {batch ? (
+            <p role="status" className={note}>
               {L(
-                'ఈ కథనానికి ప్రధాన ఫోటో లేదు — క్రియేటివ్ డిజైన్‌పై పాఠ్యం మాత్రమే ఉంటుంది. AI ఎప్పుడూ వార్తా ఫోటోను గీయదు.',
-                'This story has no main photo — the creative will be text over the design only. The AI never draws a news photo.',
+                `${picked.length} కథనాలు — అన్నింటికీ ఒకే పరిమాణం, ఒకే డిజైన్; ప్రతిదానికి దాని ఫోటో, దాని పాఠ్యం.`,
+                `${picked.length} stories — one size and one design for all; each keeps its own photo and words.`,
               )}
             </p>
           ) : null}
@@ -447,6 +550,24 @@ export default function CreativeStudio() {
             </p>
           ))}
           {copyFields}
+          {nav()}
+        </Section>
+      ) : null}
+      {step === 1 && batch ? (
+        <Section
+          title={L('2. పాఠ్యం', '2. Copy')}
+          subtitle={L(
+            'బ్యాచ్‌లో ప్రతి క్రియేటివ్‌కు దాని కథనం శీర్షిక, సారాంశం. పాఠ్యం మార్చాలంటే ఆ కథనం ఒక్కదాన్నే ఎంచుకోండి.',
+            'In a batch each creative takes its own story’s headline and summary. To change the words, make that story’s creative on its own.',
+          )}
+        >
+          <ol className="list-decimal space-y-1 pl-5">
+            {picked.map((a) => (
+              <li key={a.id} lang="te" className="te text-te-body-xs text-ink">
+                {a.title_te}
+              </li>
+            ))}
+          </ol>
           {nav()}
         </Section>
       ) : null}
@@ -487,6 +608,21 @@ export default function CreativeStudio() {
       {/* ------------------------------------------------- 4. design -- */}
       {step === 3 ? (
         <Section title={L('4. డిజైన్', '4. Design')} subtitle={L('లేఅవుట్, రిఫరెన్స్ డిజైన్లు, AI నేపథ్యం.', 'Layout, reference designs and the AI backdrop.')}>
+          {batch ? (
+            <p className={note}>{L('ప్రతి క్రియేటివ్‌లో దాని కథనం ఫోటో మార్పు లేకుండా వస్తుంది.', 'Each creative carries its own story’s photo, unchanged.')}</p>
+          ) : article?.hero_media ? (
+            <div>
+              <span className={legend}>{L('కార్డ్‌పై ఫోటో', 'Photo on the card')}</span>
+              <div className="flex items-center gap-3">
+                <img src={article.hero_media.url} alt={L('కథనం ఫోటో', 'Story photo')} className="aspect-[4/3] w-32 shrink-0 rounded-lg object-cover" />
+                <p className={note}>
+                  {L('ఈ కథనం ఫోటో కార్డ్‌పై మార్పు లేకుండా వస్తుంది — AI దాన్ని ఎప్పుడూ మళ్లీ గీయదు.', 'This story’s photo is placed on the card, unchanged — the AI never redraws it.')}
+                </p>
+              </div>
+            </div>
+          ) : (
+            noPhoto
+          )}
           <fieldset>
             <legend className={legend}>{L('లేఅవుట్', 'Layout')}</legend>
             {TEMPLATES.map((o) => (
@@ -686,6 +822,89 @@ export default function CreativeStudio() {
               )}
             </div>
           </div>
+          {nav(<span />)}
+        </Section>
+      ) : null}
+      {step === 4 && batch && size ? (
+        <Section title={L('5. తయారీ', '5. Generate')} subtitle={L(`${picked.length} కథనాలు · ${size.w} × ${size.h}`, `${picked.length} stories · ${size.w} × ${size.h}`)}>
+          <div className="flex flex-wrap gap-2">
+            <Button icon={ImagePlus} pending={queueBusy} disabled={queueBusy} onClick={() => void runQueue(picked.map((a) => ({ article: a, status: 'waiting' })))}>
+              {queueBusy ? t('ui.generating') : L(`${picked.length} క్రియేటివ్‌లు తయారు చేయండి`, `Generate ${picked.length} creatives`)}
+            </Button>
+            {failedCount > 0 && !queueBusy ? (
+              <Button
+                variant="secondary"
+                icon={RotateCcw}
+                onClick={() => void runQueue(jobs.map((j) => (j.status === 'failed' ? { ...j, status: 'waiting' } : j)))}
+              >
+                {L(`విఫలమైనవి మళ్లీ (${failedCount})`, `Retry failed (${failedCount})`)}
+              </Button>
+            ) : null}
+            {doneJobs.length > 1 ? (
+              <Button
+                variant="secondary"
+                icon={Download}
+                onClick={async () => {
+                  for (const j of doneJobs) await downloadFile(j.card!.url, j.card!.filename);
+                }}
+              >
+                {L('అన్నీ డౌన్‌లోడ్', 'Download all')}
+              </Button>
+            ) : null}
+          </div>
+          <p className={note}>
+            {aiOn && backdropId === null
+              ? L(
+                  'డిజైన్ ఒక్కసారే గీస్తాం (15–60 సెకన్లు) — బ్యాచ్‌లోని అన్ని క్రియేటివ్‌లకు అదే. తర్వాత రెండేసి చొప్పున తయారవుతాయి.',
+                  'The design is drawn once (15 to 60 seconds) and shared by every creative in the batch; they are then made two at a time.',
+                )
+              : L('రెండేసి చొప్పున తయారవుతాయి.', 'Made two at a time.')}{' '}
+            {canSave ? L('ప్రతిదీ మీడియా లైబ్రరీలో సేవ్ అవుతుంది. ఈ పేజీ తెరిచి ఉంచండి.', 'Each is saved to the media library. Leave this page open.') : L('ఈ పేజీ తెరిచి ఉంచండి.', 'Leave this page open.')}
+          </p>
+          {jobs.length ? (
+            <p role="status" className={cn(s.body, 'text-ui-sm font-semibold text-ink')}>
+              {L(`${doneJobs.length} / ${jobs.length} పూర్తి`, `${doneJobs.length} of ${jobs.length} done`)}
+              {failedCount ? L(` · ${failedCount} విఫలం`, ` · ${failedCount} failed`) : ''}
+            </p>
+          ) : null}
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {(jobs.length ? jobs : picked.map((a): Job => ({ article: a, status: 'waiting' }))).map((j) => {
+              const src = j.card?.url ?? j.article.hero_media?.url;
+              const st = JOB_STATUS[j.status];
+              return (
+                <li key={j.article.id} className="min-w-0 space-y-2 rounded-xl border border-rule bg-surface p-2">
+                  {src ? (
+                    <img
+                      src={src}
+                      alt={j.card ? j.article.title_te : ''}
+                      loading="lazy"
+                      className={cn('w-full rounded-lg bg-placeholder', j.card ? 'object-contain' : 'object-cover opacity-60')}
+                      style={{ aspectRatio: `${size.w} / ${size.h}` }}
+                    />
+                  ) : (
+                    <span aria-hidden className="flex w-full items-center justify-center rounded-lg bg-placeholder text-muted" style={{ aspectRatio: `${size.w} / ${size.h}` }}>
+                      <Icon icon={ImageOff} size="sm" />
+                    </span>
+                  )}
+                  <span lang="te" className="te te-clamp-2 block text-te-body-xs font-semibold text-ink">
+                    {j.article.title_te}
+                  </span>
+                  {jobs.length ? (
+                    <Badge tone={st.tone} size="xs">
+                      {L(st.te, st.en)}
+                    </Badge>
+                  ) : null}
+                  {j.status === 'failed' ? <p className={cn(note, 'text-partial')}>{j.error ?? L('క్రియేటివ్ తయారు కాలేదు.', 'No creative was made.')}</p> : null}
+                  {j.card?.warnings.length ? <p className={note}>{j.card.warnings.map((w) => WARNINGS[w] ?? w).join(' ')}</p> : null}
+                  {j.card ? (
+                    <Button variant="secondary" size="sm" icon={Download} onClick={() => void downloadFile(j.card!.url, j.card!.filename)}>
+                      {L('డౌన్‌లోడ్', 'Download')}
+                    </Button>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
           {nav(<span />)}
         </Section>
       ) : null}

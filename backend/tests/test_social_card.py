@@ -364,6 +364,8 @@ class TestPhotoLabel:
         stand_in = Media(credit=None, source_type="own", ai_generated=False, meta={"representative": True})
         assert social_card_service._photo_label(borrowed) is None
         assert social_card_service._photo_label(drawn) == "AI చిత్రం"
+        scene = Media(credit=None, source_type="own", ai_generated=True, meta={"representative": True})
+        assert social_card_service._photo_label(scene) == "ప్రతీకాత్మక AI చిత్రం"
         assert social_card_service._photo_label(stand_in) == "ప్రతీకాత్మక చిత్రం"
 
 
@@ -604,7 +606,7 @@ class TestCardEndpoint:
         assert provider.aspects == ["16:9"]  # a 4:5 panel card's picture band
         db.refresh(article)
         assert article.hero_media_id is None
-        assert stub_render["input"].photo_label == "AI చిత్రం"
+        assert stub_render["input"].photo_label == "ప్రతీకాత్మక AI చిత్రం"
 
         # The editor fixes a typo: same picture, no second drawing.
         again = _card(

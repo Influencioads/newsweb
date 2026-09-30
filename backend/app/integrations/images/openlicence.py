@@ -97,18 +97,70 @@ MIN_WIDTH, MIN_HEIGHT = 1000, 600
 #: are what a licence-filtered Commons search actually returns for a person
 #: who has no free photograph: their autograph, a party symbol, a map.
 _NOT_A_PHOTOGRAPH = (
-    "signature", "coat of arms", "flag of", "map of", "locator",
+    # "flag", not "flag of": "Hyderabad City Flag" was attached to a Hyderabad
+    # story on 2026-09-30.
+    "signature", "coat of arms", "flag", "map of", "locator",
     "seal of", "emblem", "stamp of", "chart", "diagram", "poster",
     # Measured, not guessed: a live "Vijayawada city" search returned
     # "Floor plan of Trimurti rock-cut temple" as a top CC0 hit.
     "floor plan", "plan of",
+    # "Guntur city", live: a Wikidata/OSM map screenshot and "Flora of
+    # Viswanagar in Guntur district" — named for the place, pictures of neither.
+    "wikidata", "screenshot", "flora of", "fauna of",
 )
 
-#: The proper nouns in a search query. `depicts_subject` matches on these and
-#: nothing else, so "Mithali Raj cricketer portrait" is tested on the name.
-#: `{2,}` is a three-character floor, not four: Raj, Rao and Roy are surnames,
-#: and a floor of four tested "Mithali" alone and called that a match.
+#: The proper nouns in a search query, so "Mithali Raj cricketer portrait" is
+#: tested on the name. `{2,}` is a three-character floor, not four: Raj, Rao
+#: and Roy are surnames, and a floor of four tested "Mithali" alone and called
+#: that a match.
 _CAPITALISED = re.compile(r"\b[A-Z][a-zA-Z]{2,}\b")
+
+#: Adjacent proper nouns are one name: "Mithali Raj", not "Mithali" and "Raj".
+#: `depicts_subject` looks for each name whole.
+_NAME = re.compile(rf"{_CAPITALISED.pattern}(?:\s+{_CAPITALISED.pattern})*")
+
+#: Names no single photograph can show. A state or a country is where a
+#: picture was taken, not what is in it: the model answered "Andhra city" for
+#: a Tirupati accident, and Commons returned a temple in Vontimitta filed
+#: under "Andhra Pradesh". The query prompt forbids these too; this is the
+#: part that does not depend on the model listening.
+# ponytail: our two states and the country only; add a name when a live run
+# shows another region slipping through.
+_TOO_BROAD = frozenset({"andhra", "pradesh", "telangana", "india", "indian", "telugu"})
+
+#: The trailing noun `story_image_service._QUERY_RULES` mandates. It says what
+#: kind of picture, not whose, so it is never part of a name however the model
+#: capitalised it ("Charminar Building", "Rajamouli Portrait").
+_QUERY_NOUNS = frozenset({"portrait", "city", "town", "temple", "stadium", "building"})
+
+#: A person's name on one of these is a thing named after them — Rajiv Gandhi
+#: International Airport, NTR Gardens, Indira Gandhi Municipal Stadium — not a
+#: photograph of the person.
+_NAMED_AFTER = re.compile(
+    r"\b(?:airport|stadium|gardens?|park|road|marg|nagar|station|bridge|hospital"
+    r"|college|university|memorial|colony|statue|bhavan|samadhi|ghat)\b",
+    re.IGNORECASE,
+)
+
+#: A homonym abroad, in the title or the categories. Measured 2026-09-30: the
+#: top CC0 hit for "Guntur city" was a Dutch print of Mount Guntur in Java,
+#: then a Javanese gamelan named Guntur; Hyderabad is also a city in Sindh. An
+#: "India/Andhra/Telangana" anchor was tried and refused — the correct hits
+#: ("Guntur rail station platform", "Charminar 11") carry none.
+# ponytail: the homonyms seen so far; add a region when a live run shows another.
+_ABROAD = re.compile(
+    r"\b(?:java|indonesia|yogyakarta|sindh|pakistan|bangladesh)\b", re.IGNORECASE
+)
+
+#: A title that is a picture of the place itself: the name first (or after
+#: "view of the"), then nothing but a comma, a bracket, a number or a word
+#: like skyline. Measured 2026-09-30: "Hyderabad city" took "Inorbit Mall,
+#: Hyderabad", "Dubai city"/"Dubai building" a building's shadow — photos
+#: taken in the place, not of it.
+_VIEW_PREFIX = r"\W*(?i:[\d\s]*view of (?:the )?)?"
+_VIEW_SUFFIX = (
+    r"(?:\s*(?:$|[,(\d])|\s+(?i:skyline|panorama|cityscape|aerial|view|at|campus)\b)"
+)
 
 
 def licence_of_commons(extmetadata: dict | None) -> str | None:
@@ -158,99 +210,80 @@ def is_photograph(title: str, url: str) -> bool:
 
 
 def depicts_subject(candidate: StockImage, query: str) -> bool:
-    """Is this a picture **of the named subject**, or merely on the topic?
+    """Is this a picture **of the named person, place or event**? The only
+    question, because nothing else is attached.
 
-    The honesty rule, and the caller sets the caption from it. Every
-    capitalised word in the search query — the proper nouns, which is all the
-    query is meant to contain — must appear in the file's title or its Commons
-    categories. That is a deliberately strict test:
+    Every name in the query must appear, whole, in the file's **title**:
 
-      * "Mithali Raj cricketer" against a file categorised `Mithali Raj` —
-        both words present, it is her.
-      * the same query against a generic `India Women v Australia Women` shot
-        with no name — topical, not her.
-      * a query with no proper noun at all ("flood rescue") can never match,
-        which is correct: there is no named subject to be a picture of.
+      * "Rajamouli portrait" against "SS Rajamouli" — it is him.
+      * "Charminar building" against "Charminar at night" — it is the place.
+      * a query with no proper noun at all ("flood rescue") never matches:
+        there is no named subject to be a picture of.
 
-    Matching is on **word boundaries**, not substrings. A plain `in` test read
-    "Nara Brahmani" as depicted by "Brahmani River near Naraj Odisha", and the
-    same collision fires on the commonest terms we search for: Modi ⊂
-    Modinagar, Rama ⊂ Ramanathapuram, Guntur ⊂ Gunturu. Those land on the
-    confident side of the caption, which is the one direction that is not
-    allowed to be wrong.
+    **Title only.** Commons categories cannot tell a photograph of a subject
+    from one merely filed under it: a Deepika Padukone story matched a working
+    still of her film's director, categorised under her name. They can only
+    refuse — `_ABROAD`, a homonym in another country.
 
-    False does not reject the image. It decides whether the reader is told the
-    picture is a stand-in.
-    """
-    names = _CAPITALISED.findall(query or "")
-    if not names:
-        return False
-    text = f"{candidate.title} {candidate.subject_text or ''}".lower()
-    return all(
-        re.search(rf"\b{re.escape(name.lower())}\b", text) is not None for name in names
-    )
+    **A name is matched whole, on word boundaries, in its own case.**
+    Substrings read "Nara Brahmani" into "Brahmani River near Naraj Odisha"
+    (Modi ⊂ Modinagar, Rama ⊂ Ramanathapuram). Words matched separately read
+    "Green Card" into "Charles Green - The Visiting Card". Case, because a
+    capitalised common noun ("Bus Accident") is not a name, and "Bus accident
+    in Kerala" must not answer it. The query's trailing noun and a trailing
+    state ("Amaravati Andhra Pradesh") are not part of the name.
 
+    **A person is not a landmark.** For a portrait, a title naming an airport,
+    a stadium, gardens (`_NAMED_AFTER`) is somewhere named after them.
 
-def is_person_query(query: str) -> bool:
-    """Whether this search was for a named human rather than a place or topic.
+    **A place is only its own picture.** For a city, town or building query
+    the title must be about the place (`_VIEW_PREFIX`/`_VIEW_SUFFIX`):
+    "Inorbit Mall, Hyderabad", "Guntur rail station platform" and "Dubai
+    building shadow" were taken there; they are not the place. A temple or
+    stadium query keeps the looser rule — its name is already the landmark.
 
-    `image_query` mandates a trailing noun, and "portrait" is the one it uses
-    for people. It is the whole test on purpose: the caller needs to know
-    "would a stand-in be a lie here", and for a person the answer is always yes.
+    **"from <name>" is something else.** "Buddha from Guntur district,
+    Warangal Museum" is a statue, "View from Charminar" is the city below it.
+
+    There used to be a second, looser rule — any one proper noun in the title
+    or categories, captioned ప్రాతినిధ్య చిత్రం (representative image). It was
+    removed after 2026-09-30, when it put a Yale painting on an EB-5 green-card
+    story, a Zelenskyy meeting on a Telangana voter-registration story, a
+    Kodandarama temple on a Tirupati accident and a WW2 Yugoslav crash on a
+    Tu-95 crash. A label does not make a picture of somewhere else honest.
+    Nothing matching means no picture; the AI rung and the editor's
+    MediaPicker sit behind this one.
     """
     words = (query or "").split()
-    return bool(words) and words[-1].lower() == "portrait"
-
-
-def may_attach(candidate: StockImage, query: str) -> bool:
-    """Is this close enough to the story to publish **at all**?
-
-    `depicts_subject` decides whether the reader is told the picture is a
-    stand-in. This decides whether there is a picture. They are different
-    questions and conflating them produced real nonsense on the first live run
-    against fourteen crawled stories: a "WAPL" (women's cricket league) search
-    attached *Foe Killer Creek, Roswell, Georgia*; "Jubilee Hills" attached a
-    football club's rooms in Bassendean, Australia, matched on the word
-    Jubilee; a bank-holiday story got a shopfront in Crawford, Nebraska. Each
-    was correctly labelled ప్రాతినిధ్య చిత్రం — which made the label meaningless,
-    because a representative image has to be representative *of something*.
-
-    Two rules:
-
-      * A **person** query attaches only on a full match. A story about
-        somebody needs a picture of that person; a topical stand-in on a named
-        individual is the case where a wrong face is worst. The live run found
-        one: a Deepika Padukone story matched a working still of the film's
-        director, categorised under her name.
-      * A **place or topic** query attaches when at least one proper noun from
-        the query really appears in the file's title or categories — Warangal
-        Museum on a Warangal story — and is then labelled as a stand-in.
-
-    Nothing matching means no picture. Hero-less is a correct outcome, and the
-    AI rung and the editor's own MediaPicker both sit behind this one.
-    """
-    if is_person_query(query):
-        # A story about somebody needs a picture of THEM, and Commons
-        # categories cannot tell a photograph of a person from one merely
-        # filed under their name: the live run matched a Deepika Padukone
-        # story to a working still of her film's DIRECTOR, categorised under
-        # her. The title is where Commons names who is actually in the
-        # frame, so for a person that is the only field that counts.
-        names = _CAPITALISED.findall(query or "")
-        title = (candidate.title or "").lower()
-        return bool(names) and all(
-            re.search(rf"\b{re.escape(name.lower())}\b", title) is not None
-            for name in names
-        )
-    if depicts_subject(candidate, query):
-        return True
-    names = _CAPITALISED.findall(query or "")
-    if not names:
+    # The model stacks them ("Hyderabad city portrait", "Dubai city building").
+    nouns = set()
+    while words and words[-1].lower() in _QUERY_NOUNS:
+        nouns.add(words.pop().lower())
+    # Only a temple or a stadium names its landmark; anything else, including
+    # a query off the mandated form ("Dubai airplane"), must be the place itself.
+    person = nouns == {"portrait"}
+    place = not person and not nouns & {"temple", "stadium"}
+    names = []
+    for name in _NAME.findall(" ".join(words)):
+        parts = name.split()
+        while parts and parts[-1].lower() in _TOO_BROAD:
+            parts.pop()
+        if parts:
+            names.append(parts)
+    title = candidate.title or ""
+    if not names or _ABROAD.search(f"{title} {candidate.subject_text or ''}"):
         return False
-    text = f"{candidate.title} {candidate.subject_text or ''}".lower()
-    return any(
-        re.search(rf"\b{re.escape(name.lower())}\b", text) is not None
-        for name in names
+    if person and _NAMED_AFTER.search(title):
+        return False
+    if place:  # "Tirupati, Andhra Pradesh", "Charminar at night", "Amaravati"
+        name = r"\W+".join(map(re.escape, names[0]))
+        return re.match(_VIEW_PREFIX + name + _VIEW_SUFFIX, title) is not None
+    return all(
+        re.search(
+            r"(?<![Ff]rom )\b" + r"\W+".join(map(re.escape, parts)) + r"\b", title
+        )
+        is not None
+        for parts in names
     )
 
 
@@ -368,8 +401,7 @@ def _commons(query: str, limit: int, timeout: float) -> list[StockImage]:
             height=info.get("thumbheight") or info.get("height"),
             creator=_clean((meta.get("Artist") or {}).get("value")),
             licence_url=_clean((meta.get("LicenseUrl") or {}).get("value")),
-            # Categories are the only reliable proof of subject: Commons
-            # `ImageDescription` is routinely "IMG_2652".
+            # Read only to refuse a homonym abroad (`_ABROAD`), never as proof.
             subject_text=_clean((meta.get("Categories") or {}).get("value")),
         )
         if candidate is None:

@@ -1,12 +1,13 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { memo, type ReactNode } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { absoluteMediaUrl } from '@/api/client';
 import type { ArticleCard as ArticleCardType } from '@/api/types';
 import { ArticleActions } from '@/components/ArticleActions';
+import { EditorialGradient } from '@/components/home/EditorialGradient';
 import { timeAgo, useI18n } from '@/lib/i18n';
 import { useMotion } from '@/lib/motion';
 import { alpha, radius, space } from '@/lib/theme';
@@ -15,7 +16,7 @@ import { Badge } from '@/ui/Badge';
 import { Card } from '@/ui/Card';
 import { Divider } from '@/ui/Divider';
 import { PressableScale } from '@/ui/PressableScale';
-import { T } from '@/ui/Text';
+import { T, type PaletteKey } from '@/ui/Text';
 
 /**
  * Card variants for feeds. Same information architecture as the web cards
@@ -46,7 +47,7 @@ function hasFlags(article: ArticleCardType): boolean {
  */
 function Stagger({ index, children }: { index?: number; children: ReactNode }) {
   const m = useMotion();
-  const entering = index === undefined || index >= STAGGER_MAX ? undefined : m.entering(index);
+  const entering = Platform.OS === 'web' || index === undefined || index >= STAGGER_MAX ? undefined : m.entering(index);
   return <Animated.View entering={entering}>{children}</Animated.View>;
 }
 
@@ -99,7 +100,7 @@ function Topline({ article }: { article: ArticleCardType }) {
   );
 }
 
-function MetaLine({ article }: { article: ArticleCardType }) {
+function MetaLine({ article, color = 'muted' }: { article: ArticleCardType; color?: PaletteKey }) {
   const { language, pick } = useI18n();
   const parts = [
     article.district ? pick(article.district.name_te, article.district.name_en) : null,
@@ -107,7 +108,7 @@ function MetaLine({ article }: { article: ArticleCardType }) {
   ].filter(Boolean);
   if (!parts.length) return null;
   return (
-    <T variant="meta" color="muted" numberOfLines={1}>
+    <T variant="meta" color={color} numberOfLines={1}>
       {parts.join(' · ')}
     </T>
   );
@@ -181,26 +182,29 @@ function CardShell({
   a11y,
   style,
   actions = true,
+  elevated = true,
   children,
 }: {
   article: ArticleCardType;
   a11y: string;
   style?: StyleProp<ViewStyle>;
   actions?: boolean;
+  elevated?: boolean;
   children: React.ReactNode;
 }) {
+  const styles = useStyles();
   return (
-    <Card padding="none" elevated style={style}>
+    <Card padding="none" elevated={elevated} style={style}>
       <PressableScale onPress={() => openArticle(article)} accessibilityLabel={a11y}>
         {children}
       </PressableScale>
       {actions ? (
-        <>
+        <View style={styles.actionSurface}>
           <Divider />
           {/* `flags="cache"` — a mounted row must never issue its own request,
               or a 20-card page costs 20 of them on every scroll. */}
           <ArticleActions article={article} size="card" flags="cache" />
-        </>
+        </View>
       ) : null}
     </Card>
   );
@@ -240,6 +244,45 @@ export const LeadCard = memo(function LeadCard({ article, index }: ArticleCardPr
   );
 });
 
+/** The home page's first story gets the strongest editorial hierarchy. */
+export const FeaturedHomeCard = memo(function FeaturedHomeCard({ article, index }: ArticleCardProps) {
+  const styles = useStyles();
+  const { pick, t } = useI18n();
+  const title = pick(article.title_te, article.title_en);
+  const a11y = `${t('home.topStory')}, ${useCardLabel(article)}`;
+  const hasImage = !!absoluteMediaUrl(article.hero?.url ?? null);
+
+  return (
+    <Stagger index={index}>
+      <CardShell article={article} a11y={a11y} elevated={false} style={[styles.card, styles.featuredCard]}>
+        <View style={styles.featuredBody}>
+          <EditorialGradient tone="featured" />
+          <View style={styles.featuredEyebrow} aria-hidden>
+            <View style={styles.featuredRule} />
+            <T variant="ui" weight="bold" color="onOverlay">
+              {t('home.topStory')}
+            </T>
+          </View>
+          <View style={styles.featuredTopline} aria-hidden>
+            <Flags article={article} />
+            <Kicker article={article} />
+          </View>
+          <T variant="display" weight="heavy" color="onOverlay" scaled>
+            {title}
+          </T>
+          {article.summary_te ? (
+            <T variant="body" color="onOverlay" numberOfLines={2} style={styles.featuredSummary}>
+              {article.summary_te}
+            </T>
+          ) : null}
+          <MetaLine article={article} color="onOverlay" />
+        </View>
+        {hasImage ? <Thumb article={article} style={styles.featuredImage} /> : null}
+      </CardShell>
+    </Stagger>
+  );
+});
+
 /** Thumb + headline row: lists and section blocks. */
 export const RowCard = memo(function RowCard({ article, index }: ArticleCardProps) {
   const styles = useStyles();
@@ -265,7 +308,7 @@ export const RowCard = memo(function RowCard({ article, index }: ArticleCardProp
   );
 });
 
-/** Headline-only compact row for the latest rail. */
+/** Compact row for the latest rail: headline beside a small thumbnail. */
 export const CompactCard = memo(function CompactCard({ article, index }: ArticleCardProps) {
   const styles = useStyles();
   const { pick } = useI18n();
@@ -274,12 +317,15 @@ export const CompactCard = memo(function CompactCard({ article, index }: Article
   return (
     <Stagger index={index}>
       <Card elevated onPress={() => openArticle(article)} accessibilityLabel={a11y} style={styles.card}>
-        <View style={styles.compact}>
-          <Topline article={article} />
-          <T variant="bodySmall" weight="semibold" numberOfLines={2}>
-            {title}
-          </T>
-          <MetaLine article={article} />
+        <View style={styles.compactRow}>
+          <View style={[styles.rowText, styles.compact]}>
+            <Topline article={article} />
+            <T variant="bodySmall" weight="semibold" numberOfLines={2}>
+              {title}
+            </T>
+            <MetaLine article={article} />
+          </View>
+          <Thumb article={article} style={styles.compactImage} />
         </View>
       </Card>
     </Stagger>
@@ -288,6 +334,23 @@ export const CompactCard = memo(function CompactCard({ article, index }: Article
 
 const useStyles = makeStyles((color) => ({
   card: { marginHorizontal: space.lg, marginTop: space.md },
+  featuredCard: {
+    overflow: 'hidden',
+    borderColor: color.brandDeep,
+    backgroundColor: color.inkDeep,
+  },
+  featuredBody: {
+    position: 'relative',
+    gap: space.sm,
+    padding: space.lg,
+    backgroundColor: color.inkDeep,
+  },
+  featuredEyebrow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  featuredRule: { width: 24, height: 3, backgroundColor: color.onOverlay, borderRadius: radius.pill },
+  featuredTopline: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  featuredSummary: { opacity: 0.88 },
+  featuredImage: { width: '100%', aspectRatio: 16 / 9, backgroundColor: color.placeholder },
+  actionSurface: { backgroundColor: color.surface },
   topline: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm },
   fallback: { backgroundColor: color.placeholder },
   /* The image fills this box absolutely so the AI label can sit on top of it. */
@@ -328,4 +391,6 @@ const useStyles = makeStyles((color) => ({
   rowImage: { width: 112, height: 80, borderRadius: radius.sm, backgroundColor: color.placeholder },
 
   compact: { gap: space.xs },
+  compactRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space.md },
+  compactImage: { width: 80, height: 60, borderRadius: radius.sm, backgroundColor: color.placeholder },
 }));

@@ -24,6 +24,8 @@ const ORIGIN: ArticleOrigin = {
     similarity_percent: 28, confidence: 0.9, unverified: false,
     engine: 'aimlapi', model: 'google/gemini-3-5-flash-lite', word_count: 110, created_at: '2026-09-11T00:00:00Z',
   },
+  ai: null,
+  photos: null,
 };
 
 /** What the editor has in the form right now — the right column's only source. */
@@ -130,6 +132,54 @@ describe('OriginCompare', () => {
     expect(screen.queryByText('మా పాఠ్యం')).toBeNull();
     // Word count follows the live text, not the server's 110.
     expect(screen.getByText(/^3 words/)).toBeInTheDocument();
+  });
+
+  it('shows where the AI filed it and what it saw in each photo', async () => {
+    vi.mocked(cmsApi.fetchArticleOrigin).mockResolvedValue({
+      ...ORIGIN,
+      ai: {
+        category: { id: 3, name_te: 'రాజకీయం', name_en: 'Politics' },
+        subcategory: null,
+        district: { id: 7, name_te: 'గుంటూరు', name_en: 'Guntur' },
+        mandal: { id: 70, name_te: 'మంగళగిరి', name_en: 'Mangalagiri' },
+        tags: [{ name: 'పోలవరం', type: 'place' }],
+        breaking: true,
+        glyph_warning: true,
+      },
+      photos: {
+        model: 'google/gemini-vision',
+        candidates: [
+          { url: 'https://tv9.example/a.jpg', verdict: 'watermark', reason: 'channel bug top right' },
+          { url: 'https://tv9.example/b.jpg', verdict: 'clean', reason: 'plain street photo' },
+        ],
+        hero: 'crawled',
+      },
+    });
+    const { container } = renderPanel();
+    await open(container);
+    expect(await screen.findByText('AI filed it as')).toBeInTheDocument();
+    expect(screen.getByText('Politics')).toBeInTheDocument();
+    expect(screen.getByText('Mangalagiri')).toBeInTheDocument();
+    expect(screen.getByText('పోలవరం')).toBeInTheDocument();
+    expect(screen.getByText('place')).toBeInTheDocument();
+    expect(screen.getByText('AI suggests breaking')).toBeInTheDocument();
+    expect(screen.getByText(/stray foreign letters/)).toBeInTheDocument();
+
+    expect(screen.getByText('Photos checked')).toBeInTheDocument();
+    expect(screen.getByText(/one of the publisher’s photos/)).toBeInTheDocument();
+    expect(screen.getByText('watermark')).toBeInTheDocument();
+    expect(screen.getByText('channel bug top right')).toBeInTheDocument();
+    expect(screen.getByText('clean')).toBeInTheDocument();
+    expect(container.querySelector('img[src="https://tv9.example/a.jpg"]')).not.toBeNull();
+  });
+
+  it('shows no AI sections for a story filed before the AI did', async () => {
+    vi.mocked(cmsApi.fetchArticleOrigin).mockResolvedValue(ORIGIN);
+    const { container } = renderPanel();
+    await open(container);
+    expect(await screen.findByText('held copy')).toBeInTheDocument();
+    expect(screen.queryByText('AI filed it as')).toBeNull();
+    expect(screen.queryByText('Photos checked')).toBeNull();
   });
 
   it('says so when the body is empty rather than showing a blank column', async () => {

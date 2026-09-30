@@ -364,7 +364,7 @@ export default function SettingsPage() {
           {/* --------------------------------------------- §17 AI images -- */}
           <Switch checked={bool('ai.image_enabled')} onChange={(v) => set('ai.image_enabled', v)}
             disabled={!bool('ai.enabled') || !keySet}
-            label={en ? 'Draw an illustration when there is no photograph' : 'ఫోటో లేనప్పుడు చిత్రం గీయండి'}
+            label={en ? 'Make a realistic AI picture when there is no photograph' : 'ఫోటో లేనప్పుడు AI చిత్రం రూపొందించండి'}
             hint={en
               ? 'Needs AI on and a key saved above. Sensitive stories — communal, sexual violence, a named minor, suicide — are refused before any call is made, and every generated image carries a visible label.'
               : 'పైన AI ఆన్ కావాలి, కీ సేవ్ కావాలి. సున్నితమైన కథనాలు — మతపరమైనవి, లైంగిక హింస, మైనర్లు, ఆత్మహత్య — కాల్ చేయకముందే తిరస్కరించబడతాయి. తయారైన ప్రతి చిత్రంపై లేబుల్ కనిపిస్తుంది.'} />
@@ -594,7 +594,7 @@ export default function SettingsPage() {
           <Switch checked={bool('voice.article_tts_enabled')} onChange={(v) => set('voice.article_tts_enabled', v)} label={en ? 'Article TTS' : 'కథనం TTS'} />
           <Switch checked={bool('epaper.personalized_enabled')} onChange={(v) => set('epaper.personalized_enabled', v)} label={en ? 'Personalized E-Paper' : 'వ్యక్తిగత ఈ-పేపర్'} />
           <Switch checked={bool('polls.enabled')} onChange={(v) => set('polls.enabled', v)} label={en ? 'Polls and Big Question' : 'పోల్స్ మరియు బిగ్ క్వశ్చన్'} />
-          <Switch checked={bool('ai.research_enabled')} onChange={(v) => set('ai.research_enabled', v)} disabled={!bool('ai.enabled')} label={en ? 'AI multiple-source research' : 'AI బహుళ మూలాల పరిశోధన'} />
+          <Switch checked={bool('ai.research_enabled')} onChange={(v) => set('ai.research_enabled', v)} disabled={!bool('ai.enabled')} label={en ? 'AI web research' : 'AI వెబ్ పరిశోధన'} hint={en ? 'Lets Sanjaya search the web and write deal and research articles (Perplexity Sonar, about ₹0.6 per search).' : 'సంజయ వెబ్‌లో వెతికి, డీల్స్ మరియు పరిశోధన కథనాలు రాయడానికి (Perplexity Sonar, ఒక్కో శోధనకు సుమారు ₹0.6).'} />
         </Section>
 
         {/* --------------------------------------------------- §35 mix ---- */}

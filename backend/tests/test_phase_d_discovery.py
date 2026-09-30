@@ -37,6 +37,7 @@ from app.models.enums import (  # noqa: E402
     ArticleStatus,
     EventType,
     FollowTargetType,
+    MediaType,
     NotificationKind,
     RoleKey,
     ScopeType,
@@ -44,6 +45,7 @@ from app.models.enums import (  # noqa: E402
     WorkflowState,
 )
 from app.models.geo import District  # noqa: E402
+from app.models.media import Media  # noqa: E402
 from app.models.notify import Notification  # noqa: E402
 from app.models.user import Role, User, UserRole  # noqa: E402
 from app.services import auth_service, notification_service, trending_service, workflow_service  # noqa: E402
@@ -65,7 +67,13 @@ def make_article(db: Session, *, title_te: str, category: Category | None = None
                  status: ArticleStatus = ArticleStatus.PUBLISHED) -> Article:
     global _counter
     _counter += 1
+    # A story without its photo is never published, so every one has one.
+    hero = Media(type=MediaType.IMAGE, filename="hero.webp", mime="image/webp",
+                 storage_provider="test", storage_key=f"images/test/d{_counter}.webp")
+    db.add(hero)
+    db.flush()
     article = Article(
+        hero_media_id=hero.id,
         short_id=f"d{_counter:05d}",
         slug=f"discovery-{_counter}",
         title_te=title_te,

@@ -55,7 +55,13 @@ celery.conf.beat_schedule = {
     # crawl.rewrite_every_minutes, the IST crawl hours); hourly is :05 / :20.
     "crawl-hourly": {"task": "crawl.hourly", "schedule": crontab(minute="*/5")},
     "crawl-rewrite": {"task": "crawl.rewrite_pass", "schedule": crontab(minute="*/5")},
-    "crawl-breaking": {"task": "crawl.breaking", "schedule": 300.0},
+    # Queued behind a long rewrite pass on the one ingest worker, a breaking
+    # tick expires rather than piling up: the next one does the same work.
+    "crawl-breaking": {
+        "task": "crawl.breaking",
+        "schedule": 300.0,
+        "options": {"expires": 240},
+    },
     # bulletin_service.SLOTS, on the IST hour. A real crontab rather than the
     # e-paper's tick-and-compare, because these times are a product decision
     # and not an admin setting.

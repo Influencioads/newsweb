@@ -142,7 +142,9 @@ def hero_media_url(db, article: Article) -> str | None:
     draws no caption, and og:image has nowhere to put one either, so a library
     photo would travel WhatsApp and Twitter reading as a picture of the event
     with nothing to correct it — and a shared card cannot be corrected after
-    the fact. The brand band this falls back to is the honest version.
+    the fact. The brand band this falls back to is the honest version. Since
+    2026-09-30 that includes every AI news picture: they are realistic and
+    filed `representative`, and unlabelled they would read as the event.
     """
     if not article.hero_media_id:
         return None

@@ -311,6 +311,11 @@ class IngestedItem(PKMixin, TimestampMixin, Base):
         default=RewriteStatus.NONE,
         server_default=RewriteStatus.NONE.name,
     )
+    #: What the AI saw in each candidate photo at import, and where the hero
+    #: finally came from: `{model, candidates: [{url, verdict, reason}],
+    #: hero: crawled|open_licence|ai_illustration|none}`. Verdicts only — a
+    #: branded photo is rejected, never cleaned.
+    photo_check: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     source: Mapped["ContentSource"] = relationship(lazy="joined")
     rewrites: Mapped[list["IngestedRewrite"]] = relationship(
@@ -404,6 +409,11 @@ class IngestedRewrite(PKMixin, TimestampMixin, Base):
         server_default=RewriteStatus.READY.name,
     )
     refusal_reason: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    #: Where the model filed the story, already validated against our own
+    #: tables (`crawl_service._classify`): `{category_id, subcategory_id,
+    #: district_id, mandal_id, tags: [{name, type, tag_id}], breaking,
+    #: glyph_warning, raw}`. Ids, never the model's strings, reach an article.
+    classification: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     #: NULL means the hourly task produced it rather than a person.
     created_by: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True

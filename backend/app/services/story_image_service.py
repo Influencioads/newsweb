@@ -6,42 +6,46 @@ picture kept undoing that. The source publisher's photograph is their work, so
 our headline. This service is the way out — and the way out is a **licence**
 question, never a watermark question.
 
-    a. the publisher's own photo, if one survived `feeds.images`   (unchanged)
-    b. an open-licence photo — CC0 / PDM only, no credit line
-    c. nothing. Hero-less is a perfectly good outcome.
+    a. the publisher's own photo, if one survived `feeds.images` and, with
+       `crawl.image_scan` on, the vision check (branded ones are rejected,
+       never cleaned)                                  (`ingestion_service`)
+    b. an open-licence photo of the story's named person, place or event —
+       CC0 / PDM only, no credit line                            (this file)
+    c. an AI image, photographic, on the crawl's automatic import only
+                                         (`ingestion_service._illustrate`)
+    d. nothing. Hero-less is a good outcome; the desk adds a photo.
 
 (b) runs only when (a) produced nothing, and sits behind
 `crawl.open_licence_images`, which defaults off — so this file changes nothing
 until an admin says otherwise.
 
-**There is deliberately no AI-illustration rung here.** `_attach_media`'s
-reasoning has not changed: a drawing costs money per item at up to sixty items
-an hour, and the two rungs are anti-correlated — Commons being thin, slow or
-rate-limited is exactly the condition that would route *every* article to the
-paid one. An admin who turns on a switch labelled "find a no-credit photo" is
-not asking to buy a picture for every import. The editor's
-MediaPicker button still generates one on demand, for a human who chose it.
+**The AI rung is deliberately not here**, and is fenced hard where it is. A
+picture costs money per item at up to sixty items an hour, and the rungs are
+anti-correlated — Commons being thin, slow or rate-limited is exactly the
+condition that would route *every* article to the paid one. So (c) has its
+own switch (`crawl.ai_illustrations`, default off), a daily cap, stops at the
+budget-alert line and never runs inside a web request. What it draws is a
+generic representative scene — never the event, a victim or a recognisable
+real person — labelled AI-made and ప్రతీకాత్మక చిత్రం, and a sensitive story
+gets none. The editor's MediaPicker button still generates one on demand, for
+a human who chose it.
 
 WHAT THE READER IS TOLD, which is the part that is not negotiable
 ----------------------------------------------------------------
-A photograph of a named person *is* that person, and needs no qualifier — but
-it is a library photograph, not a picture of the event in the story, so it is
-captioned **ఫైల్ చిత్రం** (file photo), the same word a print desk has used for
-a century. Anything else — a city view on a story datelined that city, a
-cricket-ground shot on a cricket story — is captioned **ప్రాతినిధ్య చిత్రం**
-(representative image), the label `seed_media` already uses.
+Only an exact match is attached: the name the story is about — a person, a
+place, an event — is in the Commons file's *title* (`openlicence.
+depicts_subject`). That photograph *is* its subject, but it is a library
+photograph, not a picture of the event in the story, so it is captioned
+**ఫైల్ చిత్రం** (file photo), the same word a print desk has used for a
+century.
 
-Two things must both hold before the confident label is used.
-`openlicence.depicts_subject` — every proper noun in the search query present
-in the file's title or Commons categories — and the query must be about a
-*person*, which `_QUERY_RULES` marks with the trailing noun "portrait". A
-place fails the second test on purpose: "Mangalagiri" matches any Commons
-photo categorised Mangalagiri, so a temple or a street view would be captioned
-"file photo" on a story about a bus fire there, and in Indian news convention
-that says the picture is an older shot *of the thing in the story*. Everything
-that is not a named person falls to the stand-in label. A generic photo
-presented as the event is a lie to the reader, and the only safe direction to
-be wrong in is towards the label.
+There is no stand-in any more. A second, looser rule used to attach anything
+sharing one proper noun with the query, captioned ప్రాతినిధ్య చిత్రం
+(representative image). On 2026-09-30 it attached a Yale painting to an EB-5
+green-card story, a Zelenskyy meeting to a Telangana voter-registration
+story, a Kodandarama temple to a Tirupati accident and a WW2 crash in
+Yugoslavia to a Tu-95 crash. A label does not make a picture of something
+else honest, so a story with no exact match gets no Commons photo.
 
 No credit line is printed for (b) because CC0 and PDM require none. The
 provenance does not vanish: `Media.copyright`, `Media.meta['open_licence']` and
@@ -49,8 +53,6 @@ the source page URL are all written, so an auditor can retrace any picture.
 """
 
 from __future__ import annotations
-
-import re
 
 from sqlalchemy.orm import Session
 
@@ -67,9 +69,6 @@ logger = get_logger(__name__)
 #: A library photograph of the named subject. True, and honest about its age.
 FILE_PHOTO_TE = "ఫైల్ చిత్రం"
 
-#: A stand-in. Matches `seed_media.DEMO_CREDIT`'s wording on purpose.
-REPRESENTATIVE_TE = "ప్రాతినిధ్య చిత్రం"
-
 #: Asked of the cheap bulk model, the same one the crawl rewrite uses. An image
 #: lookup runs on every import; the editorial model's price does not survive
 #: that, and this is a four-word answer.
@@ -82,6 +81,9 @@ _QUERY_RULES = (
     "is about, then one plain noun for what the photo should show.\n"
     "The noun must be exactly 'portrait' for a person, and one of city, town, "
     "temple, stadium or building for a place. Nothing else.\n"
+    # Measured 2026-09-30: without this line "Andhra:" in a headline became
+    # "Andhra city", and a Vontimitta temple went on a Tirupati accident.
+    "A place is a city, town, village or landmark, never a state or a country.\n"
     "Capitalise proper nouns and nothing else.\n"
     "Name only people or places that appear in the headline. If the headline "
     "names neither a person nor a place, reply with the word NONE."
@@ -89,40 +91,6 @@ _QUERY_RULES = (
 
 #: A model that ignores the word limit is a model whose answer is a sentence.
 _MAX_QUERY_WORDS = 6
-
-_SLUG_NOISE = re.compile(r"\d|^(news|video|photos|live|latest|update|story)$")
-
-
-def _from_latin_text(item: IngestedItem) -> str | None:
-    """The fallback when AI is off or failed: proper nouns already in the item.
-
-    A Telugu headline rarely carries Latin script, but the source URL almost
-    always does — `/cricket-news/wapl-t20-launch-nara-brahmani-mithali-raj-…`
-    is a list of exactly the names we want, written by the publisher's own CMS.
-    Nothing is invented: every word returned came out of the item.
-
-    It also cannot tell a name from a section word, so the query it builds
-    carries "Launch" beside "Mithali Raj" — and `depicts_subject`, which
-    demands *every* capitalised word be present, will then refuse to call any
-    result a picture of the subject. That is the correct outcome rather than a
-    shortcoming: a query nothing verified should not produce a photo captioned
-    as if it were verified. Fallback results get the stand-in label.
-
-    Three characters is the floor, not four: Raj, Rao and Roy are surnames.
-    """
-    from_title = openlicence._CAPITALISED.findall(item.title or "")
-    if from_title:
-        return " ".join(from_title[:4])
-
-    slug = (item.url or "").rstrip("/").rsplit("/", 1)[-1].split(".")[0]
-    words = [w for w in slug.split("-") if len(w) >= 3 and not _SLUG_NOISE.search(w)]
-    # Trailing numeric ids and section words are gone; what is left is names —
-    # and the **tail** is taken, not the head. A news CMS writes the campaign
-    # and section words first and the names last: the real slug above survives
-    # as [wapl, launch, nara, brahmani, mithali, raj], where the first four are
-    # "Wapl Launch Nara Brahmani" — the names cut off, and two section words
-    # searched for as proper nouns.
-    return " ".join(w.capitalize() for w in words[-4:]) or None
 
 
 def image_query(db: Session, item: IngestedItem) -> str | None:
@@ -134,16 +102,22 @@ def image_query(db: Session, item: IngestedItem) -> str | None:
     headline does not — a hallucinated celebrity would be searched for, found,
     and published beside an unrelated story.
 
+    **NONE is the answer, not a cue to guess.** There used to be a fallback
+    that built a query from Latin text in the item — the English title, the
+    URL slug — and it ran whenever the model said NONE. It cannot tell a name
+    from a topic, and on 2026-09-30 it turned four NONEs into "Green Card",
+    "Rights Register Review Meeting", "Bomber Crashes" and "Gold Medals", each
+    of which Commons answered with something unrelated. It is gone: no model,
+    no key, a refusal, a timeout or NONE all mean no Commons photo.
+
     `_complete` is reached through `getattr` rather than by widening
     `AiProvider`: the keyless heuristic provider has no completion to offer and
-    no business growing a fourth abstract method for one caller. No provider,
-    no key, a refusal or a timeout all land in the same place — the Latin
-    fallback, which needs nothing.
+    no business growing a fourth abstract method for one caller.
 
     It is a billed call like any other, so it is bracketed by
     `ai_usage_service` the way every sibling call site is: the budget is
-    checked first (inside the try, so an exhausted month falls to the fallback
-    rather than failing the import) and the spend is recorded after. Without
+    checked first (inside the try, so an exhausted month means no photo rather
+    than a failed import) and the spend is recorded after. Without
     the record the ₹15,000 ceiling under-counts by one call per import; without
     the check this is the one AI feature that keeps firing after every other
     one has stopped.
@@ -167,7 +141,7 @@ def image_query(db: Session, item: IngestedItem) -> str | None:
                     return " ".join(words[:_MAX_QUERY_WORDS])
             except Exception:  # noqa: BLE001 — a picture must never fail an import
                 logger.warning("image_query_failed", item_id=item.id, exc_info=True)
-    return _from_latin_text(item)
+    return None
 
 
 def _attach(
@@ -176,7 +150,6 @@ def _attach(
     item: IngestedItem,
     candidate,
     *,
-    depicts: bool,
     actor_id: int | None,
 ) -> Media | None:
     """Download one candidate and hang it off the article as the hero.
@@ -192,18 +165,10 @@ def _attach(
         return None
     raw, mime, final_url = downloaded
 
-    caption = FILE_PHOTO_TE if depicts else REPRESENTATIVE_TE
-    # Alt text describes the *picture*, not the article. A screen-reader user
-    # on a stand-in used to hear "Bus burned in Mangalagiri — representative
-    # image": the claim first, the qualifier after it. For a stand-in the only
-    # text that says what is actually in the frame is the file's own title, so
-    # that leads. When it really is the named subject the headline is accurate
-    # and stays in front.
-    alt = (
-        f"{article.title_te} — {caption}"
-        if depicts
-        else f"{caption}: {candidate.title}"
-    )
+    # Alt text describes the *picture*, not the article: a Charminar photo on
+    # a story about a bandobast there shows Charminar, not the bandobast. The
+    # file's own title is the text that says what is in the frame.
+    alt = f"{FILE_PHOTO_TE}: {candidate.title}"
     media = media_service.create_image_media(
         db,
         raw=raw,
@@ -212,7 +177,7 @@ def _attach(
         max_bytes=ingestion_service.MAX_IMAGE_BYTES,
         uploaded_by=actor_id,
         alt_te=alt[:500],
-        caption_te=caption,
+        caption_te=FILE_PHOTO_TE,
         # No credit, and that is the whole feature. CC0 and PDM require none,
         # and `source_type="public_domain"` is what tells `media_service` this
         # is a licensed absence rather than a forgotten field.
@@ -238,9 +203,6 @@ def _attach(
             "title": candidate.title,
         },
         "origin_url": candidate.image_url,
-        # The machine-readable half of the caption, for any client that wants
-        # to badge a stand-in rather than print the Telugu line.
-        "representative": not depicts,
     }
     if final_url != candidate.image_url:
         media.meta["fetched_from"] = final_url
@@ -269,15 +231,21 @@ def resolve_hero(
         return None
     if not settings_service.get_bool(db, "crawl.open_licence_images"):
         return None
+    # An incident gets no file photo of the place: a temple on a Tirupati
+    # accident (2026-09-30) reads as the scene. The owner wants it drawn as a
+    # representative scene instead, which is the next rung's job.
+    from app.services import ai_image_service
+
+    if ai_image_service.is_incident(db, article, item.source.default_category_id if item.source else None):
+        return None
 
     query = image_query(db, item)
     if query:
         try:
             for candidate in openlicence.search(query):
-                # Close enough to the story to publish at all? A label saying
-                # "representative image" does not rescue a photograph of
-                # somewhere else entirely — see `openlicence.may_attach`.
-                if not openlicence.may_attach(candidate, query):
+                # The story's named subject in the file's title, or nothing —
+                # see `openlicence.depicts_subject`.
+                if not openlicence.depicts_subject(candidate, query):
                     logger.info(
                         "story_image_off_subject",
                         item_id=item.id,
@@ -285,29 +253,13 @@ def resolve_hero(
                         title=candidate.title[:80],
                     )
                     continue
-                media = _attach(
-                    db,
-                    article,
-                    item,
-                    candidate,
-                    # Both halves of the confident label: it matches every
-                    # proper noun, *and* the query is about a person. A place
-                    # query matches any photo categorised under that place —
-                    # a temple, a street — and "file photo" would then claim
-                    # the picture shows what the story is about.
-                    depicts=(
-                        openlicence.depicts_subject(candidate, query)
-                        and query.split()[-1].lower() == "portrait"
-                    ),
-                    actor_id=actor_id,
-                )
+                media = _attach(db, article, item, candidate, actor_id=actor_id)
                 if media is not None:
                     logger.info(
                         "story_image_open_licence",
                         article_id=article.id,
                         licence=candidate.license_code,
                         source=candidate.source,
-                        representative=media.meta.get("representative"),
                     )
                     return media
         except Exception:  # noqa: BLE001
@@ -316,4 +268,4 @@ def resolve_hero(
     return None
 
 
-__all__ = ["FILE_PHOTO_TE", "REPRESENTATIVE_TE", "image_query", "resolve_hero"]
+__all__ = ["FILE_PHOTO_TE", "image_query", "resolve_hero"]

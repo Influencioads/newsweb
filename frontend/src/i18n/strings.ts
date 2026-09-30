@@ -58,6 +58,7 @@ export const STRINGS = {
   // --- home ----------------------------------------------------------------
   'home.breaking': { te: 'బ్రేకింగ్', en: 'Breaking' },
   'home.latest': { te: 'తాజా వార్తలు', en: 'Latest News' },
+  'home.topStories': { te: 'ముఖ్య కథనాలు', en: 'Top stories' },
   'home.briefs': { te: 'క్లుప్తంగా', en: 'In Brief' },
   'home.seeAll': { te: 'అన్నీ చూడండి', en: 'See all' },
   'home.moreStories': { te: 'మరిన్ని కథనాలు', en: 'More stories' },
@@ -349,6 +350,7 @@ export const STRINGS = {
   'admin.group.publishing': { te: 'ప్రచురణ', en: 'Publishing' },
   'admin.group.settings': { te: 'సెట్టింగ్స్', en: 'Settings' },
   'admin.page.dashboard': { te: 'డాష్‌బోర్డ్', en: 'Dashboard' },
+  'admin.page.assistant': { te: 'సంజయ AI', en: 'Sanjaya AI' },
   'admin.page.articles': { te: 'కథనాలు', en: 'Articles' },
   'admin.page.newArticle': { te: 'కొత్త కథనం', en: 'New article' },
   'admin.page.newShort': { te: 'కొత్త షార్ట్ న్యూస్', en: 'New short news' },

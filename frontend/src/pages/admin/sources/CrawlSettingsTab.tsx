@@ -230,6 +230,24 @@ function CrawlForm({ payload }: { payload: SettingsPayload }) {
           L('పునర్లేఖనం పక్కనే అసలు కనిపిస్తుంది; దిగుమతి లేదా తిరస్కరణ తర్వాత తొలగిస్తాం.', 'Shown beside the rewrite; dropped once the item is imported or rejected.'))}
         {toggle('crawl.open_licence_images', L('చిత్రం లేని వార్తకు ఉచిత ఫోటో వెతకండి', 'Find a no-credit photo when a story has none'),
           L('వికీమీడియా కామన్స్ CC0/PDM మాత్రమే. దొరకకపోవడం సాధారణమే.', 'Wikimedia Commons CC0/PDM only. Finding none is normal.'))}
+        {toggle('crawl.image_scan', L('వాడే ముందు ప్రతి ఫోటోను AI చూడాలి', 'Have the AI check each crawled photo first'),
+          L(
+            'వాటర్‌మార్క్, ఛానల్ లోగో, ముద్రించిన శీర్షిక ఉన్నవి, ప్రచురించదగనివి తిరస్కరిస్తాం — ఎప్పుడూ వాడం, ఎప్పుడూ శుభ్రం చేయం. ఒక్కో ఫోటోకు చిన్న AI ఖర్చు. ఆఫ్ అయితే మొదట దిగిన ఫోటోనే వాడతాం.',
+            'Rejects any photo the publisher branded — a watermark, a channel logo, a headline burned in — and anything unfit to print. Rejected photos are never used and never cleaned. A small AI call per photo; off means the first photo that downloads is used.',
+          ))}
+        {toggle('crawl.ai_illustrations', L('ఫోటో దొరకకపోతే AI ప్రతీకాత్మక చిత్రం రూపొందించండి', 'Make a realistic AI picture when no photo is found'),
+          payload.values['ai.image_enabled']
+            ? L(
+              'ఉపయోగపడే ఫోటో, ఉచిత ఫోటో రెండూ లేనప్పుడే. వాస్తవంగా కనిపించే ప్రతీకాత్మక చిత్రం, సైట్‌లో "ప్రతీకాత్మక చిత్రం — AI రూపొందించినది" అని చూపిస్తాం — ఘటన, బాధితులు, నిజమైన వ్యక్తులు ఎప్పుడూ ఉండరు. నేరాలు, మరణాలు, ప్రమాదాలకు సాధారణ దృశ్యం మాత్రమే (అంబులెన్స్, పోలీస్ బారికేడ్, ఆసుపత్రి గేటు); సున్నితమైన వార్తలకు అసలు ఉండదు. ఆఫ్ అయితే డెస్క్ ఫోటో జోడించే వరకు వార్త ఆగుతుంది.',
+              'Only when there is no usable photo and no free-licence one. A realistic, representative picture labelled as AI on the site — never the event, a victim or a real person. Crime, death and accident stories get only a generic scene (an ambulance, a police cordon, a hospital gate); sensitive stories get none. Off means the story waits for the desk to add a photo.',
+            )
+            : L('ముందు సెట్టింగ్స్‌లో AI చిత్రాలు ఆన్ చేయాలి.', 'Switch AI images on in Settings first.'),
+          !payload.values['ai.image_enabled'])}
+        {toggle('crawl.auto_import', L('తిరగరాసిన వార్తలను నేరుగా సమీక్ష క్యూకు పంపండి', 'Send finished rewrites straight to the review queue'),
+          L(
+            'AI ముందే విభాగం, ప్రదేశం, ట్యాగ్‌లు, తనిఖీ చేసిన ఫోటో పెడుతుంది. ఎడిటర్ ఆమోదించాలి, మరొకరు ప్రచురించాలి. కీ లేని సారాంశాలు, వేరే లిపి అక్షరాలున్న పాఠ్యం ఎప్పుడూ వెళ్లవు. ఆఫ్ అయితే క్రాల్ క్యూ నుంచి ఒక్కొక్కటిగా పంపాలి.',
+            'Already filed by the AI — section, place, tags and a checked photo. An editor still approves and a second person still publishes. Keyless excerpts and copy with stray foreign letters are never sent. Off means an editor sends each one from the crawl queue by hand.',
+          ))}
         {toggle('crawl.mandal_autotag', L('వార్త నుంచి మండలాన్ని ఊహించండి', 'Guess the mandal from the story text'),
           L('ఎప్పుడూ ఊహే — ఎడిటర్ మార్చవచ్చు.', 'Always a guess — the editor can change it.'))}
       </Section>
@@ -283,7 +301,7 @@ function CrawlForm({ payload }: { payload: SettingsPayload }) {
       {/* ------------------------------------------------------ how many -- */}
       <Section
         title={L('ఎన్ని', 'How many')}
-        subtitle={L('పునర్లేఖనాలే ఖర్చు — ఫీడ్ తనిఖీకి ఖర్చు లేదు.', 'Rewrites are what cost money; checking a feed costs nothing.')}
+        subtitle={L('పునర్లేఖనాలు, ఫోటో తనిఖీలు, AI చిత్రాలే ఖర్చు — ఫీడ్ తనిఖీకి ఖర్చు లేదు.', 'Rewrites, photo checks and AI pictures cost money; checking a feed costs nothing.')}
       >
         <div className="grid gap-4 sm:grid-cols-2">
           {numberField('crawl.hourly_item_cap', L('గంటకు పునర్లేఖనాలు', 'Rewrites per hour'),
@@ -302,6 +320,10 @@ function CrawlForm({ payload }: { payload: SettingsPayload }) {
             L('ప్రచురణకర్త తేదీ ప్రకారం.', 'By the publisher’s own date.'))}
           {numberField('crawl.rewrite_min_words', L('కనీస పదాలు', 'Minimum words to rewrite'),
             L('ఇంతకంటే తక్కువ పాఠ్యం ఉంటే AI కి పంపం — అది కల్పిస్తుంది.', 'Less source text than this is never sent to the AI — it would invent.'))}
+          {numberField('crawl.image_scan_max', L('ఒక వార్తకు AI చూసే ఫోటోలు', 'Photos checked per story'),
+            L('ఇన్ని చూశాక ప్రచురణకర్త ఫోటోలను వదిలేస్తాం.', 'After this many, the publisher’s photos are given up on.'), 4)}
+          {numberField('crawl.ai_illustration_daily_cap', L('రోజుకు AI చిత్రాలు', 'AI pictures per day'),
+            L('ఒక్కొక్కటి చెల్లించే చిత్రం — కామన్స్ ఖాళీగా ఉన్న రోజు నెల బడ్జెట్ ఖర్చవకుండా.', 'Each is a paid image; the cap keeps a quiet Commons day from spending the month.'), 500)}
         </div>
         <fieldset className="rounded-xl border border-rule p-3">
           <legend className={cn(s.body, 'px-1 text-ui-sm font-semibold text-ink')}>

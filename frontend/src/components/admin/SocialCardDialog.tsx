@@ -211,8 +211,11 @@ export function SocialCardDialog({ open, onClose, articleId, title, summary, has
               value="ai"
               checked={photo === 'ai'}
               onChange={() => pickPhoto('ai')}
-              label={L('GPT Image 2.5 తో గీయండి', 'Draw with GPT Image 2.5')}
-              hint={L('సుమారు 25 సెకన్లు. కార్డ్‌పై "AI చిత్రం" అని ఉంటుంది.', 'About 25 seconds. The card is labelled "AI చిత్రం".')}
+              label={L('GPT Image 2.5 తో AI చిత్రం రూపొందించండి', 'Make an AI picture with GPT Image 2.5')}
+              hint={L(
+                'సుమారు 25 సెకన్లు. వాస్తవంగా కనిపించే ప్రతీకాత్మక చిత్రం — కార్డ్‌పై "ప్రతీకాత్మక AI చిత్రం" అని ఉంటుంది.',
+                'About 25 seconds. A realistic, representative picture — the card is labelled "ప్రతీకాత్మక AI చిత్రం".',
+              )}
               className="py-1"
             />
             <Radio
@@ -226,11 +229,11 @@ export function SocialCardDialog({ open, onClose, articleId, title, summary, has
             {photo === 'ai' ? (
               <Field
                 className="mt-2"
-                label={L('ఏమి గీయాలి', 'What to draw')}
+                label={L('ఏ దృశ్యం కావాలి', 'Describe the scene')}
                 optionalLabel
                 hint={
                   heldId !== null
-                    ? L('చిత్రం ఇప్పటికే గీశాం — మార్చాలంటే "మళ్లీ గీయండి" నొక్కండి.', 'Already drawn — press "Redraw picture" to use a new brief.')
+                    ? L('చిత్రం ఇప్పటికే తయారైంది — మార్చాలంటే "కొత్త చిత్రం" నొక్కండి.', 'Already made — press "New picture" to use a new brief.')
                     : L('ఉన్న వ్యక్తుల ఫోటోలు తయారు చేయబడవు.', 'Photoreal images of real people are never made.')
                 }
               >
@@ -269,11 +272,11 @@ export function SocialCardDialog({ open, onClose, articleId, title, summary, has
           {make.isPending ? (
             <p role="status" className={note}>
               {drawing
-                ? L('GPT Image 2.5 చిత్రం గీస్తోంది — సుమారు 25 సెకన్లు. ఈ విండో మూసివేయకండి.', 'GPT Image 2.5 is drawing the picture — about 25 seconds. Leave this window open.')
+                ? L('GPT Image 2.5 చిత్రం రూపొందిస్తోంది — సుమారు 25 సెకన్లు. ఈ విండో మూసివేయకండి.', 'GPT Image 2.5 is making the picture — about 25 seconds. Leave this window open.')
                 : L('కార్డ్ తయారవుతోంది…', 'Making the card…')}
             </p>
           ) : drawing ? (
-            <p className={note}>{L('కొత్త చిత్రం గీయడానికి సుమారు 25 సెకన్లు పట్టవచ్చు.', 'Drawing a new picture may take about 25 seconds.')}</p>
+            <p className={note}>{L('కొత్త చిత్రం రూపొందించడానికి సుమారు 25 సెకన్లు పట్టవచ్చు.', 'A new picture may take about 25 seconds.')}</p>
           ) : null}
 
           {refusal ? (
@@ -313,7 +316,7 @@ export function SocialCardDialog({ open, onClose, articleId, title, summary, has
                 </Button>
                 {photo === 'ai' && heldId !== null ? (
                   <Button variant="ghost" size="sm" icon={RefreshCw} disabled={busy} onClick={redraw}>
-                    {L('మళ్లీ గీయండి', 'Redraw picture')}
+                    {L('కొత్త చిత్రం', 'New picture')}
                   </Button>
                 ) : null}
               </div>

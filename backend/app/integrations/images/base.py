@@ -54,9 +54,10 @@ class StockImage:
     subject_text: str | None = None
     """Whatever the provider knows about *what is in the picture* beyond its
     title — Commons categories, in practice. `openlicence.depicts_subject`
-    matches against it to decide whether a photo is of the named person or
-    only on the topic, which is the difference between a caption and a
-    "representative image" label."""
+    reads it only to refuse a homonym abroad (`_ABROAD`), never as proof: a
+    category cannot tell a photo of the subject from one merely filed under
+    it, so the title alone decides, and a match is always captioned ఫైల్
+    చిత్రం (file photo)."""
 
     @property
     def license_label(self) -> str:

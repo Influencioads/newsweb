@@ -352,6 +352,8 @@ class TestContent:
         assert len(script) <= bulletin_service.MAX_SCRIPT_CHARS
         seconds = len(script) / bulletin_service.CHARS_PER_SECOND
         assert 100 <= seconds <= 210, seconds
+        # Each story's headline ends in a full stop, so the voice pauses before the story.
+        assert all(piece.startswith("వార్త శీర్షిక సంఖ్య ") and ". " in piece for _a, piece in spoken)
 
     def test_the_heuristic_skeleton_can_never_be_broadcast(
         self, db: Session, monkeypatch: pytest.MonkeyPatch

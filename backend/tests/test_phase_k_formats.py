@@ -404,6 +404,27 @@ class TestShareCard:
         db.flush()
         assert share_card_service.hero_media_url(db, article) is None
 
+    def test_a_realistic_ai_hero_never_travels_as_a_bare_preview(self, db: Session) -> None:
+        """og:image has no room for "ప్రతీకాత్మక చిత్రం — AI", so a realistic AI
+        scene shared on WhatsApp would read as a photo of the event."""
+        article = make_article(db, short_id="card07")
+        media = Media(
+            type="image",
+            filename="ai.png",
+            mime="image/png",
+            bytes=99,
+            storage_provider="local",
+            storage_key="media/ai.png",
+            cdn_url="https://cdn.example/ai.png",
+            ai_generated=True,
+            meta={"representative": True},
+        )
+        db.add(media)
+        db.flush()
+        article.hero_media_id = media.id
+        db.flush()
+        assert share_card_service.hero_media_url(db, article) is None
+
     def test_the_key_is_content_addressed(self, db: Session) -> None:
         """No database column and no invalidation logic: the bucket is the
         cache, so the key has to carry the content digest."""

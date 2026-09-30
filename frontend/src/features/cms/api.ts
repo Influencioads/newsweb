@@ -1,5 +1,5 @@
 import { api } from '@/api/client';
-import type { ArticleOrigin, AudioAssetRow, BulletinList, BulletinRow, ContentSource, KycProfileRow, KycStatus, Vertical, CrawlStatus, IngestQueueCounts, IngestedItem, IngestedRewrite, AiDraft, AiSuggestion, AudioState, CmsArticle, CmsArticleList, CmsAudioRef, CmsEditorOptions, CmsMediaRef, CmsOption, DashboardStats, SettingsPayload } from '@/types/cms';
+import type { ArticleOrigin, AssistantConversation, AssistantConversationSummary, AssistantJob, AssistantStatus, AudioAssetRow, BulletinList, BulletinRow, ContentSource, KycProfileRow, KycStatus, Vertical, CrawlStatus, IngestQueueCounts, IngestedItem, IngestedRewrite, AiDraft, AiSuggestion, AudioState, CmsArticle, CmsArticleList, CmsAudioRef, CmsEditorOptions, CmsMediaRef, CmsOption, DashboardStats, SettingsPayload } from '@/types/cms';
 export const fetchArticles=async(params?:{state?:string;search?:string;offset?:number;limit?:number})=>(await api.get<CmsArticleList>('/cms/articles',{params})).data;
 export const fetchArticle=async(id:number)=>(await api.get<CmsArticle>(`/cms/articles/${id}`)).data;
 export const createArticle=async(payload:Record<string,unknown>)=>(await api.post<CmsArticle>('/cms/articles',payload)).data;
@@ -122,14 +122,14 @@ export const decideKyc=async(id:number,action:'approve'|'reject'|'request-more',
 // the server's, not a convenience.
 export const setPanchayatPublish=async(id:number,granted:boolean)=>(await api.post<{id:number;granted_at:string|null;unpublished_article_ids:number[]}>(`/cms/kyc/${id}/panchayat-publish`,{granted,unpublish_live:true})).data;
 
-// --- §17 an illustration when no photograph exists -------------------------
+// --- §17 an AI picture when no photograph exists ---------------------------
 // `available:false` with a `reason` is a normal answer, not a failure: the
 // reason is a sentence written for the desk, so the caller shows it verbatim
 // rather than inventing its own wording. A refused sensitive topic arrives as
 // a 422 ApiError instead, carrying its own Telugu message.
-// The illustration carries no credit — nobody photographed it — so the media
+// The AI picture carries no credit — nobody photographed it — so the media
 // it returns is a CmsMediaRef minus that field, plus what the desk pressed the
-// button to learn: which model drew it and whether it became the hero.
+// button to learn: which model made it and whether it became the hero.
 type GeneratedImage=Omit<CmsMediaRef,'credit'>&{ai_generated:boolean;ai_model:string|null;is_hero:boolean};
 export const generateArticleImage=async(id:number,brief:string,force=false)=>(await api.post<{available:boolean;reason:string|null;media:GeneratedImage|null}>(`/cms/ai/articles/${id}/image`,{brief:brief||null,force})).data;
 
@@ -167,3 +167,14 @@ export const reorderCategories=async(orderedIds:number[])=>(await api.put('/cms/
 // --- §13 push campaigns ------------------------------------------------------
 // Only a `scheduled` campaign cancels; anything already sent is a 409.
 export const cancelCampaign=async(id:number)=>(await api.delete<{id:number;status:string}>(`/cms/notifications/${id}`)).data;
+
+// --- Sanjaya, the newsroom assistant ---------------------------------------
+// The POST only queues the turn (202) and the page polls the conversation, so
+// 30 s is headroom for a slow insert, not for the model: an abort here would
+// look like a network failure while the server carries on and bills.
+export const fetchAssistantStatus=async()=>(await api.get<AssistantStatus>('/cms/assistant/status')).data;
+export const fetchAssistantConversations=async(limit=30)=>(await api.get<{items:AssistantConversationSummary[]}>('/cms/assistant/conversations',{params:{limit}})).data.items;
+export const fetchAssistantConversation=async(id:number)=>(await api.get<AssistantConversation>(`/cms/assistant/conversations/${id}`)).data;
+export const sendAssistantMessage=async(body:{conversation_id:number|null;text:string})=>(await api.post<AssistantConversation>('/cms/assistant/messages',body,{timeout:30_000})).data;
+export const deleteAssistantConversation=async(id:number)=>(await api.delete(`/cms/assistant/conversations/${id}`)).data;
+export const fetchAssistantJob=async(id:number)=>(await api.get<AssistantJob>(`/cms/assistant/jobs/${id}`)).data;

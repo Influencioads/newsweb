@@ -10,7 +10,7 @@ story in a second, in the four shapes the platforms want.
 the same picture it also invented a price board (`₹60/kg`, `₹50/kg`) that the
 story never mentioned. A news card is read as a statement of fact, and a model
 that adds a figure it was not given cannot be the one holding the pen. So the
-model draws only the picture (`ai_image_service`, illustration-only, no text),
+model draws only the picture (`ai_image_service`, picture only, no text),
 and every word on the card is the editor's, set in a real Telugu face.
 
 **The Telugu shaping trap** is the one `share_card_service` documents: Pillow
@@ -442,7 +442,7 @@ class CardInput:
     tag: str = ""
     #: A PIL image, or None for the brand background.
     photo: object | None = None
-    #: "AI చిత్రం" or "ప్రతీకాత్మక చిత్రం" — drawn on the picture.
+    #: "ప్రతీకాత్మక AI చిత్రం", "AI చిత్రం" or "ప్రతీకాత్మక చిత్రం" — drawn on the picture.
     photo_label: str | None = None
     #: A PIL image drawn under everything in place of our dark blue: the
     #: creative studio's design backdrop. Text then sits on dark panels.
@@ -805,14 +805,17 @@ def _load(media: Media):
 def _photo_label(media: Media) -> str | None:
     """What kind of picture this is, printed on it.
 
-    AI art is labelled (§7.4); a library stand-in says it is representative,
-    which is the correction `share_card_service` could not print and so
-    refused to use one. No photo credit is printed: the owner's decision
-    (2026-09-23), made knowing a borrowed photo is still the source's work —
-    `Media.credit` keeps the record either way.
+    An AI picture is labelled (§7.4), and today's realistic ones also say they
+    are representative, so nobody takes the scene for the event. A library
+    stand-in (older rows only; none is attached since 2026-09-30) says it is
+    representative, which is the correction `share_card_service` could not
+    print and so refused to use one. No photo credit is printed: the owner's
+    decision (2026-09-23), made knowing a borrowed photo is still the source's
+    work — `Media.credit` keeps the record either way.
     """
     if media.ai_generated:
-        return "AI చిత్రం"
+        # A realistic AI scene must say it is not the event, not only that it is AI.
+        return "ప్రతీకాత్మక AI చిత్రం" if (media.meta or {}).get("representative") else "AI చిత్రం"
     if (media.meta or {}).get("representative"):
         return "ప్రతీకాత్మక చిత్రం"
     return None

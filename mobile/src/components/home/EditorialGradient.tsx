@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import type { Palette } from '@/lib/theme';
@@ -52,17 +52,22 @@ export function EditorialGradient({ tone }: { tone: EditorialTone }) {
   const [start, middle] = accents(color, tone);
   const strength = theme === 'dark' ? 0.52 : 0.78;
 
+  // The wrapper View matters: Yoga resolves an absolute child's 100% against the
+  // parent's box minus its padding, so a bare Svg stops short of padded bands and
+  // leaves a black strip on the right and bottom.
   return (
-    <Svg pointerEvents="none" width="100%" height="100%" style={StyleSheet.absoluteFill} aria-hidden>
-      <Defs>
-        <LinearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0" stopColor={start} stopOpacity={strength} />
-          <Stop offset="0.54" stopColor={middle} stopOpacity={strength * 0.55} />
-          <Stop offset="1" stopColor={color.brandDeep} stopOpacity="0.95" />
-        </LinearGradient>
-      </Defs>
-      <Rect width="100%" height="100%" fill={color.inkDeep} />
-      <Rect width="100%" height="100%" fill={`url(#${id})`} />
-    </Svg>
+    <View pointerEvents="none" style={StyleSheet.absoluteFill} aria-hidden>
+      <Svg width="100%" height="100%">
+        <Defs>
+          <LinearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0" stopColor={start} stopOpacity={strength} />
+            <Stop offset="0.54" stopColor={middle} stopOpacity={strength * 0.55} />
+            <Stop offset="1" stopColor={color.brandDeep} stopOpacity="0.95" />
+          </LinearGradient>
+        </Defs>
+        <Rect width="100%" height="100%" fill={color.inkDeep} />
+        <Rect width="100%" height="100%" fill={`url(#${id})`} />
+      </Svg>
+    </View>
   );
 }

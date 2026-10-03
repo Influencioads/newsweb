@@ -1,20 +1,29 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Headphones, Loader2, Pause, ShieldAlert, Sparkles } from 'lucide-react';
+import { Loader2, Pause, ShieldAlert, Sparkles } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { AdSlot } from '@/components/ads/AdSlot';
 import { ArticleGallery } from '@/components/article/ArticleGallery';
 import { ArticleRenderer } from '@/components/article/ArticleRenderer';
 import { ArticleVideo } from '@/components/article/ArticleVideo';
-import { AudioPlayer, audioQuery, PILL, type TrackMeta } from '@/components/article/AudioPlayer';
+import {
+  AudioPlayer,
+  audioQuery,
+  LABEL,
+  PILL,
+  SUBLABEL,
+  TAGLINE,
+  type TrackMeta,
+} from '@/components/article/AudioPlayer';
 import { ReaderToolbar, ReadingProgress } from '@/components/article/ReaderToolbar';
-import { ShareSheet } from '@/components/article/ShareSheet';
+import { ShareSheet, ShareStrip } from '@/components/article/ShareSheet';
 import { Badge } from '@/components/ui/Badge';
 import { Button, ButtonLink, IconButton } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Chip } from '@/components/ui/Chip';
+import { ListenIcon } from '@/components/ui/glyphs';
 import { Icon } from '@/components/ui/Icon';
 import { PageContainer } from '@/components/ui/Layout';
 import { QueryState, Skeleton } from '@/components/ui/State';
@@ -222,6 +231,8 @@ export default function ArticlePage() {
 
   const listen = serverTrack ? listenServer : renderable ? prepareAndListen : deviceListen;
   const speaking = tts.state === 'speaking';
+  // The tagline invites; once anything is happening, the status speaks alone.
+  const idleListen = !preparing && tts.state === 'idle';
 
   useNewsArticleJsonLd(article);
   useDocumentTitle(article ? pick(article.title_te, article.title_en) : t('state.loadingArticle'));
@@ -325,7 +336,8 @@ export default function ArticlePage() {
                         readingLabel={readingTime(data.reading_time_sec, language)}
                         deviceTts={tts}
                         track={trackMeta}
-                        idleIcon={Headphones}
+                        idleIcon={ListenIcon}
+                        tagline={t('reader.listenTagline')}
                       />
                     </div>
                   ) : listen && formats.isFetched ? (
@@ -334,7 +346,7 @@ export default function ArticlePage() {
                           disabled button drops the focus it just took (a
                           repeat press is ignored in prepareAndListen). */}
                       <IconButton
-                        icon={preparing ? Loader2 : speaking ? Pause : Headphones}
+                        icon={preparing ? Loader2 : speaking ? Pause : ListenIcon}
                         label={speaking ? t('ui.pause') : t('reader.listen')}
                         variant="primary"
                         round
@@ -343,18 +355,23 @@ export default function ArticlePage() {
                         aria-describedby="article-listen-status"
                         onClick={listen}
                       />
-                      <span
-                        id="article-listen-status"
-                        aria-live="polite"
-                        className={cn(s.body, 'pr-2 text-ui-sm font-semibold text-brand')}
-                      >
-                        {preparing
-                          ? L('ఆడియో సిద్ధమవుతోంది…', 'Preparing audio…')
-                          : speaking
-                            ? t('ui.pause')
-                            : tts.state === 'paused'
-                              ? L('కొనసాగించండి', 'Resume')
-                              : `${t('reader.listen')} · ${readingTime(data.reading_time_sec, language)}`}
+                      <span className="flex flex-col pr-2">
+                        {idleListen ? (
+                          <span className={cn(s.body, TAGLINE)}>{t('reader.listenTagline')}</span>
+                        ) : null}
+                        <span
+                          id="article-listen-status"
+                          aria-live="polite"
+                          className={cn(s.body, idleListen ? SUBLABEL : LABEL)}
+                        >
+                          {preparing
+                            ? L('ఆడియో సిద్ధమవుతోంది…', 'Preparing audio…')
+                            : speaking
+                              ? t('ui.pause')
+                              : tts.state === 'paused'
+                                ? L('కొనసాగించండి', 'Resume')
+                                : `${t('reader.listen')} · ${readingTime(data.reading_time_sec, language)}`}
+                        </span>
                       </span>
                     </div>
                   ) : null}
@@ -450,6 +467,9 @@ export default function ArticlePage() {
                     {t('article.source')}: {data.source_credit}
                   </p>
                 ) : null}
+
+                {/* Where the story ends: the four share paths, always in view. */}
+                <ShareStrip shortId={data.short_id} url={data.url} title={shareTitle} className="mt-7" />
 
                 {/* Like · comment · save · share · report (§5) */}
                 <EngagementBar article={data} />

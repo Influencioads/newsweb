@@ -1,3 +1,4 @@
+import * as Clipboard from 'expo-clipboard';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { useState } from 'react';
@@ -6,9 +7,10 @@ import { ActivityIndicator, Linking, Share, View } from 'react-native';
 import { API_BASE, API_ORIGIN } from '@/api/client';
 import { trackShare } from '@/lib/beacon';
 import { useI18n } from '@/lib/i18n';
-import { radius, space, TAP_LG } from '@/lib/theme';
+import { radius, social, space, TAP_LG } from '@/lib/theme';
 import { makeStyles, useColors } from '@/lib/useTheme';
 import { BottomSheet } from '@/ui/BottomSheet';
+import { TelegramGlyph, WhatsAppGlyph, XGlyph } from '@/ui/glyphs';
 import { Icon, type IconName } from '@/ui/Icon';
 import { PressableScale } from '@/ui/PressableScale';
 import { T } from '@/ui/Text';
@@ -31,9 +33,9 @@ import { useToast } from '@/ui/Toast';
  * cannot shape Telugu reports `card.available: false`, and offering a button
  * that produces an unreadable image would be worse than not offering it.
  *
- * There is no "copy link" row: no clipboard module is installed (expo-clipboard
- * is absent and RN's own `Clipboard` is deprecated and warns on every access),
- * so the OS sheet carries that job. Every path reports to the share beacon.
+ * The sheet has no "copy link" row — the OS sheet carries that job there; the
+ * end-of-article `ShareStrip` copies via expo-clipboard. Every path reports to
+ * the share beacon.
  */
 
 // ponytail: no i18n keys yet for these — see neededStrings.
@@ -66,6 +68,30 @@ const useStyles = makeStyles((color) => ({
   },
   label: { flex: 1 },
   list: { paddingBottom: space.sm },
+  strip: {
+    marginTop: space.xl,
+    padding: space.lg,
+    gap: space.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: color.rule,
+    borderLeftWidth: 4,
+    borderLeftColor: color.brand,
+    backgroundColor: color.paperSub,
+  },
+  stripHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
+  pill: {
+    flexBasis: '45%',
+    flexGrow: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.sm,
+    paddingHorizontal: space.md,
+    borderRadius: radius.pill,
+  },
+  copyPill: { borderWidth: 1, borderColor: color.ruleStrong, backgroundColor: color.surface },
 }));
 
 function ShareRow({
@@ -133,7 +159,7 @@ export function useShareActions(
   { shortId, url, title }: ShareTarget,
   onDone: () => void = () => {},
 ) {
-  const { isTelugu } = useI18n();
+  const { isTelugu, t } = useI18n();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const link = `${API_ORIGIN}${url}`;
@@ -148,6 +174,27 @@ ${link}`;
     } catch {
       toast.error(L('వాట్సాప్ తెరవలేకపోయాం.', 'Could not open WhatsApp.', isTelugu));
     }
+  }
+
+  /** X and Telegram take the link and the headline as separate params. */
+  async function intent(href: string) {
+    onDone();
+    trackShare(shortId);
+    try {
+      await Linking.openURL(href);
+    } catch {
+      toast.error(L('యాప్ తెరవలేకపోయాం.', 'Could not open the app.', isTelugu));
+    }
+  }
+  const query = `url=${encodeURIComponent(link)}&text=${encodeURIComponent(title)}`;
+  const x = () => intent(`https://x.com/intent/tweet?${query}`);
+  const telegram = () => intent(`https://t.me/share/url?${query}`);
+
+  async function copy() {
+    onDone();
+    await Clipboard.setStringAsync(link);
+    trackShare(shortId);
+    toast.success(t('ui.copied'));
   }
 
   async function native() {
@@ -200,7 +247,7 @@ ${link}`;
     }
   }
 
-  return { whatsapp, native, card, busy };
+  return { whatsapp, x, telegram, copy, native, card, busy };
 }
 
 /**
@@ -243,5 +290,55 @@ export function ShareOptionsSheet({
         <ShareRow icon="share2" label={t('ui.shareNative')} onPress={() => void native()} />
       </View>
     </BottomSheet>
+  );
+}
+
+/** End-of-article strip: four coloured buttons, always on the page — no sheet to open. */
+export function ShareStrip(target: ShareTarget) {
+  const styles = useStyles();
+  const color = useColors();
+  const { t } = useI18n();
+  const { whatsapp, x, telegram, copy } = useShareActions(target);
+  const marks = [
+    { label: t('ui.whatsapp'), bg: social.whatsapp, glyph: WhatsAppGlyph, onPress: whatsapp },
+    { label: 'X (Twitter)', bg: social.x, glyph: XGlyph, onPress: x },
+    { label: 'Telegram', bg: social.telegram, glyph: TelegramGlyph, onPress: telegram },
+  ];
+  return (
+    <View style={styles.strip}>
+      <View style={styles.stripHead}>
+        <Icon name="megaphone" size={20} color={color.breaking} />
+        <T variant="ui" weight="bold" style={styles.label}>
+          {t('ui.shareStripTitle')}
+        </T>
+      </View>
+      <View style={styles.grid}>
+        {marks.map(({ label, bg, glyph: Glyph, onPress }) => (
+          <PressableScale
+            key={label}
+            onPress={() => void onPress()}
+            minHeight={TAP_LG}
+            accessibilityLabel={label}
+            style={[styles.pill, { backgroundColor: bg }]}
+          >
+            <Glyph size={18} color={social.onMark} />
+            <T variant="ui" weight="semibold" color="onOverlay" numberOfLines={1}>
+              {label}
+            </T>
+          </PressableScale>
+        ))}
+        <PressableScale
+          onPress={() => void copy()}
+          minHeight={TAP_LG}
+          accessibilityLabel={t('ui.copyLink')}
+          style={[styles.pill, styles.copyPill]}
+        >
+          <Icon name="copy" size={20} color={color.ink} />
+          <T variant="ui" weight="semibold" numberOfLines={1}>
+            {t('ui.copyLinkShort')}
+          </T>
+        </PressableScale>
+      </View>
+    </View>
   );
 }

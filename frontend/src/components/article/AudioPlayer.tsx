@@ -43,6 +43,11 @@ import { cn } from '@/utils/cn';
 export const PILL =
   'flex w-fit max-w-full min-h-tap flex-wrap items-center gap-2 rounded-pill border border-brand/20 bg-brand-tint px-2 py-1';
 
+/** The pill's text: the label alone, or the tagline over a quieter label. */
+export const LABEL = 'text-ui-sm font-semibold text-brand';
+export const TAGLINE = 'text-ui-sm font-bold text-brand';
+export const SUBLABEL = 'text-meta font-semibold text-ink-soft';
+
 /** What the caller knows about the track; the file and length come from the server. */
 export type TrackMeta = Pick<Track, 'kind' | 'title'> & Partial<Pick<Track, 'subtitle' | 'href' | 'artwork'>>;
 
@@ -75,8 +80,10 @@ export interface AudioPlayerProps {
   track?: TrackMeta;
   /** The running order this track belongs to; playback starts there at this track. */
   queue?: Track[];
-  /** The play button's icon while not playing (the article page shows headphones). */
+  /** The play button's icon while not playing (the article page shows the house radio). */
   idleIcon?: GlyphIcon;
+  /** A line over the label while idle — the article page's invitation to listen. */
+  tagline?: string;
 }
 
 export function AudioPlayer({
@@ -87,6 +94,7 @@ export function AudioPlayer({
   track,
   queue,
   idleIcon = Play,
+  tagline,
 }: AudioPlayerProps) {
   const { t, language } = useI18n();
   const s = useScript();
@@ -155,11 +163,14 @@ export function AudioPlayer({
           aria-describedby={labelId}
           onClick={deviceTts.toggle}
         />
-        <span
-          id={labelId}
-          className={cn(s.body, 'pr-2 text-ui-sm font-semibold text-brand', unavailable && 'opacity-60')}
-        >
-          {label}
+        <span className="flex flex-col pr-2">
+          {tagline && state === 'idle' ? <span className={cn(s.body, TAGLINE)}>{tagline}</span> : null}
+          <span
+            id={labelId}
+            className={cn(s.body, tagline && state === 'idle' ? SUBLABEL : LABEL, unavailable && 'opacity-60')}
+          >
+            {label}
+          </span>
         </span>
       </div>
     );
@@ -219,8 +230,11 @@ export function AudioPlayer({
           <span className="sr-only">{t('player.open')}</span>
         </button>
       ) : (
-        <span id={labelId} className={cn(s.body, 'pr-2 text-ui-sm font-semibold text-brand')}>
-          {t('reader.listen')} · <span className="font-sans tabular-nums">{duration ? clock(duration) : readingLabel}</span>
+        <span className="flex flex-col pr-2">
+          {tagline ? <span className={cn(s.body, TAGLINE)}>{tagline}</span> : null}
+          <span id={labelId} className={cn(s.body, tagline ? SUBLABEL : LABEL)}>
+            {t('reader.listen')} · <span className="font-sans tabular-nums">{duration ? clock(duration) : readingLabel}</span>
+          </span>
         </span>
       )}
     </div>

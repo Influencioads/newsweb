@@ -25,6 +25,7 @@ import { ErrorState, LoadingState } from '@/components/Feedback';
 import { FollowChip } from '@/components/FollowChip';
 import { PollCard } from '@/components/PollCard';
 import { SectionHeader } from '@/components/SectionHeader';
+import { ShareStrip } from '@/components/ShareSheet';
 import { useReadingBeacon } from '@/lib/beacon';
 import { timeAgo, useI18n } from '@/lib/i18n';
 import { SPRING, useMotion } from '@/lib/motion';
@@ -157,7 +158,7 @@ export default function ArticleScreen() {
 
   // §16/§19 listen, directly under the photo — under the headline when there
   // is none, as on the web. Always a direct child of the scroll, so its layout
-  // y is what the header's headphones button jumps to, and it keeps playing
+  // y is what the header's listen button jumps to, and it keeps playing
   // while the reader reads.
   const listenBlock = data ? (
     <View style={styles.audio} onLayout={onAudioLayout}>
@@ -167,6 +168,7 @@ export default function ArticleScreen() {
         onToggleDevice={tts.toggle}
         listenLabel={t('article.listen')}
         stopLabel={t('article.stopListening')}
+        tagline={t('article.listenTagline')}
         meta={{
           title: data.title_te,
           subtitle: data.category
@@ -330,6 +332,9 @@ export default function ArticleScreen() {
                   {data.source_credit}
                 </T>
               ) : null}
+
+              {/* Where the story ends: the four share paths, always in view. */}
+              <ShareStrip shortId={data.short_id} url={data.url} title={data.title_te} />
 
               {/* Renders nothing when the story has no extra pictures. */}
               <ArticleGallery images={data.gallery} />

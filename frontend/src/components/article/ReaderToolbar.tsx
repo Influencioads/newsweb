@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bookmark, BookmarkCheck, Headphones, Loader2, MessageCircle, Share2, Type } from 'lucide-react';
+import { Bookmark, BookmarkCheck, Loader2, MessageCircle, Share2, Type } from 'lucide-react';
 
 import { IconButton } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
+import { ListenIcon } from '@/components/ui/glyphs';
 import { Sheet } from '@/components/ui/Dialog';
 import { translate, useI18n } from '@/i18n';
 import { FONT_STEPS, useReaderPrefs } from '@/stores/readerPrefs';
@@ -112,7 +113,7 @@ export interface ReaderToolbarProps {
   onShare: () => void;
   onComments?: () => void;
   listening?: boolean;
-  /** Listen is fetching its audio: the headphones spin (busy, not disabled). */
+  /** Listen is fetching its audio: the listen icon spins (busy, not disabled). */
   listenPending?: boolean;
   saved?: boolean;
   onSave?: () => void;
@@ -164,7 +165,7 @@ export function ReaderToolbar({
     <>
       {showListen && (
         <IconButton
-          icon={listenPending ? Loader2 : Headphones}
+          icon={listenPending ? Loader2 : ListenIcon}
           label={t('reader.listen')}
           pressed={listening}
           disabled={!onListen}

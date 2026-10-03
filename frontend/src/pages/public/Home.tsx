@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { AdSlot } from '@/components/ads/AdSlot';
 import { BriefCard, KickerCard, LatestCard } from '@/components/article/ArticleCard';
-import { BulletinCard } from '@/components/bulletin/BulletinCard';
+import { BulletinBanner } from '@/components/bulletin/BulletinBanner';
 import { PageContainer, SectionHeader } from '@/components/ui/Layout';
 import { EmptyState, QueryState } from '@/components/ui/State';
 import { VideoStrip } from '@/components/video/VideoStrip';
@@ -130,9 +130,9 @@ export default function Home() {
 
   return (
     <PageContainer width="site" className="space-y-7 py-6 md:space-y-10 md:py-8">
-      {/* Keep the independently fetched audio available even if the news feed
-          is empty or fails. With a lead, its card moves below the front grid. */}
-      {!home.data?.lead ? <BulletinCard /> : null}
+      {/* The latest audio bulletin leads the page, fetched on its own so it
+          shows even when the news feed is empty or fails. */}
+      <BulletinBanner />
       <QueryState
         query={home}
         skeleton={<HomeSkeleton />}
@@ -146,8 +146,6 @@ export default function Home() {
             <FrontGrid data={data} />
 
             <TrendingRail articles={[...data.latest, ...data.briefs].slice(0, 6)} />
-            {/* The first article leads the page; a live audio bulletin follows it. */}
-            <BulletinCard />
 
             {!data.sections.some((section) => section.key === 'exclusive') && exclusives.length >= 2 ? (
               <SectionBlock

@@ -97,7 +97,7 @@ export function HomePromos({ epaper, topics }: HomePromosProps) {
               onPress={() => router.push({ pathname: '/epaper/[date]', params: { date: epaper.pub_date } })}
             />
             <IconButton
-              name="headphones"
+              name="listen"
               label={t('epaper.listen')}
               color={color.onOverlay}
               onPress={() => router.push({ pathname: '/epaper/[date]', params: { date: epaper.pub_date } })}

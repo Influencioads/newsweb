@@ -46,6 +46,7 @@ export function useBulletin() {
     queryFn: async () => (await api.get<BulletinSummary>('/public/bulletins/latest')).data,
     retry: false,
     staleTime: 5 * 60_000,
+    refetchInterval: 10 * 60_000,
   });
 }
 

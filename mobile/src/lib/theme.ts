@@ -61,6 +61,13 @@ export const lightColor = {
   onBrand: '#FFFFFF',
 } as const;
 
+/**
+ * Third-party marks for the end-of-article share strip — the networks'
+ * colours, so the same in both themes. Each takes white text at >= 4.5:1.
+ * Twin of `social` in frontend/tailwind.config.ts.
+ */
+export const social = { whatsapp: '#1B7F36', x: '#0F172A', telegram: '#0A6BA8', onMark: '#FFFFFF' } as const;
+
 /** Font family names as registered with expo-font in app/_layout.tsx. */
 export const font = {
   telugu: 'NotoSansTelugu_400Regular',

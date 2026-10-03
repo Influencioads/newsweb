@@ -11,7 +11,8 @@ import * as notificationsApi from '@/api/notifications';
 import * as publicApi from '@/api/public';
 import type { ArticleCard, HomePayload } from '@/api/types';
 import { CompactCard, LeadCard, RowCard } from '@/components/ArticleCard';
-import { BulletinCard, useBulletin, type BulletinSummary } from '@/components/BulletinCard';
+import { BulletinBanner } from '@/components/BulletinBanner';
+import { useBulletin, type BulletinSummary } from '@/components/BulletinCard';
 import { EmptyState, ErrorState } from '@/components/Feedback';
 import { HomeListHeader, HomePromos } from '@/components/home/HomeListHeader';
 import { HomeSectionBand } from '@/components/home/HomeSectionBand';
@@ -33,8 +34,8 @@ import { SkeletonFeed } from '@/ui/Skeleton';
 import { T } from '@/ui/Text';
 
 /**
- * Home feed: breaking strip, top-stories slider (lead + secondary), e-paper
- * promo, top topics, for-you rail, bulletin, big question, latest rail, mandal block, video
+ * Home feed: breaking strip, bulletin banner, top-stories slider (lead + secondary), e-paper
+ * promo, top topics, for-you rail, big question, latest rail, mandal block, video
  * strip, then the admin-configured section blocks — one `/public/home`
  * request (§23), flattened into a single FlatList so the masthead collapses
  * against one scroll offset.
@@ -63,6 +64,9 @@ function flatten(
   const article = (type: 'lead' | 'row' | 'compact', prefix: string, a: ArticleCard) =>
     rows.push({ key: `${prefix}-${a.short_id}`, type, article: a });
 
+  // The listen banner leads; no row at all when no bulletin is on air (between slots, or switched off).
+  if (bulletin) rows.push({ key: 'bulletin', type: 'bulletin', bulletin });
+
   // The top stories slide — the lead, then the secondary stories — as on the web.
   if (home.lead) rows.push({ key: 'lead-slider', type: 'slider', articles: [home.lead, ...home.secondary] });
   rows.push({ key: 'promos', type: 'promos' });
@@ -74,8 +78,6 @@ function flatten(
     forYou.forEach((a) => article('row', 'fy', a));
   }
 
-  // No row at all when no bulletin is on air (between slots, or switched off).
-  if (bulletin) rows.push({ key: 'bulletin', type: 'bulletin', bulletin });
   if (poll) rows.push({ key: `poll-${poll.id}`, type: 'poll', poll });
 
   if (home.latest.length) {
@@ -217,7 +219,7 @@ export default function HomeScreen() {
       case 'poll':
         return <PollCard poll={item.poll} />;
       case 'bulletin':
-        return <BulletinCard bulletin={item.bulletin} />;
+        return <BulletinBanner bulletin={item.bulletin} />;
       case 'video':
         return <VideoStrip />;
       case 'empty':
@@ -292,7 +294,10 @@ export default function HomeScreen() {
           refreshControl={
             <RefreshControl
               refreshing={home.isRefetching}
-              onRefresh={() => home.refetch()}
+              onRefresh={() => {
+                void home.refetch();
+                void bulletin.refetch();
+              }}
               tintColor={color.brand}
               colors={[color.brand]}
               progressBackgroundColor={color.surface}

@@ -2,19 +2,18 @@
 
 Six named slots a day at 07, 09, 15, 17, 19 and 21 IST, about three
 minutes each — each show has its own banner art (web `public/bulletins/`,
-mobile `assets/bulletins/`, keyed by the slot hour).
+mobile `assets/bulletins/`, keyed by the slot hour) and its own anchor voice.
 
-**Why this can go live without an editor pressing Approve.** Everything spoken
+**Recorded at quarter to, aired on the hour.** `prepare_slot` scripts and
+records each slot `LEAD_MINUTES` early and leaves it at READY; `run_slot` puts
+it on air when the hour strikes, or produces it then if the early recording
+never happened.
+
+**Why this goes live without an editor pressing Approve.** Everything spoken
 is drawn from stories that a human already approved and a *second* human
 already published. The machine chooses an order; it writes nothing and does
-not decide what is true. That is why
-`bulletin.requires_approval` defaults to false — and why it exists at all, for
-a newsroom that would rather gate it.
-
-Note the setting is not called `auto_publish`. The behaviour is identical, but
-this codebase treats that phrase as meaning "a reader sees unreviewed copy",
-which is not what happens here, and a future reviewer grepping for it should
-not find a hit.
+not decide what is true. The owner ruled (2026-10-03) that no approval step
+sits in front of the schedule; `bulletin.enabled` is the stop.
 
 **The script is deterministic, and read clean.** The greeting, then each
 story's headline and published summary, then a fixed close — with a 2.5 s
@@ -39,6 +38,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.errors import AiProviderError, ConflictError, NotFoundError
 from app.core.logging import get_logger
 from app.db.base import utcnow
+from app.integrations.ai import catalogue
 from app.integrations.storage import get_storage
 from app.integrations.tts import get_tts
 from app.models.bulletin import AudioBulletin, AudioBulletinItem
@@ -71,6 +71,10 @@ CHARS_PER_SECOND = 12.0
 #: Hard ceiling regardless of the configured target: five minutes at 12 cps,
 #: the longest bulletin a person can ask the assistant for.
 MAX_SCRIPT_CHARS = 3_600
+
+#: How long before its hour a slot is recorded. Stories published after that
+#: cut-off belong to the next slot's window (`window_for`), so none is skipped.
+LEAD_MINUTES = 15
 
 #: How late a slot may still be produced. Past this, a worker that was down
 #: declines rather than publishing a stale "1 o'clock bulletin" at three. Must
@@ -114,6 +118,19 @@ _LABELS_TE: dict[int, str] = {
     21: "ఫుల్ మీల్స్ న్యూస్",  # Full Meals News
 }
 
+#: Each slot's anchor: the six Sarvam bulbul:v3 voices picked on 2026-09-23 by
+#: pitch analysis and a listening panel, a woman and a man in turn through the
+#: day. The weakest (neha) has the afternoon. One key per SLOTS hour (a test
+#: holds the two in step); any other speech model reads with the Voice setting.
+_ANCHORS: dict[int, str] = {
+    7: "shreya",
+    9: "soham",
+    15: "neha",
+    17: "sunny",
+    19: "ritu",
+    21: "rohan",
+}
+
 
 # --------------------------------------------------------------------------- #
 # Slots and windows
@@ -122,19 +139,26 @@ def slot_label_te(slot: int) -> str:
     return _LABELS_TE.get(slot, f"{slot} గంటల బులెటిన్")
 
 
+def slot_time(day: date, slot: int) -> datetime:
+    """When `slot` airs on `day`, IST."""
+    return datetime.combine(day, time(hour=slot), tzinfo=IST)
+
+
 def window_for(day: date, slot: int) -> tuple[datetime, datetime]:
-    """[previous slot, this slot) in UTC.
+    """[previous slot's cut-off, this slot's cut-off) in UTC, each cut-off
+    `LEAD_MINUTES` before its hour — when the recording is made.
 
     The 07:00 window reaches back to 21:00 the previous evening, so overnight
     news is carried rather than dropped — the gap between the last bulletin of
     one day and the first of the next is the longest of the cycle.
     """
-    end = datetime.combine(day, time(hour=slot), tzinfo=IST)
+    lead = timedelta(minutes=LEAD_MINUTES)
+    end = slot_time(day, slot) - lead
     index = SLOTS.index(slot) if slot in SLOTS else 0
     if index == 0:
-        start = datetime.combine(day - timedelta(days=1), time(hour=SLOTS[-1]), tzinfo=IST)
+        start = slot_time(day - timedelta(days=1), SLOTS[-1]) - lead
     else:
-        start = datetime.combine(day, time(hour=SLOTS[index - 1]), tzinfo=IST)
+        start = slot_time(day, SLOTS[index - 1]) - lead
     return start.astimezone(utcnow().tzinfo), end.astimezone(utcnow().tzinfo)
 
 
@@ -145,10 +169,46 @@ def current_slot(now: datetime | None = None) -> int | None:
     if not candidates:
         return None
     slot = max(candidates)
-    slot_time = moment.replace(hour=slot, minute=0, second=0, microsecond=0)
-    if (moment - slot_time) > timedelta(minutes=CATCH_UP_MINUTES):
+    if (moment - slot_time(moment.date(), slot)) > timedelta(minutes=CATCH_UP_MINUTES):
         return None
     return slot
+
+
+def upcoming_slot(now: datetime | None = None) -> int | None:
+    """The slot about to air — at most twice `LEAD_MINUTES` away — or None.
+
+    Twice, so a beat tick a second early or a worker a few minutes late still
+    finds it; slots are two hours apart, so it can never be the wrong one.
+    """
+    moment = (now or utcnow()).astimezone(IST)
+    for slot in SLOTS:
+        ahead = slot_time(moment.date(), slot) - moment
+        if timedelta(0) < ahead <= timedelta(minutes=2 * LEAD_MINUTES):
+            return slot
+    return None
+
+
+def awaiting_air(bulletin: AudioBulletin) -> bool:
+    """Recorded by the schedule and not yet on air, with no person's say on it.
+
+    A pull stamps `approved_by`, and every person's own recording (Run now,
+    Regenerate, the assistant) stamps `requested_by` — so an editor who took
+    a bulletin off, or made one to hold, is never overruled by the clock.
+    """
+    return (
+        bulletin.status == BulletinStatus.READY
+        and bulletin.requested_by is None
+        and bulletin.approved_by is None
+    )
+
+
+def anchor_for(slot: int, provider: Any) -> str | None:
+    """The slot's anchor, when `provider` speaks with these Sarvam voices."""
+    anchor = _ANCHORS.get(slot)
+    model = f"sarvam/{getattr(provider, 'model_name', '')}"
+    if getattr(provider, "key", "") == "sarvam" and anchor in catalogue.tts_voices(model):
+        return anchor
+    return None
 
 
 def today(now: datetime | None = None) -> date:
@@ -447,6 +507,7 @@ def render(
     # sting can sit between them. One ledger row still covers the lot:
     # `synthesise_long` leaves only its own block's total on `last_usage`.
     blocks = [b.strip() for b in bulletin.script_te.split(MUSIC_MARK) if b.strip()]
+    voice = anchor_for(bulletin.slot, provider) or tts_service.configured_voice(db)
     takes: list[tuple[bytes, str, int, str, int]] = []
     spent: dict[str, float | int] = {}
     try:
@@ -455,10 +516,7 @@ def render(
             try:
                 takes.append(
                     tts_service.synthesise_long(
-                        block,
-                        language=language,
-                        voice=tts_service.configured_voice(db),
-                        provider=provider,
+                        block, language=language, voice=voice, provider=provider
                     )
                 )
             finally:
@@ -577,17 +635,37 @@ def regenerate(
         if bulletin.status == BulletinStatus.SKIPPED:
             return bulletin
     render(db, bulletin, requested_by=actor_id)
-    if bulletin.status == BulletinStatus.READY and not requires_approval(db):
+    if bulletin.status == BulletinStatus.READY:
         publish(db, bulletin, actor_id=actor_id)
     return bulletin
 
 
-def requires_approval(db: Session) -> bool:
-    return settings_service.get_bool(db, "bulletin.requires_approval")
-
-
 def enabled(db: Session) -> bool:
     return settings_service.get_bool(db, "bulletin.enabled")
+
+
+def prepare_slot(db: Session, *, now: datetime | None = None) -> AudioBulletin | None:
+    """Record the slot about to air and hold it at READY; `run_slot` airs it
+    on the hour.
+
+    Leaves alone a row that is live or already recorded, and a person's
+    (`requested_by`) — the same rows the hour striking leaves alone.
+    """
+    if not enabled(db):
+        return None
+    slot = upcoming_slot(now)
+    if slot is None:
+        return None
+    bulletin = get_or_create(db, today(now), slot)
+    if (
+        bulletin.status in (BulletinStatus.PUBLISHED, BulletinStatus.READY)
+        or bulletin.requested_by is not None
+    ):
+        return bulletin
+    script_bulletin(db, bulletin)
+    if bulletin.status != BulletinStatus.SKIPPED:
+        render(db, bulletin)
+    return bulletin
 
 
 def run_slot(
@@ -597,17 +675,17 @@ def run_slot(
     slot: int | None = None,
     requested_by: int | None = None,
 ) -> AudioBulletin | None:
-    """Produce one slot, end to end. Idempotent.
+    """Air one slot, producing it first if it was not recorded. Idempotent.
 
     `(bulletin_date, slot)` is unique, so a double-fire updates the same row
     rather than producing two bulletins for nine o'clock.
 
-    The beat (no slot, nobody asking) leaves alone a row that is live, and a
-    row a person made (`requested_by`: the assistant, Run now, Regenerate).
+    The beat (no slot, nobody asking) puts on air what `prepare_slot` recorded
+    at quarter to. It leaves alone a row that is live, one an editor pulled,
+    and one a person made (`requested_by`: the assistant, Run now, Regenerate).
     That one is theirs — held at READY for a human to publish, or already
     reviewed by one — and the hour striking must neither re-record it with
-    other news nor put it on air. (Before the assistant, the beat re-scripted
-    a Run-now bulletin still awaiting approval; a person's work now stands.)
+    other news nor put it on air.
     """
     if not enabled(db):
         return None
@@ -618,19 +696,26 @@ def run_slot(
     resolved_day = day or today()
 
     bulletin = get_or_create(db, resolved_day, resolved_slot)
-    if slot is None and (
-        bulletin.status == BulletinStatus.PUBLISHED
-        or (requested_by is None and bulletin.requested_by is not None)
-    ):
-        return bulletin
+    if slot is None:
+        if awaiting_air(bulletin):
+            return publish(db, bulletin)
+        if bulletin.status in (BulletinStatus.PUBLISHED, BulletinStatus.READY) or (
+            requested_by is None and bulletin.requested_by is not None
+        ):
+            return bulletin
 
-    script_bulletin(db, bulletin)
-    if bulletin.status == BulletinStatus.SKIPPED:
-        return bulletin
+    # The beat finds a row SCRIPTED only after a hand edit since quarter to
+    # (`prepare_slot` scripts and records in one transaction): speak it as it
+    # stands rather than rebuild it.
+    if slot is not None or bulletin.status != BulletinStatus.SCRIPTED:
+        script_bulletin(db, bulletin)
+        if bulletin.status == BulletinStatus.SKIPPED:
+            return bulletin
 
     render(db, bulletin, requested_by=requested_by)
-    if bulletin.status == BulletinStatus.READY and not requires_approval(db):
-        publish(db, bulletin, actor_id=None)
+    # The hour never overrules a pull; a person asking (`slot`) always airs.
+    if bulletin.status == BulletinStatus.READY and (slot is not None or awaiting_air(bulletin)):
+        publish(db, bulletin)
     return bulletin
 
 

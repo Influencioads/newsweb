@@ -62,9 +62,18 @@ celery.conf.beat_schedule = {
         "schedule": 300.0,
         "options": {"expires": 240},
     },
-    # bulletin_service.SLOTS, on the IST hour. A real crontab rather than the
-    # e-paper's tick-and-compare, because these times are a product decision
-    # and not an admin setting.
+    # bulletin_service.SLOTS: recorded LEAD_MINUTES before the IST hour, aired
+    # on it. Real crontabs rather than the e-paper's tick-and-compare, because
+    # these times are a product decision and not an admin setting. A recording
+    # still queued five minutes before its hour expires; the hour produces it.
+    "bulletin-prepare": {
+        "task": "bulletin.prepare",
+        "schedule": crontab(
+            minute=str(60 - bulletin_service.LEAD_MINUTES),
+            hour=",".join(str(slot - 1) for slot in bulletin_service.SLOTS),
+        ),
+        "options": {"expires": (bulletin_service.LEAD_MINUTES - 5) * 60},
+    },
     "bulletin-slots": {
         "task": "bulletin.run_slot",
         "schedule": crontab(minute="0", hour=",".join(map(str, bulletin_service.SLOTS))),

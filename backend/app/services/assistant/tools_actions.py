@@ -718,9 +718,11 @@ def rewrite_crawled_news(ctx: ToolContext, args: dict[str, Any]) -> dict[str, An
 # Audio bulletin
 # --------------------------------------------------------------------------- #
 def _next_slot(now: datetime | None = None) -> tuple[str, int]:
-    """The next slot more than ten minutes ahead (IST). Nearer than that the
-    beat is about to produce it, and two writers on one row race."""
-    moment = (now or utcnow()).astimezone(IST) + timedelta(minutes=10)
+    """The next slot more than ten minutes before its recording (IST), which
+    the beat starts `LEAD_MINUTES` ahead of the hour. Nearer than that the beat
+    is about to produce it, and two writers on one row race."""
+    ahead = timedelta(minutes=bulletin_service.LEAD_MINUTES + 10)
+    moment = (now or utcnow()).astimezone(IST) + ahead
     for slot in bulletin_service.SLOTS:
         if datetime.combine(moment.date(), time(hour=slot), tzinfo=IST) > moment:
             return moment.date().isoformat(), slot
@@ -730,7 +732,7 @@ def _next_slot(now: datetime | None = None) -> tuple[str, int]:
 @tool(
     "prepare_audio_bulletin",
     "Prepare a spoken Telugu news bulletin of 1-5 minutes from stories already published, "
-    "record it with the configured voice, and hold it at READY for a desk editor to "
+    "record it in that slot's anchor voice, and hold it at READY for a desk editor to "
     "publish (never published here). Defaults to the next bulletin slot today; pick "
     "stories by category/district/recency or give article_ids. Background job.",
     {

@@ -301,17 +301,11 @@ SPECS: dict[str, Spec] = {
     "bulletin.enabled": Spec(
         False,
         "bool",
-        "Produce and serve the six daily audio bulletins. Off stops the "
+        "Produce and serve the six daily audio bulletins: each is recorded 15 "
+        "minutes before its hour and airs on it, with no approval step — it "
+        "is read only from stories an editor already published. Off stops the "
         "schedule and hides every bulletin, including ones already live — this "
         "is the emergency stop.",
-    ),
-    "bulletin.requires_approval": Spec(
-        False,
-        "bool",
-        "Hold each rendered bulletin at Ready until an editor publishes it. Off "
-        "(the default) publishes on schedule, which is safe because a bulletin "
-        "is assembled only from stories an editor already approved and "
-        "published; nothing in the script is machine-written.",
     ),
     "bulletin.target_seconds": Spec(
         180, "int", "Target bulletin length in seconds."

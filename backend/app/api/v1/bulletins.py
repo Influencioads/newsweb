@@ -143,7 +143,6 @@ def list_bulletins(
     return {
         "date": day.isoformat(),
         "enabled": settings_service.bulletin_enabled(db),
-        "requires_approval": bulletin_service.requires_approval(db),
         "items": [_cms_row(db, row) for row in rows],
         # Slots that have not been produced yet, so the screen can offer
         # "Run now" rather than simply showing nothing.

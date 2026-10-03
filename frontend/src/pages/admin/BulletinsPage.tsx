@@ -23,20 +23,18 @@ import { useReveal } from '@/utils/motion';
  * ("గరం చాయ్ న్యూస్" at 07:00 and so on) live in `bulletin_service._LABELS_TE`
  * and arrive on each row as `slot_label_te`.
  *
- * Bulletins publish on schedule because everything in them is already
- * published: a human approved each story and a second human put it live. The
- * machine picks an order and writes the joining sentences. So this screen is
+ * Each bulletin is recorded 15 minutes before its hour, in that slot's anchor
+ * voice, and airs on the hour with no approval step — everything in it is
+ * already published: a human approved each story and a second human put it
+ * live. The machine picks an order and reads it. So this screen is
  * supervision, not a gate — the editor watches, edits a script when a name is
  * mispronounced, and pulls one if something is wrong.
- *
- * The switch that turns it into a gate is `bulletin.requires_approval` in
- * Settings; when it is on, every card waits at Ready for a Publish.
  *
  * Playback: a live bulletin renders the readers' own `AudioPlayer` against the
  * public bulletin route (the same payload shape as article audio). That route
  * 404s for anything not on air, so a file that exists but is not live yet — a
- * Ready card under the approval gate, or everything while the kill switch is
- * off — gets a plain link to the file instead.
+ * Ready card recorded ahead of its hour, or everything while the kill switch
+ * is off — gets a plain link to the file instead.
  */
 
 const slotLabel = (slot: number) => `${String(slot).padStart(2, '0')}:00`;
@@ -293,15 +291,6 @@ function Desk({ data, date, onChanged }: { data: BulletinList; date: string; onC
             )}
           </p>
         </Card>
-      ) : null}
-
-      {data.requires_approval ? (
-        <p role="status" className={cn(body, 'rounded-xl border border-info/30 bg-info-tint p-4 text-ink-soft')}>
-          {L(
-            'ఆమోదం తప్పనిసరి: ప్రతి బులెటిన్ ఎవరైనా ప్రసారం చేసే వరకు వేచి ఉంటుంది.',
-            'Approval is required: every bulletin waits at Audio ready until somebody puts it on air.',
-          )}
-        </p>
       ) : null}
 
       {data.missing_slots.length ? (

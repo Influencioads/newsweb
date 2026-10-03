@@ -512,8 +512,8 @@ export default function SettingsPage() {
               </p>
               <p className={cn(s.body, 'mt-1 text-muted', s.te ? 'text-te-body-xs' : 'text-ui')}>
                 {en
-                  ? 'A starting point for the read, not an imitation of any presenter. Each sets the voice and the pace below; listen, then adjust.'
-                  : 'ఇవి చదివే శైలికి ప్రారంభ బిందువు మాత్రమే — ఏ యాంకర్‌నూ అనుకరించవు. ప్రతి ఎంపిక కింది వాయిస్‌ను, వేగాన్ని సెట్ చేస్తుంది; విని సర్దుబాటు చేయండి.'}
+                  ? 'A starting point for the read, not an imitation of any presenter. Each sets the article voice and the pace below; bulletins read in their slot’s own anchor voice.'
+                  : 'ఇవి చదివే శైలికి ప్రారంభ బిందువు మాత్రమే — ఏ యాంకర్‌నూ అనుకరించవు. ప్రతి ఎంపిక కింది వార్తల వాయిస్‌ను, వేగాన్ని సెట్ చేస్తుంది; బులెటిన్లు ఆ స్లాట్ సొంత వాయిస్‌లో వినిపిస్తాయి.'}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {presets.map((p) => {
@@ -634,11 +634,9 @@ export default function SettingsPage() {
           ) : null}
           <Switch checked={bool('bulletin.enabled')} onChange={(v) => set('bulletin.enabled', v)}
             label={en ? 'Enable audio bulletins' : 'ఆడియో బులెటిన్లు ఆన్'}
-            hint={en ? 'Off means no bulletin is built or aired.' : 'ఆఫ్ అయితే బులెటిన్ తయారు కాదు.'} />
-          <Switch checked={bool('bulletin.requires_approval')} onChange={(v) => set('bulletin.requires_approval', v)}
-            disabled={!bool('bulletin.enabled')}
-            label={en ? 'An editor must approve before it airs' : 'ప్రసారానికి ముందు ఎడిటర్ ఆమోదం'}
-            hint={en ? 'Stories are read from published copy, a music sting between each.' : 'ప్రచురించిన వార్తలే చదువుతారు, మధ్యలో సంగీతం.'} />
+            hint={en
+              ? 'Each is recorded 15 minutes early in its slot’s anchor voice and airs on the hour, no approval. Off means none is built or aired.'
+              : 'ప్రతి బులెటిన్ 15 నిమిషాల ముందే ఆ స్లాట్ వాయిస్‌లో రికార్డై, సమయానికి ఆమోదం లేకుండా ప్రసారమవుతుంది. ఆఫ్ అయితే బులెటిన్ తయారు కాదు.'} />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={en ? 'Target length (seconds)' : 'లక్ష్య నిడివి (సెకన్లు)'}>
               <Input script="en" type="number" min={30} max={900}

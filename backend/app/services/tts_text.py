@@ -83,7 +83,7 @@ import re
 import unicodedata
 from collections import Counter
 
-__all__ = ["assemble", "for_speech", "number_words", "same_sentence", "SIMILAR"]
+__all__ = ["assemble", "for_speech", "number_words", "same_sentence", "sentences", "SIMILAR"]
 
 # --------------------------------------------------------------------------- #
 # Telugu numerals
@@ -441,7 +441,7 @@ def _core(body: str) -> str:
     return re.sub(r"^[^:\n]{2,60}:\s+", "", body.strip(), count=1)
 
 
-def _sentences(text: str) -> list[str]:
+def sentences(text: str) -> list[str]:
     # Not after a 1–3 letter token: "రూ.", "డా.", "సి.ఎం." are not sentence ends.
     return [s for s in re.split(r"(?<=[!?।])\s+|(?<=[^\s.]{4}\.)\s+|\n+", text) if s.strip()]
 
@@ -455,7 +455,7 @@ def _repeats(part: str, later: str) -> bool:
     window = " ".join(_words(later)[: len(_words(part)) + 3])
     if same_sentence(part, window):
         return True
-    return any(same_sentence(part, s) for s in _sentences(later)[:4])
+    return any(same_sentence(part, s) for s in sentences(later)[:4])
 
 
 def assemble(title: str, sub_title: str, summary: str, body: str) -> str:

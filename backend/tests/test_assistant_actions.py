@@ -638,7 +638,7 @@ class TestBulletin:
         monkeypatch.setattr(tools_actions, "get_tts", lambda *_a, **_k: tts)
         # Approval NOT required: the setting under which the beat and the retry
         # would put a bulletin on air by themselves.
-        configure(db, **{"bulletin.enabled": True, "bulletin.requires_approval": False})
+        configure(db, **{"bulletin.enabled": True})
         day = bulletin_service.today()
         for i in range(10):
             publish_story(db, i, datetime.combine(day, time(12, 30), tzinfo=IST) - timedelta(minutes=i))
@@ -679,14 +679,16 @@ class TestBulletin:
         monkeypatch.setattr(bulletin_tasks, "session_scope", session)
         row.status = BulletinStatus.SCRIPTED
         db.commit()
+        # Inside the slot's own window, where the schedule's recordings do air.
+        monkeypatch.setattr(bulletin_service, "utcnow", lambda: datetime.combine(day, time(15, 15), tzinfo=IST))
         assert bulletin_tasks.retry() == {"retried": 1}
         db.refresh(row)
         assert row.status == BulletinStatus.READY and row.requested_by == user.id
 
     def test_the_default_slot_is_the_next_one_ahead(self) -> None:
         at = lambda h, m=0: datetime(2026, 9, 29, h, m, tzinfo=IST)  # noqa: E731
-        assert tools_actions._next_slot(at(6, 45)) == ("2026-09-29", 7)
-        assert tools_actions._next_slot(at(6, 55)) == ("2026-09-29", 9)  # the beat's, in 5 min
+        assert tools_actions._next_slot(at(6, 30)) == ("2026-09-29", 7)
+        assert tools_actions._next_slot(at(6, 40)) == ("2026-09-29", 9)  # the beat records 7 at 6:45
         assert tools_actions._next_slot(at(13)) == ("2026-09-29", 15)  # 13:00 is now, not ahead
         assert tools_actions._next_slot(at(21, 30)) == ("2026-09-30", 7)
 
@@ -968,12 +970,20 @@ class TestBulletinReviewFixes:
         db.commit()
         return stories
 
+    def _recorded(self, db: Session) -> AudioBulletin:
+        """Slot 15 as the schedule records it at quarter to: READY, not on air."""
+        row = bulletin_service.get_or_create(db, bulletin_service.today(), 15)
+        bulletin_service.script_bulletin(db, row)
+        bulletin_service.render(db, row)
+        assert row.status == BulletinStatus.READY
+        return row
+
     def test_a_filter_that_matches_nothing_leaves_a_held_bulletin_alone(
         self, db: Session, tts: FakeTts
     ) -> None:
-        configure(db, **{"bulletin.enabled": True, "bulletin.requires_approval": True})
+        configure(db, **{"bulletin.enabled": True})
         self._stories(db, 6)
-        held = bulletin_service.run_slot(db, day=bulletin_service.today(), slot=15)
+        held = self._recorded(db)
         db.commit()
         before = (held.status, held.url, held.script_hash, held.revision, tts.calls)
         user = staff(db, RoleKey.ADMIN, "sanjaya-admin@example.com")
@@ -986,9 +996,9 @@ class TestBulletinReviewFixes:
     def test_replacing_audio_is_a_new_revision_and_repeated_ids_read_once(
         self, db: Session, tts: FakeTts
     ) -> None:
-        configure(db, **{"bulletin.enabled": True, "bulletin.requires_approval": True})
+        configure(db, **{"bulletin.enabled": True})
         a, b = self._stories(db, 2)
-        held = bulletin_service.run_slot(db, day=bulletin_service.today(), slot=15)
+        held = self._recorded(db)
         db.commit()
         revision = held.revision
         user = staff(db, RoleKey.ADMIN, "sanjaya-admin@example.com")
@@ -1021,7 +1031,7 @@ class TestBulletinReviewFixes:
         live (the assistant's) is held by the retry."""
         from app.workers.tasks import bulletin as bulletin_tasks
 
-        configure(db, **{"bulletin.enabled": True, "bulletin.requires_approval": False})
+        configure(db, **{"bulletin.enabled": True})
         self._stories(db, 3)
         editor = staff(db, RoleKey.ADMIN, "sanjaya-admin@example.com")
         row = bulletin_service.run_slot(db, day=bulletin_service.today(), slot=15, requested_by=editor.id)

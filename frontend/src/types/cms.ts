@@ -332,7 +332,6 @@ export interface BulletinRow {
 export interface BulletinList {
   date: string;
   enabled: boolean;
-  requires_approval: boolean;
   items: BulletinRow[];
   /** Slots not yet produced, so the desk can offer "Run now". */
   missing_slots: number[];

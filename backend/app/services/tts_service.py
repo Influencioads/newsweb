@@ -304,6 +304,12 @@ def month_chars_used(db: Session) -> int:
 #: The pre-existing private name, kept so nothing that already imports it breaks.
 _month_chars_used = month_chars_used
 
+#: Voices Sarvam truncates: the last words of a long passage come back cut off
+#: mid-word, even at pace 1.0, while one sentence per request comes back whole
+#: (measured 2026-09-23). They are sent a sentence at a time — more requests,
+#: the same characters billed.
+WHOLE_SENTENCE_VOICES = frozenset({"neha"})
+
 
 def synthesise_long(
     text: str,
@@ -328,9 +334,17 @@ def synthesise_long(
     """
     # Every voice call reads copy, not print: "రూ.2,000" is "2,000 రూపాయలు"
     # aloud. Idempotent, so text `tts_text.assemble` already prepared is unchanged.
-    chunks = audio_concat.split_for_tts(
-        tts_text.for_speech(text), max_chars=provider.max_chars
+    spoken = tts_text.for_speech(text)
+    parts = (
+        tts_text.sentences(spoken)
+        if (voice or "").casefold() in WHOLE_SENTENCE_VOICES
+        else [spoken]
     )
+    chunks = [
+        chunk
+        for part in parts
+        for chunk in audio_concat.split_for_tts(part, max_chars=provider.max_chars)
+    ]
     if not chunks:
         raise AiProviderError(details={"tts": "nothing to synthesise"})
 

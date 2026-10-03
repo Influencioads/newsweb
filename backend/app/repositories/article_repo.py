@@ -356,28 +356,6 @@ def search(
     return rows, total
 
 
-def short_news(
-    db: Session, *, limit: int = 20, offset: int = 0, category_id: int | None = None
-) -> list[Article]:
-    """Short-news feed: items an editor marked `is_short` (a photo and a few
-    lines in `summary_te`), newest first. Publishing a short item requires both,
-    so the summary check only guards rows edited after going live."""
-    stmt = (
-        published_query()
-        .where(
-            Article.is_short.is_(True),
-            Article.summary_te.is_not(None),
-            Article.summary_te != "",
-        )
-        .order_by(Article.published_at.desc(), Article.id.desc())
-        .limit(limit)
-        .offset(offset)
-    )
-    if category_id is not None:
-        stmt = stmt.where(in_category(category_id))
-    return list(db.execute(stmt).unique().scalars())
-
-
 def active_states(db: Session) -> list[State]:
     stmt = select(State).where(State.is_active.is_(True)).order_by(State.sort, State.id)
     return list(db.execute(stmt).scalars())

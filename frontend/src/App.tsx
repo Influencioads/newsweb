@@ -73,6 +73,7 @@ const AiSuggestionsPage = lazy(() => import('./pages/admin/AiSuggestions'));
 const ContentSourcesPage = lazy(() => import('./pages/admin/ContentSources'));
 const PendingArticlesPage = lazy(() => import('./pages/admin/PendingArticles'));
 const CreativeStudio = lazy(() => import('./pages/admin/CreativeStudio'));
+const ShortNewsAdmin = lazy(() => import('./pages/admin/ShortNewsAdmin'));
 const AssistantPage = lazy(() => import('./pages/admin/assistant/AssistantPage'));
 
 const management = () => import('./pages/admin/ManagementPages');
@@ -221,6 +222,7 @@ export default function App() {
                 <Route path="/admin/taxonomy" element={<TaxonomyPage />} />
                 <Route path="/admin/media" element={<MediaPage />} />
                 <Route path="/admin/creative" element={<CreativeStudio />} />
+                <Route path="/admin/short-news" element={<ShortNewsAdmin />} />
                 <Route path="/admin/users" element={<UsersPage />} />
                 <Route path="/admin/roles" element={<RolesPage />} />
                 <Route path="/admin/audit" element={<AuditPage />} />

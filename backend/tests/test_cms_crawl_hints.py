@@ -229,6 +229,10 @@ def test_origin_shows_the_ai_filing_as_names_and_the_photo_verdicts(
                 "breaking": True,
                 "glyph_warning": False,
                 "raw": {"category": "ignored"},
+                "story_type": "governance",
+                "editor_note": "మంత్రి స్పందన కోరండి.",
+                "style_warnings": ["copied", "lede_too_long"],
+                "refuse_screen": False,
             },
         )
     )
@@ -245,6 +249,10 @@ def test_origin_shows_the_ai_filing_as_names_and_the_photo_verdicts(
     # The model's raw strings are debug data, not something to show a reviewer.
     assert "raw" not in ai
     assert body["photos"] == photo_check
+    # The house-style pass, named for the desk.
+    assert ai["story_type"]["key"] == "governance" and ai["story_type"]["name_te"]
+    assert ai["editor_note"] == "మంత్రి స్పందన కోరండి."
+    assert ai["style_warnings"] == ["copied", "lede_too_long"] and ai["refuse_screen"] is False
 
     # An item from before the feature: both keys present, both null.
     older = make_article(db)

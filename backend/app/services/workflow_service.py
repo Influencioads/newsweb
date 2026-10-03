@@ -8,9 +8,9 @@ from nanoid import generate
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.core.deps import Principal
+from app.core.deps import Principal, build_principal
 from app.core.errors import ConflictError, ValidationError
-from app.core.permissions import LEVEL_PIN_PLACEMENT
+from app.core.permissions import LEVEL_PIN_PLACEMENT, LEVEL_SELF_APPROVE
 from app.db.base import utcnow
 from app.models.content import (
     Article,
@@ -23,6 +23,7 @@ from app.models.content import (
 from app.models.enums import ArticleStatus, ArticleType, TagType, WorkflowState
 from app.models.geo import Locality, Mandal
 from app.models.media import ArticleMedia, Media
+from app.models.user import User
 from app.services import tiptap
 from app.telugu.normalize import normalize_headline, normalize_text
 from app.telugu.transliterate import slugify
@@ -386,13 +387,15 @@ def update(
     db: Session, principal: Principal, article: Article, values: dict[str, Any]
 ) -> Article:
     _scope(principal, article)
-    if article.workflow_state not in {
-        WorkflowState.DRAFT,
-        WorkflowState.CHANGES_REQUESTED,
-    }:
-        raise ConflictError(
-            message_en="Only drafts or returned articles can be edited."
-        )
+    # Any article can be edited, live ones included (owner, 2026-10-02); what
+    # changes with the state is who may. Copy under review is the desk's to
+    # fix; once approved, editing it is publishing that text.
+    state = article.workflow_state
+    if state in {WorkflowState.SUBMITTED, WorkflowState.IN_REVIEW}:
+        principal.require("article.edit")
+    elif state not in {WorkflowState.DRAFT, WorkflowState.CHANGES_REQUESTED}:
+        principal.require("article.publish")
+        principal.require_level(LEVEL_PIN_PLACEMENT, reason="edit after approval")
     _guard_flags(db, principal, article, values)
     gallery = values.pop("gallery_media_ids", None)
     apply_copy(article, values, db)
@@ -400,6 +403,12 @@ def update(
         _apply_gallery(db, article, gallery)
     article.updated_by = principal.id
     article.version += 1
+    if article.status == ArticleStatus.PUBLISHED:
+        # Readers saw the old text; keep every live version restorable.
+        _snapshot(db, article, principal.id)
+        # Only a save that set a pin re-pins; a typo fix must not.
+        if any(key in values for key in _PIN_INTENT):
+            apply_placement_pins(db, article, principal.id)
     return article
 
 
@@ -433,6 +442,12 @@ def _snapshot(db: Session, article: Article, actor_id: int | None) -> None:
             created_at=utcnow(),
         )
     )
+
+
+def approver_may_self_approve(db: Session, user_id: int) -> bool:
+    """Is this approver an admin, so approving their own copy was allowed?"""
+    user = db.get(User, user_id)
+    return user is not None and build_principal(user, "").level >= LEVEL_SELF_APPROVE
 
 
 def transition(
@@ -487,7 +502,7 @@ def transition(
     if old not in allowed:
         raise ConflictError(details={"state": old, "action": action})
     if action == "approve":
-        if article.author_id == principal.id:
+        if article.author_id == principal.id and principal.level < LEVEL_SELF_APPROVE:
             raise ValidationError(
                 message_en="Authors cannot approve their own article."
             )
@@ -522,7 +537,10 @@ def transition(
             panchayat_service.stamp_ugc(db, article, principal)
             _snapshot(db, article, principal.id)
         else:
-            if not article.approved_by or article.approved_by == article.author_id:
+            if not article.approved_by or (
+                article.approved_by == article.author_id
+                and not approver_may_self_approve(db, article.approved_by)
+            ):
                 raise ValidationError(
                     message_en="A different senior editor must approve before publishing."
                 )

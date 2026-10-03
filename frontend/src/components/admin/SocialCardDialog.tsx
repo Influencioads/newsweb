@@ -213,8 +213,8 @@ export function SocialCardDialog({ open, onClose, articleId, title, summary, has
               onChange={() => pickPhoto('ai')}
               label={L('GPT Image 2.5 తో AI చిత్రం రూపొందించండి', 'Make an AI picture with GPT Image 2.5')}
               hint={L(
-                'సుమారు 25 సెకన్లు. వాస్తవంగా కనిపించే ప్రతీకాత్మక చిత్రం — కార్డ్‌పై "ప్రతీకాత్మక AI చిత్రం" అని ఉంటుంది.',
-                'About 25 seconds. A realistic, representative picture — the card is labelled "ప్రతీకాత్మక AI చిత్రం".',
+                'సుమారు 25 సెకన్లు. వాస్తవంగా కనిపించే ప్రతీకాత్మక చిత్రం — కార్డ్‌పై "ప్రతీకాత్మక చిత్రం" అని ఉంటుంది.',
+                'About 25 seconds. A realistic, representative picture — the card is labelled "ప్రతీకాత్మక చిత్రం".',
               )}
               className="py-1"
             />

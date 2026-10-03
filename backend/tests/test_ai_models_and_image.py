@@ -1222,7 +1222,7 @@ class TestImageService:
         assert article.title_te in (media.ai_prompt or "")
         assert "documentary PHOTOGRAPH" in (media.ai_prompt or "")
         # Representative, not the event: said in the caption and in `meta`.
-        assert media.caption_te == "ప్రతీకాత్మక చిత్రం — AI రూపొందించినది"
+        assert media.caption_te == "ప్రతీకాత్మక చిత్రం"
         assert (media.meta or {}).get("representative") is True
         assert "ప్రతీకాత్మక చిత్రం" in (media.alt_te or "")
         assert article.hero_media_id == media.id

@@ -12,6 +12,8 @@ clearly-marked skeleton for a journalist to fill, never fake reporting.
 
 from __future__ import annotations
 
+from datetime import date, datetime
+
 from app.integrations.ai.base import AiProvider, DraftText, RewriteText, TopicIdea
 
 
@@ -23,7 +25,15 @@ class HeuristicAi(AiProvider):
         # provider is the fallback path and contributes no ideas of its own.
         return []
 
-    def write_draft(self, *, topic: str, notes: str, sources: list[dict]) -> DraftText:
+    def write_draft(
+        self,
+        *,
+        topic: str,
+        notes: str,
+        sources: list[dict],
+        story_type: str | None = None,  # no model, so no house style to follow
+        house_style: bool = True,
+    ) -> DraftText:
         cited = ", ".join(
             str(s.get("publisher", "")) for s in sources if s.get("publisher")
         )
@@ -49,6 +59,9 @@ class HeuristicAi(AiProvider):
         target_words: int = 220,
         credit_source: bool = True,
         taxonomy: dict | None = None,  # no model, so nothing is classified
+        story_type: str | None = None,  # nor styled, retried or dated
+        feedback: str | None = None,
+        source_date: date | datetime | None = None,
     ) -> RewriteText:
         """Degrade to an excerpt and a credit — never invent reporting.
 

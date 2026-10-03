@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import date, datetime
 
 
 @dataclass(slots=True)
@@ -61,6 +62,21 @@ class RewriteText:
     #: every value against our own tables before anything reaches an article.
     #: None when no taxonomy was offered, or on a refusal.
     classification: dict | None = None
+    #: The house-style story type the model says it followed (validated
+    #: against `newsroom_style.type_keys`), and what it wants an editor to
+    #: check — kept out of the copy, per the guide. None when not asked.
+    story_type: str | None = None
+    editor_note: str | None = None
+
+
+@dataclass(slots=True)
+class HeadlineOption:
+    """One suggested headline: the words and the curiosity device it uses
+    (`straight` for the plain factual one)."""
+
+    text: str
+    device: str
+    label_te: str = ""
 
 
 @dataclass(slots=True)
@@ -111,12 +127,23 @@ class AiProvider(ABC):
         never someone else's article text."""
 
     @abstractmethod
-    def write_draft(self, *, topic: str, notes: str, sources: list[dict]) -> DraftText:
+    def write_draft(
+        self,
+        *,
+        topic: str,
+        notes: str,
+        sources: list[dict],
+        story_type: str | None = None,
+        house_style: bool = True,
+    ) -> DraftText:
         """Write original Telugu copy about `topic`.
 
         `sources` carries publisher names and URLs so the model can attribute,
         not so it can reproduce: implementations must instruct the model to
         write in its own words and never to copy sentences.
+
+        `house_style` adds the newsroom style brief; a caller whose output is
+        not an article (the bulletin's spoken connectives) turns it off.
         """
 
     @abstractmethod
@@ -131,8 +158,17 @@ class AiProvider(ABC):
         target_words: int = 220,
         credit_source: bool = True,
         taxonomy: dict | None = None,
+        story_type: str | None = None,
+        feedback: str | None = None,
+        source_date: date | datetime | None = None,
     ) -> RewriteText:
         """Rewrite an external report as original Telugu copy.
+
+        `story_type` picks the house-style guide the model follows (None: it
+        is offered the likeliest three and reports its pick); `feedback` is
+        why the previous answer was rejected, for the one retry the crawl
+        allows; `source_date` is when the source was published, so relative
+        days (నేడు, నిన్న) are counted from it.
 
         `taxonomy`, when given, also asks where the story belongs:
         `{"categories": [{"slug", "name", "children": [{"slug", "name"}]}],
@@ -173,6 +209,16 @@ class AiProvider(ABC):
             headline=_clip(headline, 90),
             summary=_clip(summary or body, 170),
         )
+
+    def headline_options(
+        self, *, headline: str, summary: str, body: str, story_type: str | None = None
+    ) -> list[HeadlineOption]:
+        """Alternative headlines for our own story, for an editor to pick from.
+
+        Not abstract: the keyless answer is no ideas — there is no honest way
+        to invent a headline without a model.
+        """
+        return []
 
     def inspect_image(self, raw: bytes) -> ImageVerdict | None:
         """Look at one crawled photo and say whether the publisher branded it.

@@ -98,7 +98,8 @@ export function TabBar({ state, descriptors, navigation, insets }: BottomTabBarP
                     </View>
                   ) : null}
                 </View>
-                <T variant="meta" weight="semibold" color={focused ? 'brand' : 'muted'} numberOfLines={1}>
+                {/* Shrinks rather than truncates: "షార్ట్ న్యూస్" at a large OS font step. */}
+                <T variant="meta" weight="semibold" color={focused ? 'brand' : 'muted'} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                   {label}
                 </T>
               </PressableScale>

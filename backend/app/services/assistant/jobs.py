@@ -30,6 +30,7 @@ from app.core.errors import (
 )
 from app.core.logging import get_logger
 from app.db.base import utcnow
+from app.integrations.ai import newsroom_style
 from app.models.ai import AiArticleDraft
 from app.models.bulletin import AudioBulletin
 from app.models.content import Article, WorkflowTransition
@@ -422,6 +423,19 @@ def _one_article(
     urls = [pg["url"] for pg in pages] + [s["url"] for s in found.get("sources") or []]
     subject = f"{brief} {angle} {p['notes']}"
     threshold = settings_service.get_int(db, "crawl.similarity_block_percent")
+    # The house style after this job's own hard rules, never instead of them:
+    # the deals guide for a shopping list, else whatever the brief reads as.
+    rules = (
+        f"{_WRITE_RULES}\n\n"
+        + newsroom_style.writer_brief(
+            "deals_offers" if items_wanted else newsroom_style.detect_type(f"{brief} {angle}"),
+            headline=f"{brief} {angle}",
+            # `_body` prints its own dated price notice under a shopping list.
+            disclaimer=not items_wanted,
+        )
+        + "\n\n"
+        + newsroom_style.today_lines()
+    )
 
     reason = None
     for attempt in range(2):
@@ -431,7 +445,7 @@ def _one_article(
             tools_actions.paid(
                 db, writer, uid, "draft",
                 lambda prompt=prompt: writer._parse_json(
-                    writer._complete(prompt, rules=_WRITE_RULES, timeout=120)
+                    writer._complete(prompt, rules=rules, timeout=120)
                 ),
             )
         )
@@ -448,6 +462,16 @@ def _one_article(
     tools_actions._screen_topic(db, " ".join([copy["title"], copy["summary"], *copy["paragraphs"]]))
 
     tick(4, "filing it for review")
+    # House spellings, fixed in code (సీఎం, నుంచి, తర్వాత) before the copy is
+    # laid out; whole words only, so nothing else moves.
+    fix = newsroom_style.canonicalize
+    copy["title"], copy["summary"], copy["paragraphs"] = newsroom_style.canonicalize_copy(
+        copy["title"], copy["summary"], copy["paragraphs"]
+    )
+    copy["intro"] = [fix(p) for p in copy["intro"]]
+    copy["closing"] = [fix(p) for p in copy["closing"]]
+    for item in items:
+        item["offer_te"], item["highlight_te"] = fix(item["offer_te"]), fix(item["highlight_te"])
     body = _body(copy, items)
     _, plain, _, words, _ = tiptap.derive(body)
     unverified = dropped

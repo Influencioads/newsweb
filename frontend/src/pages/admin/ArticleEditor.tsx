@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ImagePlus, Save, X } from 'lucide-react';
 
 import { ApiError } from '@/api/client';
@@ -50,9 +50,6 @@ function EditorSkeleton() {
 export default function ArticleEditor() {
   const { id } = useParams();
   const editing = Boolean(id);
-  // /admin/articles/new?short=1 — the Articles list's "New short news" button.
-  const [params] = useSearchParams();
-  const startShort = !editing && params.get('short') === '1';
   const nav = useNavigate();
   const { t } = useI18n();
   const L = useL();
@@ -77,11 +74,10 @@ export default function ArticleEditor() {
   const set = (patch: Partial<ArticleForm>) => setForm((f) => ({ ...f, ...patch }));
 
   useEffect(() => {
-    // Preset on both, so a fresh short form does not count as unsaved.
-    const next = existing.data ? fromArticle(existing.data) : { ...EMPTY_FORM, isShort: startShort };
+    const next = existing.data ? fromArticle(existing.data) : EMPTY_FORM;
     setForm(next);
     setBaseline(next);
-  }, [existing.data, startShort]);
+  }, [existing.data]);
 
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(baseline), [form, baseline]);
 
@@ -117,7 +113,7 @@ export default function ArticleEditor() {
     }
   }
 
-  const title = editing ? t('admin.page.editArticle') : form.isShort ? t('admin.page.newShort') : t('admin.page.newArticle');
+  const title = editing ? t('admin.page.editArticle') : t('admin.page.newArticle');
   const categories = options.data?.categories ?? [];
   const words = wordCount(form.body);
   const shortWords = wordCount(form.summary);
@@ -205,13 +201,19 @@ export default function ArticleEditor() {
           <AssistPanel
             title={form.title}
             body={form.body}
+            summary={form.summary}
+            onTitle={(title) => set({ title })}
             onSummary={(summary) => set({ summary })}
             onCategorySlug={(slug) => {
               const m = categories.find((c) => c.slug === slug);
               if (m) set({ categoryId: m.id, subcategoryId: null });
             }}
             onTags={(names) => set({ tags: Array.from(new Set([...form.tags, ...names])) })}
-            onSeo={(seo) => set({ seoTitle: seo.seo_title, seoDescription: seo.seo_description })}
+            onSeo={(seo) =>
+              // The server blanks a suggested SEO field that fails its checks
+              // (too long, an invented figure); a blank must not wipe the editor's own.
+              set({ seoTitle: seo.seo_title || form.seoTitle, seoDescription: seo.seo_description || form.seoDescription })
+            }
           />
 
           <Section title={L('రచయిత & మూలం', 'Byline and source')}>

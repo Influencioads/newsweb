@@ -153,12 +153,6 @@ export function MetaSidebar({ form, set, errors, options, article, canPin }: Met
             label={L('ఫీచర్డ్', 'Featured')}
             hint={L('ఎడిటర్ ఎంపిక రైలులో చూపుతుంది', 'Shows in the editor-selected rail')}
           />
-          <Switch
-            checked={form.isShort}
-            onChange={(v) => set({ isShort: v })}
-            label={L('షార్ట్ న్యూస్', 'Short news')}
-            hint={L('ఫోటో + చిన్న వార్త, యాప్ స్వైప్ ఫీడ్‌లో', 'Photo + short text, in the app swipe feed')}
-          />
         </div>
         <Field
           label={L('ప్రచురణ తేదీ & సమయం', 'Publish at')}

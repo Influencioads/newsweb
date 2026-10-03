@@ -29,6 +29,7 @@ rewrite call and is checked against our own tables in `_classify`.
 
 from __future__ import annotations
 
+import dataclasses
 import re
 import time
 from collections.abc import Iterable
@@ -44,7 +45,7 @@ from app.core.errors import AiBudgetExceededError, AiProviderError
 from app.core.logging import get_logger
 from app.db.base import desc_nulls_last, utcnow
 from app.db.seed_content import retired_category_slugs
-from app.integrations.ai import get_ai
+from app.integrations.ai import get_ai, newsroom_style
 from app.integrations.ai.base import AiProvider, RewriteText
 from app.integrations.ai.sensitive import _matcher
 from app.integrations.feeds import FeedResult, extract_article, fetch_feed
@@ -862,10 +863,61 @@ def _words(result: RewriteText) -> str:
     return "\n".join([result.title_te or "", result.summary_te or "", *result.paragraphs_te])
 
 
+def _usable(retry: RewriteText | None) -> bool:
+    """A second answer worth keeping over the first: copy, and no stray letter."""
+    return (
+        retry is not None
+        and not retry.refused
+        and bool(retry.title_te)
+        and bool(retry.paragraphs_te)
+        and not _foreign_glyph(_words(retry))
+    )
+
+
+def _styled(
+    result: RewriteText, story_type: str | None, source_text: str, outlets: list[str]
+) -> tuple[RewriteText, list[dict[str, str]]]:
+    """The rewrite with house spellings applied, and what the style lint says
+    about it. Spellings are fixed in code, never asked of a model twice."""
+    title, summary, paragraphs = newsroom_style.canonicalize_copy(
+        result.title_te, result.summary_te, result.paragraphs_te
+    )
+    result = dataclasses.replace(
+        result, title_te=title, summary_te=summary, paragraphs_te=paragraphs
+    )
+    issues = newsroom_style.lint_copy(
+        title,
+        summary,
+        paragraphs,
+        story_type=result.story_type or story_type,
+        source=source_text,
+        outlets=outlets,
+    )
+    return result, issues
+
+
+def _outlets_to_avoid(db: Session, source: ContentSource) -> list[str]:
+    """Publication names the copy must not print: every configured feed's, in
+    both scripts — less the credited publisher's own when the source asks to
+    be credited, since the credit line is meant to name it."""
+    names = {
+        str(name)
+        for row in db.execute(select(ContentSource.name, ContentSource.name_te))
+        for name in row
+        if name
+    }
+    if source.attribution_required:
+        names -= {source.name, source.name_te}
+    return sorted(names)
+
+
 def _retry_for_glyph(
     db: Session, provider: AiProvider, request: dict[str, Any], actor_id: int | None
 ) -> RewriteText | None:
     """The one second call a stray foreign letter earns; None if it failed.
+
+    Also the style retry's: `request` then carries `feedback`, and the caller
+    makes sure an item never gets more than one second call between the two.
 
     Measured on the bulk model, about one rewrite in five carries a letter
     from another script (`ఎစ်భై` for `ఎనభై`) that reads as Telugu at a
@@ -982,6 +1034,13 @@ def rewrite_one(
 
     provider = get_ai(**settings_service.ai_credentials(db, bulk=True))
     tax = taxonomy if taxonomy is not None else _taxonomy(db)
+    # Which house-style guide the writer follows. Free and deterministic: the
+    # source's section and beat say most of it, the headline the rest.
+    story_type = newsroom_style.detect_type(
+        headline,
+        body_text,
+        hint=(source.category.slug if source.category else None, str(source.beat or "")),
+    )
     request: dict[str, Any] = {
         "headline": headline,
         "body_text": body_text,
@@ -990,6 +1049,12 @@ def rewrite_one(
         "language_in": (item.language or source.language or "te"),
         "credit_source": source.attribution_required,
         "taxonomy": tax,
+        "story_type": story_type,
+        "source_date": item.published_at,
+        # The prompt's closing "about N words" is the last thing the model
+        # reads. At the default 220 it overrides the brief's "a ceiling, not a
+        # target" and pads a 50-word district item with background.
+        "target_words": min(220, len(body_text.split())),
     }
     # The rewrite pass is the highest-volume spender: hourly, up to
     # crawl.hourly_item_cap items a run — which is the whole reason ai.bulk_model
@@ -1039,18 +1104,61 @@ def rewrite_one(
     # the same the rewrite is kept for a person to fix — flagged, and never
     # sent to review automatically.
     glyph_warning = False
+    retried = False
     if _foreign_glyph(_words(result)):
+        retried = True
         retry = _retry_for_glyph(db, provider, request, actor_id)
-        if (
-            retry is not None
-            and not retry.refused
-            and retry.title_te
-            and retry.paragraphs_te
-            and not _foreign_glyph(_words(retry))
-        ):
+        if _usable(retry):
             result = retry
         else:
             glyph_warning = True
+
+    # House style. Spellings are fixed in code; the lint's block issues earn
+    # the second call — the same one the stray-letter check spends, so an
+    # item never costs more than two — with the reasons as feedback, and the
+    # answer with fewer block issues is kept. Nothing here may raise: the
+    # rewrite is paid for, and a lint bug must not lose it.
+    issues: list[dict[str, str]] = []
+    # Read here because the style retry needs it too: see below.
+    telugu_source = (item.language or source.language or "te").startswith("te")
+    threshold = settings_service.get_int(db, "crawl.similarity_block_percent")
+    try:
+        result, issues = _styled(result, story_type, body_text, _outlets_to_avoid(db, source))
+        blocks = newsroom_style.blocking(issues)
+        if blocks and not retried:
+            feedback = " ".join(issue["message"] for issue in blocks)
+            retry = _retry_for_glyph(db, provider, {**request, "feedback": feedback}, actor_id)
+            if _usable(retry):
+                styled, retry_issues = _styled(
+                    retry, story_type, body_text, _outlets_to_avoid(db, source)
+                )
+                # A cleaner retry that the similarity gate below would refuse
+                # is no better: keeping it loses both paid calls, where the
+                # first copy needed an editor for ten seconds.
+                too_close = bool(
+                    threshold
+                    and telugu_source
+                    and similarity_percent(
+                        "\n\n".join(normalize_text(p) for p in styled.paragraphs_te), body_text
+                    ) >= threshold
+                )
+                # Fewer block issues is better — unless the retry is MORE
+                # copied than the first answer: trading an outlet name for
+                # twice the lifted wording is no improvement (post-build
+                # review, 2026-10-03).
+                copied_before = newsroom_style.copied_share("\n\n".join(result.paragraphs_te), body_text)
+                copied_after = newsroom_style.copied_share("\n\n".join(styled.paragraphs_te), body_text)
+                fewer = len(newsroom_style.blocking(retry_issues)) < len(blocks)
+                if fewer and copied_after <= max(copied_before, newsroom_style.COPY_BLOCK_PERCENT - 1) and not too_close:
+                    result, issues = styled, retry_issues
+    except Exception:  # noqa: BLE001 — the first rewrite still stands
+        logger.warning("crawl_style_failed", item_id=item.id, exc_info=True)
+    # A subject the refusal screen names (suicide, a sexual offence, a minor,
+    # communal conflict) found in the copy itself: kept, like a stray letter,
+    # for a person to judge — never sent to review automatically.
+    refuse_screen = any(issue["code"] == "refuse_screen" for issue in issues)
+    if refuse_screen:
+        item.requires_human = True
 
     # Still computed and still stored on the row below even when it is not
     # printed: `attribution_te` is how the newsroom answers "where did this
@@ -1077,9 +1185,8 @@ def rewrite_one(
 
     # Only meaningful for a Telugu source — see `similarity_percent`.
     similarity = 0
-    if (item.language or source.language or "te").startswith("te"):
+    if telugu_source:
         similarity = similarity_percent(model_plain, body_text)
-        threshold = settings_service.get_int(db, "crawl.similarity_block_percent")
         if threshold and similarity >= threshold:
             logger.warning(
                 "crawl_rewrite_too_similar", item_id=item.id, similarity=similarity
@@ -1096,7 +1203,7 @@ def rewrite_one(
             db.flush()
             return row
 
-    classification = None
+    classification: dict[str, Any] = {}
     if result.classification is not None or glyph_warning:
         try:
             classification = _classify(
@@ -1111,7 +1218,12 @@ def rewrite_one(
             # for or abort the pass: the story imports with its source's defaults.
             logger.warning("crawl_classify_failed", item_id=item.id, exc_info=True)
             classification = {}
-        classification["glyph_warning"] = glyph_warning
+    classification["glyph_warning"] = glyph_warning
+    # The house style's verdict rides the same JSON — no migration.
+    classification["story_type"] = result.story_type or story_type
+    classification["editor_note"] = result.editor_note or ""
+    classification["style_warnings"] = list(dict.fromkeys(issue["code"] for issue in issues))
+    classification["refuse_screen"] = refuse_screen
 
     row = IngestedRewrite(
         item_id=item.id,
@@ -1141,6 +1253,8 @@ def rewrite_one(
         words=words,
         similarity=similarity,
         glyph_warning=glyph_warning,
+        story_type=classification["story_type"],
+        style_warnings=classification["style_warnings"],
     )
     return row
 
@@ -1291,6 +1405,7 @@ def auto_import_ready(
             rewrite is None
             or rewrite.engine == "heuristic"
             or (rewrite.classification or {}).get("glyph_warning")
+            or (rewrite.classification or {}).get("refuse_screen")
             # Checked again on the stored words: a rewrite made before the
             # stray-letter gate existed has no classification to carry it.
             or _foreign_glyph(

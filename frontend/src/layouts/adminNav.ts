@@ -26,6 +26,7 @@ import {
   UserCheck,
   Users,
   Video,
+  Zap,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -86,6 +87,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       // `ai.use`: every role that may make a news card holds it; the API still
       // checks article.edit / edit_own and district scope per story.
       { to: '/admin/creative', labelKey: 'admin.page.creative', icon: Palette, permission: 'ai.use' },
+      { to: '/admin/short-news', labelKey: 'admin.page.shortNews', icon: Zap, permission: 'article.publish' },
       { to: '/admin/videos', labelKey: 'admin.page.videos', icon: Video, permission: 'video.view' },
       { to: '/admin/bulletins', labelKey: 'admin.page.bulletins', icon: Radio, permission: 'voice.manage' },
       { to: '/admin/voice', labelKey: 'admin.page.voice', icon: Mic, permission: 'voice.manage' },

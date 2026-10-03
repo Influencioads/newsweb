@@ -224,7 +224,62 @@ function AiFilingPanel({ ai }: { ai: AiFiling }) {
           ) : null}
         </p>
       ) : null}
+      <StyleCheck ai={ai} />
     </section>
+  );
+}
+
+/** Copy-checker codes worth a reviewer's eye, by name; any other code shows as itself. */
+const STYLE_CODE: Record<string, [BadgeTone, string, string]> = {
+  copied: ['breaking', 'మూల వాక్యాలు యథాతథంగా', 'copies source wording'],
+  outlet_named: ['breaking', 'వేరే సంస్థ పేరు', 'names another outlet'],
+  placeholder: ['breaking', '[ ] ఖాళీ మిగిలింది', 'unfilled [ ] slot'],
+  death_headline_mark: ['breaking', 'మరణ వార్తకు ?/!', '?/! on a death headline'],
+  headline_too_long: ['partial', 'శీర్షిక పొడవు', 'headline too long'],
+  avoid_phrase: ['partial', 'నిషేధిత పదం', 'banned phrase'],
+  lede_too_long: ['muted', 'మొదటి పేరా పొడవు', 'long lede'],
+  latin_heavy: ['muted', 'ఇంగ్లిష్ పదాలు ఎక్కువ', 'much English'],
+};
+
+/** The house-style pass: the story type the writer followed, its note to the desk, what the checker still flags. */
+function StyleCheck({ ai }: { ai: AiFiling }) {
+  const L = useL();
+  const s = useScript();
+  const type = ai.story_type ? s.text(ai.story_type.name_te, ai.story_type.name_en) : null;
+  const warnings = ai.style_warnings ?? [];
+  if (!type && !ai.editor_note && !warnings.length && !ai.refuse_screen) return null;
+  return (
+    <div className="mt-3 space-y-2">
+      {type ? (
+        <p className={cn(s.body, 'text-ui-sm text-muted')}>
+          {L('కథన రకం:', 'Story type:')}{' '}
+          <span lang={type.lang} className={cn(type.cls, 'text-ink')}>{type.text}</span>
+        </p>
+      ) : null}
+      {ai.refuse_screen ? (
+        <Badge tone="breaking" size="xs">
+          {L('సున్నిత అంశం — సంపాదకుడే నిర్ణయించాలి', 'sensitive subject — an editor must decide')}
+        </Badge>
+      ) : null}
+      {ai.editor_note ? (
+        <p className="rounded-lg border border-rule bg-surface p-2 text-ui-sm">
+          <span lang={s.language} className={cn(s.body, 'font-bold text-ink')}>{L('రచయిత సూచన: ', 'Writer’s note: ')}</span>
+          <span lang="te" className="te text-te-body-xs text-ink-soft">{ai.editor_note}</span>
+        </p>
+      ) : null}
+      {warnings.length ? (
+        <p className="flex flex-wrap items-center gap-1.5">
+          {warnings.map((code) => {
+            const [tone, te, en] = STYLE_CODE[code] ?? ['muted', code, code];
+            return (
+              <Badge key={code} tone={tone} size="xs">
+                {L(te, en)}
+              </Badge>
+            );
+          })}
+        </p>
+      ) : null}
+    </div>
   );
 }
 

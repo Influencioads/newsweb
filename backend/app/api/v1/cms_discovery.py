@@ -7,8 +7,9 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.deps import Principal, require_permission
 from app.core.permissions import LEVEL_PIN_PLACEMENT
@@ -18,9 +19,11 @@ from app.db.base import utcnow
 from app.db.session import get_db
 from app.models.content import Article, Category
 from app.models.discovery import Pin
-from app.models.enums import AuditAction, PinPlacement, TrendingScope
+from app.models.enums import AuditAction, MediaType, PinPlacement, TrendingScope
 from app.models.geo import District
-from app.repositories import discovery_repo
+from app.models.media import Media, ShortNewsCard
+from app.repositories import article_repo, discovery_repo
+from app.services.media_service import STUDIO_ONLY
 from app.services import analytics_service, audit_service, trending_service
 
 router = APIRouter(prefix="/cms", tags=["cms-discovery"])
@@ -167,6 +170,175 @@ def unpin(
     )
     _purge_feeds()
     return {"id": pin.id, "ended": True}
+
+
+# --------------------------------------------------------------------------- #
+# short news (§14) — picture cards the desk adds each day
+# --------------------------------------------------------------------------- #
+#: The two shapes the swipe deck is built for, as width / height.
+SHORT_NEWS_SHAPES = {"4:5": 4 / 5, "9:16": 9 / 16}
+
+
+def short_news_shape(width: int | None, height: int | None) -> str | None:
+    """"4:5" / "9:16" within 2 % (resizing rounds a pixel), else None."""
+    if not width or not height:
+        return None
+    ratio = width / height
+    return next((k for k, r in SHORT_NEWS_SHAPES.items() if abs(ratio - r) <= r * 0.02), None)
+
+
+class ShortNewsIn(BaseModel):
+    media_id: int
+    article_id: int | None = None
+
+
+def _short_row(card: ShortNewsCard) -> dict:
+    m = card.media
+    return {
+        "id": card.id,
+        "media_id": m.id,
+        "url": m.cdn_url or f"/media/{m.storage_key}",
+        "width": m.width,
+        "height": m.height,
+        "shape": short_news_shape(m.width, m.height),
+        "article_id": card.article_id,
+        "article_short_id": card.article.short_id if card.article else None,
+        "article_title_te": card.article.title_te if card.article else None,
+        "created_at": card.created_at,
+    }
+
+
+@router.get("/short-news")
+def list_short_news(
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=60, ge=1, le=100),
+    db: Session = Depends(get_db),
+    _p: Principal = Depends(require_permission("article.publish", min_level=LEVEL_PIN_PLACEMENT)),
+) -> dict:
+    rows = db.execute(
+        select(ShortNewsCard)
+        .join(ShortNewsCard.media)
+        .where(Media.deleted_at.is_(None))
+        .options(selectinload(ShortNewsCard.article))
+        .order_by(ShortNewsCard.created_at.desc(), ShortNewsCard.id.desc())
+        .limit(limit)
+        .offset(offset)
+    ).scalars()
+    total = db.execute(
+        select(func.count())
+        .select_from(ShortNewsCard)
+        .join(ShortNewsCard.media)
+        .where(Media.deleted_at.is_(None))
+    ).scalar_one()
+    return {"items": [_short_row(r) for r in rows], "total": total}
+
+
+@router.post("/short-news", status_code=201)
+def add_short_news(
+    payload: ShortNewsIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    p: Principal = Depends(require_permission("article.publish", min_level=LEVEL_PIN_PLACEMENT)),
+) -> dict:
+    """Put a library image in the Short News swipe. Idempotent per image, so a
+    double click or a re-run batch never shows the same card twice, and one
+    card per story, so re-making a story's card swaps the picture in place.
+
+    Level 60, as for pins: a level-15 panchayat secretary also holds
+    `article.publish`, for their own panchayat's stories, not the app-wide
+    swipe. The studio's reference designs and backdrops are refused — the
+    library hides them for the same reason: they are never published."""
+    media = db.get(Media, payload.media_id)
+    if (
+        media is None
+        or media.deleted_at is not None
+        or media.type != MediaType.IMAGE
+        or any((media.meta or {}).get(k) for k in STUDIO_ONLY)
+    ):
+        raise NotFoundError()
+    if short_news_shape(media.width, media.height) is None:
+        raise ValidationError(
+            message_en="Short news takes 4:5 or 9:16 images only.",
+            message_te="షార్ట్ న్యూస్‌కు 4:5 లేదా 9:16 చిత్రాలు మాత్రమే.",
+            details={"media_id": f"{media.width}x{media.height} is not 4:5 or 9:16"},
+        )
+    # A card is the story's headline and photo: it goes live only once the
+    # story has, or one editor could publish past the approval rule.
+    if payload.article_id is not None and db.execute(
+        select(Article.id).where(Article.id == payload.article_id, *article_repo.published_filter())
+    ).first() is None:
+        raise ValidationError(
+            message_en="Publish the story first; its card goes live with it.",
+            message_te="ముందు కథనాన్ని ప్రచురించండి; దాని కార్డ్ ఆ తర్వాతే.",
+            details={"article_id": "not a published story"},
+        )
+
+    existing = select(ShortNewsCard).where(ShortNewsCard.media_id == media.id)
+    card = db.execute(existing).scalar_one_or_none()
+    if card is None and payload.article_id is not None:
+        # One card per story: a re-made card (a typo fixed, another size)
+        # replaces the story's earlier one where it stands, never a second.
+        card = db.execute(
+            select(ShortNewsCard).where(ShortNewsCard.article_id == payload.article_id)
+        ).scalars().first()
+        if card is not None:
+            before = card.media_id
+            card.media_id = media.id
+            db.flush()
+            audit_service.record(
+                db,
+                action=AuditAction.UPDATE,
+                entity_type="short_news",
+                entity_id=card.id,
+                actor=p.user,
+                before={"media_id": before},
+                after={"media_id": media.id},
+                request=request,
+            )
+    if card is None:
+        card = ShortNewsCard(media_id=media.id, article_id=payload.article_id, created_by=p.id)
+        try:
+            with db.begin_nested():
+                db.add(card)
+        except IntegrityError:
+            # A concurrent request added the same image first (unique media_id).
+            # A locking read: REPEATABLE READ's snapshot would not show its row.
+            return _short_row(db.execute(existing.with_for_update()).scalar_one())
+        audit_service.record(
+            db,
+            action=AuditAction.CREATE,
+            entity_type="short_news",
+            entity_id=card.id,
+            actor=p.user,
+            after={"media_id": media.id, "article_id": payload.article_id},
+            request=request,
+        )
+    db.refresh(card)
+    return _short_row(card)
+
+
+@router.delete("/short-news/{card_id}")
+def remove_short_news(
+    card_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    p: Principal = Depends(require_permission("article.publish", min_level=LEVEL_PIN_PLACEMENT)),
+) -> dict:
+    """Off the swipe; the image stays in the media library."""
+    card = db.get(ShortNewsCard, card_id)
+    if card is None:
+        raise NotFoundError()
+    audit_service.record(
+        db,
+        action=AuditAction.DELETE,
+        entity_type="short_news",
+        entity_id=card.id,
+        actor=p.user,
+        before={"media_id": card.media_id, "article_id": card.article_id},
+        request=request,
+    )
+    db.delete(card)
+    return {"id": card_id, "deleted": True}
 
 
 # --------------------------------------------------------------------------- #

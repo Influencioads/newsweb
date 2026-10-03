@@ -353,7 +353,7 @@ export const STRINGS = {
   'admin.page.assistant': { te: 'సంజయ AI', en: 'Sanjaya AI' },
   'admin.page.articles': { te: 'కథనాలు', en: 'Articles' },
   'admin.page.newArticle': { te: 'కొత్త కథనం', en: 'New article' },
-  'admin.page.newShort': { te: 'కొత్త షార్ట్ న్యూస్', en: 'New short news' },
+  'admin.page.shortNews': { te: 'షార్ట్ న్యూస్', en: 'Short news' },
   'admin.page.creative': { te: 'క్రియేటివ్ స్టూడియో', en: 'Creative studio' },
   'admin.page.crawlSettings': { te: 'క్రాల్ సెట్టింగ్స్', en: 'Crawl settings' },
   'admin.page.editArticle': { te: 'కథనం సవరించండి', en: 'Edit article' },

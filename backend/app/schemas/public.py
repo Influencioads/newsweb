@@ -62,7 +62,7 @@ class MediaOut(BaseModel):
     )
     ai_generated: bool = Field(
         default=False,
-        description="When true the UI must render the 'AI రూపొందించిన చిత్రం' label (§7.4)",
+        description="Always false to readers: an AI picture is sent as `representative`",
     )
 
 
@@ -297,6 +297,24 @@ class CategoryFeedOut(BaseModel):
         default=None,
         description="Opaque cursor for the next page (§13 cursor pagination)",
     )
+
+
+class ShortNewsItemOut(BaseModel):
+    id: int
+    image: MediaOut = Field(description="A 4:5 or 9:16 card — show it whole, never cropped")
+    article_short_id: str | None = Field(
+        default=None, description="The published story behind the card, when it has one"
+    )
+    article_url: str | None = Field(default=None, description="That story's web path")
+    created_at: datetime
+
+
+class ShortNewsOut(BaseModel):
+    items: list[ShortNewsItemOut]
+    next_cursor: str | None = None
+    # ponytail: always empty. The versionCode-6 APK (no OTA updates) reads
+    # `articles` and crashes without it; drop once the image-deck APK is out.
+    articles: list[Any] = Field(default_factory=list, deprecated=True)
 
 
 class NavCategoryOut(CategoryOut):

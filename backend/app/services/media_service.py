@@ -168,9 +168,11 @@ def process_image(
     primary_url = ""
 
     # Never upscale: a 900px source produces 400 and 800, not a blurry 1600.
-    widths = [w for w in RESPONSIVE_WIDTHS if w <= width] or [
-        min(width, RESPONSIVE_WIDTHS[0])
-    ]
+    # Its own width (to 1600) is kept as the top rendition too, so a 1080 news
+    # card is not served at 800 and its printed text blown back up on a phone.
+    widths = sorted(
+        {w for w in RESPONSIVE_WIDTHS if w <= width} | {min(width, RESPONSIVE_WIDTHS[-1])}
+    )
 
     for target in widths:
         resized = image.copy()

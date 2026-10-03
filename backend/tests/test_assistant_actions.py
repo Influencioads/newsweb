@@ -53,13 +53,14 @@ from app.models.ai import AiArticleDraft, AiUsage  # noqa: E402
 from app.models.assistant import AssistantConversation, AssistantJob, AssistantMessage  # noqa: E402
 from app.models.audit import AuditLog  # noqa: E402
 from app.models.bulletin import AudioBulletin, AudioBulletinItem  # noqa: E402
-from app.models.content import Article, WorkflowTransition  # noqa: E402
+from app.models.content import Article, ArticleVersion, WorkflowTransition  # noqa: E402
 from app.models.enums import (  # noqa: E402
     ArticleStatus,
     ArticleType,
     BulletinStatus,
     ContentPolicy,
     IngestStatus,
+    MediaType,
     RewriteStatus,
     RoleKey,
     ScopeType,
@@ -69,15 +70,22 @@ from app.models.enums import (  # noqa: E402
     WorkflowState,
 )
 from app.models.ingestion import ContentSource, IngestedItem, IngestedRewrite  # noqa: E402
+from app.models.media import Media  # noqa: E402
 from app.models.setting import AppSetting  # noqa: E402
 from app.models.user import Role, User, UserRole  # noqa: E402
-from app.core.errors import AiBudgetExceededError, AiSensitiveTopicError, ValidationError  # noqa: E402
+from app.core.errors import (  # noqa: E402
+    AiBudgetExceededError,
+    AiSensitiveTopicError,
+    PermissionDeniedError,
+    ValidationError,
+)
 from app.services import (  # noqa: E402
     ai_service,
     ai_usage_service,
     bulletin_service,
     ingestion_service,
     settings_service,
+    workflow_service,
 )
 from app.services.assistant import jobs, registry, tools_actions  # noqa: E402
 from app.services.assistant.registry import ToolContext  # noqa: E402
@@ -708,11 +716,32 @@ class TestProposalsAndJobs:
         return article
 
     def test_the_author_cannot_be_offered_their_own_approval(self, db: Session) -> None:
-        author = staff(db, RoleKey.ADMIN, "sanjaya-admin@example.com")
+        author = staff(db, RoleKey.EDITOR_IN_CHIEF, "sanjaya-eic@example.com")
         article = self._submitted(db, author)
         data, cards = call(db, author, "propose_action", {"action": "approve_article", "article_id": article.id})
         assert data["error"] == "VALIDATION_ERROR" and data["details"] == {"rule": "two-person"}
         assert cards == []
+        with pytest.raises(ValidationError):
+            workflow_service.transition(db, build_principal(author, "t"), article, "approve", None)
+
+    def test_an_admin_may_approve_and_publish_their_own_story(self, db: Session) -> None:
+        author = staff(db, RoleKey.ADMIN, "sanjaya-admin@example.com")
+        article = self._submitted(db, author)
+        _, cards = call(db, author, "propose_action", {"action": "approve_article", "article_id": article.id})
+        assert cards[0]["action"] == "approve_article"
+
+        hero = Media(type=MediaType.IMAGE, filename="hero.webp", mime="image/webp",
+                     storage_provider="test", storage_key="images/test/self.webp")
+        db.add(hero)
+        db.flush()
+        article.hero_media_id = hero.id
+        principal = build_principal(author, "t")
+        workflow_service.transition(db, principal, article, "approve", None)
+        _, cards = call(db, author, "propose_action", {"action": "publish_article", "article_id": article.id})
+        assert cards[0]["action"] == "publish_article"
+        workflow_service.transition(db, principal, article, "publish", None)
+        assert article.workflow_state == WorkflowState.PUBLISHED
+        assert article.approved_by == article.published_by == author.id
 
     def test_a_proposal_changes_nothing(self, db: Session) -> None:
         author = staff(db, RoleKey.ADMIN, "sanjaya-admin@example.com")
@@ -743,6 +772,33 @@ class TestProposalsAndJobs:
         db.commit()
         data, _ = call(db, owner, "job_status", {"job_id": job.id})
         assert data["status"] == "failed"
+
+
+class TestEditingAnyArticle:
+    def test_a_live_article_is_editable_by_the_desk_and_versioned(self, db: Session) -> None:
+        author = staff(db, RoleKey.REPORTER, "edit-rep@example.com")
+        sub = staff(db, RoleKey.SUB_EDITOR, "edit-sub@example.com")
+        admin = staff(db, RoleKey.ADMIN, "edit-admin@example.com")
+        article = Article(
+            short_id="ed0001", slug="live-story", title_te="పాత శీర్షిక",
+            body={"type": "doc", "content": []}, body_plain="", status=ArticleStatus.PUBLISHED,
+            workflow_state=WorkflowState.PUBLISHED, author_id=author.id, published_at=utcnow(),
+        )
+        db.add(article)
+        db.commit()
+
+        # Below publishing authority, a live story stays as readers have it.
+        with pytest.raises(PermissionDeniedError):
+            workflow_service.update(db, build_principal(sub, "t"), article, {"title_te": "కొత్త"})
+        with pytest.raises(PermissionDeniedError):
+            workflow_service.update(db, build_principal(author, "t"), article, {"title_te": "కొత్త"})
+
+        workflow_service.update(db, build_principal(admin, "t"), article, {"title_te": "కొత్త శీర్షిక"})
+        db.commit()
+        assert article.title_te == "కొత్త శీర్షిక" and article.slug == "live-story"
+        assert article.workflow_state == WorkflowState.PUBLISHED
+        version = db.scalar(select(ArticleVersion).where(ArticleVersion.article_id == article.id))
+        assert version.snapshot["title_te"] == "కొత్త శీర్షిక"
 
 
 

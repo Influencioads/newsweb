@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, Check, Download, ImageOff, ImagePlus, RefreshCw, RotateCcw, Save, Search, SearchX, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Download, ImageOff, ImagePlus, RefreshCw, RotateCcw, Save, Search, SearchX, Sparkles, Trash2, Zap } from 'lucide-react';
 
 import { ApiError } from '@/api/client';
 import { AdminPage } from '@/components/admin/AdminPage';
@@ -21,6 +21,7 @@ import type { CmsArticle } from '@/types/cms';
 import { cn } from '@/utils/cn';
 import { downloadFile } from '@/utils/download';
 
+import { shortShape } from './ShortNewsAdmin';
 import { useL } from './useL';
 
 /**
@@ -283,6 +284,21 @@ export default function CreativeStudio() {
     if (article) make.mutate({ id: article.id, b });
   };
 
+  // ---------------------------------------------------------- short news --
+  // A published story's 4:5 or 9:16 card can go straight into the app's Short
+  // News swipe; each card is judged by its own size, not the picker's.
+  const canShorts = can('article.publish');
+  const toShorts = useMutation({
+    mutationFn: async (list: Array<{ media_id: number; article_id: number }>) => {
+      for (const x of list) await cmsApi.addShortNews(x); // in order: the feed shows the last first
+      return list.length;
+    },
+    onSuccess: (n) => toast.success(L(`${n} షార్ట్ న్యూస్‌లో చేరాయి.`, `${n} added to Short News.`)),
+    onError: (e) => toast.error(e),
+    // Partly done is still done: what went up before a failure is live.
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ['cms', 'short-news'] }),
+  });
+
   // -------------------------------------------------------------- batch --
   const canSave = can('media.upload');
   async function runQueue(list: Job[]) {
@@ -332,6 +348,10 @@ export default function CreativeStudio() {
     );
   }
   const doneJobs = jobs.filter((j) => j.card);
+  // Each card by its own size: the picker may have moved on since the batch ran.
+  const shortJobs = doneJobs.filter(
+    (j) => j.article.workflow_state === 'PUBLISHED' && j.card?.media_id && shortShape(j.card.width, j.card.height),
+  );
   const failedCount = jobs.filter((j) => j.status === 'failed').length;
   const queueBusy = jobs.some((j) => j.status === 'waiting' || j.status === 'running');
   // A 422 is a refusal (sensitive topic, a model without references) — the
@@ -809,6 +829,24 @@ export default function CreativeStudio() {
                         {card.media_id ? L('మళ్లీ సేవ్ చేయండి', 'Save again') : L('మీడియా లైబ్రరీలో సేవ్ చేయండి', 'Save to media library')}
                       </Button>
                     ) : null}
+                    {/* Only a published story's card: it would otherwise publish the story's words first. */}
+                    {article && canShorts && shortShape(card.width, card.height) && article.workflow_state === 'PUBLISHED' && (card.media_id || canSave) ? (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={Zap}
+                        pending={toShorts.isPending}
+                        // Stale: the saved file is the old copy, not what the editor just typed.
+                        disabled={busy || stale || toShorts.isPending || !headline.trim()}
+                        onClick={async () => {
+                          // Not saved yet: save first (free — the backdrop is held), then add.
+                          const id = card.media_id ?? (await make.mutateAsync({ id: article.id, b: body(true) }).catch(() => null))?.card?.media_id;
+                          if (id) toShorts.mutate([{ media_id: id, article_id: article.id }]);
+                        }}
+                      >
+                        {L('షార్ట్ న్యూస్‌లో పెట్టండి', 'Add to Short News')}
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               ) : (
@@ -838,6 +876,17 @@ export default function CreativeStudio() {
                 onClick={() => void runQueue(jobs.map((j) => (j.status === 'failed' ? { ...j, status: 'waiting' } : j)))}
               >
                 {L(`విఫలమైనవి మళ్లీ (${failedCount})`, `Retry failed (${failedCount})`)}
+              </Button>
+            ) : null}
+            {canShorts && !queueBusy && shortJobs.length ? (
+              <Button
+                variant="secondary"
+                icon={Zap}
+                pending={toShorts.isPending}
+                disabled={toShorts.isPending}
+                onClick={() => toShorts.mutate(shortJobs.map((j) => ({ media_id: j.card!.media_id!, article_id: j.article.id })))}
+              >
+                {L('అన్నీ షార్ట్ న్యూస్‌లో పెట్టండి', 'Add all to Short News')}
               </Button>
             ) : null}
             {doneJobs.length > 1 ? (

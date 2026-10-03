@@ -42,7 +42,7 @@ from functools import lru_cache
 import httpx
 from sqlalchemy.orm import Session
 
-from app.core.config import SITE_NAME_TE, settings
+from app.core.config import settings
 from app.core.errors import AppError, NotFoundError
 from app.core.fonts import (
     BUNDLED_DIR,
@@ -87,7 +87,7 @@ TEMPLATES = ("panel", "overlay", "frame")
 #: Bump to change every card's storage key after a template change.
 CARD_VERSION = 2
 
-#: Drop a transparent PNG here and it replaces the drawn wordmark.
+#: The owner's official logo, a transparent PNG. Cards paste it; nothing redraws it.
 LOGO_FILE = BUNDLED_DIR.parent / "brand" / "logo.png"
 
 # The logo's red and deep blue (frontend/src/assets/index.css) plus the two card accents.
@@ -95,7 +95,6 @@ RED = (208, 16, 26)
 DEEP = (11, 42, 110)
 DEEPER = (6, 24, 66)
 NIGHT = (10, 13, 26)
-CREAM = (247, 233, 188)
 HEAD = (255, 214, 64)
 WHITE = (255, 255, 255)
 
@@ -345,89 +344,32 @@ def _chip(text: str, size: int, bg, fg, *, radius: int | None = None, max_width:
     return chip
 
 
-def _tracked(draw, xy, text: str, face, fill, tracking: float) -> None:
-    x, y = xy
-    for ch in text:
-        draw.text((x, y), ch, font=face, fill=fill, anchor="ls", language="en")
-        x += draw.textlength(ch, font=face, language="en") + tracking
-
-
-def _tracked_width(draw, text: str, face, tracking: float) -> float:
-    return sum(draw.textlength(ch, font=face, language="en") for ch in text) + tracking * (
-        len(text) - 1
-    )
-
-
 @lru_cache(maxsize=8)
 def _logo(h: int):
-    """The masthead lockup at height `h`: a gold "తె" tile and the wordmark.
+    """The official logo at height `h` — always the owner's file, never redrawn
+    (owner's rule, 2026-10-02)."""
+    from PIL import Image
 
-    Drawn, not loaded, because the site has no logo file — the masthead is
-    type (`Masthead.tsx`). A PNG at `LOGO_FILE` replaces it.
-    """
-    from PIL import Image, ImageDraw
-
-    if LOGO_FILE.is_file():
-        custom = Image.open(LOGO_FILE).convert("RGBA")
-        return custom.resize(
-            (max(1, round(custom.width * h / custom.height)), h), Image.Resampling.LANCZOS
-        )
-
-    probe = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
-    te_size, en_size = int(h * 0.36), int(h * 0.15)
-    en_face = _face("bold", en_size, False)
-    tracking = en_size * 0.28
-    en_text = "TOP TELUGU NEWS"
-    text_w = max(
-        _line_width(probe, SITE_NAME_TE.split(), "bold", te_size),
-        _tracked_width(probe, en_text, en_face, tracking),
-    )
-    pad = int(h * 0.2)
-    tile = h
-    w = tile + pad + int(text_w) + pad
-
-    logo = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    d = ImageDraw.Draw(logo)
-    radius = int(h * 0.18)
-    d.rounded_rectangle([0, 0, w - 1, h - 1], radius=radius, fill=RED)
-    d.rounded_rectangle([0, 0, tile - 1, h - 1], radius=radius, fill=WHITE)
-    d.rectangle([tile - radius, 0, tile - 1, h - 1], fill=WHITE)
-
-    mono = _face("bold", int(h * 0.56), True)
-    d.text((tile / 2, h * 0.52), "తె", font=mono, fill=RED, anchor="mm", language="te")
-
-    x = tile + pad
-    _draw_block(
-        d,
-        _Block([SITE_NAME_TE.split()], te_size, te_size, "bold"),
-        x,
-        int(h * 0.5 - te_size * 1.02),
-        CREAM,
-    )
-    _tracked(d, (x, int(h * 0.8)), en_text, en_face, WHITE, tracking)
-    return logo
+    logo = Image.open(LOGO_FILE).convert("RGBA")
+    return logo.resize((max(1, round(logo.width * h / logo.height)), h), Image.Resampling.LANCZOS)
 
 
 def _paste(canvas, piece, xy) -> None:
     canvas.alpha_composite(piece, (int(xy[0]), int(xy[1])))
 
 
-def _small_logo(canvas, inp: "CardInput", logo, xy) -> None:
-    """The corner masthead — skipped when the brand fill already shows it large."""
-    if inp.photo is not None:
-        _paste(canvas, logo, xy)
+def _band(w: int, unit: int):
+    """The foot of every card with a photo: the logo centred on white under a
+    red rule, as on the desk's own reference cards. The owner's rule
+    (2026-10-02): the logo sits centred, on white, on every card."""
+    from PIL import Image, ImageDraw
 
-
-def _domain() -> str:
-    from urllib.parse import urlparse
-
-    return (urlparse(settings.APP_URL).netloc or "").replace("www.", "")
-
-
-def _footer(size: int, max_width: int):
-    domain = _domain()
-    text = f"పూర్తి వార్త · {domain}" if domain else "పూర్తి వార్త మా వెబ్‌సైట్‌లో"
-    return _chip(text, size, WHITE, DEEP, radius=int(size * 1.75) // 2, max_width=max_width)
+    logo = _logo(int(unit * 2.4))
+    pad = int(unit * 0.45)
+    band = Image.new("RGBA", (w, logo.height + 2 * pad), WHITE + (255,))
+    ImageDraw.Draw(band).rectangle([0, 0, w, max(4, unit // 9)], fill=RED)
+    band.alpha_composite(logo, ((w - logo.width) // 2, pad))
+    return band
 
 
 # --------------------------------------------------------------------------- #
@@ -442,7 +384,7 @@ class CardInput:
     tag: str = ""
     #: A PIL image, or None for the brand background.
     photo: object | None = None
-    #: "ప్రతీకాత్మక AI చిత్రం", "AI చిత్రం" or "ప్రతీకాత్మక చిత్రం" — drawn on the picture.
+    #: "ప్రతీకాత్మక చిత్రం" or None — drawn on the picture.
     photo_label: str | None = None
     #: A PIL image drawn under everything in place of our dark blue: the
     #: creative studio's design backdrop. Text then sits on dark panels.
@@ -467,7 +409,16 @@ def _brand_fill(w: int, h: int, cy: float = 0.5, backdrop=None):
     logo = _logo(max(40, int(min(w, h) * 0.16)))
     if logo.width > w * 0.8:
         logo = _logo(max(40, int(logo.height * w * 0.8 / logo.width)))
-    fill.alpha_composite(logo, ((w - logo.width) // 2, int(h * cy - logo.height / 2)))
+    x, y = (w - logo.width) // 2, int(h * cy - logo.height / 2)
+    if backdrop is not None:
+        # On white wherever it stands, never on the model's colours.
+        from PIL import ImageDraw
+
+        pad = logo.height // 4
+        ImageDraw.Draw(fill).rounded_rectangle(
+            [x - pad, y - pad, x + logo.width + pad, y + logo.height + pad], radius=pad, fill=WHITE
+        )
+    fill.alpha_composite(logo, (x, y))
     return fill
 
 
@@ -564,10 +515,8 @@ def _tag(inp: CardInput, unit: int, max_width: int):
 
 
 def _panel(canvas, draw, inp: CardInput, W: int, H: int, unit: int, m: int):
-    landscape = W > H
+    landscape = inp.aspect == "16:9"
     tag = _tag(inp, unit, (W // 2 if landscape else W) - 2 * m)
-    logo = _logo(int(unit * 1.55))
-    footer = _footer(int(unit * 0.44), W - m)
 
     if landscape:
         seam = W // 2
@@ -576,11 +525,10 @@ def _panel(canvas, draw, inp: CardInput, W: int, H: int, unit: int, m: int):
         draw.rectangle([seam, 0, seam + 7, H], fill=RED)
         _label(canvas, inp, seam - m // 2, m // 2, unit)
         x, width = seam + m, W - seam - 2 * m
-        _small_logo(canvas, inp, logo, (x, m))
-        y = m + logo.height + int(unit * 0.8)
+        y = m
         _paste(canvas, tag, (x, y))
         y += tag.height + int(unit * 0.55)
-        bottom = H - m - footer.height - int(unit * 0.5)
+        bottom = H - m
         head, summ = _text_blocks(draw, inp, width=width, head_h=int((bottom - y) * 0.52),
                                   sum_h=int((bottom - y) * 0.48), head_lines=4,
                                   sum_lines=5, unit=unit)
@@ -594,9 +542,8 @@ def _panel(canvas, draw, inp: CardInput, W: int, H: int, unit: int, m: int):
         _label(canvas, inp, W - m // 2, m // 2, unit)
         x, width = m, W - 2 * m
         _paste(canvas, tag, (x, seam - tag.height // 2))
-        _small_logo(canvas, inp, logo, (x, seam - tag.height // 2 - logo.height - int(unit * 0.35)))
         y = seam + tag.height // 2 + int(unit * 0.6)
-        bottom = H - m // 2 - footer.height - int(unit * 0.45)
+        bottom = H - m // 2
         lines = {"1:1": (3, 3), "4:5": (3, 4), "9:16": (4, 6)}.get(inp.aspect, (3, 4))
         head, summ = _text_blocks(draw, inp, width=width, head_h=int((bottom - y) * 0.55),
                                   sum_h=int((bottom - y) * 0.45), head_lines=lines[0],
@@ -604,23 +551,18 @@ def _panel(canvas, draw, inp: CardInput, W: int, H: int, unit: int, m: int):
 
     gap = int(head.size * 0.3) if head.lines and summ.lines else 0
     # Unused height goes mostly below the text, a little above: top-aligned
-    # like the reference cards, without a dead band over the footer.
+    # like the reference cards, without a dead gap above the logo band.
     y += max(0, (bottom - y) - (head.height + gap + summ.height)) * 3 // 10
     _behind(canvas, inp, x, y, width, head.height + gap + summ.height, unit)
     y = _draw_block(draw, head, x, y, HEAD)
     _draw_block(draw, summ, x, y + gap, WHITE)
-    _paste(canvas, footer, (W - m // 2 - footer.width if not landscape else W - m - footer.width,
-                            H - m // 2 - footer.height))
     return head, summ
 
 
 def _overlay(canvas, draw, inp: CardInput, W: int, H: int, unit: int, m: int):
-    landscape = W > H
+    landscape = inp.aspect == "16:9"
     _paste(canvas, _photo_or_brand(inp, W, H, cy=0.28), (0, 0))
-    _paste(canvas, _gradient(W, int(H * 0.22), (0, 0, 0, 150), (0, 0, 0, 0)), (0, 0))
 
-    logo = _logo(int(unit * 1.55))
-    footer = _footer(int(unit * 0.44), W - m)
     width = int(W * 0.62) if landscape else W - 2 * m
     tag = _tag(inp, unit, width)
     room = int(H * (0.52 if landscape else 0.46))
@@ -631,35 +573,26 @@ def _overlay(canvas, draw, inp: CardInput, W: int, H: int, unit: int, m: int):
 
     gap = int(head.size * 0.3) if head.lines and summ.lines else 0
     text_h = tag.height + int(unit * 0.5) + head.height + gap + summ.height
-    bottom = H - m // 2 - footer.height - int(unit * 0.55)
+    bottom = H - m // 2
     top = bottom - text_h
     scrim_top = max(0, top - int(H * 0.18))
     _paste(canvas, _gradient(W, top - scrim_top, (0, 0, 0, 0), (0, 0, 0, 165)), (0, scrim_top))
     _paste(canvas, _gradient(W, H - top, (0, 0, 0, 165), (0, 0, 0, 235)), (0, top))
 
-    _small_logo(canvas, inp, logo, (m, m))
     _label(canvas, inp, W - m // 2, m // 2, unit)
     _paste(canvas, tag, (m, top))
     y = top + tag.height + int(unit * 0.5)
     y = _draw_block(draw, head, m, y, HEAD, shadow=True)
     _draw_block(draw, summ, m, y + gap, WHITE, shadow=True)
-    _paste(canvas, footer, (W - m // 2 - footer.width, H - m // 2 - footer.height))
     return head, summ
 
 
 def _frame(canvas, draw, inp: CardInput, W: int, H: int, unit: int, m: int):
     from PIL import Image, ImageDraw
 
-    landscape = W > H
+    landscape = inp.aspect == "16:9"
     _paste(canvas, _ground(inp, W, H, NIGHT, DEEPER), (0, 0))
-    logo = _logo(int(unit * 1.4))
-    # Portrait puts the tag in the logo's row, so it gets what the logo leaves.
-    tag = _tag(
-        inp, unit,
-        int(W * 0.46) - m - int(unit * 0.6) if landscape
-        else W - 2 * m - (logo.width + int(unit * 0.5) if inp.photo is not None else 0),
-    )
-    footer = _footer(int(unit * 0.44), W - m)
+    tag = _tag(inp, unit, int(W * 0.46) - m - int(unit * 0.6) if landscape else W - 2 * m)
     radius = int(unit * 0.7)
 
     def framed(w: int, h: int):
@@ -673,11 +606,10 @@ def _frame(canvas, draw, inp: CardInput, W: int, H: int, unit: int, m: int):
     if landscape:
         col = int(W * 0.46)
         x, width = m, col - m - int(unit * 0.6)
-        _small_logo(canvas, inp, logo, (x, m))
-        y = m + logo.height + int(unit * 0.8)
+        y = m
         _paste(canvas, tag, (x, y))
         y += tag.height + int(unit * 0.5)
-        bottom = H - m - footer.height - int(unit * 0.5)
+        bottom = H - m
         head, summ = _text_blocks(draw, inp, width=width, head_h=int((bottom - y) * 0.55),
                                   sum_h=int((bottom - y) * 0.45), head_lines=4,
                                   sum_lines=4, unit=unit)
@@ -687,27 +619,23 @@ def _frame(canvas, draw, inp: CardInput, W: int, H: int, unit: int, m: int):
         pic_x, pic_w = col, W - col - m
         _paste(canvas, framed(pic_w, H - 2 * m), (pic_x, m))
         _label(canvas, inp, pic_x + pic_w - int(unit * 0.4), m + int(unit * 0.4), unit)
-        _paste(canvas, footer, (x, H - m - footer.height))
         return head, summ
 
     x, width = m, W - 2 * m
-    _small_logo(canvas, inp, logo, (x, m))
-    _paste(canvas, tag, (W - m - tag.width, m + (logo.height - tag.height) // 2))
-    y = m + logo.height + int(unit * 0.7)
+    _paste(canvas, tag, (x, m))
+    y = m + tag.height + int(unit * 0.6)
     lines = {"1:1": (2, 3), "4:5": (3, 3), "9:16": (4, 4)}.get(inp.aspect, (3, 3))
     head, summ = _text_blocks(draw, inp, width=width, head_h=int(H * 0.21),
                               sum_h=int(H * 0.17), head_lines=lines[0],
                               sum_lines=lines[1], unit=unit)
     _behind(canvas, inp, x, y, width, head.height, unit)
     y = _draw_block(draw, head, x, y, HEAD) + int(unit * 0.55)
-    footer_y = H - m // 2 - footer.height
-    sum_y = footer_y - int(unit * 0.5) - summ.height
+    sum_y = H - m // 2 - summ.height
     pic_h = sum_y - int(unit * 0.55) - y
     _paste(canvas, framed(width, pic_h), (x, y))
     _label(canvas, inp, x + width - int(unit * 0.4), y + int(unit * 0.4), unit)
     _behind(canvas, inp, x, sum_y, width, summ.height, unit)
     _draw_block(draw, summ, x, sum_y, WHITE)
-    _paste(canvas, footer, (W - m // 2 - footer.width, footer_y))
     return head, summ
 
 
@@ -721,17 +649,25 @@ def render(inp: CardInput) -> tuple[bytes, list[str]]:
     if inp.template not in TEMPLATES or (inp.size is None and inp.aspect not in ASPECTS):
         raise ValueError(f"unknown card shape {inp.aspect}/{inp.template}")
     W, H = inp.size or ASPECTS[inp.aspect]
-    canvas = Image.new("RGBA", (W, H), DEEP + (255,))
-    if inp.backdrop is not None:
-        canvas.paste(_cover(inp.backdrop, W, H).convert("RGBA"))
-    draw = ImageDraw.Draw(canvas)
     # One layout unit: 1/19 of the short side, ~57 px on every shape, so a
     # headline is the same physical size on a Story as on a square.
     unit = min(W, H) // 19
     margin = int(unit * 1.05)
+    # The logo band takes the foot; the layout gets what is left. A card with
+    # no photo shows the logo large in the photo's place instead (`_brand_fill`).
+    band = _band(W, unit) if inp.photo is not None else None
+    h = H - (band.height if band is not None else 0)
+    canvas = Image.new("RGBA", (W, H), DEEP + (255,))
+    if inp.backdrop is not None:
+        canvas.paste(_cover(inp.backdrop, W, h).convert("RGBA"))
+    if band is not None:
+        canvas.paste(band, (0, h))
+    # Drawn through a view of the top part, so no template can spill onto the band.
+    top = canvas.crop((0, 0, W, h))
     head, summ = {"panel": _panel, "overlay": _overlay, "frame": _frame}[inp.template](
-        canvas, draw, inp, W, H, unit, margin
+        top, ImageDraw.Draw(top), inp, W, h, unit, margin
     )
+    canvas.paste(top, (0, 0))
 
     warnings = []
     if head.truncated:
@@ -805,18 +741,14 @@ def _load(media: Media):
 def _photo_label(media: Media) -> str | None:
     """What kind of picture this is, printed on it.
 
-    An AI picture is labelled (§7.4), and today's realistic ones also say they
-    are representative, so nobody takes the scene for the event. A library
-    stand-in (older rows only; none is attached since 2026-09-30) says it is
-    representative, which is the correction `share_card_service` could not
-    print and so refused to use one. No photo credit is printed: the owner's
-    decision (2026-09-23), made knowing a borrowed photo is still the source's
-    work — `Media.credit` keeps the record either way.
+    An AI picture or a library stand-in says it is representative, so nobody
+    takes the scene for the event — the correction `share_card_service` could
+    not print and so refused to use one. It never says AI: the owner's decision
+    (2026-10-02), as it never prints a photo credit (2026-09-23), made knowing a
+    borrowed photo is still the source's work. `Media.ai_generated` and
+    `Media.credit` keep the record either way.
     """
-    if media.ai_generated:
-        # A realistic AI scene must say it is not the event, not only that it is AI.
-        return "ప్రతీకాత్మక AI చిత్రం" if (media.meta or {}).get("representative") else "AI చిత్రం"
-    if (media.meta or {}).get("representative"):
+    if media.ai_generated or (media.meta or {}).get("representative"):
         return "ప్రతీకాత్మక చిత్రం"
     return None
 

@@ -169,6 +169,21 @@ export interface CategoryFeed {
   next_cursor: string | null;
 }
 
+/** One Short News swipe: a 4:5 or 9:16 picture card, shown whole. */
+export interface ShortNewsItem {
+  id: number;
+  image: MediaOut;
+  /** The published story behind the card, when it has one. */
+  article_short_id: string | null;
+  article_url: string | null;
+  created_at: string;
+}
+
+export interface ShortNewsFeed {
+  items: ShortNewsItem[];
+  next_cursor: string | null;
+}
+
 export interface StateOut {
   code: string;
   slug: string;

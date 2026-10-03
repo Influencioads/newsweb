@@ -734,10 +734,12 @@ class TestPlacementFromTheForm:
         created = self._approved(client, db, "ప్రచురణ తర్వాత పిన్")
         client.post(f"/api/v1/cms/articles/{created['id']}/publish", json={}, headers=chief)
 
-        # A published article cannot be PATCHed, which is exactly why placement
-        # has its own route.
-        assert client.patch(f"/api/v1/cms/articles/{created['id']}",
-                            json={"pin_home_minutes": 10}, headers=chief).status_code == 409
+        # A published article can be PATCHed now (2026-10-02), and the form's
+        # pin lands at once; the placement route still works on its own.
+        edited = client.patch(f"/api/v1/cms/articles/{created['id']}",
+                              json={"pin_home_minutes": 10}, headers=chief)
+        assert edited.status_code == 200, edited.text
+        assert {p["placement"] for p in edited.json()["active_pins"]} == {"home"}
 
         placed = client.post(f"/api/v1/cms/articles/{created['id']}/placement",
                              json={"pin_home_minutes": 10}, headers=chief)

@@ -216,34 +216,90 @@ class TestVideos:
 # short news (§14)
 # --------------------------------------------------------------------------- #
 class TestShortNews:
-    def test_only_short_items_appear(self, client: TestClient, db: Session) -> None:
-        cinema = cat(db, "cinema")
-        short = make_article(
-            db, title_te="షార్ట్ కథనం", category=cinema, is_short=True,
-            summary_te="రెండు లైన్ల సంక్షిప్త సారాంశం ఇక్కడ ఉంటుంది.",
-        )
-        # A summary alone no longer makes a story short news — crawled
-        # rewrites all carry one, which turned the feed into the newswire.
-        summary_only = make_article(
-            db, title_te="సారాంశం మాత్రమే", category=cinema, summary_te="సాధారణ సారాంశం.",
-        )
+    @staticmethod
+    def image(db: Session, w: int, h: int) -> Media:
+        global _counter
+        _counter += 1
+        m = Media(type=MediaType.IMAGE, filename=f"card{_counter}.webp", mime="image/webp",
+                  storage_provider="test", storage_key=f"images/test/card{_counter}.webp",
+                  cdn_url=f"https://cdn.test/card{_counter}.webp", width=w, height=h)
+        db.add(m)
         db.commit()
+        return m
 
-        r = client.get("/api/v1/public/short-news")
-        assert r.status_code == 200
-        ids = [a["short_id"] for a in r.json()["articles"]]
-        assert short.short_id in ids
-        assert summary_only.short_id not in ids
-
-    def test_category_filter(self, client: TestClient, db: Session) -> None:
-        sports = cat(db, "sports")
-        s = make_article(db, title_te="క్రీడల షార్ట్", category=sports,
-                         summary_te="క్రీడా సారాంశం.", is_short=True)
+    def test_images_feed_newest_first_and_link_only_live_stories(
+        self, client: TestClient, db: Session
+    ) -> None:
+        desk = staff_headers(db, role=RoleKey.DESK_EDITOR, email="shorts@test.example.com")
+        live = make_article(db, title_te="ప్రచురితం")
+        later = make_article(db, title_te="తర్వాత ఉపసంహరణ")
+        draft = make_article(db, title_te="డ్రాఫ్ట్")
+        draft.status = ArticleStatus.DRAFT
+        draft.workflow_state = WorkflowState.DRAFT
         db.commit()
-        r = client.get("/api/v1/public/short-news", params={"category": "sports"})
-        ids = [a["short_id"] for a in r.json()["articles"]]
-        assert s.short_id in ids
-        assert all(a["category"]["slug"] == "sports" for a in r.json()["articles"])
+        portrait, story = self.image(db, 1080, 1350), self.image(db, 900, 1600)
+
+        a = client.post("/api/v1/cms/short-news", headers=desk,
+                        json={"media_id": portrait.id, "article_id": live.id})
+        assert a.status_code == 201, a.text
+        assert a.json()["shape"] == "4:5"
+        # A draft's card would publish its headline past the approval rule.
+        early = client.post("/api/v1/cms/short-news", headers=desk,
+                            json={"media_id": story.id, "article_id": draft.id})
+        assert early.status_code == 422, early.text
+        b = client.post("/api/v1/cms/short-news", headers=desk,
+                        json={"media_id": story.id, "article_id": later.id})
+        assert b.json()["shape"] == "9:16"
+        # Adding the same image again is a no-op, not a second card.
+        again = client.post("/api/v1/cms/short-news", headers=desk, json={"media_id": story.id})
+        assert again.json()["id"] == b.json()["id"]
+        # A re-made card for the same story swaps the picture, in place.
+        remade = self.image(db, 1080, 1350)
+        swap = client.post("/api/v1/cms/short-news", headers=desk,
+                           json={"media_id": remade.id, "article_id": live.id})
+        assert swap.json()["id"] == a.json()["id"]
+        assert swap.json()["media_id"] == remade.id
+
+        feed = client.get("/api/v1/public/short-news").json()
+        assert feed["articles"] == []  # the versionCode-6 APK reads this key
+        items = feed["items"]
+        assert [i["id"] for i in items][:2] == [b.json()["id"], a.json()["id"]]
+        assert items[0]["image"]["url"] == story.cdn_url
+        assert items[0]["article_short_id"] == later.short_id
+        assert items[1]["article_url"].endswith(live.short_id)
+        assert items[1]["image"]["url"] == remade.cdn_url
+
+        # Retracted after its card went up: the card leaves the swipe too.
+        later.status = ArticleStatus.DRAFT
+        later.workflow_state = WorkflowState.DRAFT
+        db.commit()
+        ids = [i["id"] for i in client.get("/api/v1/public/short-news").json()["items"]]
+        assert b.json()["id"] not in ids and a.json()["id"] in ids
+
+        assert client.delete(f"/api/v1/cms/short-news/{a.json()['id']}", headers=desk).status_code == 200
+        ids = [i["id"] for i in client.get("/api/v1/public/short-news").json()["items"]]
+        assert a.json()["id"] not in ids
+        assert db.get(Media, remade.id) is not None  # the library keeps the image
+
+    def test_other_shapes_and_readers_are_refused(self, client: TestClient, db: Session) -> None:
+        desk = staff_headers(db, role=RoleKey.DESK_EDITOR, email="shorts@test.example.com")
+        square = self.image(db, 1080, 1080)
+        r = client.post("/api/v1/cms/short-news", headers=desk, json={"media_id": square.id})
+        assert r.status_code == 422, r.text
+        headers, _ = reader(client, "9876500011")
+        portrait = self.image(db, 1080, 1350)
+        r = client.post("/api/v1/cms/short-news", headers=headers, json={"media_id": portrait.id})
+        assert r.status_code in (401, 403)
+        # article.publish at level 15 files for one panchayat, not the app-wide swipe.
+        secretary = staff_headers(db, role=RoleKey.PANCHAYAT_SECRETARY, email="ps-shorts@test.example.com")
+        r = client.post("/api/v1/cms/short-news", headers=secretary, json={"media_id": portrait.id})
+        assert r.status_code == 403, r.text
+        # The studio's reference designs are never published, whatever their shape.
+        reference = self.image(db, 1080, 1350)
+        reference.meta = {"design_reference": True}
+        db.commit()
+        r = client.post("/api/v1/cms/short-news", headers=desk, json={"media_id": reference.id})
+        assert r.status_code == 404, r.text
 
     def test_publish_refused_without_hero_photo(self, client: TestClient, db: Session) -> None:
         editor = staff_headers(db, role=RoleKey.DESK_EDITOR, email="shorts@test.example.com")

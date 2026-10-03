@@ -358,15 +358,15 @@ class TestPlacement:
 
 
 class TestPhotoLabel:
-    def test_a_borrowed_photo_carries_no_credit_but_ai_and_stand_ins_are_labelled(self) -> None:
+    def test_a_borrowed_photo_carries_no_credit_and_ai_reads_as_a_stand_in(self) -> None:
         borrowed = Media(credit="NTV Telugu", source_type="syndicated", ai_generated=False, meta={})
         drawn = Media(credit=None, source_type="own", ai_generated=True, meta={})
+        scene = Media(credit=None, source_type="own", ai_generated=True, meta={"representative": True})
         stand_in = Media(credit=None, source_type="own", ai_generated=False, meta={"representative": True})
         assert social_card_service._photo_label(borrowed) is None
-        assert social_card_service._photo_label(drawn) == "AI చిత్రం"
-        scene = Media(credit=None, source_type="own", ai_generated=True, meta={"representative": True})
-        assert social_card_service._photo_label(scene) == "ప్రతీకాత్మక AI చిత్రం"
-        assert social_card_service._photo_label(stand_in) == "ప్రతీకాత్మక చిత్రం"
+        # Never "AI" (owner, 2026-10-02); always a stand-in, never the event.
+        for media in (drawn, scene, stand_in):
+            assert social_card_service._photo_label(media) == "ప్రతీకాత్మక చిత్రం"
 
 
 class TestPictureShape:
@@ -606,7 +606,7 @@ class TestCardEndpoint:
         assert provider.aspects == ["16:9"]  # a 4:5 panel card's picture band
         db.refresh(article)
         assert article.hero_media_id is None
-        assert stub_render["input"].photo_label == "ప్రతీకాత్మక AI చిత్రం"
+        assert stub_render["input"].photo_label == "ప్రతీకాత్మక చిత్రం"
 
         # The editor fixes a typo: same picture, no second drawing.
         again = _card(
@@ -688,6 +688,22 @@ class TestRender:
         assert image.format == "JPEG"
         assert image.size == social_card_service.ASPECTS[aspect]
         assert "no_photo" not in warnings
+
+    @pytest.mark.parametrize("template", social_card_service.TEMPLATES)
+    def test_the_official_logo_sits_centred_on_white_at_the_foot(self, template) -> None:
+        from PIL import Image, ImageChops
+
+        photo = Image.new("RGB", (1600, 900), (120, 90, 60))
+        raw, _ = social_card_service.render(
+            social_card_service.CardInput(aspect="4:5", template=template, headline="శీర్షిక", photo=photo)
+        )
+        card = Image.open(io.BytesIO(raw)).convert("RGB")
+        W, H = card.size
+        foot = card.crop((0, H - 120, W, H))
+        ink = ImageChops.difference(foot, Image.new("RGB", foot.size, "white")).convert("L").point(lambda v: 255 if v > 40 else 0)
+        left, _top, right, _bottom = ink.getbbox()
+        assert abs((left + right) / 2 - W / 2) <= 6
+        assert left > W * 0.2 and right < W * 0.8  # white either side, not a photo
 
     def test_a_long_tag_shrinks_to_the_room_it_has(self) -> None:
         chip = social_card_service._chip("ANDHRA PRADESH ASSEMBLY ELECTION", 34, (0, 0, 0), (9, 9, 9), max_width=300)

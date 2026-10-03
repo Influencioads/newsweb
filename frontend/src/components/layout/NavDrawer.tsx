@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Film, LogIn, MapPin, Newspaper, Radio, TrendingUp, UserRound, Video } from 'lucide-react';
+import { LogIn, MapPin, Newspaper, Radio, TrendingUp, UserRound, Video, Zap } from 'lucide-react';
 
 import { Sheet } from '@/components/ui/Dialog';
 import { Icon, type LucideIcon } from '@/components/ui/Icon';
@@ -47,7 +47,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { to: '/trending', key: 'ui.trending', icon: TrendingUp },
   { to: '/local', key: 'ui.local', icon: MapPin },
   { to: '/videos', key: 'ui.video', icon: Video },
-  { to: '/short-news', key: 'ui.shorts', icon: Film },
+  { to: '/short-news', key: 'page.shortNews', icon: Zap },
 ];
 
 /** §12.5 — Grievance Officer, correction policy and AI disclosure, live at launch. */

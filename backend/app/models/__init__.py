@@ -54,7 +54,7 @@ from app.models.geo import District, Locality, Mandal, MandalAlias, State
 from app.models.ingestion import ContentSource, IngestedItem, IngestedRewrite
 from app.models.jobs import JobPosting
 from app.models.kyc import ContributorProfile, KycDocument
-from app.models.media import ArticleMedia, Media
+from app.models.media import ArticleMedia, Media, ShortNewsCard
 from app.models.reader import UserPreference
 from app.models.setting import AppSetting
 from app.models.site import HomepageSection, SearchQuery
@@ -119,6 +119,7 @@ __all__ = [
     "Locality",
     "Mandal",
     "Media",
+    "ShortNewsCard",
     "Notification",
     "NotificationCampaign",
     "Permission",

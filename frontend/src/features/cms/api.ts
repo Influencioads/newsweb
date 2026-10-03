@@ -15,6 +15,10 @@ export const reorderHomeSections=async(orderedIds:number[])=>(await api.put('/cm
 export const fetchPins=async<T>(includeExpired=false)=>(await api.get<T>('/cms/pins',{params:{include_expired:includeExpired}})).data;
 export const createPin=async(payload:Record<string,unknown>)=>(await api.post('/cms/pins',payload)).data;
 export const removePin=async(id:number)=>(await api.delete(`/cms/pins/${id}`)).data;
+export type ShortNewsCard={id:number;media_id:number;url:string;width:number|null;height:number|null;shape:'4:5'|'9:16'|null;article_id:number|null;article_short_id:string|null;article_title_te:string|null;created_at:string};
+export const fetchShortNewsCards=async(offset=0)=>(await api.get<{items:ShortNewsCard[];total:number}>('/cms/short-news',{params:{offset,limit:60}})).data;
+export const addShortNews=async(payload:{media_id:number;article_id?:number|null})=>(await api.post<ShortNewsCard>('/cms/short-news',payload)).data;
+export const removeShortNews=async(id:number)=>(await api.delete(`/cms/short-news/${id}`)).data;
 export const fetchTrendingScores=async<T>()=>(await api.get<T>('/cms/trending')).data;
 export const recomputeTrending=async()=>(await api.post('/cms/trending/recompute')).data;
 export const fetchAnalytics=async<T>()=>(await api.get<T>('/cms/analytics')).data;
@@ -24,6 +28,7 @@ export const fetchSubmissions=async<T>(status='pending')=>(await api.get<T>('/cm
 export const approveSubmission=async(id:number)=>(await api.post(`/cms/moderation/submissions/${id}/approve`)).data;
 export const rejectSubmission=async(id:number,note:string|null)=>(await api.post(`/cms/moderation/submissions/${id}/reject`,{note})).data;
 export const aiAssist=async<T>(payload:Record<string,unknown>)=>(await api.post<T>('/cms/ai/assist',payload)).data;
+export const aiHeadlines=async(payload:{article_id?:number;title_te?:string;body_plain?:string;summary_te?:string})=>(await api.post<{available:boolean;reason?:string|null;engine?:string;model?:string;story_type?:string|null;options?:Array<{text:string;device:string;label_te:string}>;seo_title?:string;seo_description?:string}>('/cms/ai/headlines',payload,{timeout:45_000})).data; // one model call, ~20 s: the global 20 s would abort a call that is still billed
 export const fetchAds=async<T>()=>(await api.get<T>('/cms/ads')).data;
 export const createAd=async(payload:Record<string,unknown>)=>(await api.post('/cms/ads',payload)).data;
 export const patchAd=async(id:number,payload:Record<string,unknown>)=>(await api.patch(`/cms/ads/${id}`,payload)).data;
@@ -41,7 +46,7 @@ export const pinComment=async(id:number,pinned:boolean)=>(await api.patch<{id:nu
 // --- §1 / §2 editor helpers ------------------------------------------------
 export const fetchEditorMandals=async(districtId:number)=>(await api.get<{items:CmsOption[]}>('/cms/dashboard/mandals',{params:{district_id:districtId}})).data.items;
 export const fetchEditorLocalities=async(mandalId:number)=>(await api.get<{items:Array<CmsOption&{kind:string}>}>('/cms/dashboard/localities',{params:{mandal_id:mandalId}})).data.items;
-export const uploadMedia=async(file:File,meta?:{alt_te?:string;credit?:string;source_type?:string})=>{const fd=new FormData();fd.append('file',file);if(meta?.alt_te)fd.append('alt_te',meta.alt_te);if(meta?.credit)fd.append('credit',meta.credit);if(meta?.source_type)fd.append('source_type',meta.source_type);return (await api.post<CmsMediaRef&{blurhash:string|null}>('/cms/media',fd,{headers:{'Content-Type':'multipart/form-data'}})).data};
+export const uploadMedia=async(file:File,meta?:{alt_te?:string;credit?:string;source_type?:string;ai_generated?:boolean})=>{const fd=new FormData();fd.append('file',file);if(meta?.alt_te)fd.append('alt_te',meta.alt_te);if(meta?.credit)fd.append('credit',meta.credit);if(meta?.source_type)fd.append('source_type',meta.source_type);if(meta?.ai_generated)fd.append('ai_generated','true');return (await api.post<CmsMediaRef&{blurhash:string|null}>('/cms/media',fd,{headers:{'Content-Type':'multipart/form-data'}})).data};
 export const fetchPendingArticles=async(params:Record<string,unknown>)=>(await api.get<CmsArticleList>('/cms/articles/pending',{params})).data;
 export const setBreaking=async(id:number,payload:{minutes?:number;clear?:boolean;repush?:boolean})=>(await api.post<CmsArticle>(`/cms/articles/${id}/breaking`,payload)).data;
 

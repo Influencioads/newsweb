@@ -9,7 +9,7 @@ export type Language = 'te' | 'en';
 const STRINGS = {
   'tab.home': { te: 'హోమ్', en: 'Home' },
   'tab.local': { te: 'లోకల్', en: 'Local' },
-  'tab.shorts': { te: 'షార్ట్స్', en: 'Shorts' },
+  'tab.shorts': { te: 'షార్ట్ న్యూస్', en: 'Short News' },
   'tab.profile': { te: 'ప్రొఫైల్', en: 'Profile' },
   'home.breaking': { te: 'బ్రేకింగ్', en: 'BREAKING' },
   'home.topStory': { te: 'ముఖ్య కథనం', en: 'TOP STORY' },

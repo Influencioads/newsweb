@@ -145,6 +145,10 @@ describe('OriginCompare', () => {
         tags: [{ name: 'పోలవరం', type: 'place' }],
         breaking: true,
         glyph_warning: true,
+        story_type: { key: 'politics', name_te: 'రాజకీయం', name_en: 'Politics desk' },
+        editor_note: 'మంత్రి స్పందన కోరండి.',
+        style_warnings: ['copied', 'made_up_code'],
+        refuse_screen: true,
       },
       photos: {
         model: 'google/gemini-vision',
@@ -164,6 +168,12 @@ describe('OriginCompare', () => {
     expect(screen.getByText('place')).toBeInTheDocument();
     expect(screen.getByText('AI suggests breaking')).toBeInTheDocument();
     expect(screen.getByText(/stray foreign letters/)).toBeInTheDocument();
+    // The house-style pass: type, the writer's note, and what the checker flags.
+    expect(screen.getByText('Politics desk')).toBeInTheDocument();
+    expect(screen.getByText('మంత్రి స్పందన కోరండి.')).toBeInTheDocument();
+    expect(screen.getByText('copies source wording')).toBeInTheDocument();
+    expect(screen.getByText('made_up_code')).toBeInTheDocument();
+    expect(screen.getByText(/an editor must decide/)).toBeInTheDocument();
 
     expect(screen.getByText('Photos checked')).toBeInTheDocument();
     expect(screen.getByText(/one of the publisher’s photos/)).toBeInTheDocument();

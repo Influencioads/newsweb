@@ -17,6 +17,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Response
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import SITE_NAME_EN, SITE_NAME_TE, settings
@@ -26,6 +27,7 @@ from app.core.redis_client import cache_get, cache_set
 from app.db.base import utcnow
 from app.db.session import get_db
 from app.models.content import Article
+from app.models.media import Media, ShortNewsCard
 from app.models.video import Video
 from app.models.enums import HomeSectionKind, PinPlacement, TrendingScope
 from app.repositories import article_repo, discovery_repo, site_repo
@@ -50,6 +52,8 @@ from app.schemas.public import (
     NavCategoryOut,
     SearchMetaOut,
     SearchResultsOut,
+    ShortNewsItemOut,
+    ShortNewsOut,
     SiteConfigOut,
     StateOut,
     TagOut,
@@ -95,11 +99,14 @@ def _media_out(media: Any) -> MediaOut | None:
         credit=media.credit,
         license_label=media.copyright,
         source_url=(media.meta or {}).get("landing_url"),
-        representative=bool((media.meta or {}).get("representative")),
+        # Editorial decision (2026-10-02): readers never see that a picture was
+        # AI-made, as with AI-drafted copy below. It still goes out as a
+        # stand-in, so nobody takes the scene for the event.
+        representative=bool((media.meta or {}).get("representative") or media.ai_generated),
         width=media.width,
         height=media.height,
         blurhash=media.blurhash,
-        ai_generated=media.ai_generated,
+        ai_generated=False,
     )
 
 
@@ -123,7 +130,6 @@ def _card(article: Article) -> ArticleCardOut:
         is_exclusive=article.is_exclusive,
         # Editorial decision: readers never see that AI drafted a story. The
         # column still drives the CMS review flow; only the public API hides it.
-        # (AI-made *pictures* keep their label — see _media_out.)
         ai_generated=False,
         published_at=article.published_at,
         reading_time_sec=article.reading_time_sec,
@@ -697,41 +703,57 @@ def get_trending(
 # --------------------------------------------------------------------------- #
 @router.get(
     "/short-news",
-    response_model=CategoryFeedOut,
-    summary="Quick-read cards — headline, image, 2–5 line summary",
+    response_model=ShortNewsOut,
+    summary="Short news — one picture card per swipe",
     description=(
-        "The §14 swipe feed. Cards are articles an editor marked as short news "
-        "(`is_short`: hero photo + `summary_te`); one opens the full story only "
-        "when it has a body (`reading_time_sec > 0`). `next_cursor` carries the "
-        "offset for the next page."
+        "The §14 swipe feed: 4:5 / 9:16 image cards the desk adds each day, "
+        "newest first. `article_short_id` is set only when the card's story is "
+        "published. `next_cursor` carries the offset for the next page."
     ),
 )
 def get_short_news(
     response: Response,
-    category: str | None = Query(default=None, description="Category slug"),
     offset: int = Query(default=0, ge=0, le=1000),
     limit: int = Query(default=15, ge=1, le=30),
     db: Session = Depends(get_db),
-) -> CategoryFeedOut:
+) -> ShortNewsOut:
     _cache_headers(response)
-    category_row = article_repo.get_category_by_slug(db, category) if category else None
-    if category and category_row is None:
-        raise NotFoundError(
-            message_en="No such section.", message_te="ఆ విభాగం కనిపించలేదు."
-        )
-
-    rows = article_repo.short_news(
-        db,
-        limit=limit + 1,
-        offset=offset,
-        category_id=category_row.id if category_row else None,
+    # A story's card shows its headline: once the story is unpublished or
+    # retracted, its card leaves the swipe with it.
+    rows = list(
+        db.execute(
+            select(ShortNewsCard)
+            .join(ShortNewsCard.media)
+            .outerjoin(Article, Article.id == ShortNewsCard.article_id)
+            .where(
+                Media.deleted_at.is_(None),
+                or_(ShortNewsCard.article_id.is_(None), and_(*article_repo.published_filter())),
+            )
+            .order_by(ShortNewsCard.created_at.desc(), ShortNewsCard.id.desc())
+            .limit(limit + 1)
+            .offset(offset)
+        ).scalars()
     )
-    has_more = len(rows) > limit
-    return CategoryFeedOut(
-        category=CategoryOut.model_validate(category_row) if category_row else None,
-        district=None,
-        articles=_cards(rows[:limit], db, _district_map(db)),
-        next_cursor=str(offset + limit) if has_more else None,
+    page_rows = rows[:limit]
+    linked = {r.article_id for r in page_rows if r.article_id}
+    live = {
+        a.id: a
+        for a in db.execute(
+            article_repo.published_query().where(Article.id.in_(linked))
+        ).unique().scalars()
+    } if linked else {}
+    return ShortNewsOut(
+        items=[
+            ShortNewsItemOut(
+                id=r.id,
+                image=_media_out(r.media),
+                article_short_id=a.short_id if (a := live.get(r.article_id)) else None,
+                article_url=a.url_path if a else None,
+                created_at=r.created_at,
+            )
+            for r in page_rows
+        ],
+        next_cursor=str(offset + limit) if len(rows) > limit else None,
     )
 
 

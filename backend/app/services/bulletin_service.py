@@ -223,6 +223,9 @@ def _ai_connectives(db: Session, headlines: list[str]) -> list[str] | None:
                 topic="ఈ గంట వార్తల మధ్య కలిపే చిన్న వాక్యాలు",
                 notes="\n".join(headlines),
                 sources=[],
+                # Spoken connectives between stories are not an article: the
+                # house style's headline and lede rules do not apply.
+                house_style=False,
             )
         except Exception as exc:  # noqa: BLE001 — a failed call is still billed
             # The inner try is only around the call: a refused budget spent

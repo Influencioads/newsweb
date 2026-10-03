@@ -85,12 +85,14 @@ function nodeMedia(node: TiptapNode, src: string): MediaOut {
     caption_te: node.attrs?.caption ? String(node.attrs.caption) : null,
     credit: node.attrs?.credit ? String(node.attrs.credit) : null,
     license_label: null,
-    representative: false,
+    // An AI picture in the body reads as a stand-in, never as AI (the public
+    // API's rule for heroes, applied here because the body is served as-is).
+    representative: node.attrs?.ai_generated === true,
     source_url: null,
     width,
     height,
     blurhash: null,
-    ai_generated: node.attrs?.ai_generated === true,
+    ai_generated: false,
   };
 }
 

@@ -459,7 +459,28 @@ def _ai_filing(db: Session, cls: dict | None) -> dict | None:
         ],
         "breaking": bool(cls.get("breaking")),
         "glyph_warning": bool(cls.get("glyph_warning")),
+        # The house-style pass (newsroom_style): what kind of story the writer
+        # took it for, what it asked the desk to check, and what the copy
+        # checker still flags. Absent on rewrites from before that pass.
+        "story_type": _story_type(cls.get("story_type")),
+        "editor_note": str(cls.get("editor_note") or "")[:600],
+        # A list or nothing: a stray string would iterate as letters.
+        "style_warnings": [
+            str(code) for code in (cls.get("style_warnings") if isinstance(cls.get("style_warnings"), list) else [])
+        ][:20],
+        "refuse_screen": bool(cls.get("refuse_screen")),
     }
+
+
+def _story_type(key: object) -> dict | None:
+    from app.integrations.ai import newsroom_style
+
+    entry = newsroom_style.story_type(key if isinstance(key, str) else None)
+    return (
+        {"key": entry["key"], "name_te": entry["label_te"], "name_en": entry["label_en"]}
+        if entry
+        else None
+    )
 
 
 @router.patch("/{article_id}", response_model=CmsArticleOut)
@@ -483,6 +504,13 @@ def update_article(
         actor=principal.user,
         request=request,
     )
+    if article.status == ArticleStatus.PUBLISHED:
+        # A live edit must reach readers now, not after the cache TTL.
+        from app.core.redis_client import cache_delete_prefix
+
+        cache_delete_prefix("home:")
+        cache_delete_prefix("breaking")
+        cache_delete_prefix("trending:")
     return _out(db, article)
 
 

@@ -5,6 +5,7 @@ GET  /users/me/submissions          — my submissions with status
 GET  /cms/moderation/submissions    — moderation queue
 POST /cms/moderation/submissions/{id}/approve | /reject
 POST /cms/ai/assist                 — §18 suggestions (ai.use)
+POST /cms/ai/headlines              — alternative headlines + SEO pair (ai.use)
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.api.v1.cms_ai import _scoped_article
 from app.core.config import settings
 from app.core.deps import (
     Principal,
@@ -23,7 +25,7 @@ from app.core.deps import (
     require_any_permission,
     require_permission,
 )
-from app.core.errors import ConflictError, NotFoundError
+from app.core.errors import ConflictError
 from app.core.ratelimit import rate_limit
 from app.db.session import get_db
 from app.models.content import Article, Category
@@ -354,6 +356,9 @@ class AssistIn(BaseModel):
     )
     title_te: str | None = Field(default=None, max_length=400)
     body_plain: str | None = Field(default=None, max_length=60_000)
+    # The editor's standfirst: without it the style checklist never lints it
+    # and shows a clean pass over a placeholder or a banned phrase there.
+    summary_te: str | None = Field(default=None, max_length=1000)
 
 
 @router.post(
@@ -362,16 +367,14 @@ class AssistIn(BaseModel):
 def assist(
     payload: AssistIn,
     db: Session = Depends(get_db),
-    _p: Principal = Depends(require_permission("ai.use")),
+    p: Principal = Depends(require_permission("ai.use")),
 ) -> dict:
     title = payload.title_te or ""
     body = payload.body_plain or ""
-    summary: str | None = None
+    summary: str | None = payload.summary_te
     exclude = None
     if payload.article_id is not None:
-        article = db.get(Article, payload.article_id)
-        if article is None:
-            raise NotFoundError()
+        article = _scoped_article(db, payload.article_id, p)
         title = article.title_te
         body = article.body_plain or ""
         summary = article.summary_te
@@ -382,4 +385,29 @@ def assist(
         body_plain=body,
         summary_te=summary,
         exclude_article_id=exclude,
+    )
+
+
+@router.post("/cms/ai/headlines", summary="Headline ideas in the house style")
+def headlines(
+    payload: AssistIn,
+    db: Session = Depends(get_db),
+    p: Principal = Depends(require_permission("ai.use")),
+) -> dict:
+    """Up to eight headline options and an SEO title/description.
+
+    The one paid call beside assist: the editorial model, billed to the
+    caller. With AI off or no key it answers 200 `available: false` with the
+    reason, so the button explains itself instead of failing.
+    """
+    title = payload.title_te or ""
+    body = payload.body_plain or ""
+    summary = payload.summary_te
+    if payload.article_id is not None:
+        article = _scoped_article(db, payload.article_id, p)
+        title = article.title_te
+        body = article.body_plain or ""
+        summary = summary or article.summary_te
+    return ai_assist_service.headline_ideas(
+        db, title_te=title, body_plain=body, summary_te=summary, actor_id=p.id
     )

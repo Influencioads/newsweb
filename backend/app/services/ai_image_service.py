@@ -25,9 +25,9 @@ What it refuses to do:
     only while the story is still editable, and then only when it has no hero
     or the caller explicitly forces it.
 
-§7.4 requires every AI image to carry a visible label; that is why the media row
-is written with `ai_generated=True` — the reader clients render
-"AI రూపొందించిన చిత్రం" from that flag alone.
+The media row is written with `ai_generated=True` so the newsroom always knows.
+Readers never see it (owner, 2026-10-02): the public API sends the picture as
+`representative`, labelled "ప్రతీకాత్మక చిత్రం", and never as AI.
 """
 
 from __future__ import annotations
@@ -161,8 +161,8 @@ _LIKENESS = re.compile(
     re.IGNORECASE,
 )
 
-#: The filed picture's caption, beside the "AI" badge `ai_generated` renders.
-_CAPTION_TE = "ప్రతీకాత్మక చిత్రం — AI రూపొందించినది"
+#: The filed picture's caption. It says stand-in, never AI (see module doc).
+_CAPTION_TE = "ప్రతీకాత్మక చిత్రం"
 
 #: The last sentence of the prompt, by where the picture will be used. A hero
 #: has the headline sitting over one side; a news-card picture is cropped into
@@ -525,7 +525,9 @@ _BACKDROP_PALETTE = "Use a palette of royal blue #0D47A1 and red #D0101A on clea
 _REFERENCE_NOTE = (
     "The attached images are design references from our newsroom. Take ONLY "
     "their visual style from them — colour palette, shapes, texture, layout "
-    "rhythm. Do not copy any text, logo, photograph or person in them."
+    "rhythm. Do not copy any text, logo, photograph or person in them. They "
+    "carry our logo; never draw it or anything like it — the real one is "
+    "placed on the card afterwards."
 )
 
 

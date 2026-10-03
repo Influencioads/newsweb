@@ -1858,7 +1858,9 @@ class TestEnrichment:
         items, _counts = self._pass(db, monkeypatch, FakeAi(filing={"category": "politics"}), "e-boom")
         rewrite = db.get(IngestedItem, items[0].id).ready_rewrite
         assert rewrite is not None, "the rewrite was paid for; a filing error must not lose it"
-        assert rewrite.classification == {"glyph_warning": False}
+        # Only the house-style verdict rides along; nothing was filed.
+        assert rewrite.classification["glyph_warning"] is False
+        assert "category_id" not in rewrite.classification
 
     def test_the_section_and_breaking_are_checked_against_our_tables(self, db: Session) -> None:
         cats = self._sections(db)

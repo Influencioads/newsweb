@@ -255,6 +255,14 @@ export interface AiFiling {
   breaking: boolean;
   /** The rewrite kept stray foreign letters, so it was never auto-queued. */
   glyph_warning: boolean;
+  /** House-style pass — absent on rewrites from before it. The story type the writer followed. */
+  story_type?: { key: string; name_te: string; name_en: string } | null;
+  /** What the writer asked the desk to check before publishing. */
+  editor_note?: string;
+  /** Copy-checker codes still standing after the writer's one retry (e.g. 'copied'). */
+  style_warnings?: string[];
+  /** The copy names a subject only a person may handle (minor, suicide, sexual offence). */
+  refuse_screen?: boolean;
 }
 
 export type PhotoVerdict = 'clean' | 'watermark' | 'logo' | 'text' | 'graphic' | 'unchecked';

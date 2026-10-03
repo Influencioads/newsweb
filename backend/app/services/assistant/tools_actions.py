@@ -37,6 +37,7 @@ from app.core.errors import (
     NotFoundError,
     ValidationError,
 )
+from app.core.permissions import LEVEL_SELF_APPROVE
 from app.db.base import utcnow
 from app.integrations.ai import catalogue, get_ai
 from app.integrations.ai.sensitive import is_sensitive as sensitive_topic
@@ -67,6 +68,7 @@ from app.services import (
     notification_service,
     settings_service,
     social_card_service,
+    workflow_service,
 )
 from app.services.assistant import tools_data
 from app.services.assistant.registry import ToolContext, start_job, sweep_stale_job, tool
@@ -957,7 +959,7 @@ def _propose_approve(ctx: ToolContext, article: Article) -> dict[str, Any]:
             f"Only a submitted story can be approved; this one is {article.workflow_state}.",
             f"సమర్పించిన కథనాన్నే ఆమోదించగలం; ఇది {article.workflow_state} స్థితిలో ఉంది.",
         )
-    if article.author_id == ctx.user_id:
+    if article.author_id == ctx.user_id and ctx.principal.level < LEVEL_SELF_APPROVE:
         raise ValidationError(
             "You wrote this story (articles the assistant writes are filed under your "
             "name), and an author cannot approve their own story: another editor must.",
@@ -979,7 +981,10 @@ def _propose_publish(ctx: ToolContext, article: Article) -> dict[str, Any]:
     problems: list[str] = []
     if article.workflow_state not in (WorkflowState.APPROVED, WorkflowState.SCHEDULED):
         problems.append(f"it is {article.workflow_state}, not approved yet")
-    elif not article.approved_by or article.approved_by == article.author_id:
+    elif not article.approved_by or (
+        article.approved_by == article.author_id
+        and not workflow_service.approver_may_self_approve(ctx.db, article.approved_by)
+    ):
         problems.append("a different senior editor than the author must approve it first")
     elif article.author_id is None and article.approved_by == ctx.user_id:
         problems.append("you approved this machine-made story, so someone else must publish it")

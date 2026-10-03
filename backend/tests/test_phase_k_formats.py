@@ -425,6 +425,14 @@ class TestShareCard:
         db.flush()
         assert share_card_service.hero_media_url(db, article) is None
 
+    def test_readers_get_an_ai_picture_as_a_stand_in_never_as_ai(self) -> None:
+        """Owner, 2026-10-02: no reader-facing AI label on pictures."""
+        from app.api.v1.public import _media_out
+
+        drawn = Media(id=1, cdn_url="https://cdn.example/ai.png", ai_generated=True, meta={})
+        out = _media_out(drawn)
+        assert out.ai_generated is False and out.representative is True
+
     def test_the_key_is_content_addressed(self, db: Session) -> None:
         """No database column and no invalidation logic: the bucket is the
         cache, so the key has to carry the content digest."""

@@ -1,104 +1,86 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { ChevronDown, ChevronRight, Zap } from 'lucide-react';
+import { ChevronRight, Sparkles, Zap } from 'lucide-react';
 
-import { NewsImage } from '@/components/media/NewsImage';
 import { Badge } from '@/components/ui/Badge';
 import { ButtonLink } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { PageContainer } from '@/components/ui/Layout';
 import { EmptyState, QueryState, SkeletonCard } from '@/components/ui/State';
 import * as publicApi from '@/features/public/api';
 import { useI18n, useScript } from '@/i18n';
-import type { ArticleCard } from '@/types/public';
+import type { ShortNewsItem } from '@/types/public';
 import { cn } from '@/utils/cn';
 import { useDocumentTitle } from '@/utils/motion';
-import { relativeTime } from '@/utils/time';
 
 /**
- * Short news (§14): one quick-read card per viewport, scroll-snap giving the
- * swipe feel on touch. Headline + image + the editor's short text; the card
- * links into the full story only when there is one (a body-less short item
- * has reading_time_sec 0).
+ * Short news (§14): one picture card per viewport, scroll-snap giving the
+ * swipe feel on touch. The desk adds 4:5 and 9:16 news cards each day; the
+ * words are in the picture, so it is shown whole (`object-contain`, never
+ * cropped) on a blurred copy of itself. A card whose story is published links
+ * to it.
  *
- * The deck is exactly `100dvh - var(--header-h)` tall — the shell publishes that
- * variable, so the deck never has to guess a header height — and each slide is
- * `min-h-full`, never `h-full`: the card grows rather than hiding text behind
- * overflow. The short text clamps by lines (te-clamp-5) only when "Read the
- * full story" is there to carry the rest; a body-less item shows all of it.
+ * The deck ends at the bottom of the screen as the page opens: its height is
+ * measured from where it starts (under the masthead and the section nav), so a
+ * 9:16 card's last line is never below the fold. The deck scrolls itself and
+ * holds the scroll (`overscroll-contain`), so the window would never move to
+ * reveal it.
  */
 
 /** How many progress dots can sit on a phone without becoming a grey smear. */
 const DOT_WINDOW = 7;
 
-/** One quick-read card; the last slide drops the "scroll on" chevron. */
-function QuickCard({
-  article,
-  index,
-  total,
-}: {
-  article: ArticleCard;
-  /** 0-based position in the deck — the feed's posinset and the chevron cue. */
-  index: number;
-  total: number;
-}) {
-  const { pick, language } = useI18n();
-  const s = useScript();
+function ShortSlide({ item, index, total }: { item: ShortNewsItem; index: number; total: number }) {
+  const { t, language } = useI18n();
   const L = (te: string, en: string) => (language === 'te' ? te : en);
-  const title = s.forText(article.title_te, article.title_en);
-  const category = article.category && s.forText(article.category.name_te, article.category.name_en);
+  const img = item.image;
+  // The backdrop is blurred to mush: the smallest rendition is plenty.
+  const backdrop = img.srcset?.split(',')[0]?.trim().split(' ')[0] || img.url;
   return (
     // role="feed" children have to state their position and be focusable, so a
-    // screen reader can step the deck article by article.
+    // screen reader can step the deck card by card.
     <article
       aria-posinset={index + 1}
       aria-setsize={total}
       tabIndex={-1}
-      className="flex min-h-full snap-start snap-always p-3"
+      className="relative flex h-full snap-start snap-always flex-col items-center justify-center gap-3 overflow-hidden bg-overlay p-3 pb-6"
     >
-      <Card as="div" padding="none" className="flex w-full flex-col overflow-hidden rounded-2xl">
-        {article.hero && <NewsImage media={article.hero} ratio="16/9" sizes="560px" />}
-        <div className="flex flex-1 flex-col p-5">
-          <div className="flex flex-wrap items-center gap-2">
-            {article.category && category && (
-              <Badge tone="brand" size="xs" lang={category.lang}>
-                {pick(article.category.name_te, article.category.name_en)}
-              </Badge>
-            )}
-            <span lang={language} className={cn(s.body, 'text-meta text-muted')}>
-              {relativeTime(article.published_at, language)}
-            </span>
-          </div>
-          <h2 lang={title.lang} className={cn(title.head, 'te-clamp-4 mt-2 text-headline-md font-extrabold text-ink')}>
-            {pick(article.title_te, article.title_en)}
-          </h2>
-          {article.summary_te && (
-            <p
-              lang="te"
-              className={cn('te mt-3 text-te-body-xs text-ink-soft', article.reading_time_sec > 0 && 'te-clamp-5')}
-            >
-              {article.summary_te}
-            </p>
-          )}
-          {article.reading_time_sec > 0 && (
-            <ButtonLink
-              to={article.url}
-              variant="secondary"
-              size="sm"
-              iconRight={ChevronRight}
-              className="mt-4 self-start"
-            >
-              {L('పూర్తి కథనం చదవండి', 'Read the full story')}
-            </ButtonLink>
-          )}
-        </div>
-        {index < total - 1 && (
-          <p aria-hidden className="pb-2 text-center text-muted">
-            <Icon icon={ChevronDown} size="sm" className="mx-auto animate-bounce" />
-          </p>
-        )}
-      </Card>
+      {img.url ? (
+        <>
+          <img
+            aria-hidden
+            src={backdrop ?? undefined}
+            alt=""
+            loading={index < 2 ? 'eager' : 'lazy'}
+            decoding="async"
+            className="absolute inset-0 h-full w-full scale-110 object-cover opacity-50 blur-2xl"
+          />
+          <img
+            src={img.url}
+            {...(img.srcset ? { srcSet: img.srcset } : {})}
+            sizes="(min-width: 640px) 560px, 100vw"
+            // The words are in the picture: the alt is what a screen reader has.
+            alt={img.alt_te || `${t('page.shortNews')} ${index + 1}`}
+            width={img.width ?? undefined}
+            height={img.height ?? undefined}
+            loading={index < 2 ? 'eager' : 'lazy'}
+            decoding="async"
+            className="relative min-h-0 max-h-full max-w-full rounded-xl object-contain"
+          />
+        </>
+      ) : null}
+      {/* §7.4 — an AI-made picture is labelled wherever it shows. */}
+      {img.ai_generated ? (
+        <Badge tone="ai" size="xs" icon={Sparkles} className="absolute left-5 top-5">
+          {t('article.aiImage')}
+        </Badge>
+      ) : null}
+      {/* Below the picture, never over it: a card's last line is often its source. */}
+      {item.article_url ? (
+        <ButtonLink to={item.article_url} size="sm" iconRight={ChevronRight} className="shrink-0">
+          {L('పూర్తి కథనం చదవండి', 'Read the full story')}
+        </ButtonLink>
+      ) : null}
     </article>
   );
 }
@@ -137,6 +119,21 @@ export default function ShortNewsPage() {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   useDocumentTitle(t('page.shortNews'));
 
+  // Where the deck starts in the document. A static zero-height anchor, so a
+  // sticky offset or a scroll still in flight from the last page cannot skew it.
+  const anchor = useRef<HTMLDivElement | null>(null);
+  const [top, setTop] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const measure = () => {
+      if (anchor.current) setTop(Math.round(anchor.current.getBoundingClientRect().top + window.scrollY));
+    };
+    measure();
+    // The masthead reflows when the Telugu font lands or the width changes.
+    const ro = new ResizeObserver(measure);
+    ro.observe(document.body);
+    return () => ro.disconnect();
+  }, []);
+
   const feed = useInfiniteQuery({
     queryKey: ['public', 'short-news'],
     queryFn: ({ pageParam }) => publicApi.fetchShortNews({ offset: pageParam, limit: 10 }),
@@ -144,8 +141,11 @@ export default function ShortNewsPage() {
     getNextPageParam: (last) => (last.next_cursor ? Number(last.next_cursor) : undefined),
   });
 
-  const articles = feed.data?.pages.flatMap((page) => page.articles) ?? [];
-  const { deck, index } = useDeckProgress(articles.length);
+  // Offset pages over a newest-first feed: cards added while the reader scrolls
+  // push older ones into the next page, so a card can come back. Show it once.
+  const seen = new Set<number>();
+  const items = (feed.data?.pages.flatMap((page) => page.items) ?? []).filter((i) => !seen.has(i.id) && !!seen.add(i.id));
+  const { deck, index } = useDeckProgress(items.length);
 
   // Fetch the next batch as the reader approaches the bottom of the deck.
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = feed;
@@ -160,76 +160,81 @@ export default function ShortNewsPage() {
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // A long deck would otherwise grow an unreadable rail of dots; window it.
-  const first = Math.max(0, Math.min(index - Math.floor(DOT_WINDOW / 2), articles.length - DOT_WINDOW));
-  const dots = articles.slice(first, first + DOT_WINDOW);
+  const first = Math.max(0, Math.min(index - Math.floor(DOT_WINDOW / 2), items.length - DOT_WINDOW));
+  const dots = items.slice(first, first + DOT_WINDOW);
 
   return (
     // dvh, not vh: mobile browser chrome would otherwise push the progress dots
-    // below the fold. Sticky under the nav so the window itself does not scroll.
-    // Stops short of the audio player dock, which body padding cannot clear here.
-    <PageContainer
-      width="form"
-      className="sticky top-header flex h-[calc(100dvh-var(--header-h)-var(--player-dock-h,0px))] flex-col"
-    >
-      {/* Sub-header bleeds across the container gutters so nothing scrolls past its edges. */}
-      <div className="glass sticky top-header z-30 -mx-4 flex shrink-0 items-center justify-between gap-3 border-b border-rule px-4 py-2 md:-mx-6 md:px-6">
-        <h1 className={cn(s.head, 'flex items-center gap-1.5 text-headline-xs font-extrabold text-brand')}>
-          <Icon icon={Zap} size="sm" />
-          {t('page.shortNews')}
-        </h1>
-        <p className={cn(s.body, 'text-meta text-muted')}>{L('స్క్రోల్ చేసి చదవండి', 'Scroll to read')}</p>
-      </div>
-
-      <QueryState
-        query={feed}
-        skeleton={
-          <div className="py-4">
-            <SkeletonCard variant="lead" />
+    // below the fold. Stops short of the audio player dock, which body padding
+    // cannot clear here.
+    <>
+      <div ref={anchor} aria-hidden />
+      <PageContainer width="form" className="sticky top-header">
+        <div
+          className="flex flex-col"
+          style={{ height: `calc(100dvh - ${top === null ? 'var(--header-h)' : `${top}px`} - var(--player-dock-h, 0px))` }}
+        >
+          {/* Sub-header bleeds across the container gutters so nothing scrolls past its edges. */}
+          <div className="glass sticky top-header z-30 -mx-4 flex shrink-0 items-center justify-between gap-3 border-b border-rule px-4 py-2 md:-mx-6 md:px-6">
+            <h1 className={cn(s.head, 'flex items-center gap-1.5 text-headline-xs font-extrabold text-brand')}>
+              <Icon icon={Zap} size="sm" />
+              {t('page.shortNews')}
+            </h1>
+            <p className={cn(s.body, 'text-meta text-muted')}>{L('స్క్రోల్ చేసి చదవండి', 'Scroll to read')}</p>
           </div>
-        }
-        isEmpty={(data) => !data.pages.some((page) => page.articles.length)}
-        empty={<EmptyState icon={Zap} title={L('ఇంకా షార్ట్ న్యూస్ లేవు.', 'No short news yet.')} />}
-      >
-        {() => (
-          <div className="relative min-h-0 flex-1">
-            <div
-              ref={deck}
-              role="feed"
-              aria-label={t('page.shortNews')}
-              aria-busy={isFetchingNextPage || undefined}
-              className="h-full snap-y snap-mandatory overflow-y-auto overscroll-contain"
-            >
-              {articles.map((article, i) => (
-                <QuickCard key={article.short_id} article={article} index={i} total={articles.length} />
-              ))}
-              {isFetchingNextPage && (
-                <div className="p-5">
-                  <SkeletonCard variant="row" />
-                </div>
-              )}
-              <div ref={sentinelRef} className="h-2" />
-            </div>
 
-            <p role="status" lang={language} className={cn(s.body, 'sr-only')}>
-              {L(`కథనం ${index + 1} / ${articles.length}`, `Story ${index + 1} of ${articles.length}`)}
-            </p>
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-x-0 bottom-2 flex items-center justify-center gap-1.5"
-            >
-              {dots.map((article, i) => (
-                <span
-                  key={article.short_id}
-                  className={cn(
-                    'block rounded-pill transition-[colors,transform,box-shadow] duration-base ease-standard',
-                    first + i === index ? 'h-2 w-5 bg-brand' : 'h-2 w-2 bg-rule-strong',
+          <QueryState
+            query={feed}
+            skeleton={
+              <div className="py-4">
+                <SkeletonCard variant="lead" />
+              </div>
+            }
+            isEmpty={(data) => !data.pages.some((page) => page.items.length)}
+            empty={<EmptyState icon={Zap} title={L('ఇంకా షార్ట్ న్యూస్ లేవు.', 'No short news yet.')} />}
+          >
+            {() => (
+              <div className="relative min-h-0 flex-1">
+                <div
+                  ref={deck}
+                  role="feed"
+                  aria-label={t('page.shortNews')}
+                  aria-busy={isFetchingNextPage || undefined}
+                  className="h-full snap-y snap-mandatory overflow-y-auto overscroll-contain"
+                >
+                  {items.map((item, i) => (
+                    <ShortSlide key={item.id} item={item} index={i} total={items.length} />
+                  ))}
+                  {isFetchingNextPage && (
+                    <div className="p-5">
+                      <SkeletonCard variant="row" />
+                    </div>
                   )}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-      </QueryState>
-    </PageContainer>
+                  <div ref={sentinelRef} className="h-2" />
+                </div>
+
+                <p role="status" lang={language} className={cn(s.body, 'sr-only')}>
+                  {L(`కార్డ్ ${index + 1} / ${items.length}`, `Card ${index + 1} of ${items.length}`)}
+                </p>
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 bottom-2 flex items-center justify-center gap-1.5"
+                >
+                  {dots.map((item, i) => (
+                    <span
+                      key={item.id}
+                      className={cn(
+                        'block rounded-pill transition-[colors,transform,box-shadow] duration-base ease-standard',
+                        first + i === index ? 'h-2 w-5 bg-brand' : 'h-2 w-2 bg-on-ink/50',
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </QueryState>
+        </div>
+      </PageContainer>
+    </>
   );
 }

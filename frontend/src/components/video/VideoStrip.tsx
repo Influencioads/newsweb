@@ -30,6 +30,7 @@ export function VideoStrip({
     queryKey: ['public', 'videos-strip', category ?? 'all', limit],
     queryFn: () => publicApi.fetchVideos({ category, limit }),
     staleTime: 120_000,
+    enabled: publicApi.VIDEOS_PUBLIC,
   });
 
   const items = videos.data?.videos ?? [];

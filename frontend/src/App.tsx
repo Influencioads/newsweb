@@ -4,6 +4,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AppErrorBoundary, RouteFallback, ScrollToTop } from './components/app';
 import { useSiteConfig } from './components/layout/NavDrawer';
 import { EPAPER_PUBLIC } from './features/epaper/api';
+import { VIDEOS_PUBLIC } from './features/public/api';
 import { PlayerHost } from './components/player/PlayerHost';
 import { applyBrand, brandCss } from './utils/brand';
 import AdminLayout from './layouts/AdminLayout';
@@ -36,6 +37,7 @@ const LiveNewsPage = lazy(() => import('./pages/public/LiveNewsPage'));
 const ShortNewsPage = lazy(() => import('./pages/public/ShortNewsPage'));
 const VideosPage = lazy(() => import('./pages/public/VideosPage'));
 const VideoDetailPage = lazy(() => import('./pages/public/VideoDetailPage'));
+const videosGate = (page: ReactElement) => (VIDEOS_PUBLIC ? page : <Navigate to="/" replace />);
 const PolicyPage = lazy(() => import('./pages/public/PolicyPage'));
 const NotFoundPage = lazy(() => import('./pages/public/NotFoundPage'));
 
@@ -172,8 +174,8 @@ export default function App() {
               <Route path="/district/:slug" element={<DistrictPage />} />
               <Route path="/mandal/:slug" element={<MandalPage />} />
               <Route path="/photos" element={<PhotoGalleryPage />} />
-              <Route path="/videos" element={<VideosPage />} />
-              <Route path="/videos/:id" element={<VideoDetailPage />} />
+              <Route path="/videos" element={videosGate(<VideosPage />)} />
+              <Route path="/videos/:id" element={videosGate(<VideoDetailPage />)} />
               <Route path="/short-news" element={<ShortNewsPage />} />
               <Route path="/web-stories" element={<WebStoriesPage />} />
               <Route path="/author/:slug" element={<AuthorPage />} />

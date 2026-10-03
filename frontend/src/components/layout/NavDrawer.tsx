@@ -43,13 +43,13 @@ export interface Shortcut {
 }
 
 /** Reader destinations that are not categories, in nav order. */
-export const SHORTCUTS: readonly Shortcut[] = [
+export const SHORTCUTS: readonly Shortcut[] = ([
   { to: '/live', key: 'ui.live', icon: Radio, live: true },
   { to: '/trending', key: 'ui.trending', icon: TrendingUp },
   { to: '/local', key: 'ui.local', icon: MapPin },
   { to: '/videos', key: 'ui.video', icon: Video },
   { to: '/short-news', key: 'page.shortNews', icon: Zap },
-];
+] satisfies Shortcut[]).filter((s) => publicApi.VIDEOS_PUBLIC || s.to !== '/videos');
 
 /** §12.5 — Grievance Officer, correction policy and AI disclosure, live at launch. */
 export const FOOTER_LINKS = [

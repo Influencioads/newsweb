@@ -64,6 +64,10 @@ export async function fetchFeed(params: {
   return data;
 }
 
+/** Public videos are paused: no shelves or links, and the routes go home.
+ *  Admin video tools and the backend API are untouched — flip to resume. */
+export const VIDEOS_PUBLIC = false;
+
 export async function fetchVideos(params?: {
   category?: string;
   offset?: number;

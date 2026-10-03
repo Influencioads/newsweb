@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 
 import { PageContainer } from '@/components/ui/Layout';
 import { EPAPER_PUBLIC } from '@/features/epaper/api';
+import { VIDEOS_PUBLIC } from '@/features/public/api';
 import { useI18n, useScript, type StringKey } from '@/i18n';
 import { cn } from '@/utils/cn';
 
@@ -22,7 +23,9 @@ const PRODUCT_LINKS: readonly (readonly [string, StringKey])[] = ([
   ['/epaper', 'nav.epaper'],
   ['/short-news', 'page.shortNews'],
   ['/my-epaper', 'page.myEpaper'],
-] satisfies (readonly [string, StringKey])[]).filter(([to]) => EPAPER_PUBLIC || !to.includes('epaper'));
+] satisfies (readonly [string, StringKey])[]).filter(
+  ([to]) => (EPAPER_PUBLIC || !to.includes('epaper')) && (VIDEOS_PUBLIC || to !== '/videos'),
+);
 
 const LINK =
   'flex min-h-tap items-center py-2 text-ui-sm text-muted-inverse ' +

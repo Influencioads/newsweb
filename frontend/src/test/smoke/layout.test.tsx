@@ -26,6 +26,7 @@ vi.mock('@/features/public/api', () => ({
   fetchBreaking: vi.fn(async () => []),
   fetchHome: vi.fn(never),
   fetchVideos: vi.fn(never),
+  VIDEOS_PUBLIC: false,
 }));
 
 vi.mock('@/features/engagement/notificationsApi', () => ({

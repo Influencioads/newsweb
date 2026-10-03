@@ -1287,8 +1287,8 @@ def run_rewrite_pass(
     Committed item by item: the month's budget running out, or anything else
     going wrong half-way, must not roll back rewrites already paid for — the
     next tick would only pay for them again. Imports never carry `actor_id`
-    (an admin's "Run now" included): a machine story has no author, so it
-    still takes two different people to approve and publish.
+    (an admin's "Run now" included): a machine story has no author, and an
+    editor must still approve it before it can be published.
     """
     if not rewrite_enabled(db):
         return {"rewritten": 0, "skipped": "rewrite_disabled"}

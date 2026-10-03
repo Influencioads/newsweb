@@ -6,7 +6,7 @@ prevent:
   * an unlicensed source must not gain full text through the HTML fallback;
   * a sensitive subject must never reach a provider at all;
   * one loud feed must not consume the whole hourly budget;
-  * nothing the crawl produces may reach a reader without two people.
+  * nothing the crawl produces may reach a reader without an editor's approval.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from app.core.config import SITE_NAME_TE  # noqa: E402
 from app.core.deps import build_principal  # noqa: E402
-from app.core.errors import AiBudgetExceededError, ValidationError  # noqa: E402
+from app.core.errors import AiBudgetExceededError, ConflictError, ValidationError  # noqa: E402
 from app.db.base import Base, utcnow  # noqa: E402
 from app.db.seed import (  # noqa: E402
     seed_districts,
@@ -1170,11 +1170,12 @@ class TestEditorialGate:
                 db, principal, article, "approve", None
             )
 
-    def test_two_people_are_required_even_when_nobody_wrote_it(
+    def test_one_editor_may_approve_and_publish_a_machine_article(
         self, db: Session, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """A machine article has no author, so the author-vs-approver check
-        cannot bite. Without this rule one person approves and publishes alone."""
+        """One approval is enough (owner's decision, 2026-10-03): the editor
+        who approves an authorless machine article may publish it — but
+        nobody may publish it without the approval."""
         item = self._rewritten_item(db, monkeypatch, "g-authorless")
         article = give_hero(db, ingestion_service.import_item(db, item, actor_id=None))
         article.author_id = None
@@ -1182,19 +1183,15 @@ class TestEditorialGate:
 
         alice = db.scalar(select(User).where(User.email == "crawl-eic@test.local"))
         principal = build_principal(alice, "test-session")
-        workflow_service.transition(
-                db, principal, article, "review", None
-            )
-        workflow_service.transition(
-                db, principal, article, "approve", None
-            )
+        with pytest.raises(ConflictError):
+            workflow_service.transition(db, principal, article, "publish", None)
+
+        workflow_service.transition(db, principal, article, "review", None)
+        workflow_service.transition(db, principal, article, "approve", None)
+        workflow_service.transition(db, principal, article, "publish", None)
         db.flush()
         assert article.approved_by == alice.id
-
-        with pytest.raises(ValidationError):
-            workflow_service.transition(
-                db, principal, article, "publish", None
-            )
+        assert article.workflow_state == WorkflowState.PUBLISHED
 
     def test_no_crawl_or_ingestion_route_publishes(self, client: TestClient) -> None:
         offenders = [
@@ -2116,9 +2113,10 @@ class TestEnrichment:
         assert crawl_service.run_rewrite_pass(db)["imported"] == 0
         assert db.scalar(select(func.count(Article.id)).where(Article.title_te == HEADLINES[0])) == 1
 
-    def test_the_same_person_cannot_approve_and_publish_a_machine_story(
+    def test_the_approving_editor_may_publish_an_auto_imported_story(
         self, db: Session, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """One approval is enough (owner's decision, 2026-10-03)."""
         configure(db, **{"crawl.auto_import": True})
         items, _out = self._pass(db, monkeypatch, FakeAi(results=[story()]), "e-two")
         article = give_hero(db, db.get(Article, items[0].article_id))
@@ -2127,8 +2125,8 @@ class TestEnrichment:
         principal = build_principal(alice, "test-session")
         workflow_service.transition(db, principal, article, "review", None)
         workflow_service.transition(db, principal, article, "approve", None)
-        with pytest.raises(ValidationError):
-            workflow_service.transition(db, principal, article, "publish", None)
+        workflow_service.transition(db, principal, article, "publish", None)
+        assert article.workflow_state == WorkflowState.PUBLISHED
 
     def test_one_failing_import_loses_nothing_else_and_leaves_no_article(
         self, db: Session, monkeypatch: pytest.MonkeyPatch

@@ -986,8 +986,6 @@ def _propose_publish(ctx: ToolContext, article: Article) -> dict[str, Any]:
         and not workflow_service.approver_may_self_approve(ctx.db, article.approved_by)
     ):
         problems.append("a different senior editor than the author must approve it first")
-    elif article.author_id is None and article.approved_by == ctx.user_id:
-        problems.append("you approved this machine-made story, so someone else must publish it")
     if not _has_hero(ctx.db, article):
         problems.append("it has no hero photo (a story without a photo is never published)")
     if article.source_type != "own" and not article.source_credit:

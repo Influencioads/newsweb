@@ -544,23 +544,10 @@ def transition(
                 raise ValidationError(
                     message_en="A different senior editor must approve before publishing."
                 )
-            # The check above compares the approver against the *author*, which is
-            # the right test for copy a person wrote. Machine-created copy has no
-            # author — a feed import and an AI rewrite both leave `author_id` NULL
-            # — and `approved_by == None` is false, so without this clause one
-            # editor could approve and publish a machine article entirely alone.
-            # Two people are required precisely *because* nobody wrote it.
-            if article.author_id is None and article.approved_by == principal.id:
-                raise ValidationError(
-                    message_en=(
-                        "A machine-created article must be approved and published "
-                        "by two different people."
-                    ),
-                    message_te=(
-                        "యంత్రం రూపొందించిన కథనాన్ని ఇద్దరు వేర్వేరు వ్యక్తులు "
-                        "ఆమోదించి ప్రచురించాలి."
-                    ),
-                )
+            # Machine-created copy (a feed import, an AI rewrite) has no author,
+            # so the check above only asks that an editor approved it. One
+            # approval is enough: the owner dropped the "two different people"
+            # rule on 2026-10-03 — the editor who approves may also publish.
             if article.source_type != "own" and not article.source_credit:
                 raise ValidationError(
                     message_en="Agency and syndicated stories require source credit."

@@ -58,6 +58,18 @@ rule that now covers it:
     must appear in the later text), against the headline, a same-length
     window of the body, and its first four sentences.
 
+A third pass, 2026-10-03, after the owner heard a bulletin say "రూ" for
+`రూ.2,000`: Telugu copy writes the rupee as `రూ.` (458 times in a 2,000-
+article sample, against a handful of `₹`), and the rule only knew the sign.
+Bulletins also never came through here at all; `synthesise_long` now does
+this for every caller. The owner's rule is "any symbol should read
+properly", so each one in that sample, plus the weather and price forms, is
+now either said in words — `$`, `&`, `+`, `°C`, `కి.మీ.`, `డా.`, `vs`, a
+`10-15` range, `/` between words — or turned into a pause (`|`, `→`, `•`).
+Anything left that is still a symbol (emoji, ©, an invisible direction mark)
+is removed rather than left for the voice to guess at. Initials (`కె.`, `వై.ఎస్.`)
+lose the dot: it was a 0.5 s sentence break in the middle of a name.
+
 What is deliberately NOT here: any number Sarvam already reads right. `18`,
 `12`, `905`, `8,000`, `12వ` all came back correct, and rewriting a correct
 reading is how a normaliser introduces its own mistakes. `temperature` is
@@ -68,6 +80,7 @@ semitones, so it is not a control.
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections import Counter
 
 __all__ = ["assemble", "for_speech", "number_words", "same_sentence", "SIMILAR"]
@@ -154,7 +167,34 @@ _TELUGU = "ఀ-౿"
 _ZWNJ = "‌"
 _SCALE = {"లక్ష": 100_000, "లక్షలు": 100_000, "లక్షల": 100_000,
           "కోటి": 10_000_000, "కోట్లు": 10_000_000, "కోట్ల": 10_000_000}
-_OBLIQUE_SCALE = {"కోట్లు": "కోట్ల", "లక్షలు": "లక్షల", "వేలు": "వేల"}
+_OBLIQUE_SCALE = {"కోట్లు": "కోట్ల", "లక్షలు": "లక్షల", "వేలు": "వేల",
+                  "మిలియన్లు": "మిలియన్ల", "బిలియన్లు": "బిలియన్ల"}
+#: The currency, as a noun after the figure: (nominative, oblique stem).
+_MONEY = {"₹": ("రూపాయలు", "రూపాయల"), "రూ": ("రూపాయలు", "రూపాయల"), "Rs": ("రూపాయలు", "రూపాయల"),
+          "$": ("డాలర్లు", "డాలర్ల")}
+
+#: Printed short, said in full. Telugu forms only match at the start of a word.
+_SHORT_FORMS = (
+    (r"కి\.\s?మీ\.?", "కిలోమీటర్లు"),
+    (r"సెం\.\s?మీ\.?", "సెంటీమీటర్లు"),
+    (r"మి\.\s?మీ\.?", "మిల్లీమీటర్లు"),
+    (r"కి\.\s?గ్రా\.?", "కిలోలు"),
+    (r"డా\.", "డాక్టర్"),
+    (r"నెం\.|నం\.", "నంబర్"),
+)
+#: Letter names an initial is written with — "కె. చంద్రశేఖర్", "వై.ఎస్. జగన్".
+_INITIALS = "|".join(sorted(
+    {"కె", "జి", "పి", "టి", "బి", "డి", "వి", "సి", "ఎం", "ఆర్", "ఎల్", "ఎన్", "ఎస్", "ఎఫ్", "హెచ్",
+     "జే", "కే", "జీ", "పీ", "టీ", "బీ", "డీ", "వీ", "సీ", "వై", "ఏ", "ఓ", "యూ", "జెడ్", "డబ్ల్యూ"},
+    key=len, reverse=True,
+))
+#: Symbols said as a word, or as a pause. Everything else that is still a
+#: symbol after the rules run is dropped (see `_drop_symbols`).
+_SYMBOL_WORDS = {
+    "&": " అండ్ ", "+": " ప్లస్ ", "@": " ఎట్ ", "=": " సమానం ", "×": " ఇంటు ", "~": " సుమారు ",
+    "|": ". ", "→": ". ", "•": ". ", "·": ". ",
+}
+_KEEP = {"‌", "‍"}  # ZWNJ / ZWJ shape Telugu conjuncts
 
 #: Abbreviations Telugu news copy carries in Latin script, spelled the way a
 #: reader spells them — and the acronyms a reader says as a word. Anything
@@ -211,20 +251,44 @@ def _spell(match: re.Match[str]) -> str:
 
 
 def _currency(match: re.Match[str]) -> str:
-    """`₹N [scale][suffix]` → `N [scale-oblique] రూపాయలు[suffix]`.
+    """`₹N [scale][suffix]` → `N [scale-oblique] రూపాయలు[suffix]`; `రూ.`, `Rs.`
+    and `$` (డాలర్లు) the same, and `రూ.లక్ష` with no figure at all.
 
     The sign moves to the end. A suffix glued to the scale word ("కోట్లతో") or
     to the bare number ("500కు") is the case a noun would carry, so it moves
     with the sign — "కోట్ల రూపాయలతో", "రూపాయలకు" — and puts everything before
     it in the oblique. A scale already oblique ("కోట్ల నిధులు") does the same.
     """
-    number, scale, suffix = match.group(1), match.group(2) or "", match.group(3) or ""
+    sign, number = match.group(1), match.group(2) or ""
+    scale, suffix = match.group(3) or match.group(4) or "", match.group(5) or ""
+    nominative, stem = _MONEY[sign]
     oblique = bool(suffix) or (scale.endswith("ల") and not scale.endswith("లు"))
-    rupees = ("రూపాయల" if oblique else "రూపాయలు") + suffix
-    if not scale:
-        return f"{number} {rupees}"
-    scale = re.sub(r"(కోట్లు|లక్షలు|వేలు)$", lambda m: _OBLIQUE_SCALE[m.group(1)], scale)
-    return f"{number} {scale} {rupees}"
+    money = (stem if oblique else nominative) + suffix
+    if scale:
+        last = scale.split()[-1]
+        scale = scale[: len(scale) - len(last)] + _OBLIQUE_SCALE.get(last, last)
+    return " ".join(p for p in (number, scale, money) if p)
+
+
+def _range(match: re.Match[str]) -> str:
+    """`10-15 మంది` → `10 నుంచి 15 మంది`. Only a rising pair is a range."""
+    low, high = match.group(1), match.group(2)
+    return f"{low} నుంచి {high}" if int(high) > int(low) else match.group(0)
+
+
+def _drop_symbols(text: str) -> str:
+    """Whatever is still a symbol — emoji, ©, ™, a stray sign, an invisible
+    direction or format mark — is not something a reader says."""
+    return "".join(
+        c for c in text
+        if c in _KEEP
+        or not (
+            unicodedata.category(c)[0] == "S"
+            or unicodedata.category(c) in ("Cf", "Co", "Cn")
+            or c in "*#^_`\\"
+            or "︀" <= c <= "️"
+        )
+    )
 
 
 def _whole(text: str) -> int:
@@ -268,7 +332,12 @@ def _sentence_end(part: str) -> str:
     return part if part.rstrip("”\"')]")[-1:] in ".!?।" else part + "."
 
 
-_SCALE_WORD = r"(?:లక్షల?\s+)?(?:కోట్లు|కోట్ల|కోటి)|లక్షలు|లక్షల|లక్ష|వేలు|వేల|వెయ్యి"
+_SCALE_WORD = (
+    r"(?:లక్షల?\s+)?(?:కోట్లు|కోట్ల|కోటి)|లక్షలు|లక్షల|లక్ష|వేలు|వేల|వెయ్యి"
+    r"|మిలియన్లు|మిలియన్ల|మిలియన్|బిలియన్లు|బిలియన్ల|బిలియన్|million|billion"
+)
+#: `₹`, `$`, and `రూ` / `Rs` only as a sign: a dot or a figure must follow.
+_MONEY_SIGN = rf"(₹|\$|(?<![{_TELUGU}])రూ(?=\.|\s*\d)|\bRs(?=\.|\s*\d))\.?"
 
 
 def for_speech(text: str) -> str:
@@ -281,14 +350,28 @@ def for_speech(text: str) -> str:
     # An en/em dash between digits is a range, not a break.
     t = re.sub(r"(?<=\d)[—–](?=\d)", "-", t)
 
-    # Currency before anything touches the digits.
+    # Currency before anything touches the digits. "రూ.500/-" is print's
+    # "and no paise"; it has no spoken form.
+    t = re.sub(r"/-(?!\d)", "", t)
     t = re.sub(
-        rf"₹\s*(\d[\d,]*(?:\.\d+)?)(?:\s*({_SCALE_WORD}))?([{_TELUGU}]*)",
+        rf"{_MONEY_SIGN}\s*(?:(\d+(?:,\d+)*(?:\.\d+)?)(?:\s*({_SCALE_WORD}))?|({_SCALE_WORD}))"
+        rf"([{_TELUGU}]*)",
         _currency, t,
     )
     t = re.sub(r"(?<![\d,])(\d[\d,]*)\.(\d{1,2})\s+(లక్షలు|లక్షల|లక్ష)\s+(కోట్లు|కోట్ల|కోటి)", _decimal_lakh_crore, t)
     t = re.sub(r"(?<![\d,])(\d[\d,]*)\.(\d{1,2})\s+(లక్షలు|లక్షల|లక్ష|కోట్లు|కోట్ల|కోటి)", _decimal_scale, t)
     t = re.sub(r"(\d+(?:\.\d+)?)\s*%", r"\1 శాతం", t)
+    t = re.sub(r"(\d)\s*°\s*C(?![A-Za-z])", r"\1 డిగ్రీల సెల్సియస్", t)
+    t = re.sub(r"(\d)\s*°\s*F(?![A-Za-z])", r"\1 డిగ్రీల ఫారెన్‌హీట్", t)
+    t = re.sub(r"(\d)\s*°", r"\1 డిగ్రీలు", t)
+    for short, full in _SHORT_FORMS:
+        t = re.sub(rf"(?<![{_TELUGU}]){short}", full, t)
+    t = re.sub(r"(?<=\d)\s?km(?![A-Za-z])", " కిలోమీటర్లు", t)
+    t = re.sub(r"(?<=\d)\s?kg(?![A-Za-z])", " కిలోలు", t)
+    # An initial's dot is a sentence break in the middle of a name.
+    t = re.sub(rf"(?<![{_TELUGU}])({_INITIALS})\.\s*(?=[{_TELUGU}])", r"\1 ", t)
+    t = re.sub(r"(\d)\+", r"\1 కంటే ఎక్కువ", t)
+    t = re.sub(r"(?<![\w\-/.,])(\d{1,3})-(\d{1,3})(?![\d\-/])", _range, t)
     t = re.sub(r"(?<![\d\-])((?:19|20)\d\d)-(\d\d)(?![\d\-])", _fiscal_year, t)
     # Exactly four ungrouped digits: a year, or an "8000" someone forgot to
     # group. Longer runs stay — a PIN, a phone number — where digit by digit
@@ -298,7 +381,14 @@ def for_speech(text: str) -> str:
     t = re.sub(r"(?<![A-Za-z\d,.\-–—])\d{4}(?![A-Za-z\d\-–—]|[.,]\d|వ)", _year, t)
     # Abbreviations, including the dominant suffixed form ("MLAలు", "TDPకి"):
     # Telugu letters are \w, so \b cannot be the guard.
+    t = re.sub(r"(?<![A-Za-z])[Vv][Ss]\.?(?![A-Za-z])", "వర్సెస్", t)
     t = re.sub(r"(?<![A-Za-z\d])[A-Z]{2,6}(?![A-Za-z\d])", _spell, t)
+
+    # Every other symbol: a word, a pause, or nothing. A slash between words
+    # is "or"; a dash joining two words ("ఆర్టీసీ–మెట్రో") is a hyphen, not a break.
+    t = re.sub(rf"(?<=[{_TELUGU}A-Za-z])\s*/\s*(?=[{_TELUGU}A-Za-z])", " లేదా ", t)
+    t = re.sub(r"(?<=[^\s\d])[—–](?=[^\s\d])", " ", t)
+    t = _drop_symbols("".join(_SYMBOL_WORDS.get(c, c) for c in t))
 
     # Breaks. A headline's semicolon, dash or colon is a full stop on air. A
     # clock time is never followed by a space after its colon, so `:(?=\s)`
@@ -308,6 +398,7 @@ def for_speech(text: str) -> str:
     t = re.sub(r"(?<=\S)\s+-\s+(?=\S)", ". ", t)
     t = re.sub(r":(?=\s)", ".", t)
     t = t.replace("…", ".")
+    t = re.sub(r"[ \t]+(?=[.,!?।])", "", t)
     t = re.sub(r"\.(?:\s*\.)+", ".", t)
     # Every paragraph ends as a sentence and is followed by a blank line, so
     # the break buys its measured 0.92 s.

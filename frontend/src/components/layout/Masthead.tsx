@@ -9,6 +9,7 @@ import { Chip } from '@/components/ui/Chip';
 import { Dialog } from '@/components/ui/Dialog';
 import { PageContainer } from '@/components/ui/Layout';
 import * as notificationsApi from '@/features/engagement/notificationsApi';
+import { EPAPER_PUBLIC } from '@/features/epaper/api';
 import { LANGUAGE_LABELS, useI18n, useScript } from '@/i18n';
 import { useAuth } from '@/stores/auth';
 import { cn } from '@/utils/cn';
@@ -110,6 +111,7 @@ export function Masthead() {
         </Link>
 
         <div className="flex shrink-0 items-center justify-end gap-1">
+          {EPAPER_PUBLIC && (
           <ButtonLink
             to="/epaper"
             variant="secondary"
@@ -120,6 +122,7 @@ export function Masthead() {
           >
             <span className="hidden lg:inline">{t('nav.epaper')}</span>
           </ButtonLink>
+          )}
           <LocationButton />
           <IconButton icon={SlidersHorizontal} label={t('ui.readerSettings')} onClick={() => setSettings(true)} />
           {authed && <NotificationBell />}

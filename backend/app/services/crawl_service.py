@@ -898,16 +898,13 @@ def _styled(
 
 def _outlets_to_avoid(db: Session, source: ContentSource) -> list[str]:
     """Publication names the copy must not print: every configured feed's, in
-    both scripts — less the credited publisher's own when the source asks to
-    be credited, since the credit line is meant to name it."""
+    both scripts. Readers never see an outlet's name (owner, 2026-10-03)."""
     names = {
         str(name)
         for row in db.execute(select(ContentSource.name, ContentSource.name_te))
         for name in row
         if name
     }
-    if source.attribution_required:
-        names -= {source.name, source.name_te}
     return sorted(names)
 
 
@@ -1047,7 +1044,9 @@ def rewrite_one(
         "publisher": source.name,
         "source_url": item.canonical_url or item.url or "",
         "language_in": (item.language or source.language or "te"),
-        "credit_source": source.attribution_required,
+        # Never printed, whatever the source's flag: readers never see an
+        # outlet's name (owner, 2026-10-03). `attribution_te` keeps the record.
+        "credit_source": False,
         "taxonomy": tax,
         "story_type": story_type,
         "source_date": item.published_at,
@@ -1160,19 +1159,11 @@ def rewrite_one(
     if refuse_screen:
         item.requires_human = True
 
-    # Still computed and still stored on the row below even when it is not
-    # printed: `attribution_te` is how the newsroom answers "where did this
-    # come from" after the fact. Dropping the printed credit is an editorial
-    # decision; dropping the provenance would be losing the audit trail.
+    # Never printed, still stored on the row below: `attribution_te` is how
+    # the newsroom answers "where did this come from" after the fact.
     credit = attribution_line(item)
     paragraphs = [normalize_text(p) for p in result.paragraphs_te if p and p.strip()]
-    # Measured before the credit is appended. Our own attribution line adds
-    # tokens the source never had, which would dilute the score and let a
-    # near-verbatim rewrite slip under the threshold — the guard would then be
-    # measuring how long our credit line is.
     model_plain = "\n\n".join(paragraphs)
-    if source.attribution_required and credit not in paragraphs:
-        paragraphs.append(credit)
 
     body = {
         "type": "doc",

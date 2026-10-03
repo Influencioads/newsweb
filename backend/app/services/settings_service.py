@@ -162,9 +162,11 @@ SPECS: dict[str, Spec] = {
     ),
     "voice.language": Spec("te-IN", "str", "Synthesis language tag."),
     "voice.auto_generate_on_publish": Spec(
-        False,
+        True,
         "bool",
-        "Generate audio the moment a story publishes, instead of on first request.",
+        "Attach audio to every story within five minutes of it publishing (and "
+        "after an edit to a live story), instead of on the first listener's "
+        "request. Each story is still generated once and then reused.",
     ),
     "voice.article_tts_enabled": Spec(
         True,
@@ -295,11 +297,11 @@ SPECS: dict[str, Spec] = {
         "security' is on in the Expo project; blank sends without one. "
         "Write-only.",
     ),
-    # --- audio bulletins, seven a day ----------------------------------------
+    # --- audio bulletins, six a day ------------------------------------------
     "bulletin.enabled": Spec(
         False,
         "bool",
-        "Produce and serve the seven daily audio bulletins. Off stops the "
+        "Produce and serve the six daily audio bulletins. Off stops the "
         "schedule and hides every bulletin, including ones already live — this "
         "is the emergency stop.",
     ),
@@ -309,14 +311,7 @@ SPECS: dict[str, Spec] = {
         "Hold each rendered bulletin at Ready until an editor publishes it. Off "
         "(the default) publishes on schedule, which is safe because a bulletin "
         "is assembled only from stories an editor already approved and "
-        "published; the AI writes the joining sentences, not the facts.",
-    ),
-    "bulletin.ai_script_enabled": Spec(
-        False,
-        "bool",
-        "Let the AI provider write the linking phrases between stories. Off "
-        "uses fixed Telugu connectives. Story text always comes from published "
-        "copy either way.",
+        "published; nothing in the script is machine-written.",
     ),
     "bulletin.target_seconds": Spec(
         180, "int", "Target bulletin length in seconds."

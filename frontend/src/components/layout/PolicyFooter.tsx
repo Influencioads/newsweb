@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
 import { PageContainer } from '@/components/ui/Layout';
+import { EPAPER_PUBLIC } from '@/features/epaper/api';
 import { useI18n, useScript, type StringKey } from '@/i18n';
 import { cn } from '@/utils/cn';
 
@@ -13,7 +14,7 @@ import { FOOTER_LINKS, useSiteConfig } from './NavDrawer';
  * copyright line. Nothing here goes below `text-meta`.
  */
 
-const PRODUCT_LINKS: readonly (readonly [string, StringKey])[] = [
+const PRODUCT_LINKS: readonly (readonly [string, StringKey])[] = ([
   ['/live-blog', 'ui.liveBlog'],
   ['/photos', 'ui.photos'],
   ['/videos', 'ui.videos'],
@@ -21,7 +22,7 @@ const PRODUCT_LINKS: readonly (readonly [string, StringKey])[] = [
   ['/epaper', 'nav.epaper'],
   ['/short-news', 'page.shortNews'],
   ['/my-epaper', 'page.myEpaper'],
-];
+] satisfies (readonly [string, StringKey])[]).filter(([to]) => EPAPER_PUBLIC || !to.includes('epaper'));
 
 const LINK =
   'flex min-h-tap items-center py-2 text-ui-sm text-muted-inverse ' +

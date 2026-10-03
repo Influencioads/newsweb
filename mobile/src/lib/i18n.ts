@@ -98,7 +98,7 @@ const STRINGS = {
   'foryou.title': { te: 'మీ కోసం', en: 'For you' },
   'article.listen': { te: 'వినండి', en: 'Listen' },
   'article.stopListening': { te: 'ఆపండి', en: 'Stop' },
-  'article.listenTagline': { te: 'కళ్ళకు విశ్రాంతి, చెవులకు వార్తలు', en: 'Rest your eyes, tune in to the news' },
+  'article.listenTagline': { te: 'చదివే టైం లేదా? వినేయండి!', en: 'No time to read? Just listen!' },
   'submit.title': { te: 'కథనం పంపండి', en: 'Submit a story' },
   'submit.hint': {
     te: 'మీ ప్రాంత విశేషాలు రాయండి. మోడరేషన్, సంపాదకీయ సమీక్ష తర్వాత మీ పేరుతో ప్రచురిస్తాం.',

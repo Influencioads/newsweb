@@ -635,11 +635,10 @@ class TestRewrite:
         assert rewrite.body is None
         assert item.status == IngestStatus.NEW, "a refusal does not consume the item"
 
-    def test_attribution_is_added_even_when_the_model_omits_it(
+    def test_attribution_is_recorded_but_never_printed(
         self, db: Session, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Never trust the model to attribute. It usually will; usually is not
-        good enough when the failure is republishing without credit."""
+        """Owner, 2026-10-03: readers never see an outlet's name. The desk does."""
         install_ai(monkeypatch, FakeAi())
         source = make_source(db, slug="r-credit")
         item = make_item(db, source, guid="c1")
@@ -648,7 +647,7 @@ class TestRewrite:
         rewrite = crawl_service.rewrite_one(db, item)
         db.commit()
         assert rewrite.status == RewriteStatus.READY
-        assert source.name in (rewrite.body_plain or "")
+        assert source.name not in (rewrite.body_plain or "")
         assert rewrite.attribution_te.startswith("మూలం:")
 
     def test_a_near_verbatim_telugu_rewrite_is_refused(
@@ -1424,8 +1423,9 @@ class TestOurOwnMasthead:
         _item, fake = self._item(db, monkeypatch, "mast-flag", credit=False)
         assert fake.last_kwargs["credit_source"] is False
 
+        # The source's flag no longer turns a printed credit back on.
         _item, fake = self._item(db, monkeypatch, "mast-flag-on", credit=True)
-        assert fake.last_kwargs["credit_source"] is True
+        assert fake.last_kwargs["credit_source"] is False
 
     def test_no_credit_paragraph_is_appended(
         self, db: Session, monkeypatch: pytest.MonkeyPatch
@@ -1439,11 +1439,11 @@ class TestOurOwnMasthead:
         assert rewrite.attribution_te
         assert item.source.name in rewrite.attribution_te
 
-    def test_the_credit_paragraph_survives_when_the_source_requires_it(
+    def test_no_credit_paragraph_even_when_the_source_requires_it(
         self, db: Session, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         item, _fake = self._item(db, monkeypatch, "mast-body-on", credit=True)
-        assert "మూలం:" in (item.latest_rewrite.body_plain or "")
+        assert "మూలం:" not in (item.latest_rewrite.body_plain or "")
 
     def test_an_uncredited_rewrite_imports_under_our_byline(
         self, db: Session, monkeypatch: pytest.MonkeyPatch

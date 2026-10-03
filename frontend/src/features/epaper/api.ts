@@ -10,6 +10,10 @@ import type {
 } from "@/types/epaper";
 import type { ArticleCard } from "@/types/public";
 
+/** Public E-Paper is paused: readers see no links and its routes go home.
+ *  Admin building/publishing and the backend API are untouched — flip to resume. */
+export const EPAPER_PUBLIC = false;
+
 export const fetchTodayEpaper = async () =>
   (await api.get<EpaperEdition>("/epaper/today")).data;
 export const fetchEpaper = async (date: string) =>

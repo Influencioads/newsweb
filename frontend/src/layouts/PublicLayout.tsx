@@ -54,6 +54,22 @@ export default function PublicLayout() {
       </main>
 
       <PolicyFooter />
+      <LogoCube />
     </div>
+  );
+}
+
+/** Decoration pinned to the screen's bottom-left on every reader page: the official T mark on four faces of a turning cube (styles: `.logo-cube`). */
+function LogoCube() {
+  return (
+    <span className="logo-cube" aria-hidden="true">
+      <span>
+        {(['front', 'back', 'right', 'left', 'top', 'bottom'] as const).map((face) => (
+          <span key={face} data-face={face}>
+            {face !== 'top' && face !== 'bottom' && <img src="/logo-mark.webp" alt="" width={192} height={97} />}
+          </span>
+        ))}
+      </span>
+    </span>
   );
 }

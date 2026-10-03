@@ -82,7 +82,7 @@ function FrontGrid({ data }: { data: HomePayload }) {
           ))}
         </section>
 
-        <EpaperRail teaser={data.epaper} />
+        {epaperApi.EPAPER_PUBLIC && <EpaperRail teaser={data.epaper} />}
 
         {/* §26 house-ad slot; collapses when no campaign matches. */}
         <AdSlot placement="in_feed" />
@@ -158,7 +158,7 @@ export default function Home() {
               />
             ) : null}
 
-            {data.epaper ? <EpaperPromo epaper={data.epaper} /> : null}
+            {epaperApi.EPAPER_PUBLIC && data.epaper ? <EpaperPromo epaper={data.epaper} /> : null}
             <TopTopics topics={topics.data?.items ?? []} />
 
             {/* §3.2 — signed-in readers only. */}

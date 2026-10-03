@@ -5,7 +5,7 @@ Three rules, in priority order:
   1. **§20** — audio exists only when the global switch *and* the article's own
      flag are both on. Either being off means no player and no provider call.
   2. **§21** — the same words are never paid for twice. The row is keyed by
-     `(article_id, sha256(text))`, so a republish that changed nothing re-uses
+     `(article_id, words_hash)`, so a republish that changed nothing re-uses
      the file, and a monthly character budget caps the worst case.
   3. Failure is never fatal. No provider, no key, a 502 from the vendor — all
      end with `None`, and the reader falls back to the on-device voice that
@@ -59,10 +59,8 @@ def spoken_text(article: Article) -> str:
     was measured to misread — the rupee sign, percentages, decimal lakhs,
     ungrouped years, Latin abbreviations, and print breaks that buy no pause.
 
-    This is what `content_hash` is taken over, so a change to those rules
-    re-renders (and re-bills) every article the next time it is opened. That
-    is correct — the words changed — but it is why the rules are tied to
-    measured failures and not to taste.
+    The cache key is *not* taken over this (see `words_hash`), so a change to
+    those rules reaches stored audio only through an explicit regenerate.
     """
     text = tts_text.assemble(
         article.title_te or "",
@@ -79,6 +77,26 @@ def spoken_text(article: Article) -> str:
 
 def content_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def words_hash(article: Article) -> str:
+    """§21 cache key: the editor's words, not our reading of them.
+
+    Hashing `spoken_text` made every reading-rule tweak re-render — and
+    re-bill — every story the next time a reader pressed Listen. Same policy
+    as `configured_voice`: only an edit re-renders on its own; rule and voice
+    changes reach the archive through the Voice screen's `force` regenerate.
+    """
+    return content_hash(
+        "\x1f".join(
+            (
+                article.title_te or "",
+                article.sub_title_te or "",
+                article.summary_te or "",
+                article.body_plain or "",
+            )
+        )
+    )
 
 
 def configured_voice(db: Session) -> str | None:
@@ -308,7 +326,11 @@ def synthesise_long(
     each segment returns, so a chunk that fails halfway still leaves behind what
     the vendor has already charged for the chunks before it.
     """
-    chunks = audio_concat.split_for_tts(text, max_chars=provider.max_chars)
+    # Every voice call reads copy, not print: "రూ.2,000" is "2,000 రూపాయలు"
+    # aloud. Idempotent, so text `tts_text.assemble` already prepared is unchanged.
+    chunks = audio_concat.split_for_tts(
+        tts_text.for_speech(text), max_chars=provider.max_chars
+    )
     if not chunks:
         raise AiProviderError(details={"tts": "nothing to synthesise"})
 
@@ -342,7 +364,7 @@ def existing_ready(db: Session, article: Article) -> AudioAsset | None:
     upload = uploaded_asset(db, article)
     if upload is not None:
         return upload
-    digest = content_hash(spoken_text(article))
+    digest = words_hash(article)
     return db.scalar(
         select(AudioAsset).where(
             AudioAsset.article_id == article.id,
@@ -378,7 +400,7 @@ def ensure_audio(
     text = spoken_text(article)
     if not text:
         return None
-    digest = content_hash(text)
+    digest = words_hash(article)
 
     row = db.scalar(
         select(AudioAsset).where(
@@ -450,7 +472,9 @@ def ensure_audio(
         return None
 
     extension = "mp3" if mime == "audio/mpeg" else "wav"
-    key = f"audio/{article.short_id}/{digest[:16]}.{extension}"
+    # Keyed by the audio itself, not `digest`: a forced re-render keeps the
+    # same row but must not overwrite an object browsers cache as immutable.
+    key = f"audio/{article.short_id}/{hashlib.sha256(audio).hexdigest()[:16]}.{extension}"
     stored = get_storage().put(
         key,
         audio,

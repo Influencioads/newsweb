@@ -23,6 +23,7 @@ os.environ.setdefault("APP_ENV", "test")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+from app.core.config import SITE_NAME_TE  # noqa: E402
 from app.db.base import Base, utcnow  # noqa: E402
 from app.db.seed import (  # noqa: E402
     seed_districts,
@@ -381,7 +382,39 @@ class TestImport:
         assert published.status_code == 422
         assert "source credit" in published.json()["error"]["message_en"].lower()
 
-    def test_an_excerpt_only_import_carries_the_link_not_the_body(
+    def test_readers_never_see_the_outlet(
+        self, client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Owner, 2026-10-03: the CMS keeps the source; the public API never names it."""
+        item = self._queued(db, monkeypatch, "outlet-tv", SourceLicence.AGENCY_CONTRACT,
+                            ContentPolicy.FULL_TEXT, note="Wire contract")
+        editor = staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="j-editor@test.example.com")
+        approver = staff_headers(db, role=RoleKey.ADMIN, email="j-admin2@test.example.com")
+        article_id = client.post(f"/api/v1/cms/ingestion/{item.id}/import",
+                                 headers=editor).json()["article_id"]
+        article = db.get(Article, article_id)
+        hero = Media(type=MediaType.IMAGE, filename="hero.webp", mime="image/webp",
+                     storage_provider="test", storage_key="images/test/outlet-tv.webp",
+                     source_type="syndicated", credit="Outlet Tv",
+                     meta={"landing_url": "https://outlet.example/photo"})
+        db.add(hero)
+        db.flush()
+        article.hero_media_id = hero.id
+        db.commit()
+        client.post(f"/api/v1/cms/articles/{article_id}/submit", json={}, headers=editor)
+        client.post(f"/api/v1/cms/articles/{article_id}/approve", json={}, headers=approver)
+        r = client.post(f"/api/v1/cms/articles/{article_id}/publish", json={}, headers=editor)
+        assert r.status_code == 200, r.text
+        assert db.get(Article, article_id).source_credit == "Outlet Tv"  # the desk still has it
+
+        page = client.get(f"/api/v1/public/articles/{article.short_id}")
+        assert page.status_code == 200
+        for name in ("Outlet Tv", "outlet.example", "Staff Reporter"):
+            assert name not in page.text, name
+        assert item.canonical_url not in page.text
+        assert page.json()["byline_te"] == SITE_NAME_TE
+
+    def test_an_excerpt_only_import_carries_no_body_and_no_outlet(
         self, client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         item = self._queued(db, monkeypatch, "excerpt-import", SourceLicence.RSS_PUBLIC,
@@ -393,8 +426,8 @@ class TestImport:
         article = db.get(Article, article_id)
         assert "second paragraph" not in (article.body_plain or ""), \
             "an unlicensed source must not reach the article body"
-        assert article.canonical_url in (article.body_plain or ""), \
-            "the reader must be sent to the publisher"
+        assert article.canonical_url not in (article.body_plain or "")
+        assert article.source_credit not in (article.body_plain or "")
 
     def test_importing_twice_is_refused(
         self, client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch

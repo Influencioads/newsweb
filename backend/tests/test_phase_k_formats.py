@@ -225,7 +225,7 @@ class TestFormats:
                 article_id=article.id,
                 content_hash="upload-1"
                 if upload
-                else tts_service.content_hash(tts_service.spoken_text(article)),
+                else tts_service.words_hash(article),
                 status=AudioStatus.READY,
                 provider=tts_service.UPLOAD_PROVIDER if upload else "local",
                 url=f"https://cdn.example/audio/{article.short_id}.mp3",

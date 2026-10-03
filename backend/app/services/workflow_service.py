@@ -615,19 +615,8 @@ def transition(
             get_logger(__name__).exception(
                 "notification_fanout_failed", article_id=article.id
             )
-        # §20 optional pre-generation. Same reasoning as the fan-out: a TTS
-        # provider outage must never block publication.
-        try:
-            from app.services import settings_service, tts_service
-
-            if settings_service.get_bool(db, "voice.auto_generate_on_publish"):
-                tts_service.ensure_audio(db, article, requested_by=principal.id)
-        except Exception:  # noqa: BLE001
-            from app.core.logging import get_logger
-
-            get_logger(__name__).exception(
-                "tts_pregenerate_failed", article_id=article.id
-            )
+        # §20 audio is attached by `voice.publish_sweep` within a few minutes,
+        # never here: publishing must not wait on a TTS provider.
     elif action == "unpublish":
         article.status = ArticleStatus.UNPUBLISHED
     elif target in {WorkflowState.SUBMITTED, WorkflowState.IN_REVIEW}:

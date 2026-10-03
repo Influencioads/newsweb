@@ -80,6 +80,12 @@ celery.conf.beat_schedule = {
     },
     # Overnight, when nobody is generating audio by hand.
     "voice-backfill": {"task": "voice.backfill", "schedule": crontab(minute="20", hour="2")},
+    # New and edited stories get their audio within one tick of going live.
+    "voice-publish-sweep": {
+        "task": "voice.publish_sweep",
+        "schedule": 300.0,
+        "options": {"expires": 240},
+    },
     # Identity documents past their retention window. Not optional: this is
     # what makes "we verify contributors" different from "we keep strangers'
     # passport scans forever".

@@ -19,7 +19,7 @@ import { cn } from '@/utils/cn';
 import { useReveal } from '@/utils/motion';
 
 /**
- * The bulletin desk — seven named slots a day, 07:00 to 21:00 IST. The names
+ * The bulletin desk — six named slots a day, 07:00 to 21:00 IST. The names
  * ("గరం చాయ్ న్యూస్" at 07:00 and so on) live in `bulletin_service._LABELS_TE`
  * and arrive on each row as `slot_label_te`.
  *
@@ -119,7 +119,7 @@ function BulletinCard({ bulletin, live, onChanged }: { bulletin: BulletinRow; li
   const { confirm, dialog } = useConfirm();
   const [open, setOpen] = useState(false);
   const id = useId();
-  const tts = useTts(bulletin.script_te ?? '');
+  const tts = useTts((bulletin.script_te ?? '').replaceAll('♪', ''));
 
   const done = (msg: string) => () => {
     toast.success(msg);
@@ -358,8 +358,8 @@ export default function BulletinsPage() {
       title={t('admin.page.bulletins')}
       width="page"
       subtitle={L(
-        'రోజుకు ఏడు, ఉదయం 7 నుంచి రాత్రి 9 వరకు. అన్నీ ఇప్పటికే ప్రచురించిన వార్తలే కాబట్టి దానంతట ప్రసారమవుతాయి — పేరు తప్పు పలికితే స్క్రిప్ట్ మార్చండి, తప్పుంటే ఆపండి.',
-        'Seven a day, 07:00 to 21:00. Each one reads stories that are already published, so it goes on air automatically — edit a script when a name is mispronounced, or pull one if something is wrong.',
+        'రోజుకు ఆరు, ఉదయం 7 నుంచి రాత్రి 9 వరకు. అన్నీ ఇప్పటికే ప్రచురించిన వార్తలే కాబట్టి దానంతట ప్రసారమవుతాయి — పేరు తప్పు పలికితే స్క్రిప్ట్ మార్చండి, తప్పుంటే ఆపండి.',
+        'Six a day, 07:00 to 21:00. Each one reads stories that are already published, so it goes on air automatically — edit a script when a name is mispronounced, or pull one if something is wrong.',
       )}
     >
       <Field label={L('తేదీ', 'Date')} className="max-w-xs">

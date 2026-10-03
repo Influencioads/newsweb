@@ -533,9 +533,9 @@ def reject_item(
 def _body_document(item: IngestedItem, source: ContentSource) -> dict[str, Any]:
     """Build the Tiptap body an imported item becomes.
 
-    For a licensed full-text source that is the publisher's paragraphs plus the
-    disclaimer. For everything else it is the excerpt and a link — which is the
-    whole article, honestly, and exactly what a feed entitles us to.
+    For a licensed full-text source that is the publisher's paragraphs; for
+    everything else the excerpt. No credit line: readers never see an outlet's
+    name (owner, 2026-10-03) — `source_credit` and `canonical_url` keep it.
     """
     paragraphs: list[str] = []
     if source.may_store_full_text and item.content_html:
@@ -544,12 +544,6 @@ def _body_document(item: IngestedItem, source: ContentSource) -> dict[str, Any]:
         paragraphs = [p for p in paragraphs if p]
     if not paragraphs:
         paragraphs = [item.summary or item.title]
-
-    if source.attribution_required:
-        credit = f"మూలం: {source.name}"
-        if item.canonical_url:
-            credit += f" — {item.canonical_url}"
-        paragraphs.append(credit)
 
     return {
         "type": "doc",
@@ -1110,7 +1104,8 @@ def import_item(
         workflow_state=(
             WorkflowState.SUBMITTED if rewrite is not None else WorkflowState.DRAFT
         ),
-        byline_te=(item.author or source.name)[:200],
+        # Never the feed's reporter or outlet: nobody there wrote this copy.
+        byline_te=SITE_NAME_TE,
         published_at=None,
         ai_generated=rewrite is not None,
         ai_model=(rewrite.model if rewrite is not None else None),
@@ -1231,13 +1226,6 @@ def _apply_masthead(
     """
     if not is_rewrite or source.attribution_required:
         return
-
-    # The byline goes first and unconditionally. `byline_te` was
-    # `item.author or source.name` — the feed's own journalist — so a rewrite
-    # nobody at that outlet wrote was going out under a named reporter there.
-    # That is a worse misattribution than the missing credit, and no
-    # photograph makes it right.
-    article.byline_te = SITE_NAME_TE
 
     if article.hero_media_id is not None:
         hero = db.get(Media, article.hero_media_id)

@@ -5,6 +5,7 @@ import { LogIn, MapPin, Newspaper, Radio, TrendingUp, UserRound, Video, Zap } fr
 
 import { Sheet } from '@/components/ui/Dialog';
 import { Icon, type LucideIcon } from '@/components/ui/Icon';
+import { EPAPER_PUBLIC } from '@/features/epaper/api';
 import * as publicApi from '@/features/public/api';
 import { useI18n, useScript, type StringKey } from '@/i18n';
 import { useAuth } from '@/stores/auth';
@@ -114,12 +115,14 @@ export function NavDrawer({ open, onClose }: NavDrawerProps) {
           <li className="px-3 pb-2">
             <LanguageToggle />
           </li>
+          {EPAPER_PUBLIC && (
           <li>
             <NavLink to="/epaper" className={({ isActive }) => rowClass(isActive, s.body)}>
               <Icon icon={Newspaper} size="md" />
               {t('nav.epaper')}
             </NavLink>
           </li>
+          )}
           {SHORTCUTS.map((sc) => (
             <li key={sc.to}>
               <NavLink to={sc.to} className={({ isActive }) => rowClass(isActive, s.body)}>

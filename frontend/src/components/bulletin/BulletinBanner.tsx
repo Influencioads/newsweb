@@ -1,17 +1,18 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { ChevronRight, Pause, Play, Radio } from 'lucide-react';
 
 import { api } from '@/api/client';
+import { bulletinArt } from '@/components/bulletin/art';
 import { Equalizer } from '@/components/player/parts';
-import { IconButton, IconButtonLink } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { useI18n, useScript } from '@/i18n';
 import { selectTrack, usePlayer } from '@/stores/player';
 import { cn } from '@/utils/cn';
 
 /**
- * "▶ వినండి: గరం చాయ్ న్యూస్" — the latest audio bulletin as one strip at the
- * top of the home page.
+ * The latest audio bulletin at the top of the home page: the show's own banner
+ * art (`art.ts`) as the play button, its name, time and length underneath.
  *
  * `/public/bulletins/latest` is the same serialized bulletin as the slot route,
  * file URL included, so play hands the global player a track straight away — no
@@ -74,51 +75,73 @@ export function BulletinBanner() {
       });
   }
 
-  return (
-    <section
-      aria-label={t('player.kind.bulletin')}
-      className="flex items-center gap-3 rounded-2xl border border-brand/20 border-l-4 border-l-breaking bg-brand-tint py-1.5 pl-3 pr-1.5 shadow-card"
-    >
-      {/* Live mark: equalizer while it plays, else the radio with a red pulse. */}
-      <span aria-hidden className="relative flex h-6 w-6 shrink-0 items-center justify-center text-breaking">
-        {playing ? (
-          <Equalizer playing />
-        ) : (
-          <>
-            <Icon icon={Radio} size="md" />
-            <span className="absolute right-0 top-0 h-2 w-2 rounded-pill bg-breaking motion-safe:animate-ping" />
-            <span className="absolute right-0 top-0 h-2 w-2 rounded-pill bg-breaking" />
-          </>
-        )}
-      </span>
+  const art = bulletinArt(data.slot);
 
-      <p className="min-w-0 flex-1 md:flex md:items-baseline md:gap-3">
-        <span className="block">
-          <span className={cn(s.body, 'text-ui font-bold text-breaking')}>{t('reader.listen')}:</span>{' '}
-          <span lang="te" className="th text-headline-xs font-bold text-ink">
+  return (
+    <section aria-label={t('player.kind.bulletin')} className="overflow-hidden rounded-2xl bg-black shadow-card">
+      {/* The show's banner is the play button — "Click To Listen" is drawn into it. */}
+      <button
+        type="button"
+        aria-label={`${t('reader.listen')}: ${title}`}
+        aria-pressed={playing}
+        onClick={listen}
+        className="group block w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-exclusive"
+      >
+        {art ? (
+          <img
+            src={art}
+            alt=""
+            decoding="async"
+            className="h-28 w-full object-contain transition-transform duration-base ease-standard group-hover:scale-[1.02] sm:h-32"
+          />
+        ) : (
+          <span lang="te" className="th flex h-28 items-center justify-center gap-2 text-headline-sm font-bold text-white sm:h-32">
+            <Icon icon={Play} size="md" />
             {title}
           </span>
-        </span>
-        <span className="block font-sans text-meta font-semibold tabular-nums text-ink-soft">
-          {clock}
-          {minutes ? (
-            <>
-              {' · '}
-              <span className={s.body}>{`${minutes} ${L('ని', 'min')}`}</span>
-            </>
-          ) : null}
-        </span>
-      </p>
+        )}
+      </button>
 
-      <IconButton
-        icon={playing ? Pause : Play}
-        label={`${t('reader.listen')}: ${title}`}
-        variant="primary"
-        round
-        pressed={playing}
-        onClick={listen}
-      />
-      <IconButtonLink to="/bulletin" icon={ChevronRight} label={L('ఈ రోజు బులెటిన్లన్నీ', 'All of today’s bulletins')} round />
+      <div className="flex items-center gap-2 border-t border-white/10 py-1 pl-3 pr-1 text-white">
+        {/* Live mark: equalizer while it plays, else the radio with a red pulse. */}
+        <span aria-hidden className="relative flex h-5 w-5 shrink-0 items-center justify-center text-breaking">
+          {playing ? (
+            <Equalizer playing />
+          ) : (
+            <>
+              <Icon icon={Radio} size="sm" />
+              <span className="absolute right-0 top-0 h-1.5 w-1.5 rounded-pill bg-breaking motion-safe:animate-ping" />
+              <span className="absolute right-0 top-0 h-1.5 w-1.5 rounded-pill bg-breaking" />
+            </>
+          )}
+        </span>
+        <p className="min-w-0 flex-1 truncate">
+          <span lang="te" className="th text-ui font-bold">
+            {title}
+          </span>
+          <span className="font-sans text-meta font-semibold tabular-nums text-white/70">
+            {' · '}
+            {clock}
+            {minutes ? (
+              <>
+                {' · '}
+                <span className={s.body}>{`${minutes} ${L('ని', 'min')}`}</span>
+              </>
+            ) : null}
+          </span>
+        </p>
+        {playing ? <Icon icon={Pause} size="sm" className="text-white/70" /> : null}
+        <Link
+          to="/bulletin"
+          className={cn(
+            s.body,
+            'flex min-h-tap shrink-0 items-center gap-0.5 rounded-xl px-2 text-ui-sm font-semibold text-white/80 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-exclusive',
+          )}
+        >
+          {L('అన్ని బులెటిన్లు', 'All bulletins')}
+          <Icon icon={ChevronRight} size="sm" />
+        </Link>
+      </div>
     </section>
   );
 }

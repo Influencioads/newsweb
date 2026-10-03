@@ -45,7 +45,6 @@ from app.db.session import get_db  # noqa: E402
 from app.integrations.ai import newsroom_style as ns  # noqa: E402
 from app.integrations.ai.base import (  # noqa: E402
     AiProvider,
-    DraftText,
     HeadlineOption,
     RewriteText,
 )
@@ -70,7 +69,6 @@ from app.models.user import Role, User, UserRole  # noqa: E402
 from app.services import (  # noqa: E402
     ai_assist_service,
     auth_service,
-    bulletin_service,
     crawl_service,
     settings_service,
 )
@@ -793,31 +791,6 @@ class TestAssist:
             headers=headers,
         ).json()
         assert "placeholder" in {i["code"] for i in body["style_issues"]}
-
-
-# --------------------------------------------------------------------------- #
-# The bulletin
-# --------------------------------------------------------------------------- #
-def test_the_bulletin_asks_for_no_house_style(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
-    seen: dict = {}
-
-    class _Fake(AiProvider):
-        key = "fake"
-
-        def propose_topics(self, **_kw):  # pragma: no cover
-            return []
-
-        def write_draft(self, **kw) -> DraftText:
-            seen.update(kw)
-            return DraftText(title_te="కలిపే వాక్యాలు", summary_te="", paragraphs_te=["తర్వాత ఈ వార్త."])
-
-        def rewrite_item(self, **_kw):  # pragma: no cover
-            raise NotImplementedError
-
-    enable_ai(db, monkeypatch, **{"bulletin.ai_script_enabled": True})
-    monkeypatch.setattr(bulletin_service, "get_ai", lambda **_kw: _Fake())
-    assert bulletin_service._ai_connectives(db, ["మొదటి శీర్షిక"]) is not None
-    assert seen["house_style"] is False
 
 
 # --------------------------------------------------------------------------- #

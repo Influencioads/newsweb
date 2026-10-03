@@ -88,17 +88,20 @@ def _cache_headers(response: Response, ttl: int | None = None) -> None:
 def _media_out(media: Any) -> MediaOut | None:
     if media is None:
         return None
-    from app.services.media_service import srcset_for
+    from app.services.media_service import CREDIT_EXEMPT, srcset_for
 
+    # Editorial decision (2026-10-03): readers never see another outlet's name.
+    # A borrowed photo's credit, licence and link stay on `Media` for the desk.
+    ours = media.source_type in CREDIT_EXEMPT
     return MediaOut(
         id=media.id,
         url=media.cdn_url,
         srcset=srcset_for(media) or None,
         alt_te=media.alt_te,
         caption_te=media.caption_te,
-        credit=media.credit,
-        license_label=media.copyright,
-        source_url=(media.meta or {}).get("landing_url"),
+        credit=media.credit if ours else None,
+        license_label=media.copyright if ours else None,
+        source_url=(media.meta or {}).get("landing_url") if ours else None,
         # Editorial decision (2026-10-02): readers never see that a picture was
         # AI-made, as with AI-drafted copy below. It still goes out as a
         # stand-in, so nobody takes the scene for the event.
@@ -582,7 +585,9 @@ def get_article(
         body=article.body,
         author=author,
         tags=[TagOut.model_validate(at.tag) for at in article.tags if at.tag],
-        source_credit=article.source_credit,
+        # Same decision as `_media_out`: the source stays in the CMS only, and
+        # a crawled story's canonical_url is the outlet's own page.
+        source_credit=None,
         word_count=article.word_count,
         updated_at=article.updated_at,
         corrected_at=article.corrected_at,
@@ -590,7 +595,11 @@ def get_article(
         critic_note_te=article.critic_note_te,
         seo_title=article.seo_title,
         seo_description=article.seo_description,
-        canonical_url=article.canonical_url,
+        canonical_url=(
+            None
+            if article.article_source_type in ("AI_REWRITE", "IMPORTED")
+            else article.canonical_url
+        ),
         gallery=[
             m
             for m in (

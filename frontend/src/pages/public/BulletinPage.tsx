@@ -5,6 +5,7 @@ import { Play, Radio } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { AudioPlayer } from '@/components/article/AudioPlayer';
+import { bulletinArt, SLOTS } from '@/components/bulletin/art';
 import { Equalizer, PAUSED } from '@/components/player/parts';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -17,7 +18,7 @@ import { cn } from '@/utils/cn';
 import { useDocumentTitle, useReveal } from '@/utils/motion';
 
 /**
- * Today's audio bulletins — seven a day, 07:00 to 21:00, each with its own
+ * Today's audio bulletins — six a day, 07:00 to 21:00, each with its own
  * name (`slot_label_te`, set on the server).
  *
  * Only slots that are actually on air appear. A slot that has not been
@@ -27,7 +28,7 @@ import { useDocumentTitle, useReveal } from '@/utils/motion';
  * The on-air bulletins are one running order for the global player: "Play
  * all", a tap on the radio dial, or any card's own listen control starts the
  * day's queue at that bulletin, and the player carries on to the next. The
- * dial shows all seven slots — off-air ones inert — with a needle that glides to
+ * dial shows all six slots — off-air ones inert — with a needle that glides to
  * the bulletin on air, or rests on the latest one when nothing plays.
  */
 
@@ -58,8 +59,7 @@ const NO_DEVICE_TTS = {
   stop: () => undefined,
 };
 
-/** The day's slots, in hours IST (`bulletin_service.SLOTS`); the dial spans the first to the last. */
-const SLOTS = [7, 9, 13, 15, 17, 19, 21];
+// The dial spans the first slot to the last.
 const FIRST = SLOTS[0]!;
 const SPAN = SLOTS[SLOTS.length - 1]! - FIRST;
 /** A tick every half hour; the ones on a slot's hour are drawn long. */
@@ -204,9 +204,30 @@ function BulletinCard({
     return null;
   }
   const duration = clock(bulletin.duration_sec);
+  const art = bulletinArt(bulletin.slot);
+  const id = bulletinId(bulletin.date, bulletin.slot);
+
+  // The art says "Click To Listen", so it does — a mouse shortcut to the player below,
+  // which stays the one keyboard and screen-reader control.
+  function listen(): void {
+    const player = usePlayer.getState();
+    if (player.queue[player.index]?.id === id) player.toggle();
+    else player.playQueue(queue, Math.max(0, queue.findIndex((track) => track.id === id)));
+  }
 
   return (
     <Card as="li" ref={revealRef} padding="md" className="space-y-3">
+      {art ? (
+        <button type="button" tabIndex={-1} aria-hidden onClick={listen} className="group block w-full overflow-hidden rounded-xl bg-black">
+          <img
+            src={art}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="h-28 w-full object-contain transition-transform duration-base ease-standard group-hover:scale-[1.02] sm:h-32"
+          />
+        </button>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2">
         <span lang="en" className="font-sans text-ui-sm font-bold tabular-nums text-ink-soft">
           {slotClock(bulletin.slot)}
@@ -287,8 +308,8 @@ export default function BulletinPage() {
         icon={Radio}
         title={L('ఆడియో వార్తలు', 'Audio news')}
         subtitle={L(
-          'రోజుకు ఏడు బులెటిన్లు, ఒక్కొక్కటి మూడు నిమిషాలు — ఉదయం 7 నుంచి రాత్రి 9 వరకు.',
-          'Seven three-minute bulletins a day, from 7am to 9pm.',
+          'రోజుకు ఆరు బులెటిన్లు, ఒక్కొక్కటి మూడు నిమిషాలు — ఉదయం 7 నుంచి రాత్రి 9 వరకు.',
+          'Six three-minute bulletins a day, from 7am to 9pm.',
         )}
       />
 

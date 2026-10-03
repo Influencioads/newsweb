@@ -281,8 +281,8 @@ class TestChunking:
 # Slots
 # --------------------------------------------------------------------------- #
 class TestSlots:
-    def test_seven_slots_from_seven_to_nine(self) -> None:
-        assert bulletin_service.SLOTS == (7, 9, 13, 15, 17, 19, 21)
+    def test_six_slots_from_seven_to_nine(self) -> None:
+        assert bulletin_service.SLOTS == (7, 9, 15, 17, 19, 21)
 
     def test_every_slot_has_a_name_and_only_slots_do(self) -> None:
         """A slot without a name would speak the generic fallback; a name
@@ -323,16 +323,16 @@ class TestContent:
         """This is the entire basis on which a bulletin may go live without a
         further approval."""
         day = bulletin_service.today()
-        publish_story(db, title="ప్రచురించిన వార్త ఒకటి", when=slot_time(day, 13))
+        publish_story(db, title="ప్రచురించిన వార్త ఒకటి", when=slot_time(day, 15))
         publish_story(
             db,
             title="డ్రాఫ్ట్‌లో ఉన్న వార్త",
-            when=slot_time(day, 13),
+            when=slot_time(day, 15),
             status=ArticleStatus.DRAFT,
         )
         db.commit()
 
-        chosen = bulletin_service.select_stories(db, day, 13, limit=10)
+        chosen = bulletin_service.select_stories(db, day, 15, limit=10)
         titles = {a.title_te for a in chosen}
         assert "ప్రచురించిన వార్త ఒకటి" in titles
         assert "డ్రాఫ్ట్‌లో ఉన్న వార్త" not in titles
@@ -340,13 +340,13 @@ class TestContent:
     def test_the_script_fits_three_minutes(self, db: Session) -> None:
         day = bulletin_service.today()
         articles = [
-            publish_story(db, title=f"వార్త శీర్షిక సంఖ్య {i}", when=slot_time(day, 13))
+            publish_story(db, title=f"వార్త శీర్షిక సంఖ్య {i}", when=slot_time(day, 15))
             for i in range(8)
         ]
         db.commit()
 
         script, spoken = bulletin_service.build_script(
-            db, day=day, slot=13, articles=articles
+            db, day=day, slot=15, articles=articles
         )
         assert len(spoken) == 8
         assert len(script) <= bulletin_service.MAX_SCRIPT_CHARS
@@ -355,30 +355,24 @@ class TestContent:
         # Each story's headline ends in a full stop, so the voice pauses before the story.
         assert all(piece.startswith("వార్త శీర్షిక సంఖ్య ") and ". " in piece for _a, piece in spoken)
 
-    def test_the_heuristic_skeleton_can_never_be_broadcast(
-        self, db: Session, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """`HeuristicAi.write_draft` returns "[రాయవలసి ఉంది] …" — literally
-        "needs writing", meant for a journalist. Speaking it to listeners is a
-        failure nobody would catch until a reader complained."""
-        configure(db, **{"ai.enabled": True, "bulletin.ai_script_enabled": True})
+    def test_it_greets_then_reads_each_story_clean_between_stings(self, db: Session) -> None:
+        """Greeting ♪ story ♪ story ♪ close — no headline roll, no spoken filler."""
         day = bulletin_service.today()
         articles = [
-            publish_story(db, title=f"శీర్షిక {i}", when=slot_time(day, 13))
-            for i in range(3)
+            publish_story(db, title=f"శీర్షిక {i}", when=slot_time(day, 7)) for i in range(3)
         ]
         db.commit()
 
-        script, _spoken = bulletin_service.build_script(
-            db, day=day, slot=13, articles=articles
-        )
-        assert "[రాయవలసి ఉంది]" not in script
-        assert "[" not in script
+        script, spoken = bulletin_service.build_script(db, day=day, slot=7, articles=articles)
+        blocks = [b.strip() for b in script.split(bulletin_service.MUSIC_MARK)]
+        assert blocks[0] == "నమస్తే! మీరు వింటున్నారు గరం చాయ్ న్యూస్, టాప్ తెలుగు న్యూస్ నుంచి."
+        assert blocks[1:-1] == [piece for _a, piece in spoken]
+        assert blocks[-1] == bulletin_service._CLOSE_TE
 
     def test_a_slot_with_no_stories_is_skipped_not_empty(self, db: Session) -> None:
         configure(db, **{"bulletin.enabled": True})
         day = bulletin_service.today()
-        bulletin = bulletin_service.get_or_create(db, day, 13)
+        bulletin = bulletin_service.get_or_create(db, day, 15)
         bulletin_service.script_bulletin(db, bulletin)
         db.commit()
         assert bulletin.status == BulletinStatus.SKIPPED
@@ -396,7 +390,7 @@ class TestContent:
 # Rendering and the kill switch
 # --------------------------------------------------------------------------- #
 class TestRenderAndSwitches:
-    def _prepare(self, db: Session, monkeypatch: pytest.MonkeyPatch, slot: int = 13):
+    def _prepare(self, db: Session, monkeypatch: pytest.MonkeyPatch, slot: int = 15):
         provider = FakeTts()
         install_tts(monkeypatch, provider)
         day = bulletin_service.today()
@@ -411,7 +405,7 @@ class TestRenderAndSwitches:
         configure(db, **{"bulletin.enabled": True, "voice.enabled": True})
         provider, day = self._prepare(db, monkeypatch)
 
-        bulletin = bulletin_service.run_slot(db, day=day, slot=13)
+        bulletin = bulletin_service.run_slot(db, day=day, slot=15)
         db.commit()
         assert bulletin is not None
         assert bulletin.status == BulletinStatus.PUBLISHED
@@ -420,13 +414,53 @@ class TestRenderAndSwitches:
         assert bulletin.duration_sec > 0
         assert len(bulletin.items) >= 1
 
+    def test_a_sting_plays_between_blocks_and_is_never_spoken(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        configure(db, **{"bulletin.enabled": True})
+        provider, day = self._prepare(db, monkeypatch)
+        bulletin = bulletin_service.run_slot(db, day=day, slot=15)
+        db.commit()
+        assert bulletin is not None and bulletin.status == BulletinStatus.PUBLISHED
+
+        stings = bulletin.script_te.count(bulletin_service.MUSIC_MARK)
+        assert stings == len(bulletin.items) + 1
+        assert not any(bulletin_service.MUSIC_MARK in t for t in provider.texts)
+        voiced = sum(max(1, round(len(t) / 12.0)) for t in provider.texts)
+        # 0.4 s + 2.5 s sting + 0.25 s, each
+        assert abs(bulletin.duration_sec - (voiced + stings * 3.15)) <= 1
+
+    def test_the_sting_takes_the_voice_format_and_sits_under_it(self) -> None:
+        rate = 8000  # far from the asset's 22.05 kHz: the resample path
+        buffer = io.BytesIO()
+        with wave.open(buffer, "wb") as out:
+            out.setnchannels(1)
+            out.setsampwidth(2)
+            out.setframerate(rate)
+            out.writeframes(
+                b"".join(struct.pack("<h", int(1000 * math.sin(i / 3))) for i in range(rate))
+            )
+
+        sting = bulletin_service._sting_like([buffer.getvalue()])
+        assert sting is not None
+        with wave.open(io.BytesIO(sting)) as w:
+            assert (w.getnchannels(), w.getsampwidth(), w.getframerate()) == (1, 2, rate)
+            assert abs(w.getnframes() / rate - 3.15) < 0.01
+            frames = w.readframes(w.getnframes())
+        samples = struct.unpack(f"<{len(frames) // 2}h", frames)
+        music = samples[int(0.4 * rate) : int(0.4 * rate) + int(2.5 * rate)]
+        assert not any(samples[: int(0.4 * rate)])  # the silence before it
+        level = math.sqrt(sum(s * s for s in music) / len(music))
+        # The voice RMS is ~707; the sting sits 6 dB under it.
+        assert 707 * 10 ** (-7 / 20) < level < 707 * 10 ** (-5 / 20)
+
     def test_run_slot_is_idempotent(
         self, db: Session, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         configure(db, **{"bulletin.enabled": True})
         _provider, day = self._prepare(db, monkeypatch)
-        bulletin_service.run_slot(db, day=day, slot=13)
-        bulletin_service.run_slot(db, day=day, slot=13)
+        bulletin_service.run_slot(db, day=day, slot=15)
+        bulletin_service.run_slot(db, day=day, slot=15)
         db.commit()
         rows = db.scalars(
             select(AudioBulletin).where(AudioBulletin.bulletin_date == day)
@@ -438,7 +472,7 @@ class TestRenderAndSwitches:
     ) -> None:
         configure(db, **{"bulletin.enabled": True, "bulletin.requires_approval": True})
         _provider, day = self._prepare(db, monkeypatch)
-        bulletin = bulletin_service.run_slot(db, day=day, slot=13)
+        bulletin = bulletin_service.run_slot(db, day=day, slot=15)
         db.commit()
         assert bulletin is not None
         assert bulletin.status == BulletinStatus.READY
@@ -449,7 +483,7 @@ class TestRenderAndSwitches:
     ) -> None:
         configure(db, **{"bulletin.enabled": True})
         _provider, day = self._prepare(db, monkeypatch)
-        bulletin = bulletin_service.run_slot(db, day=day, slot=13)
+        bulletin = bulletin_service.run_slot(db, day=day, slot=15)
         db.commit()
         assert bulletin is not None and bulletin.status == BulletinStatus.PUBLISHED
         assert bulletin_service.serialize(db, bulletin)["available"] is True
@@ -465,7 +499,7 @@ class TestRenderAndSwitches:
     ) -> None:
         configure(db, **{"bulletin.enabled": True})
         _provider, day = self._prepare(db, monkeypatch)
-        bulletin = bulletin_service.run_slot(db, day=day, slot=13)
+        bulletin = bulletin_service.run_slot(db, day=day, slot=15)
         db.commit()
         assert bulletin is not None
         url = bulletin.url
@@ -492,12 +526,12 @@ class TestRenderAndSwitches:
             publish_story(
                 db,
                 title=f"పొడవైన వార్త {i}",
-                when=slot_time(day, 13),
+                when=slot_time(day, 15),
                 summary=TELUGU_SUMMARY * 4,
             )
         db.commit()
 
-        bulletin = bulletin_service.run_slot(db, day=day, slot=13)
+        bulletin = bulletin_service.run_slot(db, day=day, slot=15)
         db.commit()
         assert bulletin is not None
         assert bulletin.char_count > 1_650, "a real three-minute Telugu script"
@@ -516,7 +550,7 @@ class TestRenderAndSwitches:
         configure(db, **{"bulletin.enabled": True})
         _provider, day = self._prepare(db, monkeypatch)
         before = tts_service.month_chars_used(db)
-        bulletin = bulletin_service.run_slot(db, day=day, slot=13)
+        bulletin = bulletin_service.run_slot(db, day=day, slot=15)
         db.commit()
         assert bulletin is not None
         assert tts_service.month_chars_used(db) == before + bulletin.char_count
@@ -529,7 +563,7 @@ class TestRenderAndSwitches:
             **{"bulletin.enabled": True, "voice.monthly_char_budget": 10},
         )
         provider, day = self._prepare(db, monkeypatch)
-        bulletin = bulletin_service.run_slot(db, day=day, slot=13)
+        bulletin = bulletin_service.run_slot(db, day=day, slot=15)
         db.commit()
         assert bulletin is not None
         assert bulletin.status == BulletinStatus.FAILED
@@ -550,9 +584,9 @@ class TestEndpoints:
         provider = FakeTts()
         install_tts(monkeypatch, provider)
         day = bulletin_service.today()
-        publish_story(db, title="ఒక ప్రచురిత వార్త", when=slot_time(day, 13))
+        publish_story(db, title="ఒక ప్రచురిత వార్త", when=slot_time(day, 15))
         db.commit()
-        bulletin_service.run_slot(db, day=day, slot=13)
+        bulletin_service.run_slot(db, day=day, slot=15)
         db.commit()
 
         body = client.get("/api/v1/public/bulletins/latest").json()
@@ -562,7 +596,7 @@ class TestEndpoints:
         ):
             assert key in body, key
         assert body["available"] is True
-        assert body["slot"] == 13
+        assert body["slot"] == 15
         assert body["items"]
 
     def test_an_unpublished_slot_is_404_to_readers(
@@ -572,12 +606,12 @@ class TestEndpoints:
         provider = FakeTts()
         install_tts(monkeypatch, provider)
         day = bulletin_service.today()
-        publish_story(db, title="మరో వార్త ఇక్కడ", when=slot_time(day, 13))
+        publish_story(db, title="మరో వార్త ఇక్కడ", when=slot_time(day, 15))
         db.commit()
-        bulletin_service.run_slot(db, day=day, slot=13)
+        bulletin_service.run_slot(db, day=day, slot=15)
         db.commit()
 
-        response = client.get(f"/api/v1/public/bulletins/{day.isoformat()}/13")
+        response = client.get(f"/api/v1/public/bulletins/{day.isoformat()}/15")
         assert response.status_code == 404
 
     def test_running_while_disabled_is_refused(
@@ -604,9 +638,9 @@ class TestEndpoints:
         provider = FakeTts()
         install_tts(monkeypatch, provider)
         day = bulletin_service.today()
-        publish_story(db, title="సరిచేయవలసిన వార్త", when=slot_time(db and day, 13))
+        publish_story(db, title="సరిచేయవలసిన వార్త", when=slot_time(db and day, 15))
         db.commit()
-        bulletin = bulletin_service.run_slot(db, day=day, slot=13)
+        bulletin = bulletin_service.run_slot(db, day=day, slot=15)
         db.commit()
         assert bulletin is not None
 

@@ -638,11 +638,7 @@ export default function SettingsPage() {
           <Switch checked={bool('bulletin.requires_approval')} onChange={(v) => set('bulletin.requires_approval', v)}
             disabled={!bool('bulletin.enabled')}
             label={en ? 'An editor must approve before it airs' : 'ప్రసారానికి ముందు ఎడిటర్ ఆమోదం'}
-            hint={en ? 'Recommended while the script is machine-written.' : 'స్క్రిప్ట్ AI రాస్తున్నప్పుడు సిఫారసు.'} />
-          <Switch checked={bool('bulletin.ai_script_enabled')} onChange={(v) => set('bulletin.ai_script_enabled', v)}
-            disabled={!bool('bulletin.enabled') || !bool('ai.enabled')}
-            label={en ? 'Let AI write the linking script' : 'కలిపే స్క్రిప్ట్ను AI రాయనివ్వండి'}
-            hint={en ? 'Needs AI switched on above. Off uses the headlines alone.' : 'పైన AI ఆన్ చేయాలి.'} />
+            hint={en ? 'Stories are read from published copy, a music sting between each.' : 'ప్రచురించిన వార్తలే చదువుతారు, మధ్యలో సంగీతం.'} />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={en ? 'Target length (seconds)' : 'లక్ష్య నిడివి (సెకన్లు)'}>
               <Input script="en" type="number" min={30} max={900}

@@ -5,7 +5,7 @@ seeked, cannot be cached, and sounds different on every handset. §19 asks for a
 real audio file, so one row here per generated rendition.
 
 §21 (cost control) is the `content_hash` column, not a separate mechanism: the
-hash covers the exact text that was sent to the provider, so re-publishing an
+hash covers the editor's words (`tts_service.words_hash`), so re-publishing an
 article whose words did not change re-uses the existing file instead of paying
 to synthesise it again. An edit changes the hash and a new row is generated.
 """
@@ -46,7 +46,7 @@ class AudioAsset(PKMixin, TimestampMixin, Base):
         BigInteger, ForeignKey("articles.id", ondelete="CASCADE"), nullable=False
     )
     content_hash: Mapped[str] = mapped_column(
-        String(64), nullable=False, doc="sha256 of the exact text sent to the provider"
+        String(64), nullable=False, doc="tts_service.words_hash, or sha256 of an uploaded file"
     )
     status: Mapped[AudioStatus] = mapped_column(
         Enum(AudioStatus, native_enum=False, length=20, validate_strings=True),

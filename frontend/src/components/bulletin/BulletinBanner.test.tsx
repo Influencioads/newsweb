@@ -47,7 +47,8 @@ describe('BulletinBanner', () => {
     expect(await screen.findByText('గరం చాయ్ న్యూస్')).toHaveAttribute('lang', 'te');
     expect(screen.getByText(/07:00/)).toBeInTheDocument();
     expect(screen.getByText('3 ని')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'ఈ రోజు బులెటిన్లన్నీ' })).toHaveAttribute('href', '/bulletin');
+    expect(screen.getByRole('link', { name: 'అన్ని బులెటిన్లు' })).toHaveAttribute('href', '/bulletin');
+    expect(document.querySelector('img')).toHaveAttribute('src', '/bulletins/7.webp');
   });
 
   it('renders nothing when no bulletin is available', async () => {

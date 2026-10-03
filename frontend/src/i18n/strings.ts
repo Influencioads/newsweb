@@ -42,7 +42,7 @@ export const STRINGS = {
   'reader.fontSize': { te: 'అక్షర పరిమాణం', en: 'Text size' },
   'reader.language': { te: 'భాష', en: 'Language' },
   'reader.listen': { te: 'వినండి', en: 'Listen' },
-  'reader.listenTagline': { te: 'కళ్ళకు విశ్రాంతి, చెవులకు వార్తలు', en: 'Rest your eyes, tune in to the news' },
+  'reader.listenTagline': { te: 'చదివే టైం లేదా? వినేయండి!', en: 'No time to read? Just listen!' },
   'reader.location': { te: 'మీ ప్రాంతం', en: 'Your area' },
   'reader.chooseLocation': { te: 'ప్రాంతం ఎంచుకోండి', en: 'Choose your area' },
   'reader.listenSoon': { te: 'టెక్స్ట్-టు-స్పీచ్ త్వరలో', en: 'Text-to-speech coming soon' },

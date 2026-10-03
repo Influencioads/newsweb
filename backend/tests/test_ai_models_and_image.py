@@ -393,11 +393,11 @@ class _Routing:
 
 @pytest.fixture
 def routing(monkeypatch: pytest.MonkeyPatch) -> _Routing:
-    """One recorder installed at all four call sites, with kimi-k3 exported the
+    """One recorder installed at every call site, with kimi-k3 exported the
     way the deploy environment exports it."""
     recorder = _Routing()
     monkeypatch.setattr("app.core.config.settings.AIMLAPI_MODEL", "moonshot/kimi-k3")
-    for module in ("ai_service", "crawl_service", "bulletin_service"):
+    for module in ("ai_service", "crawl_service"):
         monkeypatch.setattr(f"app.services.{module}.get_ai", recorder)
     return recorder
 
@@ -457,15 +457,6 @@ class TestRouting:
         db.flush()
         ai_service.create_draft(db, suggestion.id, actor_id=None)
         assert routing.models == [catalogue.DEFAULT_TEXT_MODEL]
-
-    def test_the_bulletin_script_asks_for_the_editorial_model(
-        self, db: Session, monkeypatch: pytest.MonkeyPatch, routing: _Routing
-    ) -> None:
-        """Read aloud to a listener who cannot re-read it."""
-        enable_ai(db, monkeypatch, **{"bulletin.ai_script_enabled": True})
-        bulletin_service._ai_connectives(db, ["మొదటి శీర్షిక", "రెండో శీర్షిక"])
-        assert routing.models == [catalogue.DEFAULT_TEXT_MODEL]
-
 
 # --------------------------------------------------------------------------- #
 # Voices — one enum per vendor, and the wrong one is a 400
@@ -869,6 +860,36 @@ class TestTtsLedger:
             0.001 * (segments - 1)
         )
         assert rows[0].cost_paise > 0  # not the zero this test exists to stop
+
+    def test_the_publish_sweep_attaches_audio_once(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """§20 rule: every live story gets its audio from the worker, not from
+        the editor's Publish click — and the next tick reuses it, unpaid."""
+        from app.workers.tasks import voice as voice_tasks
+
+        @contextmanager
+        def _scope() -> Iterator[Session]:
+            yield db
+            db.commit()
+
+        monkeypatch.setattr(voice_tasks, "session_scope", _scope)
+        provider = _FakeTts()
+        _install_tts(monkeypatch, provider)
+        article = make_article(db, title="ప్రచురణ తర్వాత ఆడియో")
+
+        configure(db, **{"voice.enabled": True, "voice.auto_generate_on_publish": False})
+        assert voice_tasks.publish_sweep() == {"generated": 0}
+        assert provider.calls == 0
+
+        configure(db, **{"voice.auto_generate_on_publish": True})
+        assert voice_tasks.publish_sweep() == {"generated": 1}
+        db.refresh(article)
+        assert article.audio_asset_id is not None
+        calls = provider.calls
+
+        assert voice_tasks.publish_sweep() == {"generated": 0}
+        assert provider.calls == calls
 
 
 # --------------------------------------------------------------------------- #
@@ -1590,57 +1611,6 @@ def _scripted_bulletin(db: Session, *, script: str = "") -> AudioBulletin:
 
 
 class TestBulletinLedger:
-    def test_the_connectives_call_is_recorded_when_it_answers(
-        self, db: Session, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """`check_budget` runs before this call and reads a total this surface
-        only contributes to because of this row."""
-        enable_ai(db, monkeypatch, **{"bulletin.ai_script_enabled": True})
-        monkeypatch.setattr(bulletin_service, "get_ai", lambda **_kw: _BilledAi())
-
-        assert bulletin_service._ai_connectives(db, ["మొదటి శీర్షిక"]) is not None
-
-        rows = _usage_rows(db, "draft")
-        assert len(rows) == 1
-        assert rows[0].ok is True
-        assert rows[0].model == "fake/model"
-        assert rows[0].cost_paise == ai_usage_service.usd_to_paise(0.0089)
-
-    def test_the_connectives_call_is_recorded_when_it_fails(
-        self, db: Session, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """The failure is swallowed — a bulletin still goes out with the fixed
-        connectives — so the ledger is the only place it is visible at all."""
-        enable_ai(db, monkeypatch, **{"bulletin.ai_script_enabled": True})
-        monkeypatch.setattr(bulletin_service, "get_ai", lambda **_kw: _FailingAi())
-
-        assert bulletin_service._ai_connectives(db, ["మొదటి శీర్షిక"]) is None
-
-        rows = _usage_rows(db, "draft")
-        assert len(rows) == 1
-        assert rows[0].ok is False
-        assert rows[0].cost_paise == ai_usage_service.usd_to_paise(0.0089)
-
-    def test_a_refused_budget_is_not_recorded_as_an_outage(
-        self, db: Session, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """The inner try is only around the call. A budget that refused before
-        the provider was touched spent nothing, and a row for it would make the
-        AI screen's failure count read as outages that never happened."""
-        enable_ai(db, monkeypatch, **{"bulletin.ai_script_enabled": True})
-        monkeypatch.setattr(bulletin_service, "get_ai", lambda **_kw: _BilledAi())
-        monkeypatch.setattr(
-            "app.core.config.settings.AI_MONTHLY_BUDGET_INR", 0.01
-        )
-        ai_usage_service.record(
-            db, operation="draft", provider="fake", usage={"usd_spent": 1.0}
-        )
-
-        assert bulletin_service._ai_connectives(db, ["మొదటి శీర్షిక"]) is None
-
-        # Only the seed row above.
-        assert len(_usage_rows(db, "draft")) == 1
-
     def _install_bulletin_tts(
         self, monkeypatch: pytest.MonkeyPatch, provider: TtsProvider
     ) -> None:

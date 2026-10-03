@@ -461,13 +461,6 @@ export default function ArticlePage() {
                   </Card>
                 ) : null}
 
-                {/* §12.5 source credit */}
-                {data.source_credit ? (
-                  <p className={cn(s.body, 'mt-4 text-meta text-muted')}>
-                    {t('article.source')}: {data.source_credit}
-                  </p>
-                ) : null}
-
                 {/* Where the story ends: the four share paths, always in view. */}
                 <ShareStrip shortId={data.short_id} url={data.url} title={shareTitle} className="mt-7" />
 

@@ -192,9 +192,13 @@ ${link}`;
 
   async function copy() {
     onDone();
-    await Clipboard.setStringAsync(link);
-    trackShare(shortId);
-    toast.success(t('ui.copied'));
+    try {
+      await Clipboard.setStringAsync(link);
+      trackShare(shortId);
+      toast.success(t('ui.copied'));
+    } catch {
+      toast.error(L('లింక్ కాపీ కాలేదు.', 'Could not copy the link.', isTelugu));
+    }
   }
 
   async function native() {

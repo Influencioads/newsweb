@@ -435,7 +435,54 @@
   @media (prefers-reduced-motion: reduce) {
     .animate-eq,
     .animate-ring,
-    .animate-spin-slow { animation: none !important; }
+    .animate-spin-slow,
+    .logo-cube > span { animation: none !important; }
+  }
+
+  /* Brand cube (PublicLayout LogoCube), pinned bottom-left above the player
+     dock and the article bottom bar, under dialogs and toasts; clicks pass
+     through. White and blue T faces, red top and bottom. Logo colours are
+     literal: the logo image does not follow the theme, so neither does its
+     cube. Still under reduced motion, at an angle. */
+  .logo-cube {
+    --cube: 56px;
+    position: fixed;
+    z-index: 30;
+    left: 16px;
+    bottom: calc(16px + var(--player-dock-h, 0px) + var(--bottom-bar-h, 0px));
+    width: var(--cube);
+    height: var(--cube);
+    perspective: calc(var(--cube) * 7);
+    pointer-events: none;
+  }
+  @media (min-width: 768px) { .logo-cube { --cube: 80px; left: 24px; bottom: calc(24px + var(--player-dock-h, 0px) + var(--bottom-bar-h, 0px)); } }
+  .logo-cube > span {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transform: rotateX(-22deg) rotateY(-30deg);
+    animation: logo-cube 7s linear infinite;
+  }
+  .logo-cube [data-face] {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: #fff;
+    border: 1.5px solid #0d47a1;
+  }
+  .logo-cube img { width: 84%; height: auto; }
+  .logo-cube [data-face='front'] { transform: translateZ(calc(var(--cube) / 2)); }
+  .logo-cube [data-face='back'] { transform: rotateY(180deg) translateZ(calc(var(--cube) / 2)); }
+  .logo-cube [data-face='right'] { transform: rotateY(90deg) translateZ(calc(var(--cube) / 2)); background: #0d47a1; }
+  .logo-cube [data-face='left'] { transform: rotateY(-90deg) translateZ(calc(var(--cube) / 2)); background: #0d47a1; }
+  .logo-cube [data-face='top'] { transform: rotateX(90deg) translateZ(calc(var(--cube) / 2)); background: #d0101a; border-color: #d0101a; }
+  .logo-cube [data-face='bottom'] { transform: rotateX(-90deg) translateZ(calc(var(--cube) / 2)); background: #d0101a; border-color: #d0101a; }
+  @keyframes logo-cube {
+    from { transform: rotateX(-22deg) rotateY(-30deg); }
+    to { transform: rotateX(-22deg) rotateY(330deg); }
   }
 
   .no-scrollbar { scrollbar-width: none; }

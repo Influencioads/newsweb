@@ -1,12 +1,13 @@
 """Assembling and speaking the audio newspaper.
 
-Seven named slots a day at 07, 09, 13, 15, 17, 19 and 21 IST, about three
-minutes each.
+Six named slots a day at 07, 09, 15, 17, 19 and 21 IST, about three
+minutes each — each show has its own banner art (web `public/bulletins/`,
+mobile `assets/bulletins/`, keyed by the slot hour).
 
 **Why this can go live without an editor pressing Approve.** Everything spoken
 is drawn from stories that a human already approved and a *second* human
-already published. The machine chooses an order and writes the joining
-sentences; it does not decide what is true. That is why
+already published. The machine chooses an order; it writes nothing and does
+not decide what is true. That is why
 `bulletin.requires_approval` defaults to false — and why it exists at all, for
 a newsroom that would rather gate it.
 
@@ -15,16 +16,21 @@ this codebase treats that phrase as meaning "a reader sees unreviewed copy",
 which is not what happens here, and a future reviewer grepping for it should
 not find a hit.
 
-**The script is deterministic.** Fixed opening, the headline roll, then each
-story's own published summary, then a fixed close. The AI — when
-`bulletin.ai_script_enabled` is on, which it is not by default — writes only
-the connecting phrases between items. A model is never asked what happened.
+**The script is deterministic, and read clean.** The greeting, then each
+story's headline and published summary, then a fixed close — with a 2.5 s
+music sting between every block and no spoken filler ("తర్వాత…", "ఇక…").
+No model is asked anything.
 """
 
 from __future__ import annotations
 
 import hashlib
+import io
+import math
+import wave
+from array import array
 from datetime import date, datetime, time, timedelta
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
@@ -33,24 +39,29 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.errors import AiProviderError, ConflictError, NotFoundError
 from app.core.logging import get_logger
 from app.db.base import utcnow
-from app.integrations.ai import get_ai
 from app.integrations.storage import get_storage
 from app.integrations.tts import get_tts
 from app.models.bulletin import AudioBulletin, AudioBulletinItem
 from app.models.content import Article
 from app.models.enums import BulletinStatus
-from app.services import ai_usage_service, epaper_service, settings_service, tts_service
+from app.services import (
+    ai_usage_service,
+    audio_concat,
+    epaper_service,
+    settings_service,
+    tts_service,
+)
 from app.telugu.normalize import normalize_headline, normalize_text
 
 logger = get_logger(__name__)
 
 IST = epaper_service.IST
 
-#: The seven slots, as IST hours. A product decision, not a setting — which is
+#: The six slots, as IST hours. A product decision, not a setting — which is
 #: why the schedule is a real crontab (built from this tuple in
 #: `workers/celery_app.py`) rather than the e-paper's "tick every five minutes
 #: and compare the clock to a configured string".
-SLOTS: tuple[int, ...] = (7, 9, 13, 15, 17, 19, 21)
+SLOTS: tuple[int, ...] = (7, 9, 15, 17, 19, 21)
 
 #: Both TTS adapters estimate duration at this rate, so the script is sized by
 #: it. If that constant ever changes, this must follow — a bulletin that is
@@ -69,21 +80,38 @@ CATCH_UP_MINUTES = 90
 #: Below this, a story gets a headline mention only.
 MIN_STORY_CHARS = 120
 
-_OPEN_TE = "టాప్ తెలుగు న్యూస్ — {label}. ముఖ్యాంశాలు."
-_CLOSE_TE = "ఇవీ ఈ గంట ముఖ్యాంశాలు. పూర్తి వివరాలకు యాప్ చూడండి."
-_CONNECTIVES_TE = ("తర్వాత…", "ఇక…", "మరో వార్త…", "అలాగే…", "చివరగా…")
+_OPEN_TE = "నమస్తే! మీరు వింటున్నారు {label}, టాప్ తెలుగు న్యూస్ నుంచి."
+_CLOSE_TE = "మరిన్ని వార్తల కోసం టాప్ తెలుగు న్యూస్ యాప్ డౌన్‌లోడ్ చేసుకోండి."
+
+#: A line of its own in `script_te` wherever the sting plays. Never sent to
+#: the voice: `render` splits on it. An editor who deletes one deletes that
+#: sting; one who adds one adds a sting.
+MUSIC_MARK = "♪"
+_BREAK = f"\n\n{MUSIC_MARK}\n\n"
+
+#: Original procedural music (the tuning lab's synth, no samples): a rising
+#: D-F-A pluck into a bright F-major hit, 2.5 s with a long fade. 22.05 kHz
+#: mono 16-bit — Sarvam's own format, so the live voice needs no resampling.
+_STING = Path(__file__).with_name("bulletin_sting.wav")
+_STING_SECONDS = 2.5
+#: Silence either side: the last word rings out, then the music, then a breath.
+_PAD_BEFORE, _PAD_AFTER = 0.4, 0.25
+#: Sting level against this bulletin's own voice (RMS), measured per render so
+#: a louder or quieter provider never makes the music jump out.
+_STING_REL_DB = -6.0
+#: Airtime one sting costs, in script characters.
+_STING_CHARS = int((_PAD_BEFORE + _STING_SECONDS + _PAD_AFTER) * CHARS_PER_SECOND)
 
 #: Each slot's show name — stored on the row as `slot_label_te`, shown by every
 #: client and spoken in the opening line. Rename here; one key per SLOTS hour
 #: (a test holds the two in step).
 _LABELS_TE: dict[int, str] = {
     7: "గరం చాయ్ న్యూస్",  # Garam Chai News
-    9: "ఆఫీస్ ఎక్స్‌ప్రెస్",  # Office Express
-    13: "లంచ్ బాక్స్ న్యూస్",  # Lunch Box News
-    15: "ఫటాఫట్ న్యూస్",  # Fatafat News
+    9: "మసాలా దోశ న్యూస్",  # Masala Dosa News
+    15: "చాయ్ బిస్కెట్ న్యూస్",  # Chai Biscuit News
     17: "మిర్చి బజ్జీ న్యూస్",  # Mirchi Bajji News
-    19: "ప్రైమ్ టైమ్ న్యూస్",  # Prime Time News
-    21: "గుడ్ నైట్ రౌండప్",  # Good Night Roundup
+    19: "చాట్ మసాలా న్యూస్",  # Chat Masala News
+    21: "ఫుల్ మీల్స్ న్యూస్",  # Full Meals News
 }
 
 
@@ -198,72 +226,6 @@ def _story_text(article: Article, budget: int) -> str:
     return clipped[: stop + 1] if stop > budget // 3 else clipped
 
 
-def _ai_connectives(db: Session, headlines: list[str]) -> list[str] | None:
-    """Optional polish. Returns None whenever the output is not usable.
-
-    The rejection rule earns its place: `HeuristicAi.write_draft` returns a
-    `[రాయవలసి ఉంది]` skeleton — literally "needs writing" — for a journalist to
-    fill in. Broadcasting that to listeners is exactly the kind of failure
-    nobody would catch until a reader complained.
-    """
-    if not (
-        settings_service.ai_enabled(db)
-        and settings_service.get_bool(db, "bulletin.ai_script_enabled")
-    ):
-        return None
-    try:
-        # Editorial model, not the bulk one: seven bulletins a day, and every
-        # sentence it writes is read aloud to a listener who cannot re-read it.
-        provider = get_ai(**settings_service.ai_credentials(db))
-        if provider.key != "heuristic":
-            # Unattended: bills the newsroom, no user to quota.
-            ai_usage_service.check_budget(db)
-        try:
-            draft = provider.write_draft(
-                topic="ఈ గంట వార్తల మధ్య కలిపే చిన్న వాక్యాలు",
-                notes="\n".join(headlines),
-                sources=[],
-                # Spoken connectives between stories are not an article: the
-                # house style's headline and lede rules do not apply.
-                house_style=False,
-            )
-        except Exception as exc:  # noqa: BLE001 — a failed call is still billed
-            # The inner try is only around the call: a refused budget spent
-            # nothing, and a row for it would make the AI screen's failure
-            # count read as outages that never happened.
-            if provider.key != "heuristic":
-                ai_usage_service.record(
-                    db,
-                    operation="draft",
-                    provider=provider.key,
-                    model=getattr(provider, "model_name", None),
-                    usage=getattr(provider, "last_usage", None),
-                    ok=False,
-                    error=str(getattr(exc, "details", exc))[:300],
-                )
-            raise
-        if provider.key != "heuristic":
-            # `check_budget` above reads a total this surface only contributes
-            # to because of this row.
-            ai_usage_service.record(
-                db,
-                operation="draft",
-                provider=provider.key,
-                model=getattr(provider, "model_name", None),
-                usage=getattr(provider, "last_usage", None),
-            )
-    except (AiProviderError, Exception) as exc:  # noqa: BLE001
-        logger.info("bulletin_ai_connectives_failed", error=str(exc)[:200])
-        return None
-
-    usable = [
-        normalize_text(p)
-        for p in draft.paragraphs_te
-        if p and "[" not in p and len(p.strip()) >= 8
-    ]
-    return usable or None
-
-
 def build_script(
     db: Session,
     *,
@@ -274,23 +236,20 @@ def build_script(
 ) -> tuple[str, list[tuple[Article, str]]]:
     """`(script, [(article, spoken_text)])`, at most `target_chars` long.
 
-    Each story costs its headline twice (in the roll and before its text) plus
-    a connective, not only its body text. Budgeting the body alone overshot by
-    ~70 characters a story, and the old hard cut at the end then removed the
-    closing line and half the last story — while the transcript still listed
-    it. Now the whole cost is budgeted, a story that still does not fit is
-    dropped whole (from the roll too), and the close is always spoken.
+    Greeting ♪ story ♪ story … ♪ close. Each story costs its headline, its
+    body and the airtime of one sting, not its body alone — budgeting the body
+    alone once overshot, and the hard cut then removed the close and half the
+    last story. A story that still does not fit is dropped whole, and the
+    close is always spoken.
     """
-    label = slot_label_te(slot)
-    opening = _OPEN_TE.format(label=label)
+    opening = _OPEN_TE.format(label=slot_label_te(slot))
     closing = _CLOSE_TE
     budget = target_chars(db, seconds)
 
     headlines = [normalize_headline(a.title_te or "") for a in articles]
-    connectives = _ai_connectives(db, headlines) or list(_CONNECTIVES_TE)
-    joint = max(len(c) for c in connectives) + 4  # the connective and its two "\n\n"
-    fixed = len(opening) + len(closing) + 8
-    overhead = sum(2 * len(h) + 4 + joint for h in headlines)
+    joint = len(_BREAK) + _STING_CHARS
+    fixed = len(opening) + len(closing) + 2 * joint
+    overhead = sum(len(h) + 1 + joint for h in headlines)
     per_story = max(MIN_STORY_CHARS, (budget - fixed - overhead) // max(1, len(articles)))
 
     stories: list[tuple[Article, str, str]] = []
@@ -305,22 +264,19 @@ def build_script(
             stories.append((article, headline, piece))
 
     def assemble(chosen: list[tuple[Article, str, str]]) -> str:
-        parts = [opening, " … ".join(h for _a, h, _p in chosen if h)]
-        for index, (_article, _headline, piece) in enumerate(chosen):
-            if index:
-                parts.append(connectives[index % len(connectives)])
-            parts.append(piece)
-        parts.append(closing)
-        return "\n\n".join(p for p in parts if p).strip()
+        return _BREAK.join([opening, *(piece for _a, _h, piece in chosen), closing])
+
+    def airtime(script: str) -> int:
+        return len(script) + script.count(MUSIC_MARK) * _STING_CHARS
 
     script = assemble(stories)
-    while len(script) > budget and len(stories) > 1:
+    while airtime(script) > budget and len(stories) > 1:
         stories.pop()
         script = assemble(stories)
     if len(script) > MAX_SCRIPT_CHARS:
         # One story longer than the cap on its own: cut it, keep the close.
-        head = script[: MAX_SCRIPT_CHARS - len(closing) - 2].rsplit(" ", 1)[0]
-        script = f"{head}\n\n{closing}"
+        head = script[: MAX_SCRIPT_CHARS - len(closing) - len(_BREAK)].rsplit(" ", 1)[0]
+        script = f"{head}{_BREAK}{closing}"
     return script, [(article, piece) for article, _headline, piece in stories]
 
 
@@ -396,6 +352,65 @@ def script_bulletin(
     return bulletin
 
 
+def _rms(samples: array) -> float:
+    return math.sqrt(sum(s * s for s in samples) / len(samples)) if samples else 0.0
+
+
+def _sting_like(clips: list[bytes]) -> bytes | None:
+    """The sting, padded with silence, as a WAV in the voice's own format and
+    `_STING_REL_DB` under its level. None when the voice is not mono 16-bit."""
+    with wave.open(io.BytesIO(clips[0])) as w:
+        channels, width, rate = w.getnchannels(), w.getsampwidth(), w.getframerate()
+    if (channels, width) != (1, 2):
+        # ponytail: every TTS adapter returns mono 16-bit; another format airs without music.
+        return None
+    voice = array("h")
+    for clip in clips:
+        with wave.open(io.BytesIO(clip)) as w:
+            voice.frombytes(w.readframes(w.getnframes()))
+    with wave.open(str(_STING)) as w:
+        src_rate = w.getframerate()
+        src = array("h", w.readframes(w.getnframes()))
+
+    gain = _rms(voice) / max(_rms(src), 1.0) * 10 ** (_STING_REL_DB / 20)
+    # ponytail: linear-interpolation resample (none at all for Sarvam's 22.05 kHz);
+    # use a polyphase resampler if a provider ever runs well below that.
+    step, last = src_rate / rate, len(src) - 1
+    music = array("h")
+    for i in range(int(len(src) / step)):
+        pos = i * step
+        j = int(pos)
+        sample = src[j] + (src[min(j + 1, last)] - src[j]) * (pos - j)
+        music.append(max(-32768, min(32767, round(sample * gain))))
+
+    out = io.BytesIO()
+    with wave.open(out, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes(
+            bytes(2 * int(_PAD_BEFORE * rate))
+            + music.tobytes()
+            + bytes(2 * int(_PAD_AFTER * rate))
+        )
+    return out.getvalue()
+
+
+def _join(takes: list[tuple[bytes, str, int, str, int]]) -> tuple[bytes, str, int, str, int]:
+    """One file from the per-block takes, the sting between each pair, in
+    `synthesise_long`'s shape: `(audio, mime, duration_sec, voice, segments)`."""
+    clips = [t[0] for t in takes]
+    mime = takes[0][1]
+    # ponytail: an MP3 voice airs without music — WAV frames cannot be spliced
+    # into an MP3 stream. Add an encoder if an MP3 provider ever goes live.
+    sting = _sting_like(clips) if mime in ("audio/wav", "audio/x-wav") else None
+    if sting:
+        clips = [part for clip in clips for part in (clip, sting)][:-1]
+    audio, measured = audio_concat.concat(clips, mime)
+    estimated = sum(t[2] for t in takes)
+    return audio, mime, measured or estimated, takes[-1][3], sum(t[4] for t in takes)
+
+
 def render(
     db: Session, bulletin: AudioBulletin, *, requested_by: int | None = None
 ) -> AudioBulletin:
@@ -428,13 +443,29 @@ def render(
         return bulletin
 
     bulletin.attempts += 1
+    # Each block between two MUSIC_MARK lines is voiced on its own, so the
+    # sting can sit between them. One ledger row still covers the lot:
+    # `synthesise_long` leaves only its own block's total on `last_usage`.
+    blocks = [b.strip() for b in bulletin.script_te.split(MUSIC_MARK) if b.strip()]
+    takes: list[tuple[bytes, str, int, str, int]] = []
+    spent: dict[str, float | int] = {}
     try:
-        audio, mime, duration, voice, segments = tts_service.synthesise_long(
-            bulletin.script_te,
-            language=language,
-            voice=tts_service.configured_voice(db),
-            provider=provider,
-        )
+        for block in blocks:
+            provider.last_usage = {}
+            try:
+                takes.append(
+                    tts_service.synthesise_long(
+                        block,
+                        language=language,
+                        voice=tts_service.configured_voice(db),
+                        provider=provider,
+                    )
+                )
+            finally:
+                for name, amount in (provider.last_usage or {}).items():
+                    spent[name] = spent.get(name, 0) + amount
+                provider.last_usage = dict(spent)
+        audio, mime, duration, voice, segments = _join(takes)
     except (AiProviderError, ValueError) as exc:
         bulletin.status = BulletinStatus.FAILED
         bulletin.error = str(getattr(exc, "details", exc))[:500]
@@ -486,7 +517,7 @@ def render(
     bulletin.requested_by = requested_by
     db.flush()
     # One row for the whole bulletin, however many segments it took — the same
-    # shape `ensure_audio` writes, so seven unattended slots a day show up on the
+    # shape `ensure_audio` writes, so six unattended slots a day show up on the
     # AI meter next to the article audio they share a budget with.
     ai_usage_service.record(
         db,

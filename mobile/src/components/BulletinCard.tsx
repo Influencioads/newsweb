@@ -19,7 +19,7 @@ import { T } from '@/ui/Text';
  * The latest audio bulletin, in the home feed.
  *
  * Not a sixth tab — the bar is already at five, which is as many as a bottom
- * bar carries, and seven items a day does not earn a permanent slot.
+ * bar carries, and six items a day does not earn a permanent slot.
  *
  * The card owns no audio: play loads the bulletin into the app's global
  * player, so it keeps going when the row scrolls out of the render window or
@@ -52,6 +52,17 @@ export function useBulletin() {
 
 /** The player id every bulletin surface agrees on (the bulletin screen's controls use it too). */
 export const bulletinId = (date: string, slot: number) => `bulletin-${date}-${slot}`;
+
+/** Each slot's show banner (black background, "Click To Listen" drawn in), keyed by IST hour. */
+const ART: Record<number, number> = {
+  7: require('../../assets/bulletins/7.webp'),
+  9: require('../../assets/bulletins/9.webp'),
+  15: require('../../assets/bulletins/15.webp'),
+  17: require('../../assets/bulletins/17.webp'),
+  19: require('../../assets/bulletins/19.webp'),
+  21: require('../../assets/bulletins/21.webp'),
+};
+export const bulletinArt = (slot: number | null | undefined): number | null => (slot != null ? ART[slot] ?? null : null);
 
 /** A bulletin as a player track; null when it has no file to play. */
 export function bulletinTrack(

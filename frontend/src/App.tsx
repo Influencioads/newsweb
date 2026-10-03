@@ -1,8 +1,9 @@
-import { lazy, Suspense, useEffect, type ComponentType } from 'react';
+import { lazy, Suspense, useEffect, type ComponentType, type ReactElement } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
 import { AppErrorBoundary, RouteFallback, ScrollToTop } from './components/app';
 import { useSiteConfig } from './components/layout/NavDrawer';
+import { EPAPER_PUBLIC } from './features/epaper/api';
 import { PlayerHost } from './components/player/PlayerHost';
 import { applyBrand, brandCss } from './utils/brand';
 import AdminLayout from './layouts/AdminLayout';
@@ -27,6 +28,8 @@ const ProfilePage = lazy(() => import('./pages/public/ProfilePage'));
 const SubmitPage = lazy(() => import('./pages/public/SubmitPage'));
 const EpaperPage = lazy(() => import('./pages/public/EpaperPage'));
 const MyEpaperPage = lazy(() => import('./pages/public/MyEpaperPage'));
+// While public E-Paper is paused, old/shared reader links land on home.
+const epaperGate = (page: ReactElement) => (EPAPER_PUBLIC ? page : <Navigate to="/" replace />);
 const BulletinPage = lazy(() => import('./pages/public/BulletinPage'));
 const ContributorApplyPage = lazy(() => import('./pages/public/ContributorApplyPage'));
 const LiveNewsPage = lazy(() => import('./pages/public/LiveNewsPage'));
@@ -154,12 +157,12 @@ export default function App() {
               <Route path="/bookmarks" element={<BookmarksPage />} />
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/following" element={<FollowingPage />} />
-              <Route path="/epaper" element={<EpaperPage />} />
-              <Route path="/epaper/:date" element={<EpaperPage />} />
-              <Route path="/epaper/:date/page/:page" element={<EpaperPage />} />
-              <Route path="/my-epaper" element={<MyEpaperPage />} />
-              <Route path="/my-epaper/edition/:personalId" element={<EpaperPage />} />
-              <Route path="/my-epaper/edition/:personalId/page/:page" element={<EpaperPage />} />
+              <Route path="/epaper" element={epaperGate(<EpaperPage />)} />
+              <Route path="/epaper/:date" element={epaperGate(<EpaperPage />)} />
+              <Route path="/epaper/:date/page/:page" element={epaperGate(<EpaperPage />)} />
+              <Route path="/my-epaper" element={epaperGate(<MyEpaperPage />)} />
+              <Route path="/my-epaper/edition/:personalId" element={epaperGate(<EpaperPage />)} />
+              <Route path="/my-epaper/edition/:personalId/page/:page" element={epaperGate(<EpaperPage />)} />
               <Route path="/bulletin" element={<BulletinPage />} />
               <Route path="/contributor" element={<ContributorApplyPage />} />
               <Route path="/topic/:slug" element={<TopicPage />} />

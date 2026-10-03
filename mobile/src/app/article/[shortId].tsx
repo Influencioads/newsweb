@@ -248,7 +248,7 @@ export default function ArticleScreen() {
               <View style={styles.byline}>
                 {data.byline_te || data.author ? (
                   <T variant="bodySmall" weight="semibold">
-                    {data.byline_te ?? pick(data.author?.name_te, data.author?.name_en)}
+                    {data.author ? pick(data.author.name_te, data.author.name_en) : data.byline_te}
                   </T>
                 ) : null}
                 <T variant="meta" color="muted">
@@ -326,12 +326,6 @@ export default function ArticleScreen() {
                     : data.body
                 }
               />
-
-              {data.source_credit ? (
-                <T variant="meta" scaled color="muted" style={styles.credit}>
-                  {data.source_credit}
-                </T>
-              ) : null}
 
               {/* Where the story ends: the four share paths, always in view. */}
               <ShareStrip shortId={data.short_id} url={data.url} title={data.title_te} />
@@ -440,7 +434,6 @@ const useStyles = makeStyles((color) => ({
     marginBottom: space.lg,
   },
   ugcBody: { flex: 1, gap: space.xs },
-  credit: { marginTop: space.sm },
   followRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

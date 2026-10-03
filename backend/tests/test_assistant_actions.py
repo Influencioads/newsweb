@@ -645,7 +645,7 @@ class TestBulletin:
         db.commit()
         user = staff(db, RoleKey.ADMIN, "sanjaya-admin@example.com")
 
-        data, _ = call(db, user, "prepare_audio_bulletin", {"minutes": 3, "slot": 13, "hours_back": 48})
+        data, _ = call(db, user, "prepare_audio_bulletin", {"minutes": 3, "slot": 15, "hours_back": 48})
         assert "error" not in data, data
         job = only_job(db)
         assert job.status == "done", job.result
@@ -663,7 +663,7 @@ class TestBulletin:
 
         # The hour strikes: the beat leaves a person's bulletin alone.
         calls, digest = tts.calls, row.script_hash
-        monkeypatch.setattr(bulletin_service, "current_slot", lambda now=None: 13)
+        monkeypatch.setattr(bulletin_service, "current_slot", lambda now=None: 15)
         assert bulletin_service.run_slot(db) is row
         db.commit()
         assert (row.status, row.script_hash, tts.calls) == (BulletinStatus.READY, digest, calls)
@@ -973,11 +973,11 @@ class TestBulletinReviewFixes:
     ) -> None:
         configure(db, **{"bulletin.enabled": True, "bulletin.requires_approval": True})
         self._stories(db, 6)
-        held = bulletin_service.run_slot(db, day=bulletin_service.today(), slot=13)
+        held = bulletin_service.run_slot(db, day=bulletin_service.today(), slot=15)
         db.commit()
         before = (held.status, held.url, held.script_hash, held.revision, tts.calls)
         user = staff(db, RoleKey.ADMIN, "sanjaya-admin@example.com")
-        call(db, user, "prepare_audio_bulletin", {"slot": 13, "category": "sports"})
+        call(db, user, "prepare_audio_bulletin", {"slot": 15, "category": "sports"})
         assert only_job(db).status == "failed"
         row = db.scalars(select(AudioBulletin)).one()
         assert (row.status, row.url, row.script_hash, row.revision, tts.calls) == before
@@ -988,11 +988,11 @@ class TestBulletinReviewFixes:
     ) -> None:
         configure(db, **{"bulletin.enabled": True, "bulletin.requires_approval": True})
         a, b = self._stories(db, 2)
-        held = bulletin_service.run_slot(db, day=bulletin_service.today(), slot=13)
+        held = bulletin_service.run_slot(db, day=bulletin_service.today(), slot=15)
         db.commit()
         revision = held.revision
         user = staff(db, RoleKey.ADMIN, "sanjaya-admin@example.com")
-        call(db, user, "prepare_audio_bulletin", {"slot": 13, "article_ids": [a.id, b.id, a.id], "minutes": 2})
+        call(db, user, "prepare_audio_bulletin", {"slot": 15, "article_ids": [a.id, b.id, a.id], "minutes": 2})
         assert only_job(db).status == "done", only_job(db).result
         row = db.scalars(select(AudioBulletin)).one()
         assert [i.article_id for i in row.items] == [a.id, b.id]
@@ -1009,7 +1009,7 @@ class TestBulletinReviewFixes:
 
         monkeypatch.setattr(ai_usage_service, "guard", broke)
         user = staff(db, RoleKey.ADMIN, "sanjaya-admin@example.com")
-        call(db, user, "prepare_audio_bulletin", {"slot": 13, "hours_back": 48})
+        call(db, user, "prepare_audio_bulletin", {"slot": 15, "hours_back": 48})
         job = only_job(db)
         assert job.status == "failed" and job.result["error"]["code"] == AiBudgetExceededError.code
         assert tts.calls == 0 and db.scalars(select(AudioBulletin)).all() == []
@@ -1024,7 +1024,7 @@ class TestBulletinReviewFixes:
         configure(db, **{"bulletin.enabled": True, "bulletin.requires_approval": False})
         self._stories(db, 3)
         editor = staff(db, RoleKey.ADMIN, "sanjaya-admin@example.com")
-        row = bulletin_service.run_slot(db, day=bulletin_service.today(), slot=13, requested_by=editor.id)
+        row = bulletin_service.run_slot(db, day=bulletin_service.today(), slot=15, requested_by=editor.id)
         db.commit()
         assert row.status == BulletinStatus.PUBLISHED and row.requested_by == editor.id
 

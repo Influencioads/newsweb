@@ -14,7 +14,7 @@ import { useI18n } from '@/i18n';
  * The latest audio bulletin, on the home page.
  *
  * Not a sixth tab: the mobile bar is already at five, which is as many as a
- * bottom bar carries well, and seven items a day does not earn a permanent slot.
+ * bottom bar carries well, and six items a day does not earn a permanent slot.
  * A card above the fold gets it in front of readers without pushing anything
  * else out.
  *

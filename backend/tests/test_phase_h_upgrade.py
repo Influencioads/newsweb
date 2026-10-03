@@ -495,18 +495,23 @@ class TestVoice:
                      json={"values": {"voice.enabled": False}}, headers=admin)
         settings_service.invalidate()
 
-    def test_spoken_text_is_hashed_for_reuse(self, db: Session) -> None:
-        from app.services import tts_service
+    def test_audio_is_keyed_by_words_not_reading_rules(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from app.services import tts_service, tts_text
 
         article = db.execute(select(Article).where(
             Article.status == ArticleStatus.PUBLISHED)).scalars().first()
-        first = tts_service.content_hash(tts_service.spoken_text(article))
-        second = tts_service.content_hash(tts_service.spoken_text(article))
-        assert first == second, "§21 caching depends on a stable hash"
+        first = tts_service.words_hash(article)
+        assert tts_service.words_hash(article) == first, "§21 caching depends on a stable hash"
+
+        # A reading-rule change must not re-render (and re-bill) stored audio.
+        monkeypatch.setattr(tts_text, "assemble", lambda *parts: "changed rules")
+        assert tts_service.words_hash(article) == first
 
         article.title_te = article.title_te + " (సవరణ)"
         db.flush()
-        assert tts_service.content_hash(tts_service.spoken_text(article)) != first
+        assert tts_service.words_hash(article) != first
 
 
 # --------------------------------------------------------------------------- #

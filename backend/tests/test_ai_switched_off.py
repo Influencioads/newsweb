@@ -1,8 +1,9 @@
-"""WowIndian: AI, crawling, rewriting and voice are switched off.
+"""WowIndian: AI, crawling, rewriting and voice start switched off.
 
-`AI_ENABLED` (config) is the one switch. The rest of the suite runs with it on
-so the retained code stays tested (see conftest); every test here turns it off
-and checks what a WowIndian deployment actually does:
+Every feature is present and has an on/off switch in CMS → Settings; each of
+those starts off (`test_every_switch_starts_off`). Above them sits the
+deployment kill switch `AI_ENABLED`. The tests below it turn that off and
+check what it does:
 
 * every automated-content setting reads False, whatever the database holds,
   and the settings screen refuses to switch one on;
@@ -124,9 +125,40 @@ def _admin(db: Session) -> dict[str, str]:
     return staff_headers(db, role=RoleKey.ADMIN, email="wow-admin@test.example.com")
 
 
-def test_the_switch_defaults_off(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_the_kill_switch_defaults_to_letting_settings_decide(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("AI_ENABLED", raising=False)
-    assert config.Settings(_env_file=None).AI_ENABLED is False
+    assert config.Settings(_env_file=None).AI_ENABLED is True
+
+
+SETTINGS_SWITCHES = (
+    "ai.enabled", "ai.auto_suggest", "ai.image_enabled", "ai.research_enabled",
+    "crawl.enabled", "crawl.rewrite_enabled", "crawl.html_fallback_enabled",
+    "crawl.open_licence_images",
+    "voice.enabled", "voice.article_tts_enabled", "voice.auto_generate_on_publish",
+    "voice.backfill_enabled",
+    "bulletin.enabled", "bulletin.ai_script_enabled", "epaper.audio_enabled",
+)
+
+
+def test_every_switch_starts_off(client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A fresh WowIndian: the switches are on the settings screen, all off,
+    and an admin can turn one on and back off."""
+    monkeypatch.setattr(config.settings, "AI_ENABLED", True)
+    for key in SETTINGS_SWITCHES:
+        assert settings_service.SPECS[key].default is False, key
+
+    admin = _admin(db)
+    body = client.get("/api/v1/cms/settings", headers=admin).json()
+    specs = {s["key"]: s for s in body["specs"]}
+    for key in SETTINGS_SWITCHES:
+        assert body["values"][key] is False, key
+        assert specs[key]["locked"] is False, key
+
+    r = client.patch("/api/v1/cms/settings", json={"values": {"crawl.enabled": True}}, headers=admin)
+    assert r.status_code == 200, r.text
+    assert r.json()["values"]["crawl.enabled"] is True
+    r = client.patch("/api/v1/cms/settings", json={"values": {"crawl.enabled": False}}, headers=admin)
+    assert r.json()["values"]["crawl.enabled"] is False
 
 
 def test_a_stored_on_value_still_reads_off(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:

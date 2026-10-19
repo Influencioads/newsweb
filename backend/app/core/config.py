@@ -115,23 +115,19 @@ class Settings(BaseSettings):
     AI_QUOTA_STRINGER_PER_DAY: int = 20
     AI_QUOTA_REPORTER_PER_DAY: int = 50
     AI_SIMILARITY_BLOCK_PERCENT: int = 85
-    #: WowIndian master switch for every automated-content feature: AI drafts
-    #: and suggestions, AI images and news cards, the editor assist panel,
-    #: news crawling and RSS ingestion, AI rewriting, article voice / TTS,
-    #: audio bulletins, e-paper audio, and the Celery schedules that drive
-    #: them. It is OFF, and while it is off:
+    #: WowIndian: AI, crawling, rewriting, voice and bulletins are all present
+    #: but every one of their on/off switches in CMS → Settings starts OFF
+    #: (`ai.enabled`, `crawl.enabled`, `crawl.rewrite_enabled`,
+    #: `voice.enabled`, `bulletin.enabled`, `epaper.audio_enabled`, …). An
+    #: admin turns any of them on or off there.
     #:
-    #: * every `ai.* / crawl.* / voice.* / bulletin.*` switch and
-    #:   `epaper.audio_enabled` reads False whatever the database holds
-    #:   (`settings_service.LOCKED_OFF`), and the settings screen refuses to
-    #:   switch one on;
-    #: * the routes that run those features answer 403 AI_FEATURES_DISABLED
-    #:   (`deps.require_ai_features`);
-    #: * the beat schedule leaves their jobs out (`workers/celery_app.py`).
-    #:
-    #: The code is kept, untouched, so the features can be restored by setting
-    #: AI_ENABLED=true and redeploying. Manual newsroom work is unaffected.
-    AI_ENABLED: bool = False
+    #: This variable is the deployment-level *kill switch* above those. Set it
+    #: false to hold every automated-content feature off whatever the settings
+    #: say: the switches read off and cannot be turned on
+    #: (`settings_service.is_locked_off`), their routes answer 403
+    #: AI_FEATURES_DISABLED (`deps.require_ai_features`), and their Celery jobs
+    #: are not scheduled (`workers/celery_app.py`).
+    AI_ENABLED: bool = True
     #: §17 — the only sources the research pass is permitted to read. Feeds we
     #: are licensed for, or that are published for redistribution (press
     #: releases, government bulletins, publisher RSS). Empty means the pass has

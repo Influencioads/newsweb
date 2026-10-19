@@ -1,11 +1,11 @@
 /**
- * WowIndian feature switch for automated content: AI suggestions and drafts,
- * AI images and news cards, the editor assist panel, crawled sources and the
- * rewrite comparison, article voice and the reader's listen controls, audio
- * bulletins and e-paper radio.
+ * Whether the automated-content screens are shown at all: AI suggestions and
+ * drafts, AI images and news cards, the editor assist panel, crawled sources
+ * and the rewrite comparison, article voice and the reader's listen controls,
+ * audio bulletins and e-paper radio.
  *
- * Off. The screens are kept in the codebase but not routed, linked or
- * rendered, matching the backend's `AI_ENABLED=false`, which refuses their
- * endpoints. Turning them back on takes both: this flag and that env var.
+ * On: WowIndian shows them, and whether each feature actually runs is its
+ * switch in CMS → Settings — every one of which starts off. Set false only
+ * alongside the backend kill switch `AI_ENABLED=false`, to hide them too.
  */
-export const AI_FEATURES = false;
+export const AI_FEATURES = true;

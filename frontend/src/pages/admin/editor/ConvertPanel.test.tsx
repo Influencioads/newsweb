@@ -8,8 +8,8 @@ import { useLanguage } from '@/i18n';
 
 import { ConvertPanel } from './ConvertPanel';
 
-// WowIndian ships with AI_FEATURES off; this suite exercises the retained
-// voice code with it on. `features.test.tsx` covers the switched-off site.
+// Pinned on so this suite never depends on the shipped value;
+// `utils/features.test.tsx` covers the hidden state.
 vi.mock('@/utils/features', () => ({ AI_FEATURES: true }));
 
 vi.mock('@/features/cms/api', () => ({

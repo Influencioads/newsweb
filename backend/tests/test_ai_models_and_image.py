@@ -806,7 +806,7 @@ class TestTtsLedger:
     ) -> None:
         """Several paid calls, one row. Billing only the last segment is how
         the meter ends up under the real invoice on every long story."""
-        configure(db, **{"voice.enabled": True})
+        configure(db, **{"voice.enabled": True, "voice.article_tts_enabled": True})
         article = make_article(db, body=TELUGU_BODY * 40)
         provider = _FakeTts(usd=0.001)
         _install_tts(monkeypatch, provider)
@@ -826,7 +826,7 @@ class TestTtsLedger:
         self, db: Session, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """A provider that 400s on the voice field has still been paid."""
-        configure(db, **{"voice.enabled": True})
+        configure(db, **{"voice.enabled": True, "voice.article_tts_enabled": True})
         article = make_article(db)
         _install_tts(monkeypatch, _FakeTts(fail=True))
 
@@ -848,7 +848,7 @@ class TestTtsLedger:
         last — would book a ten-segment story as one, and a story that failed
         on segment one as the same number.
         """
-        configure(db, **{"voice.enabled": True})
+        configure(db, **{"voice.enabled": True, "voice.article_tts_enabled": True})
         article = make_article(db, body=TELUGU_BODY * 40)
         segments = len(audio_concat.split_for_tts(tts_service.spoken_text(article)))
         assert segments > 1, "this fixture has to be long enough to be split"

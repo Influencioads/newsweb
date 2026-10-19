@@ -165,7 +165,7 @@ SPECS: dict[str, Spec] = {
         "Generate audio the moment a story publishes, instead of on first request.",
     ),
     "voice.article_tts_enabled": Spec(
-        True,
+        False,
         "bool",
         "Allow generated article TTS. Per-article voice must also be enabled.",
     ),

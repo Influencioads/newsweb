@@ -10,8 +10,8 @@ import type { ArticleDetail } from '@/types/public';
 
 import ArticlePage from './ArticlePage';
 
-// WowIndian ships with AI_FEATURES off; this suite exercises the retained
-// voice code with it on. `features.test.tsx` covers the switched-off site.
+// Pinned on so this suite never depends on the shipped value;
+// `utils/features.test.tsx` covers the hidden state.
 vi.mock('@/utils/features', () => ({ AI_FEATURES: true }));
 
 const never = () => new Promise<never>(() => {});

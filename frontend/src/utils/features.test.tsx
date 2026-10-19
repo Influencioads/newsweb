@@ -6,21 +6,16 @@ import { useLanguage } from '@/i18n';
 import { visibleAdminNav } from '@/layouts/adminNav';
 import { ConvertPanel } from '@/pages/admin/editor/ConvertPanel';
 
-import { AI_FEATURES } from './features';
-
+vi.mock('@/utils/features', () => ({ AI_FEATURES: false }));
 vi.mock('@/features/cms/api', () => ({
   generateArticleAudio: vi.fn(),
   generateArticleCard: vi.fn(),
 }));
 
-/** WowIndian ships with AI, crawling and voice switched off. */
+/** With the AI_FEATURES kill switch off, the automated-content screens are hidden. */
 describe('AI_FEATURES off', () => {
   beforeEach(() => {
     act(() => useLanguage.setState({ language: 'en' }));
-  });
-
-  it('is off', () => {
-    expect(AI_FEATURES).toBe(false);
   });
 
   it('hides the AI, crawl and voice screens from the admin menu, even for a superuser', () => {

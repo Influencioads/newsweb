@@ -253,12 +253,12 @@ class TestSettings:
     def test_admin_can_change_a_setting(self, client: TestClient, db: Session) -> None:
         admin = staff_headers(db, role=RoleKey.ADMIN, email="h-admin@test.example.com")
         r = client.patch("/api/v1/cms/settings",
-                         json={"values": {"voice.enabled": True}}, headers=admin)
+                         json={"values": {"voice.enabled": True, "voice.article_tts_enabled": True}}, headers=admin)
         assert r.status_code == 200, r.text
         assert r.json()["values"]["voice.enabled"] is True
 
         client.patch("/api/v1/cms/settings",
-                     json={"values": {"voice.enabled": False}}, headers=admin)
+                     json={"values": {"voice.enabled": False, "voice.article_tts_enabled": False}}, headers=admin)
 
     def test_ratios_must_total_one_hundred(self, client: TestClient, db: Session) -> None:
         admin = staff_headers(db, role=RoleKey.ADMIN, email="h-admin@test.example.com")
@@ -468,7 +468,7 @@ class TestVoice:
     ) -> None:
         admin = staff_headers(db, role=RoleKey.ADMIN, email="h-admin@test.example.com")
         client.patch("/api/v1/cms/settings",
-                     json={"values": {"voice.enabled": True}}, headers=admin)
+                     json={"values": {"voice.enabled": True, "voice.article_tts_enabled": True}}, headers=admin)
         settings_service.invalidate()
 
         article = db.execute(select(Article).where(
@@ -481,7 +481,7 @@ class TestVoice:
         assert r["voice_enabled"] is True
 
         client.patch("/api/v1/cms/settings",
-                     json={"values": {"voice.enabled": False}}, headers=admin)
+                     json={"values": {"voice.enabled": False, "voice.article_tts_enabled": False}}, headers=admin)
         settings_service.invalidate()
 
     def test_spoken_text_is_hashed_for_reuse(self, db: Session) -> None:
@@ -756,7 +756,7 @@ class TestAudioAttachment:
 
         # The global switch governs synthesis, not a file someone recorded.
         client.patch("/api/v1/cms/settings",
-                     json={"values": {"voice.enabled": False}}, headers=admin)
+                     json={"values": {"voice.enabled": False, "voice.article_tts_enabled": False}}, headers=admin)
         settings_service.invalidate()
 
         r = client.post(
@@ -815,12 +815,12 @@ class TestAudioAttachment:
         assert removed.json()["removed"] is True
 
         client.patch("/api/v1/cms/settings",
-                     json={"values": {"voice.enabled": True}}, headers=admin)
+                     json={"values": {"voice.enabled": True, "voice.article_tts_enabled": True}}, headers=admin)
         settings_service.invalidate()
         public = client.get(f"/api/v1/public/articles/{article['short_id']}/audio").json()
         assert public["available"] is False
         assert public["fallback"] == "device"
 
         client.patch("/api/v1/cms/settings",
-                     json={"values": {"voice.enabled": False}}, headers=admin)
+                     json={"values": {"voice.enabled": False, "voice.article_tts_enabled": False}}, headers=admin)
         settings_service.invalidate()

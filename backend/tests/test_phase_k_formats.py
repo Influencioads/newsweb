@@ -265,7 +265,7 @@ class TestFormats:
         url = f"/api/v1/public/articles/{article.short_id}/formats"
         assert client.get(url).json()["audio"]["url"] is None  # off by default
 
-        settings_service.set_many(db, {"voice.enabled": True}, actor_id=None)
+        settings_service.set_many(db, {"voice.enabled": True, "voice.article_tts_enabled": True}, actor_id=None)
         db.commit()
         assert client.get(url).json()["audio"]["url"].endswith("fmt008.mp3")
 

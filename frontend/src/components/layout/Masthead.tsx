@@ -106,7 +106,7 @@ export function Masthead() {
         </div>
 
         <Link to="/" className="order-first col-span-2 flex min-w-0 justify-center rounded-xl md:order-none md:col-span-1">
-          <img src="/logo.webp" alt="వావ్ ఇండియన్ · WowIndian" width={720} height={205} className="h-12 w-auto md:h-16" />
+          <img src="/logo.webp" alt="వావ్ ఇండియన్ · WowIndian" width={960} height={257} className="h-16 w-auto md:h-20" />
         </Link>
 
         <div className="flex shrink-0 items-center justify-end gap-1">

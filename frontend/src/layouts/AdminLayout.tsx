@@ -149,9 +149,9 @@ function Wordmark({ collapsed }: { collapsed: boolean }) {
       )}
     >
       {collapsed ? (
-        <img src="/logo-mark.webp" alt="వావ్ ఇండియన్" width={192} height={97} className="h-6 w-auto" />
+        <img src="/logo-mark.webp" alt="వావ్ ఇండియన్" width={336} height={80} className="h-6 w-auto" />
       ) : (
-        <img src="/logo.webp" alt="వావ్ ఇండియన్" width={720} height={205} className="h-9 w-auto self-start" />
+        <img src="/logo.webp" alt="వావ్ ఇండియన్" width={960} height={257} className="h-9 w-auto self-start" />
       )}
       <span
         className={cn(

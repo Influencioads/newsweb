@@ -157,6 +157,6 @@ const useStyles = makeStyles((color) => ({
   titles: { flex: 1, justifyContent: 'center' },
   titlesAfterControl: { marginLeft: space.xs },
   titleOrigin: { alignSelf: 'flex-start', transformOrigin: 'left center' },
-  /** logo.png is 600×171. */
-  logo: { height: 40, aspectRatio: 600 / 171 },
+  /** logo.png is 600×161. */
+  logo: { height: 40, aspectRatio: 600 / 161 },
 }));

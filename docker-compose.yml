@@ -1,4 +1,4 @@
-# Telugu News Platform — local development stack.
+# WowIndian — local development stack.
 #
 # Ports are deliberately offset (3307 / 6380 / 7701) so this stack never collides
 # with a MySQL/Redis already installed on the host machine.
@@ -6,7 +6,7 @@
 #   docker compose up -d mysql redis meilisearch     # infrastructure only
 #   docker compose --profile app up -d               # + api, worker, beat
 #
-name: telugu-news
+name: wowindian
 
 services:
   mysql:
@@ -21,7 +21,7 @@ services:
       - --ngram_token_size=2
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-telugu_news}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-wowindian}
       MYSQL_USER: ${MYSQL_USER:-news}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-newspass}
     ports:

@@ -13,8 +13,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  *     const hidden = useHideOnScroll();  // bottom bar hides on scroll-down
  */
 
-const SITE_TITLE = 'టాప్ తెలుగు న్యూస్';
-const DEFAULT_TITLE = 'టాప్ తెలుగు న్యూస్ · Top Telugu News';
+const SITE_TITLE = 'వావ్ ఇండియన్';
+const DEFAULT_TITLE = 'వావ్ ఇండియన్ · WowIndian';
 
 /** True when the OS asks for reduced motion (or there is no window). */
 export function prefersReducedMotion(): boolean {
@@ -213,7 +213,7 @@ export function withViewTransition(fn: () => void): void {
   fn();
 }
 
-/** `document.title` = "<title> · టాప్ తెలుగు న్యూస్", or the site default when empty. */
+/** `document.title` = "<title> · వావ్ ఇండియన్", or the site default when empty. */
 export function useDocumentTitle(title: string | null | undefined): void {
   useEffect(() => {
     document.title = title ? `${title} · ${SITE_TITLE}` : DEFAULT_TITLE;

@@ -582,6 +582,8 @@ def all_settings(db: Session) -> dict[str, Any]:
     """
     values = dict(_load(db))
     for key, spec in SPECS.items():
+        if is_locked_off(key):
+            values[key] = False
         if spec.kind == "secret":
             values[key] = _SECRET_MASK if values.get(key) else ""
     return values
@@ -623,9 +625,30 @@ def get_secret(db: Session, key: str) -> str:
         return ""
 
 
+#: Prefixes of the automated-content switches the AI_ENABLED kill switch holds
+#: off — see `config.Settings.AI_ENABLED`. Only bool keys are forced; models,
+#: caps and voices keep their values so turning the features back on restores
+#: the old configuration.
+_LOCKED_PREFIXES = ("ai.", "crawl.", "voice.", "bulletin.")
+_LOCKED_KEYS = frozenset({"epaper.audio_enabled"})
+
+
+def is_locked_off(key: str) -> bool:
+    """Whether `key` is an automated-content switch held off by AI_ENABLED."""
+    spec = SPECS.get(key)
+    if spec is None or spec.kind != "bool" or env_settings.AI_ENABLED:
+        return False
+    return key in _LOCKED_KEYS or key.startswith(_LOCKED_PREFIXES)
+
+
+LOCKED_OFF = frozenset(k for k in SPECS if k in _LOCKED_KEYS or k.startswith(_LOCKED_PREFIXES))
+
+
 def get(db: Session, key: str) -> Any:
     if key not in SPECS:
         raise KeyError(key)
+    if is_locked_off(key):
+        return False
     return _load(db).get(key, SPECS[key].default)
 
 
@@ -761,6 +784,13 @@ def set_many(
             select(AppSetting).where(AppSetting.key.in_(list(changes)))
         ).all()
     }
+    locked_on = sorted(k for k, v in changes.items() if is_locked_off(k) and v is True)
+    if locked_on:
+        raise ValidationError(
+            message_en="AI, crawling and voice features are turned off on this site.",
+            message_te="ఈ సైట్‌లో AI, క్రాలింగ్, వాయిస్ ఫీచర్లు ఆఫ్ చేయబడ్డాయి.",
+            details={"keys": locked_on},
+        )
     for key, raw in changes.items():
         try:
             value = _coerce(key, raw)
@@ -794,6 +824,7 @@ def describe() -> list[dict[str, Any]]:
             "choices": _CHOICES.get(key),
             "min": _INT_BOUNDS[key][0] if key in _INT_BOUNDS else None,
             "max": _INT_BOUNDS[key][1] if key in _INT_BOUNDS else None,
+            "locked": is_locked_off(key),
         }
         for key, spec in SPECS.items()
     ]

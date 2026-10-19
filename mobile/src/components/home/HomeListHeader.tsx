@@ -90,7 +90,7 @@ export function HomeListHeader({ breaking, epaper, topics }: HomeListHeaderProps
               color={color.onOverlay}
               onPress={() =>
                 Share.share({
-                  message: `Today's Telugu News\nhttps://telugunews.influencioweb.com/epaper/${epaper.pub_date}/page/1`,
+                  message: `Today's WowIndian E-Paper\nhttps://wowindian.com/epaper/${epaper.pub_date}/page/1`,
                 })
               }
             />

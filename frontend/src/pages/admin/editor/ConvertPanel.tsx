@@ -10,6 +10,7 @@ import { useI18n, useScript } from '@/i18n';
 import { cn } from '@/utils/cn';
 
 import { useL } from '../useL';
+import { AI_FEATURES } from '@/utils/features';
 
 /**
  * "ఈ కథనాన్ని మార్చండి" — the same story as a voice and as a picture.
@@ -71,6 +72,7 @@ export function ConvertPanel({ articleId, voiceEnabled }: ConvertPanelProps) {
       )}
     >
       {/* ------------------------------------------------------- voice -- */}
+      {AI_FEATURES ? (
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="secondary" size="sm" icon={Volume2} pending={voice.isPending} onClick={() => voice.mutate(false)}>
@@ -125,6 +127,7 @@ export function ConvertPanel({ articleId, voiceEnabled }: ConvertPanelProps) {
           </p>
         ) : null}
       </div>
+      ) : null}
 
       {/* -------------------------------------------------------- card -- */}
       <div className="space-y-2 border-t border-rule-soft pt-4">

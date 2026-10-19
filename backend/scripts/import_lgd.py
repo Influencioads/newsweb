@@ -81,7 +81,7 @@ SPARQL_ENDPOINTS = (
     "https://qlever.cs.uni-freiburg.de/api/wikidata",
 )
 # Both endpoints 403 a client with no real User-Agent.
-USER_AGENT = "newsweb-lgd-import/1.0 (one-off geography import) python-urllib"
+USER_AGENT = "wowindian-lgd-import/1.0 (one-off geography import) python-urllib"
 
 STATE_CODES = {"AP": "28", "TS": "36"}
 

@@ -1,13 +1,13 @@
 # Production deployment
 
-Target: `https://telugunews.influencioweb.com`
+Target: `https://wowindian.com`
 
 The production stack is defined in `docker-compose.prod.yml`. Caddy obtains and
 renews TLS certificates automatically. Only ports 80 and 443 are published;
 MySQL, Redis, Meilisearch, the API, and the static web server stay private.
 
 If the server already runs a shared host Nginx, use
-`infra/nginx/telugunews.influencioweb.com.conf`. The web and API containers are
+`infra/nginx/wowindian.com.conf`. The web and API containers are
 available only on `127.0.0.1:8094` and `127.0.0.1:8004`. Caddy is opt-in through
 the `caddy` Compose profile, so it does not contend with an existing proxy.
 
@@ -18,9 +18,9 @@ From the project directory:
 ```bash
 git init
 git branch -M main
-git remote add origin https://github.com/Influencioads/newsweb.git
+git remote add origin https://github.com/<your-account>/wowindian.git
 git add -- .gitignore .env.example .env.production.example README.md backend docs frontend infra docker-compose.yml docker-compose.prod.yml
-git commit -m "Prepare Telugu News platform for production Docker deployment"
+git commit -m "Prepare WowIndian for production Docker deployment"
 git push -u origin main
 ```
 
@@ -28,7 +28,7 @@ Authenticate with GitHub when prompted. Never add `.env` or `.env.production`.
 
 ## 2. Configure DNS
 
-At the DNS provider for `influencioweb.com`, create:
+At the DNS provider for `wowindian.com`, create:
 
 - Type: `A`
 - Name/host: `telugunews`
@@ -39,7 +39,7 @@ If the server has IPv6, add an `AAAA` record too. Wait until this command return
 the server IP before starting Caddy:
 
 ```bash
-dig +short telugunews.influencioweb.com
+dig +short wowindian.com
 ```
 
 ## 3. Prepare an Ubuntu server
@@ -62,10 +62,10 @@ sudo ufw --force enable
 ## 4. Clone and create production secrets
 
 ```bash
-sudo mkdir -p /opt/telugu-news
-sudo chown "$USER":"$USER" /opt/telugu-news
-git clone https://github.com/Influencioads/newsweb.git /opt/telugu-news
-cd /opt/telugu-news
+sudo mkdir -p /opt/wowindian
+sudo chown "$USER":"$USER" /opt/wowindian
+git clone https://github.com/<your-account>/wowindian.git /opt/wowindian
+cd /opt/wowindian
 cp .env.production.example .env.production
 chmod 600 .env.production
 ```
@@ -104,8 +104,8 @@ docker compose --env-file .env.production -f docker-compose.prod.yml logs -f api
 Verify:
 
 ```bash
-curl -fsS https://telugunews.influencioweb.com/health/live
-curl -I https://telugunews.influencioweb.com/
+curl -fsS https://wowindian.com/health/live
+curl -I https://wowindian.com/
 ```
 
 ## 5a. The AI newsroom features
@@ -179,7 +179,7 @@ of it.
 Verify after the first contributor applies that the object is not reachable:
 
 ```bash
-curl -I https://telugunews.influencioweb.com/media/kyc/1/pan/…   # expect 404
+curl -I https://wowindian.com/media/kyc/1/pan/…   # expect 404
 ```
 
 ### nginx: `$is_link_crawler` belongs in the cache key
@@ -190,8 +190,8 @@ includes `$is_link_crawler` for a reason: without it, the first crawler's stub
 HTML is served to every human reader for the whole cache TTL.
 
 ```bash
-curl -sA "WhatsApp/2.23" https://telugunews.influencioweb.com/politics/some-story-ab12cd | grep og:image
-curl -sA "Mozilla/5.0"   https://telugunews.influencioweb.com/politics/some-story-ab12cd | grep '<div id="root">'
+curl -sA "WhatsApp/2.23" https://wowindian.com/politics/some-story-ab12cd | grep og:image
+curl -sA "Mozilla/5.0"   https://wowindian.com/politics/some-story-ab12cd | grep '<div id="root">'
 ```
 
 The first must show a card URL, the second the SPA shell. If both show the
@@ -215,7 +215,7 @@ on the server. What Android needs is done once, outside the code:
 
 1. In the [Firebase console](https://console.firebase.google.com), create a
    project and add an Android app with the package
-   `com.influencioweb.toptelugunews`. Download `google-services.json` into
+   `com.wowindian.app`. Download `google-services.json` into
    `mobile/` (next to `app.json`). The repo is public, so the file is
    gitignored and EAS never sees it on its own; hand it over once as a file
    variable:
@@ -263,7 +263,7 @@ account. Use a unique password of at least 14 characters.
 ## 7. Deploy later updates
 
 ```bash
-cd /opt/telugu-news
+cd /opt/wowindian
 git pull --ff-only origin main
 docker compose --env-file .env.production -f docker-compose.prod.yml build
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d --remove-orphans
@@ -276,7 +276,7 @@ docker image prune -f
 mkdir -p backups
 docker compose --env-file .env.production -f docker-compose.prod.yml exec -T mysql \
   sh -c 'exec mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" --single-transaction --routines --triggers "$MYSQL_DATABASE"' \
-  | gzip > "backups/telugu-news-$(date +%F-%H%M).sql.gz"
+  | gzip > "backups/wowindian-$(date +%F-%H%M).sql.gz"
 ```
 
 Also back up the `storage_data` Docker volume and `.env.production` to encrypted,

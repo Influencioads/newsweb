@@ -1,4 +1,4 @@
-# Telugu News Platform — API + workers
+# WowIndian — API + workers
 # Python 3.12+
 
 # --- web ---------------------------------------------------------------

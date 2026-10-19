@@ -205,7 +205,7 @@ function PasswordPanel({ onSignedIn }: { onSignedIn: () => void }) {
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="lakshmi@topten.news"
+          placeholder="lakshmi@wowindian.com"
         />
       </Field>
 
@@ -285,7 +285,7 @@ export default function AdminLogin() {
         <Card padding="lg">
           <div className="mb-6">
             <p lang="te" className="th text-headline-lg font-extrabold text-brand">
-              టాప్ తెలుగు
+              వావ్ ఇండియన్
             </p>
             <h1 className={cn(s.head, 'text-headline-sm font-bold text-ink')}>{t('admin.page.login')}</h1>
           </div>

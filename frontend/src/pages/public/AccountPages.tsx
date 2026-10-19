@@ -51,7 +51,7 @@ function Shell({ docTitle, title, subtitle, children, footer }: ShellProps) {
     <PageContainer width="form" className="py-8 md:py-12">
       <Card padding="lg" radius="2xl">
         <p lang="te" className="th text-headline-lg font-extrabold text-brand">
-          టాప్ తెలుగు
+          వావ్ ఇండియన్
         </p>
         <PageHeader title={title} subtitle={subtitle} />
         {children}

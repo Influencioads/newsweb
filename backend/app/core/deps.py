@@ -26,8 +26,10 @@ from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.errors import (
     AccountInactiveError,
+    AiFeaturesDisabledError,
     PermissionDeniedError,
     ScopeDeniedError,
     SessionRevokedError,
@@ -251,3 +253,10 @@ def get_optional_principal(
         return get_current_principal(request, credentials, db)
     except (UnauthorizedError, SessionRevokedError, AccountInactiveError):
         return None
+
+
+def require_ai_features() -> None:
+    """Route guard for automated-content endpoints — AI, crawling and
+    ingestion, rewriting, voice and bulletins. 403 while AI_ENABLED is off."""
+    if not settings.AI_ENABLED:
+        raise AiFeaturesDisabledError()

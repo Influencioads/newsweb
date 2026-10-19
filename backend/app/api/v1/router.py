@@ -8,7 +8,7 @@ Modules are added here as each phase lands, so the OpenAPI document always
 reflects exactly what is implemented — no placeholder routes that 404.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from app.api.v1 import (
     ads,
@@ -34,8 +34,15 @@ from app.api.v1 import (
     users,
     videos,
 )
+from app.core.deps import require_ai_features
 
 api_router = APIRouter()
+
+# AI drafts and images, crawling / ingestion / rewriting, and voice admin:
+# 403 AI_FEATURES_DISABLED while AI_ENABLED is off (see config.AI_ENABLED).
+# The per-route guards for article audio, bulletins and the editor assist
+# panel live in their own modules, beside public routes that stay open.
+_AI_OFF = [Depends(require_ai_features)]
 
 # health is mounted at the application root (see app/main.py), not under /api/v1
 api_router.include_router(auth.router)
@@ -54,9 +61,9 @@ api_router.include_router(story_formats.router)
 api_router.include_router(cms_articles.router)
 api_router.include_router(cms_dashboard.router)
 api_router.include_router(cms_admin.router)
-api_router.include_router(cms_ai.router)
+api_router.include_router(cms_ai.router, dependencies=_AI_OFF)
 api_router.include_router(cms_discovery.router)
-api_router.include_router(cms_ingestion.router)
-api_router.include_router(cms_voice.router)
+api_router.include_router(cms_ingestion.router, dependencies=_AI_OFF)
+api_router.include_router(cms_voice.router, dependencies=_AI_OFF)
 api_router.include_router(cms_kyc.router)
 api_router.include_router(contributor.router)

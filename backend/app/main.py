@@ -61,7 +61,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 DESCRIPTION = """
-REST API for the Telugu News Platform — public reader surfaces, the newsroom CMS,
+REST API for the WowIndian — public reader surfaces, the newsroom CMS,
 the AI gateway, the e-paper pipeline, and video.
 
 **The rule that overrides everything:** nothing reaches a reader without a human

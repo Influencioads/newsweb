@@ -30,6 +30,7 @@ import {
 
 import type { StringKey } from '@/i18n';
 import type { PermissionKey } from '@/types/auth';
+import { AI_FEATURES } from '@/utils/features';
 
 /**
  * CMS navigation registry — the one list the sidebar, the mobile drawer and
@@ -44,6 +45,8 @@ export interface AdminNavItem {
   labelKey: StringKey;
   icon: LucideIcon;
   permission?: PermissionKey;
+  /** An automated-content screen (AI, crawl, voice) — hidden while `AI_FEATURES` is off. */
+  ai?: true;
   /** Path prefix that counts as "this page" (active state, breadcrumb); defaults to `to`. */
   match?: string;
 }
@@ -69,7 +72,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     items: [
       { to: '/admin/review', labelKey: 'admin.page.review', icon: ClipboardCheck, permission: 'article.review' },
       { to: '/admin/pending', labelKey: 'admin.page.pending', icon: Clock, permission: 'article.review' },
-      { to: '/admin/ai', labelKey: 'admin.page.ai', icon: Sparkles, permission: 'ai.use' },
+      { to: '/admin/ai', labelKey: 'admin.page.ai', icon: Sparkles, permission: 'ai.use', ai: true },
       { to: '/admin/moderation', labelKey: 'admin.page.moderation', icon: ShieldCheck, permission: 'comment.moderate' },
       { to: '/admin/kyc', labelKey: 'admin.page.kyc', icon: UserCheck, permission: 'kyc.review' },
     ],
@@ -78,15 +81,15 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     key: 'content',
     labelKey: 'admin.group.content',
     items: [
-      { to: '/admin/sources', labelKey: 'admin.page.sources', icon: Rss, permission: 'article.review' },
+      { to: '/admin/sources', labelKey: 'admin.page.sources', icon: Rss, permission: 'article.review', ai: true },
       { to: '/admin/taxonomy', labelKey: 'admin.page.taxonomy', icon: Tags, permission: 'taxonomy.view' },
       { to: '/admin/media', labelKey: 'admin.page.media', icon: Image, permission: 'media.view' },
       // `ai.use`: every role that may make a news card holds it; the API still
       // checks article.edit / edit_own and district scope per story.
-      { to: '/admin/creative', labelKey: 'admin.page.creative', icon: Palette, permission: 'ai.use' },
+      { to: '/admin/creative', labelKey: 'admin.page.creative', icon: Palette, permission: 'ai.use', ai: true },
       { to: '/admin/videos', labelKey: 'admin.page.videos', icon: Video, permission: 'video.view' },
-      { to: '/admin/bulletins', labelKey: 'admin.page.bulletins', icon: Radio, permission: 'voice.manage' },
-      { to: '/admin/voice', labelKey: 'admin.page.voice', icon: Mic, permission: 'voice.manage' },
+      { to: '/admin/bulletins', labelKey: 'admin.page.bulletins', icon: Radio, permission: 'voice.manage', ai: true },
+      { to: '/admin/voice', labelKey: 'admin.page.voice', icon: Mic, permission: 'voice.manage', ai: true },
     ],
   },
   {
@@ -145,6 +148,6 @@ export function findAdminNav(pathname: string): { group: AdminNavGroup; item: Ad
 export function visibleAdminNav(can: (permission: PermissionKey) => boolean): AdminNavGroup[] {
   return ADMIN_NAV.map((group) => ({
     ...group,
-    items: group.items.filter((item) => !item.permission || can(item.permission)),
+    items: group.items.filter((item) => (AI_FEATURES || !item.ai) && (!item.permission || can(item.permission))),
   })).filter((group) => group.items.length > 0);
 }

@@ -164,7 +164,7 @@ def seed_article_images(db: Session, *, force: bool = False) -> int:
             # information a sighted reader gets from the image slot.
             alt_te=article.title_te[:400],
             caption_te=article.sub_title_te or article.summary_te,
-            credit="టాప్ తెలుగు న్యూస్ · ప్రాతినిధ్య చిత్రం",
+            credit="వావ్ ఇండియన్ · ప్రాతినిధ్య చిత్రం",
             source_type="own",
         )
 
@@ -183,7 +183,7 @@ def clear_demo_media(db: Session) -> int:
     """Remove generated imagery — used when real photography replaces it."""
     media_rows = list(
         db.execute(
-            select(Media).where(Media.credit.like("టాప్ తెలుగు న్యూస్ · ప్రాతినిధ్య%"))
+            select(Media).where(Media.credit.like("వావ్ ఇండియన్ · ప్రాతినిధ్య%"))
         ).scalars()
     )
     for media in media_rows:
@@ -223,7 +223,7 @@ INLINE_CAPTIONS: dict[str, tuple[str, ...]] = {
     "default": ("సంబంధిత దృశ్యం", "ప్రాంత పరిశీలన", "కార్యక్రమ దృశ్యం"),
 }
 
-DEMO_CREDIT = "టాప్ తెలుగు న్యూస్ · ప్రాతినిధ్య చిత్రం"
+DEMO_CREDIT = "వావ్ ఇండియన్ · ప్రాతినిధ్య చిత్రం"
 
 
 def _make_media(db: Session, article: Article, variant: str, caption: str) -> Media:

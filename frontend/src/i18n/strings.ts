@@ -26,8 +26,8 @@ export const LANGUAGE_LABELS: Record<Language, string> = {
 /** Every translatable string in the reader UI. */
 export const STRINGS = {
   // --- masthead / chrome ---------------------------------------------------
-  'site.name': { te: 'టాప్ తెలుగు న్యూస్', en: 'Top Telugu News' },
-  'site.tagline': { te: 'Top Telugu News', en: 'Top Telugu News' },
+  'site.name': { te: 'వావ్ ఇండియన్', en: 'WowIndian' },
+  'site.tagline': { te: 'WowIndian', en: 'WowIndian' },
   'nav.home': { te: 'హోమ్', en: 'Home' },
   'nav.epaper': { te: 'ఈ-పేపర్', en: 'E-Paper' },
   'nav.search': { te: 'వెతకండి', en: 'Search' },
@@ -53,7 +53,7 @@ export const STRINGS = {
   'reader.share': { te: 'షేర్', en: 'Share' },
   'reader.authorPage': { te: 'రచయిత పేజీ', en: 'Author page' },
   'reader.readingTime': { te: 'నిమిషాల చదువు', en: 'min read' },
-  'reader.desk': { te: 'టాప్ తెలుగు డెస్క్', en: 'Top Telugu Desk' },
+  'reader.desk': { te: 'వావ్ ఇండియన్ డెస్క్', en: 'WowIndian Desk' },
 
   // --- home ----------------------------------------------------------------
   'home.breaking': { te: 'బ్రేకింగ్', en: 'Breaking' },
@@ -254,7 +254,7 @@ export const STRINGS = {
   'ui.pages': { te: 'పేజీలు', en: 'pages' },
 
   // --- e-paper promo -----------------------------------------------------
-  'epaper.promoEyebrow': { te: 'నేటి టాప్ తెలుగు న్యూస్ · ఈ-పేపర్', en: "Today's Top Telugu News · E-Paper" },
+  'epaper.promoEyebrow': { te: 'నేటి వావ్ ఇండియన్ · ఈ-పేపర్', en: "Today's WowIndian · E-Paper" },
   'epaper.promoTitle': { te: 'వార్తాపత్రికలా చదవండి. రేడియోలా వినండి.', en: 'Read it like a newspaper. Hear it like radio.' },
   'epaper.promoToday': { te: 'ఈ రోజు తెలుగు వార్తలు', en: "Today's Telugu news" },
   'epaper.read': { te: 'వార్తాపత్రికలా చదవండి', en: 'Read like a newspaper' },

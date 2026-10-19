@@ -144,7 +144,7 @@ export function PollCard({ poll }: { poll: Poll }) {
           style={styles.share}
           onPress={() =>
             Share.share({
-              message: `${current.question_te}\nhttps://telugunews.influencioweb.com/polls/${current.id}`,
+              message: `${current.question_te}\nhttps://wowindian.com/polls/${current.id}`,
             })
           }
         />

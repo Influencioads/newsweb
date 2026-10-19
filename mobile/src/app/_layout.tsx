@@ -31,6 +31,7 @@ import { useAuth } from '@/stores/auth';
 import { usePrefs } from '@/stores/prefs';
 import { T } from '@/ui/Text';
 import { ToastHost } from '@/ui/Toast';
+import { AI_FEATURES } from '@/lib/features';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -135,8 +136,8 @@ export default function RootLayout() {
           </Stack>
           {/* The audio dock for stack routes, in flow under the stack (tab
               routes get it inside the TabBar instead), and the one player. */}
-          <MiniPlayer placement="stack" />
-          <PlayerHost />
+          {AI_FEATURES ? <MiniPlayer placement="stack" /> : null}
+          {AI_FEATURES ? <PlayerHost /> : null}
           {/* Push registration and taps; after the Stack so a tap can navigate. */}
           <PushBridge />
           <ToastHost />

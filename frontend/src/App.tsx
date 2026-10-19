@@ -8,6 +8,7 @@ import { applyBrand, brandCss } from './utils/brand';
 import AdminLayout from './layouts/AdminLayout';
 import PublicLayout from './layouts/PublicLayout';
 import { RequireAuth } from './routes/RequireAuth';
+import { AI_FEATURES } from './utils/features';
 
 /** Lazy-load one named export from a multi-page module (one chunk per module). */
 function named<M extends Record<K, ComponentType>, K extends string>(load: () => Promise<M>, key: K) {
@@ -120,6 +121,9 @@ const TeluguRenderTest = lazy(() => import('./pages/qa/TeluguRenderTest'));
  * Playing screen) sits beside the routes, outside the error boundary, so audio
  * keeps playing across every navigation — public pages and CMS previews alike.
  */
+/** Where a switched-off AI, crawl or voice screen sends an old bookmark. */
+const OFF = <Navigate to="/admin/dashboard" replace />;
+
 export default function App() {
   const { pathname } = useLocation();
   // Admin-set colours (Settings → Branding) theme the reader site and the CMS alike.
@@ -130,7 +134,7 @@ export default function App() {
   return (
     <>
       <ScrollToTop />
-      <PlayerHost />
+      {AI_FEATURES ? <PlayerHost /> : null}
       <AppErrorBoundary resetKey={pathname}>
         <Suspense fallback={<RouteFallback />}>
           <Routes>
@@ -158,7 +162,7 @@ export default function App() {
               <Route path="/my-epaper" element={<MyEpaperPage />} />
               <Route path="/my-epaper/edition/:personalId" element={<EpaperPage />} />
               <Route path="/my-epaper/edition/:personalId/page/:page" element={<EpaperPage />} />
-              <Route path="/bulletin" element={<BulletinPage />} />
+              <Route path="/bulletin" element={AI_FEATURES ? <BulletinPage /> : <Navigate to="/" replace />} />
               <Route path="/contributor" element={<ContributorApplyPage />} />
               <Route path="/topic/:slug" element={<TopicPage />} />
               <Route path="/polls/:id" element={<PollPage />} />
@@ -206,8 +210,8 @@ export default function App() {
                 <Route path="/admin/articles/:id/edit" element={<ArticleEditor />} />
                 <Route path="/admin/review" element={<ReviewQueue />} />
                 <Route path="/admin/pending" element={<PendingArticlesPage />} />
-                <Route path="/admin/ai" element={<AiSuggestionsPage />} />
-                <Route path="/admin/sources" element={<ContentSourcesPage />} />
+                <Route path="/admin/ai" element={AI_FEATURES ? <AiSuggestionsPage /> : OFF} />
+                <Route path="/admin/sources" element={AI_FEATURES ? <ContentSourcesPage /> : OFF} />
                 <Route path="/admin/moderation" element={<ModerationPage />} />
                 <Route path="/admin/pins" element={<PinsPage />} />
                 <Route path="/admin/trending" element={<TrendingAdminPage />} />
@@ -218,12 +222,12 @@ export default function App() {
                 <Route path="/admin/notifications" element={<NotificationsAdminPage />} />
                 <Route path="/admin/taxonomy" element={<TaxonomyPage />} />
                 <Route path="/admin/media" element={<MediaPage />} />
-                <Route path="/admin/creative" element={<CreativeStudio />} />
+                <Route path="/admin/creative" element={AI_FEATURES ? <CreativeStudio /> : OFF} />
                 <Route path="/admin/users" element={<UsersPage />} />
                 <Route path="/admin/roles" element={<RolesPage />} />
                 <Route path="/admin/audit" element={<AuditPage />} />
-                <Route path="/admin/voice" element={<VoicePage />} />
-                <Route path="/admin/bulletins" element={<BulletinsPage />} />
+                <Route path="/admin/voice" element={AI_FEATURES ? <VoicePage /> : OFF} />
+                <Route path="/admin/bulletins" element={AI_FEATURES ? <BulletinsPage /> : OFF} />
                 <Route path="/admin/kyc" element={<KycPage />} />
                 <Route path="/admin/settings" element={<SettingsPage />} />
                 <Route path="/admin/epaper" element={<AdminEpaperPage />} />

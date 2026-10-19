@@ -15,6 +15,7 @@ import { space } from '@/lib/theme';
 import { makeStyles } from '@/lib/useTheme';
 import { ScreenHeader } from '@/ui/ScreenHeader';
 import { useToast } from '@/ui/Toast';
+import { AI_FEATURES } from '@/lib/features';
 
 /**
  * EpaperReader — the published (and personal) edition, page by page.
@@ -24,7 +25,7 @@ import { useToast } from '@/ui/Toast';
  * left here is what belongs to the edition as a whole — which page is open,
  * the share text, and the PDF download.
  */
-const SITE = 'https://telugunews.influencioweb.com';
+const SITE = 'https://wowindian.com';
 
 export function EpaperReader({
   edition,
@@ -125,7 +126,7 @@ export function EpaperReader({
           zoom={zoom}
           onPageDelta={go}
         />
-        {edition.audio_enabled && !personal ? <EpaperRadio date={edition.edition_date} /> : null}
+        {AI_FEATURES && edition.audio_enabled && !personal ? <EpaperRadio date={edition.edition_date} /> : null}
         <EpaperArchive current={edition.id} />
       </ScrollView>
     </View>

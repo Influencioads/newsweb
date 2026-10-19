@@ -9,6 +9,7 @@ import { radius, space } from '@/lib/theme';
 import { makeStyles, useColors } from '@/lib/useTheme';
 import { PressableScale } from '@/ui/PressableScale';
 import { T } from '@/ui/Text';
+import { AI_FEATURES } from '@/lib/features';
 
 /**
  * TabBar — the custom bottom tab bar passed to `<Tabs tabBar={...}>`.
@@ -49,7 +50,7 @@ export function TabBar({ state, descriptors, navigation, insets }: BottomTabBarP
 
   return (
     <View>
-      <MiniPlayer placement="tabs" />
+      {AI_FEATURES ? <MiniPlayer placement="tabs" /> : null}
       <View
         style={[styles.bar, { height: TAB_BAR_HEIGHT + insets.bottom, paddingBottom: insets.bottom }]}
         onLayout={(e) => setWidth(e.nativeEvent.layout.width)}

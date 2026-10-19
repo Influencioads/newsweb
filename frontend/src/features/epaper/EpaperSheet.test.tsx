@@ -37,7 +37,7 @@ const article = (id: number, slot: number, size: EpaperArticle['size'], summary:
 
 const LEAD_SUMMARY = 'ప్రధాన కథనం సారాంశం';
 const BRIEF_SUMMARY = 'సంక్షిప్త కథనం సారాంశం';
-const WORDMARK = 'టాప్ తెలుగు న్యూస్';
+const WORDMARK = 'వావ్ ఇండియన్';
 
 const page: EpaperPage = {
   id: 11,

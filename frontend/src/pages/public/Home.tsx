@@ -18,6 +18,7 @@ import { useDocumentTitle, useReveal } from '@/utils/motion';
 import { EpaperPromo } from './home/EpaperPromo';
 import { EpaperRail, ForYouBlock, SectionBlock, TopTopics, TrendingRail } from './home/HomeBlocks';
 import { HomeSkeleton } from './home/HomeSkeleton';
+import { AI_FEATURES } from '@/utils/features';
 
 /**
  * Reader home page.
@@ -123,7 +124,7 @@ export default function Home() {
     <PageContainer width="site" className="space-y-7 py-6 md:space-y-10 md:py-8">
       {/* Renders nothing when no bulletin is on air, including when an admin
           has flipped the kill switch — so it never leaves an empty slot. */}
-      <BulletinCard />
+      {AI_FEATURES ? <BulletinCard /> : null}
 
       <QueryState
         query={home}

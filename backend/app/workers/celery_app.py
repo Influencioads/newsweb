@@ -24,7 +24,7 @@ from app.models.epaper import (
 from app.services import bulletin_service, epaper_service, settings_service, tts_service
 
 celery = Celery(
-    "telugu_news",
+    "wowindian",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
 )
@@ -86,6 +86,25 @@ celery.conf.beat_schedule = {
     },
     "kyc-purge": {"task": "kyc.purge", "schedule": crontab(minute="40", hour="3")},
 }
+
+#: Automated-content jobs: crawling and rewriting, AI topic discovery, article
+#: voice, audio bulletins and e-paper audio. While AI_ENABLED is off they are
+#: not scheduled at all — each task also checks its own setting, which is held
+#: off too (`settings_service.is_locked_off`), so a stray manual call is inert.
+_AI_TASK_PREFIXES = ("crawl.", "ai.", "voice.", "bulletin.", "epaper.audio")
+
+
+def without_ai_jobs(schedule: dict) -> dict:
+    """The beat schedule minus every automated-content job."""
+    return {
+        name: entry
+        for name, entry in schedule.items()
+        if not entry["task"].startswith(_AI_TASK_PREFIXES)
+    }
+
+
+if not settings.AI_ENABLED:
+    celery.conf.beat_schedule = without_ai_jobs(celery.conf.beat_schedule)
 
 
 @celery.task(name="epaper.schedule")

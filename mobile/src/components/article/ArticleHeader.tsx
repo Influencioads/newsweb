@@ -13,6 +13,7 @@ import { IconButton } from '@/ui/Button';
 import { FontSizeSheet } from '@/ui/FontSizeSheet';
 import { ScreenHeader } from '@/ui/ScreenHeader';
 import { useToast } from '@/ui/Toast';
+import { AI_FEATURES } from '@/lib/features';
 
 /**
  * The article screen's header: the standard ScreenHeader (collapsing against
@@ -96,12 +97,14 @@ export function ArticleHeader({
         right={
           <View style={styles.controls}>
             <IconButton name="type" label={t('ui.fontSize')} onPress={() => setSheet('font')} />
-            <IconButton
-              name={speaking ? 'pause' : 'headphones'}
-              label={speaking ? t('article.stopListening') : t('article.listen')}
-              active={speaking}
-              onPress={() => (speaking ? onToggleSpeech() : onListen())}
-            />
+            {AI_FEATURES ? (
+              <IconButton
+                name={speaking ? 'pause' : 'headphones'}
+                label={speaking ? t('article.stopListening') : t('article.listen')}
+                active={speaking}
+                onPress={() => (speaking ? onToggleSpeech() : onListen())}
+              />
+            ) : null}
             <IconButton
               name={bookmarked ? 'bookmarkCheck' : 'bookmark'}
               label={bookmarked ? t('engage.saved') : t('engage.save')}

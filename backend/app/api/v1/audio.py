@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFil
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.deps import Principal, require_any_permission
+from app.core.deps import Principal, require_any_permission, require_ai_features
 from app.core.errors import NotFoundError
 from app.db.session import get_db
 from app.models.content import Article
@@ -101,7 +101,7 @@ def public_audio(short_id: str, response: Response, db: Session = Depends(get_db
     return _payload(article, asset)
 
 
-@router.post("/cms/articles/{article_id}/audio", status_code=201)
+@router.post("/cms/articles/{article_id}/audio", dependencies=[Depends(require_ai_features)], status_code=201)
 async def upload_audio(
     article_id: int,
     request: Request,
@@ -140,7 +140,7 @@ async def upload_audio(
     return _payload(article, asset)
 
 
-@router.delete("/cms/articles/{article_id}/audio")
+@router.delete("/cms/articles/{article_id}/audio", dependencies=[Depends(require_ai_features)])
 def delete_audio(
     article_id: int,
     request: Request,
@@ -167,7 +167,7 @@ def delete_audio(
     }
 
 
-@router.post("/cms/articles/{article_id}/generate-audio")
+@router.post("/cms/articles/{article_id}/generate-audio", dependencies=[Depends(require_ai_features)])
 def generate_audio(
     article_id: int,
     request: Request,

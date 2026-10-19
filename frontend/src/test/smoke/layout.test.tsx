@@ -14,8 +14,8 @@ const { never } = vi.hoisted(() => ({ never: () => new Promise<never>(() => {}) 
 
 vi.mock('@/features/public/api', () => ({
   fetchSiteConfig: vi.fn(async () => ({
-    site_name_te: 'టాప్ తెలుగు న్యూస్',
-    site_name_en: 'Top Telugu News',
+    site_name_te: 'వావ్ ఇండియన్',
+    site_name_en: 'WowIndian',
     categories: [
       { slug: 'politics', name_te: 'రాజకీయాలు', name_en: 'Politics', show_in_nav: true },
       { slug: 'hidden', name_te: 'దాచినది', name_en: 'Hidden', show_in_nav: false },

@@ -10,6 +10,10 @@ import type { ArticleDetail } from '@/types/public';
 
 import ArticlePage from './ArticlePage';
 
+// WowIndian ships with AI_FEATURES off; this suite exercises the retained
+// voice code with it on. `features.test.tsx` covers the switched-off site.
+vi.mock('@/utils/features', () => ({ AI_FEATURES: true }));
+
 const never = () => new Promise<never>(() => {});
 
 // A real nanoid can carry a '-': the page must still ask for this story.

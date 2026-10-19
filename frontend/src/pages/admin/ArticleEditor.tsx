@@ -24,6 +24,7 @@ import { MetaSidebar } from './editor/MetaSidebar';
 import { OriginCompare } from './editor/OriginCompare';
 import { EMPTY_FORM, fieldError, fromArticle, toPayload, wordCount, type ArticleForm } from './editor/form';
 import { useL } from './useL';
+import { AI_FEATURES } from '@/utils/features';
 
 /**
  * §1 — the full article form.
@@ -62,7 +63,8 @@ export default function ArticleEditor() {
   // Choosing what leads the home page is publish authority, not edit authority.
   const canPin = can('article.publish');
   // The card endpoints bill and gate like the §17 image: edit or edit_own.
-  const canCard = editing && (can('article.edit') || can('article.edit_own'));
+  // The news card is drawn through the AI studio route, so it goes with it.
+  const canCard = AI_FEATURES && editing && (can('article.edit') || can('article.edit_own'));
   const [cardOpen, setCardOpen] = useState(false);
 
   const existing = useQuery({
@@ -174,7 +176,8 @@ export default function ArticleEditor() {
               to approve it. Only the crawler's two types have an original
               behind them; for anything else the endpoint 404s. Its permission
               is review-or-view, which view_own alone does not satisfy. */}
-          {editing
+          {AI_FEATURES
+          && editing
           && (existing.data?.article_type === 'AI_REWRITE' || existing.data?.article_type === 'SYNDICATED')
           && (can('article.review') || can('article.view')) ? (
             <OriginCompare
@@ -202,6 +205,7 @@ export default function ArticleEditor() {
             />
           ) : null}
 
+          {AI_FEATURES ? (
           <AssistPanel
             title={form.title}
             body={form.body}
@@ -213,6 +217,7 @@ export default function ArticleEditor() {
             onTags={(names) => set({ tags: Array.from(new Set([...form.tags, ...names])) })}
             onSeo={(seo) => set({ seoTitle: seo.seo_title, seoDescription: seo.seo_description })}
           />
+          ) : null}
 
           <Section title={L('రచయిత & మూలం', 'Byline and source')}>
             <div className="grid gap-4 sm:grid-cols-2">

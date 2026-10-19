@@ -16,6 +16,7 @@ import * as cmsApi from '@/features/cms/api';
 import { useI18n, useScript } from '@/i18n';
 import type { SettingSpec, SettingsPayload } from '@/types/cms';
 import { cn } from '@/utils/cn';
+import { AI_FEATURES } from '@/utils/features';
 
 /**
  * §18 / §20 / §35 — the settings that an editor changes during a news day.
@@ -231,6 +232,9 @@ export default function SettingsPage() {
 
     return (
       <>
+        {/* WowIndian: AI, crawl and voice are switched off — see utils/features.ts */}
+        {AI_FEATURES ? (
+        <>
         {/* ------------------------------------------------------ §18 AI -- */}
         <Section
           title={en ? 'AI assistance (§15–18)' : 'AI సహాయం (§15–18)'}
@@ -577,6 +581,8 @@ export default function SettingsPage() {
             </p>
           </div>
         </Section>
+        </>
+        ) : null}
 
         <Section
           title={en ? 'E-Paper & polls' : 'ఈ-పేపర్ & పోల్స్'}
@@ -590,11 +596,11 @@ export default function SettingsPage() {
           <Field label={en ? 'Pages per edition' : 'ఎడిషన్‌కు పేజీలు'} hint={en ? '1–24. A generate can override it for the day.' : '1–24. జనరేట్ చేసేటప్పుడు ఆ రోజుకు మార్చవచ్చు.'} className="max-w-xs">
             <Input script="en" type="number" min={1} max={24} value={num('epaper.page_count')} onChange={(e) => set('epaper.page_count', Number(e.target.value))} />
           </Field>
-          <Switch checked={bool('epaper.audio_enabled')} onChange={(v) => set('epaper.audio_enabled', v)} label={en ? 'Audio edition' : 'ఆడియో ఎడిషన్'} />
-          <Switch checked={bool('voice.article_tts_enabled')} onChange={(v) => set('voice.article_tts_enabled', v)} label={en ? 'Article TTS' : 'కథనం TTS'} />
+          {AI_FEATURES ? (<Switch checked={bool('epaper.audio_enabled')} onChange={(v) => set('epaper.audio_enabled', v)} label={en ? 'Audio edition' : 'ఆడియో ఎడిషన్'} />) : null}
+          {AI_FEATURES ? <Switch checked={bool('voice.article_tts_enabled')} onChange={(v) => set('voice.article_tts_enabled', v)} label={en ? 'Article TTS' : 'కథనం TTS'} /> : null}
           <Switch checked={bool('epaper.personalized_enabled')} onChange={(v) => set('epaper.personalized_enabled', v)} label={en ? 'Personalized E-Paper' : 'వ్యక్తిగత ఈ-పేపర్'} />
           <Switch checked={bool('polls.enabled')} onChange={(v) => set('polls.enabled', v)} label={en ? 'Polls and Big Question' : 'పోల్స్ మరియు బిగ్ క్వశ్చన్'} />
-          <Switch checked={bool('ai.research_enabled')} onChange={(v) => set('ai.research_enabled', v)} disabled={!bool('ai.enabled')} label={en ? 'AI multiple-source research' : 'AI బహుళ మూలాల పరిశోధన'} />
+          {AI_FEATURES ? (<Switch checked={bool('ai.research_enabled')} onChange={(v) => set('ai.research_enabled', v)} disabled={!bool('ai.enabled')} label={en ? 'AI multiple-source research' : 'AI బహుళ మూలాల పరిశోధన'} />) : null}
         </Section>
 
         {/* --------------------------------------------------- §35 mix ---- */}
@@ -618,6 +624,9 @@ export default function SettingsPage() {
           </p>
         </Section>
 
+        {/* WowIndian: audio bulletins are switched off with voice */}
+        {AI_FEATURES ? (
+        <>
         {/* ----------------------------------------------- audio bulletins -- */}
         <Section
           title={en ? 'Audio bulletins' : 'ఆడియో బులెటిన్లు'}
@@ -656,6 +665,8 @@ export default function SettingsPage() {
             </Field>
           </div>
         </Section>
+        </>
+        ) : null}
 
         {/* ---------------------------------------------------- branding -- */}
         <Section

@@ -39,6 +39,7 @@ import { readingTime } from '@/utils/time';
 import { ArticleBreadcrumb, ArticleHead, ArticleHero } from './article/ArticleHead';
 import { useNewsArticleJsonLd } from './article/jsonLd';
 import { ReadNext } from './article/ReadNext';
+import { AI_FEATURES } from '@/utils/features';
 
 /**
  * Article reader.
@@ -220,7 +221,8 @@ export default function ArticlePage() {
     }
   }
 
-  const listen = serverTrack ? listenServer : renderable ? prepareAndListen : deviceListen;
+  // WowIndian: no listen control — voice is one of the switched-off AI features.
+  const listen = !AI_FEATURES ? undefined : serverTrack ? listenServer : renderable ? prepareAndListen : deviceListen;
   const speaking = tts.state === 'speaking';
 
   useNewsArticleJsonLd(article);
@@ -318,7 +320,7 @@ export default function ArticlePage() {
                       speed and queue in Now Playing); voice on without one
                       renders it on the first tap; otherwise the device voice.
                       Nothing until /formats answers, so no fallback flashes. */}
-                  {serverAudio || serverTrack ? (
+                  {AI_FEATURES && (serverAudio || serverTrack) ? (
                     <div ref={listenRef} className="mt-3">
                       <AudioPlayer
                         shortId={data.short_id}

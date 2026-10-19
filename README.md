@@ -1,8 +1,25 @@
-# Telugu News Platform
+# WowIndian
 
-A Telugu-language digital news product: public reader website, newsroom CMS,
-e-paper, video, and an AI gateway — built to **Build Instructions v1.0** and the
-**Telugu News Platform Mockups**.
+A Telugu-language digital news product for **wowindian.com**: public reader
+website, newsroom CMS, e-paper, video and polls — built to **Build Instructions
+v1.0** and the **WowIndian Mockups**.
+
+> **AI is switched off on WowIndian.** AI drafts and topic suggestions, AI
+> images and news cards, the editor assist panel, news crawling and RSS
+> ingestion, AI rewriting, article voice / read-aloud, audio bulletins,
+> e-paper audio, and the Celery schedules that drive them are all off. Every
+> story is written, edited and published by hand.
+>
+> The code is kept, not deleted, behind one switch per layer:
+>
+> | Layer | Switch | Effect while off |
+> |---|---|---|
+> | Backend | `AI_ENABLED=false` (default, `backend/app/core/config.py`) | AI/crawl/voice settings read off and cannot be turned on; their routes answer 403 `AI_FEATURES_DISABLED`; their beat jobs are not scheduled |
+> | Web | `AI_FEATURES = false` (`frontend/src/utils/features.ts`) | Those screens, menu entries, editor buttons and the reader's listen control are not shown |
+> | App | `AI_FEATURES = false` (`mobile/src/lib/features.ts`) | Listen control, audio player, bulletins and e-paper radio are not shown |
+>
+> `backend/tests/test_ai_switched_off.py` pins the backend behaviour. The rest
+> of the suite runs with `AI_ENABLED=true` so the retained code stays tested.
 
 > **The rule that overrides everything.**
 > Nothing reaches a reader without a human editor pressing Approve. There is no

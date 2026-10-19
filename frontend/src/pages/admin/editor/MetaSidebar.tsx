@@ -24,6 +24,7 @@ import { cn } from '@/utils/cn';
 import { prefersReducedMotion } from '@/utils/motion';
 
 import type { ArticleForm } from './form';
+import { AI_FEATURES } from '@/utils/features';
 
 /**
  * Sticky meta sidebar of the article editor: in-page anchors, workflow status,
@@ -230,6 +231,7 @@ export function MetaSidebar({ form, set, errors, options, article, canPin }: Met
       </section>
 
       {/* -------------------------------------------------------- audio -- */}
+      {AI_FEATURES ? (
       <section className={GROUP}>
         <GroupTitle icon={Music}>{L('ఆడియో', 'Audio')}</GroupTitle>
         {/* Both halves of the §20 switch sit together: whether this story may
@@ -251,6 +253,7 @@ export function MetaSidebar({ form, set, errors, options, article, canPin }: Met
             the body ("ఈ కథనాన్ని మార్చండి"). Two buttons doing the same job in
             two places is how one of them ends up stale. */}
       </section>
+      ) : null}
     </Card>
   );
 }

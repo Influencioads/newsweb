@@ -14,6 +14,7 @@ import { useI18n, useScript } from '@/i18n';
 import type { CmsMediaRef } from '@/types/cms';
 import { cn } from '@/utils/cn';
 import { useReveal } from '@/utils/motion';
+import { AI_FEATURES } from '@/utils/features';
 
 /**
  * §1 hero image and gallery.
@@ -270,7 +271,7 @@ export function MediaPicker({ heroId, hero, gallery, onHeroChange, onGalleryChan
             }}
           />
           {/* ---------------------------------------------- §17 generate -- */}
-          {open === 'hero' && articleId ? (
+          {AI_FEATURES && open === 'hero' && articleId ? (
             <div className="space-y-3 rounded-xl border border-rule bg-canvas p-3">
               {briefOpen ? (
                 <>

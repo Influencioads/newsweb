@@ -315,7 +315,7 @@ def generate_daily(
     )
     if edition is None:
         edition = EpaperEdition(
-            title=f"Today's Telugu News — {day.isoformat()}",
+            title=f"WowIndian E-Paper — {day.isoformat()}",
             edition_date=day,
             edition_type="DAILY",
             status="GENERATED",

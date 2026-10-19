@@ -1,4 +1,4 @@
-# Top Telugu News — mobile app
+# WowIndian — mobile app
 
 React Native (Expo SDK 57, expo-router) reader app consuming the same
 `/api/v1` backend as the website. Updated-doc scope shipped so far: Home feed

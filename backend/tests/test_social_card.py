@@ -543,7 +543,7 @@ class TestCardEndpoint:
         assert response.status_code == 200
         card = response.json()["card"]
         assert (card["width"], card["height"], card["aspect"]) == (1080, 1920, "9:16")
-        assert card["filename"] == f"toptelugunews-{article.short_id}-9x16.jpg"
+        assert card["filename"] == f"wowindian-{article.short_id}-9x16.jpg"
         assert card["photo"]["media_id"] == hero.id and card["warnings"] == []
         assert stub_render["storage"].keys[0].startswith(f"social-cards/{article.short_id}/")
         # No photo credit on the card (owner's decision).

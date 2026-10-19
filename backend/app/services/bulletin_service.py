@@ -68,7 +68,7 @@ CATCH_UP_MINUTES = 90
 #: Below this, a story gets a headline mention only.
 MIN_STORY_CHARS = 120
 
-_OPEN_TE = "టాప్ తెలుగు న్యూస్ — {label}. ముఖ్యాంశాలు."
+_OPEN_TE = "వావ్ ఇండియన్ — {label}. ముఖ్యాంశాలు."
 _CLOSE_TE = "ఇవీ ఈ గంట ముఖ్యాంశాలు. పూర్తి వివరాలకు యాప్ చూడండి."
 _CONNECTIVES_TE = ("తర్వాత…", "ఇక…", "మరో వార్త…", "అలాగే…", "చివరగా…")
 

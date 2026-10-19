@@ -2,7 +2,7 @@
     email {$ACME_EMAIL}
 }
 
-telugunews.influencioweb.com {
+wowindian.com {
     encode zstd gzip
 
     header {

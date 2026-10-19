@@ -526,7 +526,7 @@ class TestFontFallback:
 
     def test_the_right_face_is_chosen_per_string(self) -> None:
         assert "Telugu" in fonts.font_path_for("ఆంధ్రప్రదేశ్").name
-        assert "Telugu" not in fonts.font_path_for("Top Telugu News").name
+        assert "Telugu" not in fonts.font_path_for("WowIndian").name
 
     def test_a_missing_telugu_font_raises_rather_than_substituting_latin(
         self, monkeypatch: pytest.MonkeyPatch

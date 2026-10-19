@@ -25,7 +25,7 @@ from app.integrations.images.base import (
 logger = get_logger(__name__)
 
 API = "https://api.openverse.org/v1/images/"
-USER_AGENT = "TeluguNewsPlatform/1.0 (editorial image sourcing)"
+USER_AGENT = "WowIndian/1.0 (editorial image sourcing)"
 
 
 class OpenverseSource(StockImageProvider):

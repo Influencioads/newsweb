@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # --- core ---------------------------------------------------------------
     APP_ENV: Environment = "development"
-    APP_NAME: str = "Telugu News Platform"
+    APP_NAME: str = "WowIndian"
     APP_URL: str = "http://localhost:5174"
     CMS_URL: str = "http://localhost:5174/admin"
     API_URL: str = "http://localhost:8000"
@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     # --- database -----------------------------------------------------------
     MYSQL_HOST: str = "127.0.0.1"
     MYSQL_PORT: int = 3307
-    MYSQL_DATABASE: str = "telugu_news"
+    MYSQL_DATABASE: str = "wowindian"
     MYSQL_USER: str = "news"
     MYSQL_PASSWORD: str = ""
     DATABASE_URL: str = ""
@@ -115,16 +115,23 @@ class Settings(BaseSettings):
     AI_QUOTA_STRINGER_PER_DAY: int = 20
     AI_QUOTA_REPORTER_PER_DAY: int = 50
     AI_SIMILARITY_BLOCK_PERCENT: int = 85
-    #: A deployment-level *kill switch*, not the on switch. False forbids every
-    #: provider call regardless of what an admin does in the CMS.
+    #: WowIndian master switch for every automated-content feature: AI drafts
+    #: and suggestions, AI images and news cards, the editor assist panel,
+    #: news crawling and RSS ingestion, AI rewriting, article voice / TTS,
+    #: audio bulletins, e-paper audio, and the Celery schedules that drive
+    #: them. It is OFF, and while it is off:
     #:
-    #: It defaults True because the on switch now lives where an operator can
-    #: reach it: `ai.enabled` in the settings screen still defaults to False,
-    #: and with no key configured `get_ai` falls back to the keyless heuristic
-    #: provider. So deploying this code still cannot start spending at a
-    #: provider — that needs an admin to switch AI on *and* paste a key — but
-    #: it no longer takes a redeploy to make the settings screen mean anything.
-    AI_ENABLED: bool = True
+    #: * every `ai.* / crawl.* / voice.* / bulletin.*` switch and
+    #:   `epaper.audio_enabled` reads False whatever the database holds
+    #:   (`settings_service.LOCKED_OFF`), and the settings screen refuses to
+    #:   switch one on;
+    #: * the routes that run those features answer 403 AI_FEATURES_DISABLED
+    #:   (`deps.require_ai_features`);
+    #: * the beat schedule leaves their jobs out (`workers/celery_app.py`).
+    #:
+    #: The code is kept, untouched, so the features can be restored by setting
+    #: AI_ENABLED=true and redeploying. Manual newsroom work is unaffected.
+    AI_ENABLED: bool = False
     #: §17 — the only sources the research pass is permitted to read. Feeds we
     #: are licensed for, or that are published for redistribution (press
     #: releases, government bulletins, publisher RSS). Empty means the pass has
@@ -146,7 +153,7 @@ class Settings(BaseSettings):
     OTP_DEV_ECHO: bool = True
     SMTP_URL: str = ""
     MAIL_FROM: str = "no-reply@localhost"
-    MAIL_FROM_NAME: str = "Top Telugu News"
+    MAIL_FROM_NAME: str = "WowIndian"
 
     # --- licensed image sourcing --------------------------------------------
     IMAGE_SOURCE_PROVIDER: str = "wikimedia"
@@ -154,7 +161,7 @@ class Settings(BaseSettings):
     #: contact. They actively 403 requests whose UA contains placeholder domains
     #: such as example.com, so this must be set to the publication's own site or
     #: editorial address before the importer will work.
-    IMAGE_SOURCE_CONTACT: str = "https://topten.news"
+    IMAGE_SOURCE_CONTACT: str = "https://wowindian.com"
 
     # --- video --------------------------------------------------------------
     YOUTUBE_API_KEY: str = ""
@@ -276,5 +283,5 @@ settings = get_settings()
 #: The masthead. Every byline on copy nobody else is credited for is this name,
 #: and `/public/config` serves it to the reader shell — one definition, because
 #: two copies of a publication's own name drift.
-SITE_NAME_TE = "టాప్ తెలుగు న్యూస్"
-SITE_NAME_EN = "Top Telugu News"
+SITE_NAME_TE = "వావ్ ఇండియన్"
+SITE_NAME_EN = "WowIndian"

@@ -39,7 +39,7 @@ export function useNewsArticleJsonLd(article: ArticleDetail | undefined): void {
         : undefined,
       publisher: {
         '@type': 'NewsMediaOrganization',
-        name: 'టాప్ తెలుగు న్యూస్',
+        name: 'వావ్ ఇండియన్',
       },
       image: article.hero?.url ? [article.hero.url] : undefined,
       mainEntityOfPage: window.location.href,

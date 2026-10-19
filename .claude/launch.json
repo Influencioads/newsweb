@@ -3,9 +3,9 @@
   "configurations": [
     {
       "name": "api",
-      "runtimeExecutable": "C:/Users/PREDATOR 12TH GEN/Desktop/Coding/newsweb/newsweb-main/backend/.venv/Scripts/python.exe",
+      "runtimeExecutable": "C:/Users/LENOVO/Desktop/WowIndian/backend/.venv/Scripts/python.exe",
       "runtimeArgs": [
-        "C:/Users/PREDATOR 12TH GEN/Desktop/Coding/newsweb/newsweb-main/backend/scripts/run_dev.py"
+        "C:/Users/LENOVO/Desktop/WowIndian/backend/scripts/run_dev.py"
       ],
       "port": 8000
     },

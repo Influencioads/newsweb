@@ -120,7 +120,7 @@ export default function LoginPage() {
     <PageContainer width="form" className="py-8 md:py-12">
       <Card padding="lg" radius="2xl">
         <p lang="te" className="th text-headline-lg font-extrabold text-brand">
-          టాప్ తెలుగు
+          వావ్ ఇండియన్
         </p>
         <PageHeader
           eyebrow={L('పాఠకుల ఖాతా', 'Reader account')}

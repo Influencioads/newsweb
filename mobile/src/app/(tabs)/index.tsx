@@ -30,6 +30,7 @@ import { Screen } from '@/ui/Screen';
 import { ScreenHeader } from '@/ui/ScreenHeader';
 import { SkeletonFeed } from '@/ui/Skeleton';
 import { T } from '@/ui/Text';
+import { AI_FEATURES } from '@/lib/features';
 
 /**
  * Home feed: breaking strip, e-paper promo, top topics, lead story, secondary
@@ -71,7 +72,7 @@ function flatten(
   }
 
   // No row at all when no bulletin is on air (between slots, or switched off).
-  if (bulletin) rows.push({ key: 'bulletin', type: 'bulletin', bulletin });
+  if (AI_FEATURES && bulletin) rows.push({ key: 'bulletin', type: 'bulletin', bulletin });
   if (poll) rows.push({ key: `poll-${poll.id}`, type: 'poll', poll });
 
   if (home.latest.length) {

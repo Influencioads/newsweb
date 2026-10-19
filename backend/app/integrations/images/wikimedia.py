@@ -45,8 +45,8 @@ def _user_agent() -> str:
     if not contact or "example.com" in contact or "example.org" in contact:
         # Fall back to an identifying token with no fake contact rather than
         # sending something the upstream will reject outright.
-        return "TeluguNewsPlatform/1.0 (editorial image sourcing)"
-    return f"TeluguNewsPlatform/1.0 ({contact})"
+        return "WowIndian/1.0 (editorial image sourcing)"
+    return f"WowIndian/1.0 ({contact})"
 
 
 USER_AGENT = _user_agent()

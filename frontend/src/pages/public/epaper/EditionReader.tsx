@@ -35,6 +35,7 @@ import { cn } from '@/utils/cn';
 import { formatDate } from '@/utils/time';
 
 import { EpaperRadio } from './EpaperRadio';
+import { AI_FEATURES } from '@/utils/features';
 
 /**
  * One edition, open at one page (two side by side in the spread) — the sheet
@@ -353,7 +354,7 @@ export function EditionReader({ edition, personalId, requestedPage }: EditionRea
         </div>
       </div>
 
-      <EpaperRadio edition={edition} />
+      {AI_FEATURES ? <EpaperRadio edition={edition} /> : null}
 
       <ShareSheet
         open={shareOpen}

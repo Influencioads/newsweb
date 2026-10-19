@@ -215,8 +215,8 @@ const STRINGS = {
   'ui.pdf': { te: 'PDF', en: 'PDF' },
 
   // --- masthead / e-paper block --------------------------------------------
-  'site.name': { te: 'టాప్ తెలుగు న్యూస్', en: 'Top Telugu News' },
-  'epaper.promoEyebrow': { te: 'నేటి టాప్ తెలుగు న్యూస్ · ఈ-పేపర్', en: "Today's Top Telugu News · E-Paper" },
+  'site.name': { te: 'వావ్ ఇండియన్', en: 'WowIndian' },
+  'epaper.promoEyebrow': { te: 'నేటి వావ్ ఇండియన్ · ఈ-పేపర్', en: "Today's WowIndian · E-Paper" },
   'epaper.promoTitle': { te: 'వార్తాపత్రికలా చదవండి', en: 'Read it like a newspaper' },
   'epaper.read': { te: 'చదవండి', en: 'Read' },
   'epaper.listen': { te: 'వినండి', en: 'Listen' },

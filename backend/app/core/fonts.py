@@ -47,7 +47,7 @@ _FILENAMES: dict[str, tuple[str, ...]] = {
 }
 
 #: Noto Sans Telugu contains Telugu and digits but **no Latin letters** —
-#: verified, not assumed. Drawing "Top Telugu News" or "11 Sep 2026" with it
+#: verified, not assumed. Drawing "WowIndian" or "11 Sep 2026" with it
 #: produces a row of .notdef boxes that looks like a rendering bug rather than
 #: a missing font. Pillow does no font fallback, so Latin runs need their own
 #: face and their own draw call.

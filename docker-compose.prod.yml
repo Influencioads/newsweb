@@ -1,4 +1,4 @@
-name: telugu-news-production
+name: wowindian-production
 
 x-api-environment: &api-environment
   env_file: .env.production
@@ -15,7 +15,7 @@ x-api-image: &api-image
   build:
     context: ./backend
     dockerfile: ../infra/docker/api.Dockerfile
-  image: telugu-news-api:latest
+  image: wowindian-api:latest
   restart: unless-stopped
   <<: *api-environment
 
@@ -40,7 +40,7 @@ services:
 
   web:
     build: ./frontend
-    image: telugu-news-web:latest
+    image: wowindian-web:latest
     restart: unless-stopped
     ports:
       - "127.0.0.1:8094:80"

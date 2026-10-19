@@ -37,6 +37,7 @@ import { Icon } from '@/ui/Icon';
 import { PressableScale } from '@/ui/PressableScale';
 import { Screen } from '@/ui/Screen';
 import { T } from '@/ui/Text';
+import { AI_FEATURES } from '@/lib/features';
 
 /**
  * Article page (§5): hero, headline, standfirst, byline, the Tiptap body
@@ -159,7 +160,7 @@ export default function ArticleScreen() {
   // is none, as on the web. Always a direct child of the scroll, so its layout
   // y is what the header's headphones button jumps to, and it keeps playing
   // while the reader reads.
-  const listenBlock = data ? (
+  const listenBlock = AI_FEATURES && data ? (
     <View style={styles.audio} onLayout={onAudioLayout}>
       <ArticleAudio
         shortId={data.short_id}

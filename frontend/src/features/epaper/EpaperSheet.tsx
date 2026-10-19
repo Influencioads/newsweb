@@ -53,7 +53,7 @@ const HEAD: Record<EpaperSlotSize, string> = {
 
 const rectStyle = ({ left, top, width, height }: Rect): CSSProperties => ({ left, top, width, height });
 
-const WORDMARK = 'టాప్ తెలుగు న్యూస్';
+const WORDMARK = 'వావ్ ఇండియన్';
 
 interface StoryProps {
   article: EpaperArticle;
@@ -228,7 +228,7 @@ export function EpaperSheet({
           <div className="mt-2 flex-1 border-t-2 border-ink pt-1">
             <img src="/logo.webp" alt={WORDMARK} width={720} height={205} className="ep-wordmark mx-auto" />
             <p lang="en" className="font-sans text-eyebrow font-semibold uppercase tracking-wordmark text-exclusive-text">
-              Top Telugu News
+              WowIndian
             </p>
           </div>
           <div className="te flex items-center justify-between border-t-2 border-ink py-1 text-meta text-ink">

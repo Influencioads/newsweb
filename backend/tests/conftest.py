@@ -10,6 +10,11 @@ import pytest
 # Must be set before app.core.config is imported anywhere.
 os.environ.setdefault("APP_ENV", "test")
 
+# WowIndian ships with AI_ENABLED=false (see config.AI_ENABLED). The suite runs
+# the retained AI, crawl and voice code with the switch ON so that code keeps
+# being tested; `test_ai_switched_off.py` turns it off and checks the lock.
+os.environ.setdefault("AI_ENABLED", "true")
+
 # Settings read the developer's own .env, so a machine with real provider
 # credentials exported would make the suite call a paid API for real: the AI
 # tests would spend money, take 25s each to time out, and fail depending on

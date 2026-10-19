@@ -377,7 +377,7 @@ def _logo(h: int):
     te_size, en_size = int(h * 0.36), int(h * 0.15)
     en_face = _face("bold", en_size, False)
     tracking = en_size * 0.28
-    en_text = "TOP TELUGU NEWS"
+    en_text = "WOWINDIAN"
     text_w = max(
         _line_width(probe, SITE_NAME_TE.split(), "bold", te_size),
         _tracked_width(probe, en_text, en_face, tracking),
@@ -935,7 +935,7 @@ def make_card(
             "height": height,
             "aspect": aspect,
             "template": template,
-            "filename": f"toptelugunews-{article.short_id}-{shape}.jpg",
+            "filename": f"wowindian-{article.short_id}-{shape}.jpg",
             "warnings": warnings,
             # Present whenever a picture was chosen, even one that failed to
             # load (then `no_photo` says so): the CMS holds this id, and a

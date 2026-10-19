@@ -64,7 +64,7 @@ const PAGES: Record<string, PolicyEntry> = {
         {
           id: 'who-we-are',
           heading: 'మేమెవరం',
-          body: ['టాప్ తెలుగు న్యూస్ — ఆంధ్రప్రదేశ్, తెలంగాణ జిల్లా వార్తల డిజిటల్ వేదిక.'],
+          body: ['వావ్ ఇండియన్ — ఆంధ్రప్రదేశ్, తెలంగాణ జిల్లా వార్తల డిజిటల్ వేదిక.'],
         },
       ],
     },
@@ -75,7 +75,7 @@ const PAGES: Record<string, PolicyEntry> = {
           id: 'who-we-are',
           heading: 'Who we are',
           body: [
-            'Top Telugu News is a digital news platform covering Andhra Pradesh and Telangana, district by district.',
+            'WowIndian is a digital news platform covering Andhra Pradesh and Telangana, district by district.',
           ],
         },
       ],

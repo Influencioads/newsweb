@@ -1,6 +1,6 @@
 # Implementation Map
 
-Built from **Build Instructions v1.0** (functional contract) + **Telugu News Platform Mockups**
+Built from **Build Instructions v1.0** (functional contract) + **WowIndian Mockups**
 (visual contract, 14 annotated screens). Every mockup screen is traced
 `SCREEN -> COMPONENT -> API -> SERVICE -> MODEL -> TABLE` before any code is written.
 

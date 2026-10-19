@@ -40,7 +40,7 @@ const card = (photo: { media_id: number; url: string | null; ai_generated: boole
     height: 1350,
     aspect: '4:5',
     template: 'panel',
-    filename: 'toptelugunews-AbC123-4x5.jpg',
+    filename: 'wowindian-AbC123-4x5.jpg',
     warnings: ['headline_truncated'],
     photo,
   },

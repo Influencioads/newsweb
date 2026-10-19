@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.deps import (
+    require_ai_features,
     Principal,
     get_current_principal,
     require_any_permission,
@@ -357,7 +358,7 @@ class AssistIn(BaseModel):
 
 
 @router.post(
-    "/cms/ai/assist", summary="Editorial suggestions (§18) — heuristic engine v1"
+    "/cms/ai/assist", dependencies=[Depends(require_ai_features)], summary="Editorial suggestions (§18) — heuristic engine v1"
 )
 def assist(
     payload: AssistIn,

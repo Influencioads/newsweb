@@ -29,7 +29,7 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.core.deps import Principal, require_permission
+from app.core.deps import Principal, require_permission, require_ai_features
 from app.core.errors import NotFoundError, ValidationError
 from app.db.session import get_db
 from app.models.bulletin import AudioBulletin
@@ -131,7 +131,7 @@ def _cms_row(db: Session, bulletin: AudioBulletin) -> dict:
     }
 
 
-@router.get("/cms/bulletins")
+@router.get("/cms/bulletins", dependencies=[Depends(require_ai_features)])
 def list_bulletins(
     date: date_type | None = None,
     db: Session = Depends(get_db),
@@ -160,7 +160,7 @@ def _get(db: Session, bulletin_id: int) -> AudioBulletin:
     return bulletin
 
 
-@router.get("/cms/bulletins/{bulletin_id}")
+@router.get("/cms/bulletins/{bulletin_id}", dependencies=[Depends(require_ai_features)])
 def get_bulletin(
     bulletin_id: int,
     db: Session = Depends(get_db),
@@ -173,7 +173,7 @@ class BulletinPatch(BaseModel):
     script_te: str = Field(min_length=20, max_length=bulletin_service.MAX_SCRIPT_CHARS)
 
 
-@router.patch("/cms/bulletins/{bulletin_id}")
+@router.patch("/cms/bulletins/{bulletin_id}", dependencies=[Depends(require_ai_features)])
 def edit_script(
     bulletin_id: int,
     payload: BulletinPatch,
@@ -216,7 +216,7 @@ class BulletinRunIn(BaseModel):
     slot: int | None = None
 
 
-@router.post("/cms/bulletins/run")
+@router.post("/cms/bulletins/run", dependencies=[Depends(require_ai_features)])
 def run_now(
     payload: BulletinRunIn,
     request: Request,
@@ -252,7 +252,7 @@ def run_now(
     return _cms_row(db, bulletin)
 
 
-@router.post("/cms/bulletins/{bulletin_id}/regenerate")
+@router.post("/cms/bulletins/{bulletin_id}/regenerate", dependencies=[Depends(require_ai_features)])
 def regenerate(
     bulletin_id: int,
     request: Request,
@@ -274,7 +274,7 @@ def regenerate(
     return _cms_row(db, bulletin)
 
 
-@router.post("/cms/bulletins/{bulletin_id}/publish")
+@router.post("/cms/bulletins/{bulletin_id}/publish", dependencies=[Depends(require_ai_features)])
 def publish_bulletin(
     bulletin_id: int,
     request: Request,
@@ -294,7 +294,7 @@ def publish_bulletin(
     return _cms_row(db, bulletin)
 
 
-@router.post("/cms/bulletins/{bulletin_id}/pull")
+@router.post("/cms/bulletins/{bulletin_id}/pull", dependencies=[Depends(require_ai_features)])
 def pull_bulletin(
     bulletin_id: int,
     request: Request,

@@ -352,3 +352,13 @@ def register_exception_handlers(app: FastAPI) -> None:
             error_type=type(exc).__name__,
         )
         return _json(AppError())
+
+
+class AiFeaturesDisabledError(AppError):
+    """AI_ENABLED is off: automated content (AI, crawling, rewriting, voice)
+    is switched off on this deployment. See `config.Settings.AI_ENABLED`."""
+
+    code = "AI_FEATURES_DISABLED"
+    status_code = status.HTTP_403_FORBIDDEN
+    message_en = "AI, crawling and voice features are turned off on this site."
+    message_te = "ఈ సైట్‌లో AI, క్రాలింగ్, వాయిస్ ఫీచర్లు ఆఫ్ చేయబడ్డాయి."

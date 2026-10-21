@@ -467,6 +467,49 @@ _AUDIT = {
 }
 
 
+@router.delete("/{article_id}", summary="Delete an article (soft delete)")
+def delete_article(
+    article_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_permission("article.delete", scoped=True)),
+) -> dict:
+    """Take an article off the site and out of every CMS list.
+
+    A soft delete (§5): `deleted_at` is set and nothing else changes, so the
+    row, its versions and its workflow history stay in the database and the
+    article can be restored by clearing `deleted_at`. `article.delete` is held
+    by super admin, admin and editor-in-chief only. Every read path already
+    filters `deleted_at IS NULL`, the public one through
+    `article_repo.published_filter`.
+    """
+    article = _get(db, article_id)
+    workflow_service._scope(principal, article)
+    article.deleted_at = utcnow()
+    audit_service.record(
+        db,
+        action=AuditAction.DELETE,
+        entity_type="article",
+        entity_id=article.id,
+        actor=principal.user,
+        before={
+            "title_te": article.title_te,
+            "status": str(article.status),
+            "workflow_state": str(article.workflow_state),
+            "short_id": article.short_id,
+        },
+        request=request,
+    )
+    # Same purge as unpublish: a published story leaves the home page,
+    # ticker and trending rails now, not when their cache expires.
+    from app.core.redis_client import cache_delete_prefix
+
+    cache_delete_prefix("home:")
+    cache_delete_prefix("breaking")
+    cache_delete_prefix("trending:")
+    return {"id": article.id, "deleted": True}
+
+
 @router.post("/{article_id}/placement", response_model=CmsArticleOut)
 def set_placement(
     article_id: int,

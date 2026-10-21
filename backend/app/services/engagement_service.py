@@ -111,7 +111,9 @@ def ingest_beacon(
     articles = {
         a.short_id: a
         for a in db.execute(
-            select(Article).where(Article.short_id.in_(short_ids))
+            select(Article).where(
+                Article.short_id.in_(short_ids), Article.deleted_at.is_(None)
+            )
         ).scalars()
     }
 

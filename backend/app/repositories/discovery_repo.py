@@ -106,7 +106,14 @@ def active_pins(
 
 
 def all_pins(db: Session, *, include_expired: bool = False) -> list[Pin]:
-    stmt = select(Pin).order_by(Pin.ends_at.desc())
+    # A deleted article's pins stay in the table (the delete is recoverable)
+    # but drop out of the CMS list with the article.
+    stmt = (
+        select(Pin)
+        .join(Article, Article.id == Pin.article_id)
+        .where(Article.deleted_at.is_(None))
+        .order_by(Pin.ends_at.desc())
+    )
     if not include_expired:
         stmt = stmt.where(Pin.ends_at > utcnow())
     return list(db.execute(stmt).unique().scalars())

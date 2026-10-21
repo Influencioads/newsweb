@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, ExternalLink, FileText, Pencil, Plus, Search, Zap } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, FileText, Pencil, Plus, Search, Trash2, Zap } from 'lucide-react';
 
 import { AdminPage } from '@/components/admin/AdminPage';
 import { DataTable, type DataTableColumn } from '@/components/admin/DataTable';
 import { WorkflowPill } from '@/components/admin/StatusPill';
 import { Badge } from '@/components/ui/Badge';
-import { Button, ButtonLink, IconButtonLink } from '@/components/ui/Button';
+import { Button, ButtonLink, IconButton, IconButtonLink } from '@/components/ui/Button';
 import { Chip, ChipRail } from '@/components/ui/Chip';
 import { useConfirm } from '@/components/ui/Dialog';
 import { PromptDialog } from '@/components/ui/PromptDialog';
@@ -156,6 +156,60 @@ export function WorkflowActions({ article }: { article: CmsArticle }) {
         pending={transition.isPending}
         onSubmit={requestChanges}
       />
+      {dialog}
+    </>
+  );
+}
+
+/**
+ * Delete, for whoever holds `article.delete` — super admin, admin and
+ * editor-in-chief. A soft delete: the story leaves the site and every CMS
+ * list, but stays in the database (and the audit log) and can be restored.
+ */
+export function DeleteArticleButton({ article }: { article: CmsArticle }) {
+  const { t } = useI18n();
+  const L = useL();
+  const s = useScript();
+  const can = useAuth((st) => st.can);
+  const qc = useQueryClient();
+  const toast = useToast();
+  const { confirm, dialog } = useConfirm();
+  const remove = useMutation({
+    mutationFn: () => cmsApi.deleteArticle(article.id),
+    onSuccess: () => {
+      toast.success(t('state.deleted'));
+      void qc.invalidateQueries({ queryKey: ['cms'] });
+    },
+    onError: (err) => toast.error(err),
+  });
+  if (!can('article.delete')) return null;
+
+  const title = s.text(article.title_te, article.title_en);
+  const run = async () => {
+    const ok = await confirm({
+      title: L('ఈ కథనాన్ని తొలగించాలా?', 'Delete this article?'),
+      body: (
+        <>
+          <span lang={title.lang} className={cn(title.cls, 'block')}>
+            {title.text}
+          </span>
+          <span className={cn(s.body, 'mt-2 block text-meta text-muted')}>
+            {L(
+              'ఇది సైట్ నుంచి, CMS జాబితాల నుంచి తొలగిపోతుంది. డేటాబేస్‌లో భద్రంగా ఉంటుంది, తిరిగి తీసుకురావచ్చు.',
+              'It disappears from the site and the CMS lists. It stays in the database and can be restored.',
+            )}
+          </span>
+        </>
+      ),
+      tone: 'danger',
+      confirmLabel: t('ui.delete'),
+    });
+    if (ok) remove.mutate();
+  };
+
+  return (
+    <>
+      <IconButton icon={Trash2} label={t('ui.delete')} variant="danger" pending={remove.isPending} onClick={() => void run()} />
       {dialog}
     </>
   );
@@ -326,6 +380,7 @@ export default function Articles() {
                 <IconButtonLink to={`/${categorySlug(a.category_id)}/${a.slug}-${a.short_id}`} external icon={ExternalLink} label={L('చూడండి', 'View')} />
               ) : null}
               <IconButtonLink to={`/admin/articles/${a.id}/edit`} icon={Pencil} label={t('ui.edit')} />
+              <DeleteArticleButton article={a} />
             </>
           )}
         />

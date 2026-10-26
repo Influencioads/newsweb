@@ -64,7 +64,7 @@ export function NominateCta({ compact = false }: { compact?: boolean }) {
         <ButtonLink
           to="/nominate"
           size="lg"
-          variant="primary"
+          variant="wow"
           icon={Award}
         >
           {te ? 'ఇప్పుడే నామినేట్ చేయండి' : 'Nominate now'}

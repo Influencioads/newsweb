@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { LogIn, MapPin, Newspaper, Radio, TrendingUp, UserRound, Video, Zap } from 'lucide-react';
+import { AudioLines, Award, GalleryVerticalEnd, LogIn, MapPin, Newspaper, Radio, TrendingUp, UserRound, Video, Zap } from 'lucide-react';
 
 import { Sheet } from '@/components/ui/Dialog';
 import { Icon, type LucideIcon } from '@/components/ui/Icon';
@@ -44,6 +44,9 @@ export interface Shortcut {
 
 /** Reader destinations that are not categories, in nav order. */
 export const SHORTCUTS: readonly Shortcut[] = ([
+  { to: '/story-shots', key: 'ui.storyShots', icon: GalleryVerticalEnd },
+  { to: '/radio', key: 'ui.wowRadio', icon: AudioLines },
+  { to: '/nominate', key: 'ui.nominate', icon: Award },
   { to: '/live', key: 'ui.live', icon: Radio, live: true },
   { to: '/trending', key: 'ui.trending', icon: TrendingUp },
   { to: '/local', key: 'ui.local', icon: MapPin },

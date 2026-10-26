@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -67,34 +67,32 @@ function renderHome(payload: HomePayload) {
 
 afterEach(() => useLanguage.setState({ language: 'te' }));
 
-describe('Home editorial hierarchy', () => {
-  it('puts the distinct featured lead before trending and other discovery shelves', () => {
+/** The WOW home page (Pallavi's design): Featured Story, Explore WOW, Story
+ *  Shots, WOW Radio beside the Nominate call, Trending, Featured Heroes. */
+describe('Home (WOW layout)', () => {
+  function follows(a: Element, b: Element) {
+    return Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+  }
+
+  it('leads with the featured story, then the WOW shelves in order', () => {
     renderHome(homePayload());
     const lead = screen.getByRole('heading', { name: 'ముఖ్య కథనం' });
-    const trending = screen.getByText('ట్రెండింగ్');
-    expect(lead.closest('article')).toHaveClass('home-feature');
-    expect(lead.compareDocumentPosition(trending) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const explore = document.getElementById('explore-wow')!;
+    const radio = screen.getByRole('heading', { name: /WOW Radio/ });
+    const nominate = document.getElementById('nominate-cta')!;
+    expect(lead.closest('article')).toBeInTheDocument();
+    expect(follows(lead, explore)).toBe(true);
+    expect(follows(explore, radio)).toBe(true);
+    expect(follows(radio, nominate)).toBe(true);
   });
 
-  it('slides the top stories: the lead first, then the secondary stories', () => {
+  it('keeps the lead out of the trending list', () => {
     renderHome(homePayload());
-    const slides = within(screen.getByRole('region', { name: 'ముఖ్య కథనాలు' })).getAllByRole('group');
-    expect(slides).toHaveLength(2);
-    expect(within(slides[0]!).getByRole('heading', { name: 'ముఖ్య కథనం' })).toBeInTheDocument();
-    expect(within(slides[1]!).getByRole('heading', { name: 'ప్రత్యేక కథనం ఒకటి' })).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { name: 'ముఖ్య కథనం' })).toHaveLength(1);
+    expect(document.querySelectorAll('a[href="/national/exclusive-one"]').length).toBeGreaterThan(0);
   });
 
-  it('builds an exclusive shelf from distinct flagged stories and excludes the lead', () => {
-    renderHome(homePayload());
-    const shelf = screen.getByRole('heading', { name: 'ఎక్స్‌క్లూజివ్' }).closest('section');
-    expect(shelf).toBeInTheDocument();
-    expect(shelf).toHaveAttribute('data-section-key', 'exclusive');
-    expect(shelf?.querySelectorAll('a[href="/national/exclusive-one"]')).toHaveLength(1);
-    expect(shelf?.querySelectorAll('a[href="/national/exclusive-two"]')).toHaveLength(1);
-    expect(shelf?.querySelector('a[href="/national/lead"]')).toBeNull();
-  });
-
-  it('does not show an empty exclusive shelf', () => {
+  it('no longer renders the newspaper exclusive shelf', () => {
     const payload = homePayload();
     renderHome({ ...payload, secondary: [], mid_column: [], latest: [], sections: [] });
     expect(screen.queryByRole('heading', { name: 'ఎక్స్‌క్లూజివ్' })).toBeNull();

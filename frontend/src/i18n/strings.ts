@@ -27,7 +27,7 @@ export const LANGUAGE_LABELS: Record<Language, string> = {
 export const STRINGS = {
   // --- masthead / chrome ---------------------------------------------------
   'site.name': { te: 'వావ్ ఇండియన్', en: 'WowIndian' },
-  'site.tagline': { te: 'WowIndian', en: 'WowIndian' },
+  'site.tagline': { te: 'డిస్కవర్. ఇన్‌స్పైర్. లెర్న్. షేర్.', en: 'Discover. Inspire. Learn. Share.' },
   'nav.home': { te: 'హోమ్', en: 'Home' },
   'nav.epaper': { te: 'ఈ-పేపర్', en: 'E-Paper' },
   'nav.search': { te: 'వెతకండి', en: 'Search' },
@@ -243,6 +243,9 @@ export const STRINGS = {
   'ui.local': { te: 'లోకల్', en: 'Local' },
   'ui.video': { te: 'వీడియో', en: 'Video' },
   'ui.shorts': { te: 'షార్ట్స్', en: 'Shorts' },
+  'ui.storyShots': { te: 'స్టోరీ షాట్స్', en: 'Story Shots' },
+  'ui.wowRadio': { te: 'వావ్ రేడియో', en: 'WOW Radio' },
+  'ui.nominate': { te: 'హీరోను నామినేట్ చేయండి', en: 'Nominate a Hero' },
   'ui.explore': { te: 'ఇంకా చూడండి', en: 'Explore' },
   'ui.readNext': { te: 'తర్వాత చదవండి', en: 'Read next' },
   'ui.forYou': { te: 'మీ కోసం', en: 'For you' },

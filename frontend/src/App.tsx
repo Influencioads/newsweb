@@ -33,13 +33,11 @@ const MyEpaperPage = lazy(() => import('./pages/public/MyEpaperPage'));
 // While public E-Paper is paused, old/shared reader links land on home.
 const epaperGate = (page: ReactElement) => (EPAPER_PUBLIC ? page : <Navigate to="/" replace />);
 const BulletinPage = lazy(() => import('./pages/public/BulletinPage'));
+const NominatePage = lazy(() => import('./features/wow/NominatePage'));
+const RadioPage = lazy(() => import('./features/wow/WowRadio'));
+const StoryShotsPage = lazy(() => import('./features/wow/StoryShots'));
 const ContributorApplyPage = lazy(() => import('./pages/public/ContributorApplyPage'));
 const LiveNewsPage = lazy(() => import('./pages/public/LiveNewsPage'));
-// WOW features (features/wow): full-screen Story Shots, WOW Radio, and the
-// Nominate Your Local Hero form.
-const StoryShotsPage = lazy(() => import('./features/wow/StoryShots'));
-const RadioPage = lazy(() => import('./features/wow/WowRadio'));
-const NominatePage = lazy(() => import('./features/wow/NominatePage'));
 const ShortNewsPage = lazy(() => import('./pages/public/ShortNewsPage'));
 const VideosPage = lazy(() => import('./pages/public/VideosPage'));
 const VideoDetailPage = lazy(() => import('./pages/public/VideoDetailPage'));
@@ -179,9 +177,6 @@ export default function App() {
               <Route path="/topic/:slug" element={<TopicPage />} />
               <Route path="/polls/:id" element={<PollPage />} />
               <Route path="/live" element={<LiveNewsPage />} />
-              <Route path="/story-shots" element={<StoryShotsPage />} />
-              <Route path="/radio" element={<RadioPage />} />
-              <Route path="/nominate" element={<NominatePage />} />
               <Route path="/live-blog" element={<LiveNewsPage />} />
               <Route path="/district/:slug" element={<DistrictPage />} />
               <Route path="/mandal/:slug" element={<MandalPage />} />
@@ -189,6 +184,9 @@ export default function App() {
               <Route path="/videos" element={videosGate(<VideosPage />)} />
               <Route path="/videos/:id" element={videosGate(<VideoDetailPage />)} />
               <Route path="/short-news" element={<ShortNewsPage />} />
+              <Route path="/story-shots" element={<StoryShotsPage />} />
+              <Route path="/radio" element={<RadioPage />} />
+              <Route path="/nominate" element={<NominatePage />} />
               <Route path="/web-stories" element={<WebStoriesPage />} />
               <Route path="/author/:slug" element={<AuthorPage />} />
               <Route path="/tag/:slug" element={<TagPage />} />

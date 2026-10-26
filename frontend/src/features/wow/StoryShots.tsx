@@ -193,7 +193,7 @@ export default function StoryShotsPage() {
           title={te ? 'స్టోరీ షాట్స్ త్వరలో' : 'Story Shots are on the way'}
           body={te ? 'సంపాదకులు కొత్త కథలు సిద్ధం చేస్తున్నారు.' : 'The desk is preparing new stories.'}
         />
-        <ButtonLink to="/" variant="primary" className="mt-4">
+        <ButtonLink to="/" variant="wow" className="mt-4">
           {te ? 'హోమ్‌కి వెళ్లండి' : 'Go home'}
         </ButtonLink>
       </div>
@@ -346,7 +346,7 @@ export default function StoryShotsPage() {
             ) : null}
             <div className="flex items-center gap-2 pt-1">
               {hasStory ? (
-                <ButtonLink to={article.url} variant="primary" iconRight={ArrowRight} className="flex-1 md:flex-none">
+                <ButtonLink to={article.url} variant="wow" iconRight={ArrowRight} className="flex-1 md:flex-none">
                   {te ? 'పూర్తి కథ చదవండి' : 'Read full story'}
                 </ButtonLink>
               ) : null}

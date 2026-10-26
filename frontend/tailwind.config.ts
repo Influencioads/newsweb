@@ -27,6 +27,13 @@ export default {
           deep: 'rgb(var(--tn-brand-deep) / <alpha-value>)',
           tint: 'rgb(var(--tn-brand-tint) / <alpha-value>)',
         },
+        /** WOW orange — the energetic accent (CTAs, Nominate, Radio). `deep` is the fill. */
+        wow: {
+          DEFAULT: 'rgb(var(--tn-wow) / <alpha-value>)',
+          deep: 'rgb(var(--tn-wow-deep) / <alpha-value>)',
+          tint: 'rgb(var(--tn-wow-tint) / <alpha-value>)',
+        },
+        'on-wow': 'rgb(var(--tn-on-wow) / <alpha-value>)',
         breaking: {
           DEFAULT: 'rgb(var(--tn-breaking) / <alpha-value>)',
           tint: 'rgb(var(--tn-breaking-tint) / <alpha-value>)',

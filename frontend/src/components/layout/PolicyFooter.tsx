@@ -81,7 +81,12 @@ export function PolicyFooter() {
         </nav>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-on-ink/10 py-6">
-          <img src="/logo.webp" alt="వావ్ ఇండియన్" width={960} height={257} loading="lazy" className="h-10 w-auto" />
+          <div className="flex flex-wrap items-center gap-3">
+            <img src="/logo.webp" alt="వావ్ ఇండియన్" width={960} height={257} loading="lazy" className="h-10 w-auto" />
+            <p lang="en" className="font-serif text-ui italic text-on-ink/85">
+              The Inspiring Indian · Every Story Has a WOW!
+            </p>
+          </div>
           <p lang="en" className="font-sans text-meta text-muted-inverse">
             © {new Date().getFullYear()} WowIndian
           </p>

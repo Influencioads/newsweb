@@ -105,8 +105,15 @@ export function Masthead() {
           <p className={cn(s.body, 'hidden text-meta text-muted xl:block')}>{formatFullDate(new Date(), language)}</p>
         </div>
 
-        <Link to="/" className="order-first col-span-2 flex min-w-0 justify-center rounded-xl md:order-none md:col-span-1">
+        <Link
+          to="/"
+          className="order-first col-span-2 flex min-w-0 flex-col items-center rounded-xl md:order-none md:col-span-1"
+        >
           <img src="/logo.webp" alt="వావ్ ఇండియన్ · WowIndian" width={960} height={257} className="h-16 w-auto md:h-20" />
+          {/* Brand line from the pitch: The Inspiring Indian — Discover. Inspire. Learn. Share. */}
+          <span lang="en" className="-mt-0.5 font-sans text-eyebrow font-bold uppercase text-wow-deep">
+            Discover · Inspire · Learn · Share
+          </span>
         </Link>
 
         <div className="flex shrink-0 items-center justify-end gap-1">

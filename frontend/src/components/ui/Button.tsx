@@ -29,7 +29,7 @@ import { cn } from '@/utils/cn';
  *     <ButtonLink to="/search" variant="secondary" iconRight={ChevronRight}>…</ButtonLink>
  *     <IconButton icon={Bell} label={t('ui.notifications')} badge={unread} />
  */
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link' | 'inverse' | 'on-fill';
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link' | 'inverse' | 'on-fill' | 'wow';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 export interface ButtonVisualProps {
@@ -62,6 +62,8 @@ const VARIANT: Record<ButtonVariant, string> = {
   // On a brand/breaking FILL (ticker band, hero scrim): follows on-brand, which
   // is white on the deep light-mode fills and ink on the lighter dark-mode ones.
   'on-fill': 'text-on-brand hover:bg-on-brand/10 focus-visible:outline-on-brand',
+  // WOW orange call to action (Nominate, Radio, Story Shots).
+  wow: 'bg-wow-deep text-on-wow hover:bg-wow-deep/90',
 };
 
 const SIZE: Record<ButtonSize, string> = {

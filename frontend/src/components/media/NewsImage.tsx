@@ -35,8 +35,8 @@ interface Props {
   ratio?: string;
   /** `sizes` hint — tell the browser how wide this slot actually renders. */
   sizes?: string;
-  /** Corner radius: the card ladder default, or `2xl` for heroes. */
-  radius?: 'xl' | '2xl';
+  /** Corner radius: the card ladder default, `2xl` for heroes, or `none` for a full-bleed image inside a card that already rounds it. */
+  radius?: 'xl' | '2xl' | 'none';
   className?: string;
   /** Eager-load the LCP image (the lead story hero); everything else is lazy. */
   priority?: boolean;
@@ -46,7 +46,7 @@ interface Props {
   showAiLabel?: boolean;
 }
 
-const RADIUS = { xl: 'rounded-xl', '2xl': 'rounded-2xl' } as const;
+const RADIUS = { xl: 'rounded-xl', '2xl': 'rounded-2xl', none: 'rounded-none' } as const;
 
 /** Average colour extracted from a blurhash, used as the placeholder tint. */
 function blurhashTint(hash: string | null | undefined): string | undefined {

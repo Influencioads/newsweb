@@ -30,7 +30,7 @@ if not exist "frontend\node_modules" (
 
 REM ---- Start both servers in their own windows ----
 start "WowIndian API (keep open)" cmd /k "cd /d %~dp0backend && .venv\Scripts\python.exe scripts\run_dev.py"
-start "WowIndian Website (keep open)" cmd /k "cd /d %~dp0frontend && npm run dev"
+start "WowIndian Website (keep open)" cmd /k "cd /d %~dp0frontend && npm run dev -- --port 5174 --strictPort"
 
 echo Waiting for servers to start...
 timeout /t 12 /nobreak >nul

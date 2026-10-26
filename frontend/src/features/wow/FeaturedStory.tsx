@@ -59,7 +59,7 @@ export function FeaturedStory({ article }: { article: ArticleCard }) {
           </p>
         ) : null}
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <ButtonLink to={article.url} variant="wow" iconRight={ArrowRight}>
+          <ButtonLink to={article.url} variant="primary" iconRight={ArrowRight}>
             {te ? 'చదవండి' : 'Read'}
           </ButtonLink>
           <ShareButton

@@ -14,6 +14,9 @@ import { useReaderPrefs } from '@/stores/readerPrefs';
 import type { ArticleCard, HomePayload } from '@/types/public';
 import { cn } from '@/utils/cn';
 import { useDocumentTitle } from '@/utils/motion';
+import { ExploreWow } from '@/features/wow/ExploreWow';
+import { FeaturedHeroes, NominateCta } from '@/features/wow/LocalHeroes';
+import { StoryShotsStrip } from '@/features/wow/StoryShots';
 
 import { EpaperPromo } from './home/EpaperPromo';
 import { EpaperRail, ForYouBlock, SectionBlock, TopTopics, TrendingRail } from './home/HomeBlocks';
@@ -146,7 +149,12 @@ export default function Home() {
           return <>
             <FrontGrid data={data} />
 
+            {/* WOW: the Story Shots shelf, then the 15 features. */}
+            <StoryShotsStrip />
+
             <TrendingRail articles={[...data.latest, ...data.briefs].slice(0, 6)} />
+
+            <ExploreWow />
 
             {!data.sections.some((section) => section.key === 'exclusive') && exclusives.length >= 2 ? (
               <SectionBlock
@@ -161,6 +169,10 @@ export default function Home() {
 
             {epaperApi.EPAPER_PUBLIC && data.epaper ? <EpaperPromo epaper={data.epaper} /> : null}
             <TopTopics topics={topics.data?.items ?? []} />
+
+            {/* WOW: published hero stories and the call to nominate one. */}
+            <FeaturedHeroes />
+            <NominateCta />
 
             {/* §3.2 — signed-in readers only. */}
             <ForYouBlock />

@@ -70,6 +70,22 @@ CATEGORIES: tuple[tuple[str, str, str, bool], ...] = (
     ("telangana", "తెలంగాణ", "Telangana", True),
     ("districts", "జిల్లాలు", "Districts", False),
     ("opinion", "అభిప్రాయం", "Opinion", False),
+    # WOW features (frontend/src/features/wow/categories.ts). Kept out of the
+    # top menu: Explore WOW on the home page is their front door. Zero to Hero
+    # is above; WOW Radio and Story Shots are pages, not categories. Appended,
+    # so existing rows keep their sort order.
+    ("real-heroes", "రియల్ హీరోస్", "Real Heroes", False),
+    ("morning-mantra", "మార్నింగ్ మంత్ర", "Morning Mantra", False),
+    ("startup-stories", "స్టార్టప్ స్టోరీస్", "Startup Stories", False),
+    ("jai-telugoda", "జై తెలుగోడా", "Jai Telugoda", False),
+    ("local-hero", "లోకల్ హీరో", "Local Hero", False),
+    ("my-village-story", "మై విలేజ్ స్టోరీ", "My Village Story", False),
+    ("wow-idea", "వావ్ ఐడియా", "WOW Idea", False),
+    ("wow-news", "వావ్ న్యూస్", "WOW News", False),
+    ("my-story", "మై స్టోరీ", "My Story", False),
+    ("wow-tech", "వావ్ టెక్", "WOW Tech", False),
+    ("mystery", "మిస్టరీ", "Mystery", False),
+    ("wow-puranam", "వావ్ పురాణం", "WOW Puranam", False),
 )
 
 TAGS: tuple[tuple[str, str, str, TagType], ...] = (

@@ -157,7 +157,7 @@ class Settings(BaseSettings):
     #: contact. They actively 403 requests whose UA contains placeholder domains
     #: such as example.com, so this must be set to the publication's own site or
     #: editorial address before the importer will work.
-    IMAGE_SOURCE_CONTACT: str = "https://wowindian.com"
+    IMAGE_SOURCE_CONTACT: str = "https://toptelugunews.com"
 
     # --- video --------------------------------------------------------------
     YOUTUBE_API_KEY: str = ""

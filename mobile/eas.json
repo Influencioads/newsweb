@@ -6,7 +6,7 @@
     "apk": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://wowindian.com"
+        "EXPO_PUBLIC_API_URL": "https://toptelugunews.com"
       },
       "android": {
         "buildType": "apk"

@@ -50,7 +50,7 @@ const COMMENT_MAX = 1000;
 // YouTube error 153 is returned when an embedded player has no HTTP Referer
 // or equivalent client identity. Native WebViews do not reliably add one, so
 // identify this app with the same public origin that serves its API and web UI.
-const PLAYER_ORIGIN = 'https://wowindian.com';
+const PLAYER_ORIGIN = 'https://toptelugunews.com';
 
 function CommentRow({ comment }: { comment: VideoComment }) {
   const styles = useStyles();

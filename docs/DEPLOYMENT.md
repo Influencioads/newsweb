@@ -1,13 +1,13 @@
 # Production deployment
 
-Target: `https://wowindian.com`
+Target: `https://toptelugunews.com`
 
 The production stack is defined in `docker-compose.prod.yml`. Caddy obtains and
 renews TLS certificates automatically. Only ports 80 and 443 are published;
 MySQL, Redis, Meilisearch, the API, and the static web server stay private.
 
 If the server already runs a shared host Nginx, use
-`infra/nginx/wowindian.com.conf`. The web and API containers are
+`infra/nginx/toptelugunews.com.conf`. The web and API containers are
 available only on `127.0.0.1:8094` and `127.0.0.1:8004`. Caddy is opt-in through
 the `caddy` Compose profile, so it does not contend with an existing proxy.
 
@@ -28,7 +28,7 @@ Authenticate with GitHub when prompted. Never add `.env` or `.env.production`.
 
 ## 2. Configure DNS
 
-At the DNS provider for `wowindian.com`, create:
+At the DNS provider for `toptelugunews.com`, create:
 
 - Type: `A`
 - Name/host: `telugunews`
@@ -39,7 +39,7 @@ If the server has IPv6, add an `AAAA` record too. Wait until this command return
 the server IP before starting Caddy:
 
 ```bash
-dig +short wowindian.com
+dig +short toptelugunews.com
 ```
 
 ## 3. Prepare an Ubuntu server
@@ -104,8 +104,8 @@ docker compose --env-file .env.production -f docker-compose.prod.yml logs -f api
 Verify:
 
 ```bash
-curl -fsS https://wowindian.com/health/live
-curl -I https://wowindian.com/
+curl -fsS https://toptelugunews.com/health/live
+curl -I https://toptelugunews.com/
 ```
 
 ## 5a. The AI newsroom features
@@ -179,7 +179,7 @@ of it.
 Verify after the first contributor applies that the object is not reachable:
 
 ```bash
-curl -I https://wowindian.com/media/kyc/1/pan/…   # expect 404
+curl -I https://toptelugunews.com/media/kyc/1/pan/…   # expect 404
 ```
 
 ### nginx: `$is_link_crawler` belongs in the cache key
@@ -190,8 +190,8 @@ includes `$is_link_crawler` for a reason: without it, the first crawler's stub
 HTML is served to every human reader for the whole cache TTL.
 
 ```bash
-curl -sA "WhatsApp/2.23" https://wowindian.com/politics/some-story-ab12cd | grep og:image
-curl -sA "Mozilla/5.0"   https://wowindian.com/politics/some-story-ab12cd | grep '<div id="root">'
+curl -sA "WhatsApp/2.23" https://toptelugunews.com/politics/some-story-ab12cd | grep og:image
+curl -sA "Mozilla/5.0"   https://toptelugunews.com/politics/some-story-ab12cd | grep '<div id="root">'
 ```
 
 The first must show a card URL, the second the SPA shell. If both show the

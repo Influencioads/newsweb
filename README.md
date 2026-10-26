@@ -1,6 +1,6 @@
 # WowIndian
 
-A Telugu-language digital news product for **wowindian.com**: public reader
+A Telugu-language digital news product for **toptelugunews.com**: public reader
 website, newsroom CMS, e-paper, video and polls — built to **Build Instructions
 v1.0** and the **WowIndian Mockups**.
 

@@ -205,7 +205,7 @@ function PasswordPanel({ onSignedIn }: { onSignedIn: () => void }) {
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="lakshmi@wowindian.com"
+          placeholder="lakshmi@toptelugunews.com"
         />
       </Field>
 

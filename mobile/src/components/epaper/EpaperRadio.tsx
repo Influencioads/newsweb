@@ -70,7 +70,7 @@ export function EpaperRadio({ date }: { date: string }) {
         <T variant="headlineSm" weight="bold" accessibilityRole="header">
           {t('epaper.radio')}
         </T>
-        <Badge tone="brand" icon="headphones" size="xs" label={`${tracks.length}`} />
+        <Badge tone="brand" icon="listen" size="xs" label={`${tracks.length}`} />
       </View>
 
       <T variant="body" weight="semibold" color="brand" lang="te" scaled>

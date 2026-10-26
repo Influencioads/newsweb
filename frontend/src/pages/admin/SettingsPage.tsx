@@ -368,7 +368,7 @@ export default function SettingsPage() {
           {/* --------------------------------------------- §17 AI images -- */}
           <Switch checked={bool('ai.image_enabled')} onChange={(v) => set('ai.image_enabled', v)}
             disabled={!bool('ai.enabled') || !keySet}
-            label={en ? 'Draw an illustration when there is no photograph' : 'ఫోటో లేనప్పుడు చిత్రం గీయండి'}
+            label={en ? 'Make a realistic AI picture when there is no photograph' : 'ఫోటో లేనప్పుడు AI చిత్రం రూపొందించండి'}
             hint={en
               ? 'Needs AI on and a key saved above. Sensitive stories — communal, sexual violence, a named minor, suicide — are refused before any call is made, and every generated image carries a visible label.'
               : 'పైన AI ఆన్ కావాలి, కీ సేవ్ కావాలి. సున్నితమైన కథనాలు — మతపరమైనవి, లైంగిక హింస, మైనర్లు, ఆత్మహత్య — కాల్ చేయకముందే తిరస్కరించబడతాయి. తయారైన ప్రతి చిత్రంపై లేబుల్ కనిపిస్తుంది.'} />
@@ -516,8 +516,8 @@ export default function SettingsPage() {
               </p>
               <p className={cn(s.body, 'mt-1 text-muted', s.te ? 'text-te-body-xs' : 'text-ui')}>
                 {en
-                  ? 'A starting point for the read, not an imitation of any presenter. Each sets the voice and the pace below; listen, then adjust.'
-                  : 'ఇవి చదివే శైలికి ప్రారంభ బిందువు మాత్రమే — ఏ యాంకర్‌నూ అనుకరించవు. ప్రతి ఎంపిక కింది వాయిస్‌ను, వేగాన్ని సెట్ చేస్తుంది; విని సర్దుబాటు చేయండి.'}
+                  ? 'A starting point for the read, not an imitation of any presenter. Each sets the article voice and the pace below; bulletins read in their slot’s own anchor voice.'
+                  : 'ఇవి చదివే శైలికి ప్రారంభ బిందువు మాత్రమే — ఏ యాంకర్‌నూ అనుకరించవు. ప్రతి ఎంపిక కింది వార్తల వాయిస్‌ను, వేగాన్ని సెట్ చేస్తుంది; బులెటిన్లు ఆ స్లాట్ సొంత వాయిస్‌లో వినిపిస్తాయి.'}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {presets.map((p) => {
@@ -600,7 +600,7 @@ export default function SettingsPage() {
           {AI_FEATURES ? <Switch checked={bool('voice.article_tts_enabled')} onChange={(v) => set('voice.article_tts_enabled', v)} label={en ? 'Article TTS' : 'కథనం TTS'} /> : null}
           <Switch checked={bool('epaper.personalized_enabled')} onChange={(v) => set('epaper.personalized_enabled', v)} label={en ? 'Personalized E-Paper' : 'వ్యక్తిగత ఈ-పేపర్'} />
           <Switch checked={bool('polls.enabled')} onChange={(v) => set('polls.enabled', v)} label={en ? 'Polls and Big Question' : 'పోల్స్ మరియు బిగ్ క్వశ్చన్'} />
-          {AI_FEATURES ? (<Switch checked={bool('ai.research_enabled')} onChange={(v) => set('ai.research_enabled', v)} disabled={!bool('ai.enabled')} label={en ? 'AI multiple-source research' : 'AI బహుళ మూలాల పరిశోధన'} />) : null}
+          {AI_FEATURES ? (<Switch checked={bool('ai.research_enabled')} onChange={(v) => set('ai.research_enabled', v)} disabled={!bool('ai.enabled')} label={en ? 'AI web research' : 'AI వెబ్ పరిశోధన'} hint={en ? 'Lets Sanjaya search the web and write deal and research articles (Perplexity Sonar, about ₹0.6 per search).' : 'సంజయ వెబ్‌లో వెతికి, డీల్స్ మరియు పరిశోధన కథనాలు రాయడానికి (Perplexity Sonar, ఒక్కో శోధనకు సుమారు ₹0.6).'} />) : null}
         </Section>
 
         {/* --------------------------------------------------- §35 mix ---- */}
@@ -643,15 +643,9 @@ export default function SettingsPage() {
           ) : null}
           <Switch checked={bool('bulletin.enabled')} onChange={(v) => set('bulletin.enabled', v)}
             label={en ? 'Enable audio bulletins' : 'ఆడియో బులెటిన్లు ఆన్'}
-            hint={en ? 'Off means no bulletin is built or aired.' : 'ఆఫ్ అయితే బులెటిన్ తయారు కాదు.'} />
-          <Switch checked={bool('bulletin.requires_approval')} onChange={(v) => set('bulletin.requires_approval', v)}
-            disabled={!bool('bulletin.enabled')}
-            label={en ? 'An editor must approve before it airs' : 'ప్రసారానికి ముందు ఎడిటర్ ఆమోదం'}
-            hint={en ? 'Recommended while the script is machine-written.' : 'స్క్రిప్ట్ AI రాస్తున్నప్పుడు సిఫారసు.'} />
-          <Switch checked={bool('bulletin.ai_script_enabled')} onChange={(v) => set('bulletin.ai_script_enabled', v)}
-            disabled={!bool('bulletin.enabled') || !bool('ai.enabled')}
-            label={en ? 'Let AI write the linking script' : 'కలిపే స్క్రిప్ట్ను AI రాయనివ్వండి'}
-            hint={en ? 'Needs AI switched on above. Off uses the headlines alone.' : 'పైన AI ఆన్ చేయాలి.'} />
+            hint={en
+              ? 'Each is recorded 15 minutes early in its slot’s anchor voice and airs on the hour, no approval. Off means none is built or aired.'
+              : 'ప్రతి బులెటిన్ 15 నిమిషాల ముందే ఆ స్లాట్ వాయిస్‌లో రికార్డై, సమయానికి ఆమోదం లేకుండా ప్రసారమవుతుంది. ఆఫ్ అయితే బులెటిన్ తయారు కాదు.'} />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={en ? 'Target length (seconds)' : 'లక్ష్య నిడివి (సెకన్లు)'}>
               <Input script="en" type="number" min={30} max={900}

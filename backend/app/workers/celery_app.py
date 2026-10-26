@@ -55,10 +55,25 @@ celery.conf.beat_schedule = {
     # crawl.rewrite_every_minutes, the IST crawl hours); hourly is :05 / :20.
     "crawl-hourly": {"task": "crawl.hourly", "schedule": crontab(minute="*/5")},
     "crawl-rewrite": {"task": "crawl.rewrite_pass", "schedule": crontab(minute="*/5")},
-    "crawl-breaking": {"task": "crawl.breaking", "schedule": 300.0},
-    # bulletin_service.SLOTS, on the IST hour. A real crontab rather than the
-    # e-paper's tick-and-compare, because these times are a product decision
-    # and not an admin setting.
+    # Queued behind a long rewrite pass on the one ingest worker, a breaking
+    # tick expires rather than piling up: the next one does the same work.
+    "crawl-breaking": {
+        "task": "crawl.breaking",
+        "schedule": 300.0,
+        "options": {"expires": 240},
+    },
+    # bulletin_service.SLOTS: recorded LEAD_MINUTES before the IST hour, aired
+    # on it. Real crontabs rather than the e-paper's tick-and-compare, because
+    # these times are a product decision and not an admin setting. A recording
+    # still queued five minutes before its hour expires; the hour produces it.
+    "bulletin-prepare": {
+        "task": "bulletin.prepare",
+        "schedule": crontab(
+            minute=str(60 - bulletin_service.LEAD_MINUTES),
+            hour=",".join(str(slot - 1) for slot in bulletin_service.SLOTS),
+        ),
+        "options": {"expires": (bulletin_service.LEAD_MINUTES - 5) * 60},
+    },
     "bulletin-slots": {
         "task": "bulletin.run_slot",
         "schedule": crontab(minute="0", hour=",".join(map(str, bulletin_service.SLOTS))),
@@ -74,6 +89,12 @@ celery.conf.beat_schedule = {
     },
     # Overnight, when nobody is generating audio by hand.
     "voice-backfill": {"task": "voice.backfill", "schedule": crontab(minute="20", hour="2")},
+    # New and edited stories get their audio within one tick of going live.
+    "voice-publish-sweep": {
+        "task": "voice.publish_sweep",
+        "schedule": 300.0,
+        "options": {"expires": 240},
+    },
     # Identity documents past their retention window. Not optional: this is
     # what makes "we verify contributors" different from "we keep strangers'
     # passport scans forever".

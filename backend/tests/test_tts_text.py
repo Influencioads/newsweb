@@ -102,7 +102,7 @@ class TestHeardMistakes:
     def test_fiscal_years(self) -> None:
         assert for_speech("2026-27 బడ్జెట్") == "రెండు వేల ఇరవై ఆరు-ఇరవై ఏడు బడ్జెట్."
         assert for_speech("2026–27 బడ్జెట్") == "రెండు వేల ఇరవై ఆరు-ఇరవై ఏడు బడ్జెట్."
-        assert for_speech("10–12 మంది") == "10-12 మంది."
+        assert for_speech("10–12 మంది") == "10 నుంచి 12 మంది."  # a range, not two sentences
 
     def test_helplines_stay_digits(self) -> None:
         """Reviewer: 1912/1930/1902/1098/1800 end almost every civic story and
@@ -189,6 +189,64 @@ class TestHeardMistakes:
 
     def test_idempotent(self) -> None:
         once = for_speech("అమరావతి: CRDA ₹1,250.5 కోట్లతో; 40% — 2026-27, MLAలు 1912కు కాల్")
+        assert for_speech(once) == once
+
+
+class TestSymbols:
+    """2026-10-03: a bulletin said "రూ" for "రూ.2,000". Owner: any symbol should read properly."""
+
+    def test_the_rupee_as_telugu_copy_writes_it(self) -> None:
+        assert for_speech("రూ.2,000 దాటిన యూపీఐ చెల్లింపులపై") == "2,000 రూపాయలు దాటిన యూపీఐ చెల్లింపులపై."
+        assert for_speech("రూ. 500కు పైగా") == "500 రూపాయలకు పైగా."
+        assert for_speech("రూ.1,250 కోట్ల నిధులు") == "1,250 కోట్ల రూపాయల నిధులు."
+        assert for_speech("రూ.లక్ష సాయం") == "లక్ష రూపాయలు సాయం."
+        assert for_speech("ధర రూ.500/- మాత్రమే") == "ధర 500 రూపాయలు మాత్రమే."
+        assert for_speech("Rs.300 ఫీజు") == "300 రూపాయలు ఫీజు."
+        # A trailing comma is the sentence's, not the number's.
+        assert for_speech("రూ.2,000, మరో") == "2,000 రూపాయలు, మరో."
+        # "రూ" inside a word, or with no figure after it, is not the sign.
+        assert for_speech("గురూ 5 నిమిషాలు") == "గురూ 5 నిమిషాలు."
+
+    def test_dollars(self) -> None:
+        assert for_speech("$12 million వసూళ్లు") == "12 million డాలర్లు వసూళ్లు."
+        assert for_speech("$5 బిలియన్ల పెట్టుబడి") == "5 బిలియన్ల డాలర్ల పెట్టుబడి."
+
+    def test_units_and_titles(self) -> None:
+        assert for_speech("ఉష్ణోగ్రత 40°C నమోదైంది") == "ఉష్ణోగ్రత 40 డిగ్రీల సెల్సియస్ నమోదైంది."
+        assert for_speech("45° వేడి") == "45 డిగ్రీలు వేడి."
+        assert for_speech("50 కి.మీ. దూరంలో") == "50 కిలోమీటర్లు దూరంలో."
+        assert for_speech("12 సెం.మీ. వర్షపాతం") == "12 సెంటీమీటర్లు వర్షపాతం."
+        assert for_speech("10 kg బియ్యం") == "10 కిలోలు బియ్యం."
+        assert for_speech("డా. అంబేద్కర్") == "డాక్టర్ అంబేద్కర్."
+
+    def test_initials_do_not_break_a_name(self) -> None:
+        assert for_speech("కె. చంద్రశేఖర్ రావు అన్నారు") == "కె చంద్రశేఖర్ రావు అన్నారు."
+        assert for_speech("వై.ఎస్. జగన్") == "వై ఎస్ జగన్."
+        # A short word that really ends a sentence keeps its stop.
+        assert for_speech("కారణం ఇదే. తర్వాత") == "కారణం ఇదే. తర్వాత."
+
+    def test_signs_said_as_words(self) -> None:
+        assert for_speech("100+ సినిమాలు") == "100 కంటే ఎక్కువ సినిమాలు."
+        assert for_speech("10-15 మంది") == "10 నుంచి 15 మంది."
+        assert for_speech("భారత్ vs పాకిస్తాన్") == "భారత్ వర్సెస్ పాకిస్తాన్."
+        assert for_speech("L&T సంస్థ") == "L అండ్ T సంస్థ."
+        assert for_speech("Paramount+ లో") == "Paramount ప్లస్ లో."
+        assert for_speech("నిందితుడు/నిందితురాలు") == "నిందితుడు లేదా నిందితురాలు."
+
+    def test_separators_are_pauses_and_joins_are_not(self) -> None:
+        assert for_speech("Mohabbat Teaser | నవదీప్ చేతుల మీదుగా") == "Mohabbat Teaser. నవదీప్ చేతుల మీదుగా."
+        assert for_speech("ఫిర్యాదు అందింది → కేసు నమోదు") == "ఫిర్యాదు అందింది. కేసు నమోదు."
+        assert for_speech("ఆర్టీసీ–మెట్రో కామన్ పాస్") == "ఆర్టీసీ మెట్రో కామన్ పాస్."
+
+    def test_leftover_symbols_are_dropped_not_read(self) -> None:
+        """Emoji, ™, a hashtag, invisible direction marks — and ZWNJ survives."""
+        assert for_speech("హైదరాబాద్⁭లో 🔥 #Pushpa2™ వేడుక*") == "హైదరాబాద్లో Pushpa2 వేడుక."
+        assert for_speech(f"యూట్యూబ్{ZWNJ}ను") == f"యూట్యూబ్{ZWNJ}ను."
+
+    def test_idempotent_over_every_symbol_rule(self) -> None:
+        once = for_speech(
+            "రూ.2,000 | $5 బిలియన్ 40°C 50 కి.మీ. కె. రావు 100+ 10-15 vs L&T నిందితుడు/నిందితురాలు → ✅ ఆర్టీసీ–మెట్రో"
+        )
         assert for_speech(once) == once
 
 

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Clock, Undo2 } from 'lucide-react';
 
 import { AdminPage } from '@/components/admin/AdminPage';
+import { AiHintBadges } from '@/components/admin/AiHintBadges';
 import { WorkflowPill } from '@/components/admin/StatusPill';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -14,7 +15,7 @@ import { EmptyState, QueryState, SkeletonCard } from '@/components/ui/State';
 import { useToast } from '@/components/ui/Toast';
 import * as cmsApi from '@/features/cms/api';
 import { useI18n, useScript } from '@/i18n';
-import { useAuth } from '@/stores/auth';
+import { LEVEL_SELF_APPROVE, useAuth } from '@/stores/auth';
 import type { PermissionKey } from '@/types/auth';
 import type { CmsArticle, CmsArticleList } from '@/types/cms';
 import { cn } from '@/utils/cn';
@@ -30,7 +31,7 @@ import { useL } from './useL';
  * column's forward transition plus "request changes" (with a reason, via
  * PromptDialog), each gated by the same permission the Articles list uses.
  * Approve is withheld on the editor's own articles (§6 four-eyes; the backend
- * enforces it too). The APPROVED column keeps the legacy publish transition
+ * enforces it too), except for admins (LEVEL_SELF_APPROVE). The APPROVED column keeps the legacy publish transition
  * and nothing more.
  */
 
@@ -127,6 +128,7 @@ function ReviewTile({ article, column, busy, pending, selfAuthored, onAction, on
           </span>
         ) : null}
       </div>
+      <AiHintBadges article={article} className="mt-2" />
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {selfApprove ? (
@@ -164,6 +166,7 @@ function ReviewColumn({ column, query, busy, pendingId, meId, onAction, onReques
   const { language } = useI18n();
   const en = language === 'en';
   const reveal = useReveal<HTMLElement>();
+  const mayApproveOwn = useAuth((st) => st.hasLevel(LEVEL_SELF_APPROVE));
 
   return (
     <Card as="section" padding="sm" tone="paper" aria-label={en ? column.en : column.te}>
@@ -199,7 +202,7 @@ function ReviewColumn({ column, query, busy, pendingId, meId, onAction, onReques
                 column={column}
                 busy={busy}
                 pending={pendingId === a.id}
-                selfAuthored={meId !== null && a.author_id === meId}
+                selfAuthored={!mayApproveOwn && meId !== null && a.author_id === meId}
                 onAction={(action) => onAction(a.id, action)}
                 onRequestChanges={() => onRequestChanges(a.id)}
                 reveal={reveal}

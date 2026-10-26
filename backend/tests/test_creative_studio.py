@@ -377,10 +377,11 @@ class TestRender:
         image = Image.open(io.BytesIO(raw))
         assert image.size == size
         assert ("no_photo" in warnings) == (photo is None)
-        # The design shows through: a real share of the card is the backdrop's green.
+        # The design shows through: a real share of the card is the backdrop's green
+        # (the white logo band at the foot covers ~14% of a photo card).
         small = image.convert("RGB").resize((size[0] // 10, size[1] // 10))
         green = sum(1 for r, g, b in small.getdata() if g > 150 and g > r + 60 and g > b + 60)
-        assert green > small.width * small.height // 20
+        assert green > small.width * small.height // 25
 
     def test_the_named_shapes_are_unchanged(self) -> None:
         assert social_card_service.ASPECTS["4:5"] == (1080, 1350)

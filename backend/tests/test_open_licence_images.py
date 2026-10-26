@@ -187,6 +187,10 @@ class TestNonLicenceRules:
         assert not openlicence.is_photograph(
             "Map of Guntur district", "https://x.test/m.jpg"
         )
+        # Attached to a Hyderabad story on 2026-09-30; "flag of" missed it.
+        assert not openlicence.is_photograph(
+            "Hyderabad City Flag", "https://x.test/f.jpg"
+        )
         assert openlicence.is_photograph("Mithali Raj batting", PHOTO)
 
     def test_the_proper_noun_floor_is_three_characters(self) -> None:
@@ -194,8 +198,29 @@ class TestNonLicenceRules:
         "Mithali" alone and called that a match for "Mithali Raj"."""
         assert openlicence._CAPITALISED.findall("Mithali Raj") == ["Mithali", "Raj"]
 
-    def test_depicts_subject_needs_every_proper_noun(self) -> None:
+    def test_depicts_subject_needs_the_name_in_the_title(self) -> None:
         her = StockImage(
+            source="wikimedia",
+            external_id="1",
+            title="Mithali Raj at the 2017 Women's Cricket World Cup",
+            image_url=PHOTO,
+            creator=None,
+            license_code="cc0",
+            license_version=None,
+            license_url=None,
+            landing_url=None,
+        )
+        assert openlicence.depicts_subject(her, "Mithali Raj cricketer portrait")
+        # Same photo, different story: not a picture of that person.
+        assert not openlicence.depicts_subject(her, "Nara Brahmani portrait")
+        # No proper noun at all — nothing to be a picture *of*.
+        assert not openlicence.depicts_subject(her, "cricket stadium")
+
+    def test_categories_are_not_proof(self) -> None:
+        """Commons files a photo under everyone connected with it: a Deepika
+        Padukone story matched a still of her film's director, categorised
+        under her name. Only the title says who is in the frame."""
+        still = StockImage(
             source="wikimedia",
             external_id="1",
             title="2017 Women's Cricket World Cup IMG 2652",
@@ -207,12 +232,7 @@ class TestNonLicenceRules:
             landing_url=None,
             subject_text="Mithali Raj|CC-Zero",
         )
-        assert openlicence.depicts_subject(her, "Mithali Raj cricketer portrait")
-        # Same photo, different story: one of the two names is missing, so it
-        # is not a picture of that person and must be labelled a stand-in.
-        assert not openlicence.depicts_subject(her, "Nara Brahmani portrait")
-        # No proper noun at all — nothing to be a picture *of*.
-        assert not openlicence.depicts_subject(her, "cricket stadium")
+        assert not openlicence.depicts_subject(still, "Mithali Raj portrait")
 
     def test_a_name_inside_a_longer_word_is_not_that_person(self) -> None:
         """The wrong-person case, and it lands on the confident side of the
@@ -404,6 +424,23 @@ def commons_page(licence_meta: dict, *, title: str, pageid: int = 1) -> dict:
 
 
 class TestResolveHero:
+    def test_an_incident_never_gets_a_file_photo_of_the_place(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A Tirupati temple on a Tirupati accident reads as the scene; the
+        incident is drawn as a representative scene by the next rung instead."""
+        article, item = make_story(db, "incident")
+        article.title_te = "తిరుపతి జిల్లాలో బ్రహ్మోత్సవాల వేళ ప్రమాదం.. పన్నెండు మందికి గాయాలు"
+        set_flag(db, True)
+
+        def _never(*_a: object, **_kw: object) -> None:
+            raise AssertionError("searched a photo library for an incident")
+
+        monkeypatch.setattr(openlicence, "search", _never)
+        monkeypatch.setattr(story_image_service, "image_query", _never)
+
+        assert story_image_service.resolve_hero(db, article, item) is None
+
     def test_the_flag_being_off_means_no_search_happens(
         self, db: Session, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -452,7 +489,7 @@ class TestResolveHero:
         assert media.meta["open_licence"]["page_url"]
         # It is her, so it is a file photo, not a stand-in.
         assert media.caption_te == story_image_service.FILE_PHOTO_TE
-        assert media.meta["representative"] is False
+        assert not media.meta.get("representative")
         # `haslicense:unrestricted` narrows the search; it never decides.
         assert "haslicense:unrestricted" in sent[0]
 
@@ -470,8 +507,8 @@ class TestResolveHero:
         crawled stories showed what "label it and attach it anyway" produces: a
         creek in Georgia on a women's cricket league, a Nebraska shopfront on a
         bank-holiday story, and a photograph of a film's director on a story
-        about its lead actress. For a named person the rule is now all-or-
-        nothing — see `openlicence.may_attach`."""
+        about its lead actress. The rule is all-or-nothing — see
+        `openlicence.depicts_subject`."""
         article, item = make_story(db, "stand-in")
         set_flag(db, True)
         page = commons_page(
@@ -496,18 +533,17 @@ class TestResolveHero:
         assert media is None
         assert article.hero_media_id is None
 
-    def test_a_photo_of_a_named_place_is_a_stand_in_not_a_file_photo(
+    def test_a_photo_merely_filed_under_the_place_is_not_attached(
         self,
         db: Session,
         monkeypatch: pytest.MonkeyPatch,
         stub_storage: None,
         stub_download: None,
     ) -> None:
-        """The generic-bus case. "Mangalagiri" matches every Commons file
-        categorised Mangalagiri — a temple, a street — so the proper-noun test
-        passes while the picture shows nothing to do with the story. "File
-        photo" would claim it is an older shot of the thing in the story; only
-        a named *person* earns that label."""
+        """The generic-bus case. This used to attach as a ప్రాతినిధ్య చిత్రం
+        stand-in: the temple is categorised Mangalagiri, so the proper-noun
+        test passed while the picture showed nothing named in the story. No
+        stand-ins now — the place has to be in the file's title."""
         article, item = make_story(db, "place-query")
         set_flag(db, True)
         stub_commons(
@@ -520,21 +556,38 @@ class TestResolveHero:
                     Restrictions="",
                     Categories="Mangalagiri|Temples in Andhra Pradesh",
                 ),
-                title="Panakala Narasimha temple Mangalagiri",
+                title="Panakala Narasimha temple",
             ),
         )
         monkeypatch.setattr(
             story_image_service, "image_query", lambda *_a: "Mangalagiri town"
         )
 
+        assert story_image_service.resolve_hero(db, article, item) is None
+        assert article.hero_media_id is None
+
+    def test_a_photo_titled_with_the_place_is_a_file_photo(
+        self,
+        db: Session,
+        monkeypatch: pytest.MonkeyPatch,
+        stub_storage: None,
+        stub_download: None,
+    ) -> None:
+        article, item = make_story(db, "charminar")
+        set_flag(db, True)
+        stub_commons(monkeypatch, commons_page(CC0, title="Charminar at night"))
+        monkeypatch.setattr(
+            story_image_service, "image_query", lambda *_a: "Charminar building"
+        )
+
         media = story_image_service.resolve_hero(db, article, item)
 
         assert media is not None
-        assert media.caption_te == story_image_service.REPRESENTATIVE_TE
-        # Alt text describes the picture, not the headline — the qualifier
-        # cannot arrive after the claim.
-        assert media.alt_te.startswith(story_image_service.REPRESENTATIVE_TE)
-        assert "Mangalagiri" in media.alt_te
+        assert media.caption_te == story_image_service.FILE_PHOTO_TE
+        # Alt text says what is in the frame, not what the story is about.
+        assert (
+            media.alt_te == f"{story_image_service.FILE_PHOTO_TE}: Charminar at night"
+        )
 
     def test_our_own_open_licence_hero_does_not_re_credit_the_publisher(
         self,
@@ -660,45 +713,122 @@ class TestResolveHero:
         assert "?" not in found[0].image_url
 
 
-class TestQueryFallback:
-    def test_names_come_out_of_the_source_slug_when_ai_is_off(
-        self, db: Session
-    ) -> None:
-        """AI off, Telugu headline, no Latin script in it — the publisher's own
-        URL slug is where the proper nouns are, and nothing is invented."""
+GREEN_CARD = (
+    "Charles Green - The Visiting Card - Langham Sketching Club Subject - "
+    "B1975.4.882 - Yale Center for British Art"
+)
+ZELENSKYY = (
+    "Rehabilitation of Wounded Soldiers and Potential Patronage Over Ukrainian "
+    "Regions – Results of Volodymyr Zelenskyy's Meeting with Iceland’s "
+    "President.- 2"
+)
+VONTIMITTA = "16th century Kodandarama temple, Vontimitta, Andhra Pradesh India - 22"
+WW2_CRASH = (
+    "Allied bomber crash-landed in Partisan-controlled territory, Yugoslavia, WW2"
+)
+
+
+class TestQuery:
+    def test_no_model_means_no_query_not_a_guess(self, db: Session) -> None:
+        """The Latin fallback that used to answer here read "Green Card" out of
+        an English headline and "Rights Register Review Meeting" out of a URL
+        slug. It cannot tell a name from a topic, so without a model there is
+        no query — and no Commons photo."""
         _, item = make_story(db, "slug-query")
-        query = story_image_service.image_query(db, item)
-        assert query is not None
-        # Three-letter surnames survive: Raj, Rao, Roy.
-        assert "Mithali" in query and "Raj" in query
-        # The numeric story id is not a name.
-        assert "1915280" not in query
+        assert story_image_service.image_query(db, item) is None
 
-        # And the fallback cannot separate "Launch" from "Mithali Raj", so it
-        # can never claim a result depicts the subject. Anything it finds is
-        # captioned a stand-in, which is the honest way to be unsure.
-        her = StockImage(
-            source="wikimedia",
-            external_id="1",
-            title="Mithali Raj batting",
-            image_url=PHOTO,
-            creator=None,
-            license_code="cc0",
-            license_version=None,
-            license_url=None,
-            landing_url=None,
-            subject_text="Mithali Raj",
+    def test_none_from_the_model_is_final(
+        self,
+        db: Session,
+        monkeypatch: pytest.MonkeyPatch,
+        stub_storage: None,
+        stub_download: None,
+    ) -> None:
+        """2026-09-30, the EB-5 story. The model said NONE — rightly: a green
+        card is not a person or a place — the fallback searched "Green Card"
+        anyway, and Commons answered with a Yale painting."""
+        article, item = make_story(db, "eb5-green-card")
+        item.title = "U.S. to hike EB-5 Green Card fees"
+        set_flag(db, True)
+        sent = stub_commons(monkeypatch, commons_page(CC0, title=GREEN_CARD))
+
+        class _Model:
+            key = "stub"
+
+            def _complete(self, prompt: str, rules: str) -> str:
+                return "NONE"
+
+        monkeypatch.setattr(settings_service, "ai_enabled", lambda _db: True)
+        monkeypatch.setattr(settings_service, "ai_credentials", lambda _db, **_kw: {})
+        monkeypatch.setattr(story_image_service, "get_ai", lambda **_kw: _Model())
+        monkeypatch.setattr(
+            story_image_service.ai_usage_service, "check_budget", lambda _db: None
         )
-        assert not openlicence.depicts_subject(her, query)
+        monkeypatch.setattr(
+            story_image_service.ai_usage_service, "record", lambda *_a, **_kw: None
+        )
+
+        assert story_image_service.resolve_hero(db, article, item) is None
+        assert sent == []
+        assert article.hero_media_id is None
 
 
-class TestNotJustAnyPhotograph:
-    """A label saying "representative image" does not rescue a photo of
-    somewhere else entirely.
+class TestExactMatchOnly:
+    """What the 2026-09-30 run attached as ప్రాతినిధ్య చిత్రం stand-ins, with the
+    query that really produced each one. Now: nothing — and the one exact
+    match from the same run still attaches, as a file photo."""
 
-    Every case here is from the first live run against fourteen real crawled
-    stories: the licence filter was sound and the matching was not.
-    """
+    @pytest.mark.parametrize(
+        ("slug", "query", "title"),
+        [
+            # EB-5 green-card fees. Both words are in the title; the name is not.
+            ("gcard1", "Green Card", GREEN_CARD),
+            # Telangana graduates' voter registration — the old slug fallback.
+            ("voter1", "Rights Register Review Meeting", ZELENSKYY),
+            # Brahmotsavam accident near Tirupati; "Andhra:" was the headline's
+            # section label, and a state is not a subject.
+            ("tirup1", "Andhra temple building", VONTIMITTA),
+            # Tu-95 crash in Russia, from the English words in the headline.
+            ("tu95b1", "Bomber Crashes", WW2_CRASH),
+        ],
+    )
+    def test_the_stand_ins_attach_nothing(
+        self,
+        db: Session,
+        monkeypatch: pytest.MonkeyPatch,
+        stub_storage: None,
+        stub_download: None,
+        slug: str,
+        query: str,
+        title: str,
+    ) -> None:
+        article, item = make_story(db, slug)
+        set_flag(db, True)
+        stub_commons(monkeypatch, commons_page(CC0, title=title))
+        monkeypatch.setattr(story_image_service, "image_query", lambda *_a: query)
+
+        assert story_image_service.resolve_hero(db, article, item) is None
+        assert article.hero_media_id is None
+
+    def test_rajamouli_still_gets_his_file_photo(
+        self,
+        db: Session,
+        monkeypatch: pytest.MonkeyPatch,
+        stub_storage: None,
+        stub_download: None,
+    ) -> None:
+        article, item = make_story(db, "rajam1")
+        set_flag(db, True)
+        stub_commons(monkeypatch, commons_page(CC0, title="SS Rajamouli"))
+        monkeypatch.setattr(
+            story_image_service, "image_query", lambda *_a: "Rajamouli portrait"
+        )
+
+        media = story_image_service.resolve_hero(db, article, item)
+
+        assert media is not None
+        assert media.caption_te == story_image_service.FILE_PHOTO_TE
+        assert not media.meta.get("representative")
 
     def _candidate(self, title: str, subject: str = "") -> StockImage:
         return StockImage(
@@ -714,19 +844,45 @@ class TestNotJustAnyPhotograph:
             subject_text=subject,
         )
 
+    def test_other_queries_for_the_same_stories(self) -> None:
+        """What a better-behaved model might have asked instead. A generic
+        topic, a state, or a place the file does not name: all nothing."""
+        match = openlicence.depicts_subject
+        assert not match(self._candidate(GREEN_CARD), "green card")
+        assert not match(self._candidate(ZELENSKYY), "Telangana voter registration")
+        assert not match(self._candidate(VONTIMITTA), "Andhra city")
+        assert not match(self._candidate(VONTIMITTA), "Andhra Pradesh temple")
+        assert not match(self._candidate(VONTIMITTA), "Tirupati temple")
+        assert not match(self._candidate(WW2_CRASH), "Russian bomber crash")
+        assert not match(self._candidate("Police exam hall, Kerala"), "police exam")
+
+    def test_a_named_place_or_person_in_the_title_attaches(self) -> None:
+        match = openlicence.depicts_subject
+        assert match(self._candidate("SS Rajamouli"), "S S Rajamouli portrait")
+        assert match(self._candidate("Tirumala Venkateswara Temple"), "Tirumala temple")
+        # Punctuation between the words of a name is still that name.
+        assert match(
+            self._candidate("Tirupati, Andhra Pradesh, from Alipiri"),
+            "Tirupati Andhra Pradesh town",
+        )
+        # A state word inside a real name is part of that name, not a region.
+        assert match(
+            self._candidate("Andhra University campus, Visakhapatnam"),
+            "Andhra University building",
+        )
+
     def test_a_georgia_creek_is_not_a_cricket_league(self) -> None:
-        """Query "WAPL", result "Foe Killer Creek, Roswell, Georgia"."""
+        """First live run: query "WAPL", result "Foe Killer Creek, Roswell,
+        Georgia"."""
         candidate = self._candidate("Foe Killer Creek, Roswell, Georgia")
-        assert openlicence.may_attach(candidate, "WAPL") is False
+        assert openlicence.depicts_subject(candidate, "WAPL") is False
 
     def test_an_australian_club_is_not_jubilee_hills(self) -> None:
-        """Matched on the word Jubilee alone. One shared word is not a place."""
+        """First live run: this attached as a stand-in on the word Jubilee
+        alone. The name is Jubilee Hills, and it is matched whole."""
         candidate = self._candidate(
             "Bassendean Caledonians SFC club rooms at Jubilee Reserve"
         )
-        assert openlicence.may_attach(candidate, "Jubilee Hills building") is True
-        # It attaches — "Jubilee" really is in the title — but it must never
-        # claim to be a picture of the story.
         assert openlicence.depicts_subject(candidate, "Jubilee Hills building") is False
 
     def test_a_person_story_needs_that_person(self) -> None:
@@ -736,22 +892,110 @@ class TestNotJustAnyPhotograph:
             "Danish Aslam 'Break Ke Baad' Working Still",
             subject="Deepika Padukone Break Ke Baad",
         )
-        assert openlicence.is_person_query("Deepika Padukone portrait") is True
-        assert openlicence.may_attach(candidate, "Deepika Padukone portrait") is False
+        assert (
+            openlicence.depicts_subject(candidate, "Deepika Padukone portrait") is False
+        )
 
     def test_a_person_story_accepts_a_picture_of_them(self) -> None:
-        candidate = self._candidate(
-            "Mithali Raj batting 2017", subject="Mithali Raj cricket"
-        )
-        assert openlicence.may_attach(candidate, "Mithali Raj portrait") is True
+        candidate = self._candidate("Mithali Raj batting 2017")
         assert openlicence.depicts_subject(candidate, "Mithali Raj portrait") is True
 
     def test_a_place_story_takes_a_photo_of_that_place(self) -> None:
-        candidate = self._candidate(
-            "2021 view of the Warangal Museum", subject="Warangal district"
-        )
-        assert openlicence.may_attach(candidate, "Warangal city building") is True
+        candidate = self._candidate("2021 view of the Warangal Museum")
+        assert openlicence.depicts_subject(candidate, "Warangal Museum building") is True
 
     def test_a_query_with_no_proper_noun_attaches_nothing(self) -> None:
         candidate = self._candidate("Adams Block (Crawford, NE)")
-        assert openlicence.may_attach(candidate, "bank branches closed") is False
+        assert openlicence.depicts_subject(candidate, "bank branches closed") is False
+
+    def test_a_landmark_named_after_a_person_is_not_their_portrait(self) -> None:
+        match = openlicence.depicts_subject
+        for title, query in (
+            ("Rajiv Gandhi International Airport, Hyderabad", "Rajiv Gandhi portrait"),
+            ("NTR Gardens Hyderabad at night", "NTR portrait"),
+            ("Indira Gandhi Municipal Stadium Vijayawada", "Indira Gandhi portrait"),
+        ):
+            assert not match(self._candidate(title), query), title
+        # The same airport is still a picture of the airport.
+        assert match(
+            self._candidate("Rajiv Gandhi International Airport, Hyderabad"),
+            "Rajiv Gandhi International Airport building",
+        )
+
+    def test_a_homonym_abroad_is_not_our_place(self) -> None:
+        """Live, 2026-09-30: the top CC0 hit for "Guntur city" was Mount Guntur
+        in Java; the next, a Javanese gamelan named in its categories."""
+        match = openlicence.depicts_subject
+        volcano = self._candidate(
+            "Vulkaan Guntur te West-Java Gunong Guntur (titel op object) Atlas tot "
+            "het werk Java",
+            "Mount Guntur|CC-Zero|Lithographs of Java",
+        )
+        gamelan = self._candidate(
+            "Gangsa Kyai Guntur Madu", "CC-Zero|Kanjeng Kyai Guntur Madu (Yogyakarta)"
+        )
+        assert not match(volcano, "Guntur city")
+        assert not match(gamelan, "Guntur city")
+        assert not match(self._candidate("Hyderabad, Sindh clock tower"), "Hyderabad city")
+        assert match(self._candidate("Guntur skyline", "Guntur"), "Guntur city")
+
+    def test_a_thing_from_the_place_is_not_the_place(self) -> None:
+        """Live, "Guntur city": a statue in a Warangal museum."""
+        match = openlicence.depicts_subject
+        assert not match(
+            self._candidate("Buddha from Guntur district, Warangal Museum"), "Guntur city"
+        )
+        assert not match(self._candidate("View from Charminar"), "Charminar building")
+        assert match(
+            self._candidate("Tirupati, Andhra Pradesh, from Alipiri"), "Tirupati town"
+        )
+
+    def test_a_capitalised_common_noun_is_not_a_name(self) -> None:
+        assert not openlicence.depicts_subject(
+            self._candidate("Bus accident in Kerala 2019"), "Bus Accident"
+        )
+
+    def test_the_query_noun_and_a_trailing_state_are_not_the_name(self) -> None:
+        match = openlicence.depicts_subject
+        assert match(self._candidate("Amaravati"), "Amaravati Andhra Pradesh city")
+        assert match(self._candidate("Charminar at night"), "Charminar Building")
+        assert match(self._candidate("SS Rajamouli"), "Rajamouli Portrait")
+        assert match(self._candidate("Tirupati, Andhra Pradesh"), "Tirupati City")
+
+    def test_a_photo_taken_in_a_city_is_not_the_city(self) -> None:
+        """Live, 2026-09-30: a mall on a Hyderabad meat-ban story, a shadow on a
+        Dubai flight story."""
+        match = openlicence.depicts_subject
+        assert not match(self._candidate("Inorbit Mall, Hyderabad (84459)"), "Hyderabad city")
+        assert not match(self._candidate("Dubai building shadow (Unsplash)"), "Dubai city")
+        assert not match(self._candidate("Guntur rail station platform"), "Guntur city")
+        assert match(self._candidate("Dubai skyline at dusk"), "Dubai city")
+        # Live, the retry: the model stacked the nouns past the one it was asked for.
+        assert not match(self._candidate("Inorbit Mall, Hyderabad (84459)"), "Hyderabad city portrait")
+        assert not match(self._candidate("Dubai festival city"), "Dubai city building")
+        assert not match(self._candidate("Dubai building shadow (Unsplash)"), "Dubai building")
+        # Off the mandated form: no type noun at all.
+        assert not match(self._candidate("Dubai building shadow (Unsplash)"), "Dubai airplane")
+        assert match(self._candidate("Dubai, United Arab Emirates (Unsplash)"), "Dubai airplane")
+
+    def test_categories_reach_the_homonym_check(
+        self,
+        db: Session,
+        monkeypatch: pytest.MonkeyPatch,
+        stub_storage: None,
+        stub_download: None,
+    ) -> None:
+        article, item = make_story(db, "guntur1")
+        set_flag(db, True)
+        gamelan = {**CC0, **_extmeta(Categories="Kanjeng Kyai Guntur Madu (Yogyakarta)")}
+        stub_commons(
+            monkeypatch,
+            commons_page(gamelan, title="Gangsa Kyai Guntur Madu"),
+            commons_page(CC0, title="Guntur skyline", pageid=2),
+        )
+        monkeypatch.setattr(story_image_service, "image_query", lambda *_a: "Guntur city")
+
+        media = story_image_service.resolve_hero(db, article, item)
+
+        assert media is not None
+        assert media.meta["open_licence"]["title"] == "Guntur skyline"

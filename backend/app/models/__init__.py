@@ -12,6 +12,7 @@ So model modules are registered here, once, rather than at each call site.
 
 from app.db.base import Base
 from app.models.ai import AiArticleDraft, AiSource, AiSuggestion
+from app.models.assistant import AssistantConversation, AssistantJob, AssistantMessage
 from app.models.audio import AudioAsset
 from app.models.bulletin import AudioBulletin, AudioBulletinItem
 from app.models.epaper import (
@@ -53,7 +54,7 @@ from app.models.geo import District, Locality, Mandal, MandalAlias, State
 from app.models.ingestion import ContentSource, IngestedItem, IngestedRewrite
 from app.models.jobs import JobPosting
 from app.models.kyc import ContributorProfile, KycDocument
-from app.models.media import ArticleMedia, Media
+from app.models.media import ArticleMedia, Media, ShortNewsCard
 from app.models.reader import UserPreference
 from app.models.setting import AppSetting
 from app.models.site import HomepageSection, SearchQuery
@@ -68,6 +69,9 @@ from app.models.user import (
 from app.models.video import Video, VideoChannel, VideoTag
 
 __all__ = [
+    "AssistantConversation",
+    "AssistantJob",
+    "AssistantMessage",
     "KycDocument",
     "ContributorProfile",
     "AudioBulletinItem",
@@ -115,6 +119,7 @@ __all__ = [
     "Locality",
     "Mandal",
     "Media",
+    "ShortNewsCard",
     "Notification",
     "NotificationCampaign",
     "Permission",

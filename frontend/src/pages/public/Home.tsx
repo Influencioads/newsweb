@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { AdSlot } from '@/components/ads/AdSlot';
-import { BriefCard, KickerCard, LatestCard, LeadCard, SecondaryCard } from '@/components/article/ArticleCard';
-import { BulletinCard } from '@/components/bulletin/BulletinCard';
+import { BriefCard, KickerCard, LatestCard } from '@/components/article/ArticleCard';
+import { BulletinBanner } from '@/components/bulletin/BulletinBanner';
 import { PageContainer, SectionHeader } from '@/components/ui/Layout';
 import { EmptyState, QueryState } from '@/components/ui/State';
 import { VideoStrip } from '@/components/video/VideoStrip';
@@ -11,14 +11,15 @@ import { PollCard } from '@/features/epaper/PollCard';
 import * as publicApi from '@/features/public/api';
 import { useI18n, useScript } from '@/i18n';
 import { useReaderPrefs } from '@/stores/readerPrefs';
-import type { HomePayload } from '@/types/public';
+import type { ArticleCard, HomePayload } from '@/types/public';
 import { cn } from '@/utils/cn';
-import { useDocumentTitle, useReveal } from '@/utils/motion';
+import { useDocumentTitle } from '@/utils/motion';
 
 import { EpaperPromo } from './home/EpaperPromo';
 import { EpaperRail, ForYouBlock, SectionBlock, TopTopics, TrendingRail } from './home/HomeBlocks';
 import { HomeSkeleton } from './home/HomeSkeleton';
 import { AI_FEATURES } from '@/utils/features';
+import { LeadSlider } from './home/LeadSlider';
 
 /**
  * Reader home page.
@@ -27,8 +28,8 @@ import { AI_FEATURES } from '@/utils/features';
  * information architecture major Indian dailies use, because it is what a
  * reader scanning for news expects:
  *
- *   ┌── lead (image + big headline + standfirst) ──┬── mid column ──┬── rail ──┐
- *   │   + secondary thumb rows                     │   kicker +     │  తాజా    │
+ *   ┌── top-stories slider (lead, then secondary) ─┬── mid column ──┬── rail ──┐
+ *   │                                              │   kicker +     │  తాజా    │
  *   │   + briefs                                   │   headline     │  వార్తలు │
  *   └──────────────────────────────────────────────┴────────────────┴──────────┘
  *   then For You, the mandal block, videos and the section blocks.
@@ -46,23 +47,13 @@ import { AI_FEATURES } from '@/utils/features';
 function FrontGrid({ data }: { data: HomePayload }) {
   const { t } = useI18n();
   const s = useScript();
-  const reveal = useReveal<HTMLDivElement>();
 
   return (
     <div className="grid gap-x-7 gap-y-7 lg:grid-cols-[1.5fr_1fr_0.8fr]">
       {/* --- left: lead + secondary + briefs --- */}
       <div className="min-w-0">
-        {data.lead ? <LeadCard article={data.lead} /> : null}
-
-        {data.secondary.length > 0 ? (
-          <div className="mt-4 flex flex-col gap-3.5 border-t border-rule pt-3.5">
-            {data.secondary.map((article) => (
-              <div key={article.short_id} ref={reveal}>
-                <SecondaryCard article={article} />
-              </div>
-            ))}
-          </div>
-        ) : null}
+        {/* The top stories slide: the lead, then the secondary stories. */}
+        {data.lead ? <LeadSlider articles={[data.lead, ...data.secondary]} /> : null}
 
         {data.briefs.length > 0 ? (
           <div className="mt-4 border-t border-rule pt-3">
@@ -92,13 +83,31 @@ function FrontGrid({ data }: { data: HomePayload }) {
           ))}
         </section>
 
-        <EpaperRail teaser={data.epaper} />
+        {epaperApi.EPAPER_PUBLIC && <EpaperRail teaser={data.epaper} />}
 
         {/* §26 house-ad slot; collapses when no campaign matches. */}
         <AdSlot placement="in_feed" />
       </aside>
     </div>
   );
+}
+
+/** A short, distinct shelf from the flags already present in the home payload. */
+function exclusiveStories(data: HomePayload): ArticleCard[] {
+  const candidates = [
+    ...data.secondary,
+    ...data.mid_column,
+    ...data.briefs,
+    ...data.latest,
+    ...data.sections.flatMap((section) => section.articles),
+  ];
+  return candidates
+    .filter((article, index) =>
+      article.is_exclusive &&
+      article.short_id !== data.lead?.short_id &&
+      candidates.findIndex((candidate) => candidate.short_id === article.short_id) === index,
+    )
+    .slice(0, 4);
 }
 
 export default function Home() {
@@ -122,10 +131,9 @@ export default function Home() {
 
   return (
     <PageContainer width="site" className="space-y-7 py-6 md:space-y-10 md:py-8">
-      {/* Renders nothing when no bulletin is on air, including when an admin
-          has flipped the kill switch — so it never leaves an empty slot. */}
-      {AI_FEATURES ? <BulletinCard /> : null}
-
+      {/* The latest audio bulletin leads the page, fetched on its own so it
+          shows even when the news feed is empty or fails. */}
+      {AI_FEATURES ? <BulletinBanner /> : null}
       <QueryState
         query={home}
         skeleton={<HomeSkeleton />}
@@ -133,13 +141,26 @@ export default function Home() {
         empty={<EmptyState title={t('state.empty')} body={t('state.emptyEdition')} />}
         errorTitle={t('state.newsFailed')}
       >
-        {(data) => (
-          <>
-            <TrendingRail articles={[...data.latest, ...data.briefs].slice(0, 6)} />
-            {data.epaper ? <EpaperPromo epaper={data.epaper} /> : null}
-            <TopTopics topics={topics.data?.items ?? []} />
-
+        {(data) => {
+          const exclusives = exclusiveStories(data);
+          return <>
             <FrontGrid data={data} />
+
+            <TrendingRail articles={[...data.latest, ...data.briefs].slice(0, 6)} />
+
+            {!data.sections.some((section) => section.key === 'exclusive') && exclusives.length >= 2 ? (
+              <SectionBlock
+                section={{
+                  key: 'exclusive',
+                  title_te: 'ఎక్స్‌క్లూజివ్',
+                  title_en: 'Exclusive',
+                  articles: exclusives,
+                }}
+              />
+            ) : null}
+
+            {epaperApi.EPAPER_PUBLIC && data.epaper ? <EpaperPromo epaper={data.epaper} /> : null}
+            <TopTopics topics={topics.data?.items ?? []} />
 
             {/* §3.2 — signed-in readers only. */}
             <ForYouBlock />
@@ -167,8 +188,8 @@ export default function Home() {
                 to={section.key === 'trending' ? '/trending' : `/section/${section.key}`}
               />
             ))}
-          </>
-        )}
+          </>;
+        }}
       </QueryState>
     </PageContainer>
   );

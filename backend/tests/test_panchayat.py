@@ -63,6 +63,7 @@ from app.models.enums import (  # noqa: E402
     ArticleType,
     ContributorType,
     KycStatus,
+    MediaType,
     ReportStatus,
     ReportTargetType,
     RoleKey,
@@ -74,6 +75,7 @@ from app.models.enums import (  # noqa: E402
 from app.models.engagement import Report  # noqa: E402
 from app.models.geo import District, Locality, Mandal  # noqa: E402
 from app.models.kyc import ContributorProfile  # noqa: E402
+from app.models.media import Media  # noqa: E402
 from app.models.user import Role, User, UserRole  # noqa: E402
 from app.services import auth_service, kyc_service, panchayat_service  # noqa: E402
 from app.services import workflow_service  # noqa: E402
@@ -252,7 +254,16 @@ def make_article(
     approved_by: int | None = None,
 ) -> Article:
     locality = _locality(db, locality_slug) if locality_slug else None
+    # Every story carries its photo, so the no-photo rule never answers for the
+    # wall a test is actually about.
+    hero = Media(
+        type=MediaType.IMAGE, filename="hero.webp", mime="image/webp",
+        storage_provider="test", storage_key="images/test/panchayat.webp",
+    )
+    db.add(hero)
+    db.flush()
     article = Article(
+        hero_media_id=hero.id,
         short_id=f"a{db.query(Article).count():05d}",
         slug=f"kathanam-{db.query(Article).count()}",
         title_te=title,

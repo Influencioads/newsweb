@@ -99,7 +99,7 @@ export function ArticleHeader({
             <IconButton name="type" label={t('ui.fontSize')} onPress={() => setSheet('font')} />
             {AI_FEATURES ? (
               <IconButton
-                name={speaking ? 'pause' : 'headphones'}
+                name={speaking ? 'pause' : 'listen'}
                 label={speaking ? t('article.stopListening') : t('article.listen')}
                 active={speaking}
                 onPress={() => (speaking ? onToggleSpeech() : onListen())}

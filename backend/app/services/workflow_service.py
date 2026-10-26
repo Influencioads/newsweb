@@ -8,9 +8,9 @@ from nanoid import generate
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.core.deps import Principal
+from app.core.deps import Principal, build_principal
 from app.core.errors import ConflictError, ValidationError
-from app.core.permissions import LEVEL_PIN_PLACEMENT
+from app.core.permissions import LEVEL_PIN_PLACEMENT, LEVEL_SELF_APPROVE
 from app.db.base import utcnow
 from app.models.content import (
     Article,
@@ -23,6 +23,7 @@ from app.models.content import (
 from app.models.enums import ArticleStatus, ArticleType, TagType, WorkflowState
 from app.models.geo import Locality, Mandal
 from app.models.media import ArticleMedia, Media
+from app.models.user import User
 from app.services import tiptap
 from app.telugu.normalize import normalize_headline, normalize_text
 from app.telugu.transliterate import slugify
@@ -102,9 +103,20 @@ def _resolve_placement(db: Session, article: Article, values: dict[str, Any]) ->
             )
 
 
-def _apply_tags(db: Session, article: Article, names: list[str]) -> None:
+def _apply_tags(
+    db: Session,
+    article: Article,
+    names: list[str],
+    *,
+    types: dict[str, TagType] | None = None,
+    create_inactive: bool = False,
+) -> None:
     """Replace the tag set. Unknown names become topic tags — an editor typing
-    a new name should not have to leave the form to create it first."""
+    a new name should not have to leave the form to create it first.
+
+    `types` (name -> type) and `create_inactive` are for the crawl's AI tags
+    and apply only to a tag created here: an existing tag keeps its type and
+    its state. An inactive tag goes live when its story is published."""
     wanted: list[Tag] = []
     seen: set[str] = set()
     for raw in names:
@@ -121,7 +133,11 @@ def _apply_tags(db: Session, article: Article, names: list[str]) -> None:
         tag = db.scalar(select(Tag).where(Tag.slug == slug))
         if tag is None:
             tag = Tag(
-                slug=slug, name_te=name[:140], name_en=name[:140], type=TagType.TOPIC
+                slug=slug,
+                name_te=name[:140],
+                name_en=name[:140],
+                type=(types or {}).get(raw, TagType.TOPIC),
+                is_active=not create_inactive,
             )
             db.add(tag)
             db.flush()
@@ -371,13 +387,15 @@ def update(
     db: Session, principal: Principal, article: Article, values: dict[str, Any]
 ) -> Article:
     _scope(principal, article)
-    if article.workflow_state not in {
-        WorkflowState.DRAFT,
-        WorkflowState.CHANGES_REQUESTED,
-    }:
-        raise ConflictError(
-            message_en="Only drafts or returned articles can be edited."
-        )
+    # Any article can be edited, live ones included (owner, 2026-10-02); what
+    # changes with the state is who may. Copy under review is the desk's to
+    # fix; once approved, editing it is publishing that text.
+    state = article.workflow_state
+    if state in {WorkflowState.SUBMITTED, WorkflowState.IN_REVIEW}:
+        principal.require("article.edit")
+    elif state not in {WorkflowState.DRAFT, WorkflowState.CHANGES_REQUESTED}:
+        principal.require("article.publish")
+        principal.require_level(LEVEL_PIN_PLACEMENT, reason="edit after approval")
     _guard_flags(db, principal, article, values)
     gallery = values.pop("gallery_media_ids", None)
     apply_copy(article, values, db)
@@ -385,6 +403,12 @@ def update(
         _apply_gallery(db, article, gallery)
     article.updated_by = principal.id
     article.version += 1
+    if article.status == ArticleStatus.PUBLISHED:
+        # Readers saw the old text; keep every live version restorable.
+        _snapshot(db, article, principal.id)
+        # Only a save that set a pin re-pins; a typo fix must not.
+        if any(key in values for key in _PIN_INTENT):
+            apply_placement_pins(db, article, principal.id)
     return article
 
 
@@ -418,6 +442,12 @@ def _snapshot(db: Session, article: Article, actor_id: int | None) -> None:
             created_at=utcnow(),
         )
     )
+
+
+def approver_may_self_approve(db: Session, user_id: int) -> bool:
+    """Is this approver an admin, so approving their own copy was allowed?"""
+    user = db.get(User, user_id)
+    return user is not None and build_principal(user, "").level >= LEVEL_SELF_APPROVE
 
 
 def transition(
@@ -472,7 +502,7 @@ def transition(
     if old not in allowed:
         raise ConflictError(details={"state": old, "action": action})
     if action == "approve":
-        if article.author_id == principal.id:
+        if article.author_id == principal.id and principal.level < LEVEL_SELF_APPROVE:
             raise ValidationError(
                 message_en="Authors cannot approve their own article."
             )
@@ -489,6 +519,16 @@ def transition(
                 message_te="షార్ట్ న్యూస్ ప్రచురించే ముందు ఫోటో మరియు చిన్న వార్త తప్పనిసరి.",
                 details={"is_short": "hero_media_id and summary required"},
             )
+        # The owner's rule (2026-09-29): no story reaches a reader without its
+        # photo. Asked before the trusted branch below writes anything, and of
+        # the picture itself — a hero deleted from the library is no photo.
+        hero = db.get(Media, article.hero_media_id) if article.hero_media_id else None
+        if hero is None or hero.deleted_at is not None or not hero.mime.startswith("image/"):
+            raise ValidationError(
+                message_en="Add a hero photo before publishing: a story without a photo is never published.",
+                message_te="ప్రచురించే ముందు ప్రధాన ఫోటో జత చేయండి — ఫోటో లేని వార్త ప్రచురించబడదు.",
+                details={"hero_media_id": "a usable photo is required"},
+            )
         if trusted:
             # `approved_by` stays NULL on purpose. Stamping the secretary into
             # it would make the audit log claim an editor approved this when
@@ -497,27 +537,17 @@ def transition(
             panchayat_service.stamp_ugc(db, article, principal)
             _snapshot(db, article, principal.id)
         else:
-            if not article.approved_by or article.approved_by == article.author_id:
+            if not article.approved_by or (
+                article.approved_by == article.author_id
+                and not approver_may_self_approve(db, article.approved_by)
+            ):
                 raise ValidationError(
                     message_en="A different senior editor must approve before publishing."
                 )
-            # The check above compares the approver against the *author*, which is
-            # the right test for copy a person wrote. Machine-created copy has no
-            # author — a feed import and an AI rewrite both leave `author_id` NULL
-            # — and `approved_by == None` is false, so without this clause one
-            # editor could approve and publish a machine article entirely alone.
-            # Two people are required precisely *because* nobody wrote it.
-            if article.author_id is None and article.approved_by == principal.id:
-                raise ValidationError(
-                    message_en=(
-                        "A machine-created article must be approved and published "
-                        "by two different people."
-                    ),
-                    message_te=(
-                        "యంత్రం రూపొందించిన కథనాన్ని ఇద్దరు వేర్వేరు వ్యక్తులు "
-                        "ఆమోదించి ప్రచురించాలి."
-                    ),
-                )
+            # Machine-created copy (a feed import, an AI rewrite) has no author,
+            # so the check above only asks that an editor approved it. One
+            # approval is enough: the owner dropped the "two different people"
+            # rule on 2026-10-03 — the editor who approves may also publish.
             if article.source_type != "own" and not article.source_credit:
                 raise ValidationError(
                     message_en="Agency and syndicated stories require source credit."
@@ -558,6 +588,11 @@ def transition(
         article.published_by = principal.id
         article.published_at = utcnow()
         article.first_published_at = article.first_published_at or article.published_at
+        # Tags the crawl created for this story waited inactive for a person
+        # to let the story out; one just has.
+        for link in article.tags:
+            if not link.tag.is_active:
+                link.tag.is_active = True
         # §9 duration control: an explicit end time wins, otherwise the
         # configured default (24h out of the box) applies from now.
         if article.is_breaking and article.breaking_until is None:
@@ -580,19 +615,8 @@ def transition(
             get_logger(__name__).exception(
                 "notification_fanout_failed", article_id=article.id
             )
-        # §20 optional pre-generation. Same reasoning as the fan-out: a TTS
-        # provider outage must never block publication.
-        try:
-            from app.services import settings_service, tts_service
-
-            if settings_service.get_bool(db, "voice.auto_generate_on_publish"):
-                tts_service.ensure_audio(db, article, requested_by=principal.id)
-        except Exception:  # noqa: BLE001
-            from app.core.logging import get_logger
-
-            get_logger(__name__).exception(
-                "tts_pregenerate_failed", article_id=article.id
-            )
+        # §20 audio is attached by `voice.publish_sweep` within a few minutes,
+        # never here: publishing must not wait on a TTS provider.
     elif action == "unpublish":
         article.status = ArticleStatus.UNPUBLISHED
     elif target in {WorkflowState.SUBMITTED, WorkflowState.IN_REVIEW}:

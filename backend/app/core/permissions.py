@@ -556,3 +556,6 @@ LEVEL_PUSH_BREAKING = 80  # §11  — a breaking push needs level >= 80
 #: that key; every other holder is already at 60 or above, so this threshold
 #: changes nothing for anyone who had it before.
 LEVEL_PIN_PLACEMENT = 60
+#: §6 four-eyes exception (owner, 2026-10-02): admins and super admins may
+#: approve copy they wrote themselves. Machine copy still needs two people.
+LEVEL_SELF_APPROVE = 90

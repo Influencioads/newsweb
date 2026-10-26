@@ -60,6 +60,7 @@ const useStyles = makeStyles((color) => ({
   track: { height: 4, borderRadius: radius.pill, backgroundColor: color.rule, overflow: 'hidden' },
   fill: { height: 4, borderRadius: radius.pill, backgroundColor: color.brand },
   pill: { alignSelf: 'flex-start', borderRadius: radius.pill },
+  stack: { gap: space.xs },
 }));
 
 export function ArticleAudio({
@@ -72,8 +73,11 @@ export function ArticleAudio({
   url,
   meta,
   queue,
+  tagline,
 }: {
   shortId: string;
+  /** A line over the control while idle — the article's invitation to listen. */
+  tagline?: string;
   deviceSpeaking?: boolean;
   /** Omit when there is no device-voice fallback to offer. */
   onToggleDevice?: () => void;
@@ -128,13 +132,20 @@ export function ArticleAudio({
     // story that has a file.
     if (onDemand ? formats.isLoading : audio.isLoading) return null;
     return onToggleDevice ? (
-      <Button
-        variant={deviceSpeaking ? 'primary' : 'secondary'}
-        icon={deviceSpeaking ? 'pause' : 'headphones'}
-        label={deviceSpeaking ? stopLabel : listenLabel}
-        onPress={onToggleDevice}
-        style={styles.pill}
-      />
+      <View collapsable={false} style={styles.stack}>
+        {tagline && !deviceSpeaking ? (
+          <T variant="meta" weight="bold" color="brand">
+            {tagline}
+          </T>
+        ) : null}
+        <Button
+          variant={deviceSpeaking ? 'primary' : 'secondary'}
+          icon={deviceSpeaking ? 'pause' : 'listen'}
+          label={deviceSpeaking ? stopLabel : listenLabel}
+          onPress={onToggleDevice}
+          style={styles.pill}
+        />
+      </View>
     ) : null;
   }
 
@@ -184,11 +195,16 @@ export function ArticleAudio({
   // live (a swapped element takes the focus with it). The outer view never
   // collapses, so the button keeps its native parent too.
   return (
-    <View collapsable={false} style={status.current ? styles.player : undefined}>
+    <View collapsable={false} style={status.current ? styles.player : styles.stack}>
+      {tagline && !status.current ? (
+        <T variant="meta" weight="bold" color="brand">
+          {tagline}
+        </T>
+      ) : null}
       <View style={styles.top}>
         <Button
           variant={status.current ? 'primary' : 'secondary'}
-          icon={!status.current ? 'headphones' : status.playing ? 'pause' : 'play'}
+          icon={!status.current ? 'listen' : status.playing ? 'pause' : 'play'}
           label={!status.current ? idleLabel : status.playing ? t('ui.pause') : listenLabel}
           accessibilityLabel={!status.current && length ? `${listenLabel}, ${formatTime(length)}` : undefined}
           haptic={status.current ? 'medium' : undefined}

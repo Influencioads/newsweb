@@ -9,6 +9,7 @@ import type {
   MandalOut,
   SearchMeta,
   SearchResults,
+  ShortNewsFeed,
   ReactionKind,
   ReactionSummary,
   SiteConfig,
@@ -63,6 +64,10 @@ export async function fetchFeed(params: {
   return data;
 }
 
+/** Public videos are paused: no shelves or links, and the routes go home.
+ *  Admin video tools and the backend API are untouched — flip to resume. */
+export const VIDEOS_PUBLIC = false;
+
 export async function fetchVideos(params?: {
   category?: string;
   offset?: number;
@@ -72,12 +77,8 @@ export async function fetchVideos(params?: {
   return data;
 }
 
-export async function fetchShortNews(params?: {
-  category?: string;
-  offset?: number;
-  limit?: number;
-}): Promise<CategoryFeed> {
-  const { data } = await api.get<CategoryFeed>('/public/short-news', { params });
+export async function fetchShortNews(params?: { offset?: number; limit?: number }): Promise<ShortNewsFeed> {
+  const { data } = await api.get<ShortNewsFeed>('/public/short-news', { params });
   return data;
 }
 

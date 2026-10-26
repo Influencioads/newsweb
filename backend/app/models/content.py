@@ -359,6 +359,12 @@ class Article(PKMixin, TimestampMixin, SoftDeleteMixin, ActorMixin, Base):
     ai_job_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     ai_model: Mapped[str | None] = mapped_column(String(80), nullable=True)
     ai_confidence: Mapped[float | None] = mapped_column(nullable=True)
+    #: The crawl's AI thought this reads like breaking news. A suggestion shown
+    #: to the desk only: `is_breaking` pushes to every reader and needs the
+    #: `article.breaking` permission, so no model ever sets it.
+    breaking_suggested: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
 
     # --- SEO ---------------------------------------------------------------
     seo_title: Mapped[str | None] = mapped_column(String(200), nullable=True)

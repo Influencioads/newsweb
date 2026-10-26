@@ -138,8 +138,8 @@ class CmsMediaRef(BaseModel):
 
     `caption_te`, `source_type` and `licence` are here because without them an
     open-licence Commons photo on an imported story is indistinguishable from
-    a staff photograph: no credit, no licence, no indication of whether the
-    page will print "file photo" or "representative image". The audit trail
+    a staff photograph: no credit, no licence, no sign that the page will
+    print ఫైల్ చిత్రం (file photo) under it. The audit trail
     lives in `Media.meta`, which is on no screen. Admin-side only — none of
     this reaches the reader.
     """
@@ -153,6 +153,13 @@ class CmsMediaRef(BaseModel):
     licence: str | None = None
     width: int | None = None
     height: int | None = None
+    #: Made by a model, not photographed — a realistic representative picture
+    #: the page captions "ప్రతీకాత్మక చిత్రం — AI రూపొందించినది".
+    ai_generated: bool = False
+    #: The crawl's vision check looked at this photo and found no publisher
+    #: branding (`meta.photo_check.verdict == "clean"`). False covers both
+    #: "never scanned" and "not a crawled photo".
+    checked: bool = False
 
 
 class CmsVideoRef(BaseModel):
@@ -204,6 +211,9 @@ class CmsArticleOut(BaseModel):
     status: str
     workflow_state: str
     is_breaking: bool
+    #: The crawl's AI thought this was breaking. A hint for the desk only —
+    #: nothing sets `is_breaking` from it.
+    breaking_suggested: bool = False
     is_exclusive: bool
     is_featured: bool = False
     is_short: bool = False

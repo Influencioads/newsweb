@@ -1,8 +1,8 @@
 import { Skeleton, SkeletonCard } from '@/components/ui/State';
 
 /**
- * Loading stand-in for the home page. It mirrors the real layout — chip rail,
- * then the lead / mid-column / rail grid — so nothing jumps when the payload
+ * Loading stand-in for the home page. It mirrors the real layout — the lead /
+ * mid-column / rail grid, then the chip rail — so nothing jumps when the payload
  * lands. Rendered through `QueryState`, which owns the `aria-busy` wrapper and
  * the polite "loading" status.
  *
@@ -13,17 +13,13 @@ import { Skeleton, SkeletonCard } from '@/components/ui/State';
 export function HomeSkeleton() {
   return (
     <div className="space-y-7 md:space-y-10">
-      {/* Trending chip rail. */}
-      <div className="flex h-tap gap-2">
-        {[0, 1, 2, 3].map((i) => (
-          <Skeleton key={i} variant="block" className="h-full w-32 rounded-pill" />
-        ))}
-      </div>
-
       {/* Front-page grid: lead + secondary | mid column | latest rail. */}
       <div className="grid gap-x-7 gap-y-7 lg:grid-cols-[1.5fr_1fr_0.8fr]">
         <div className="flex flex-col gap-4">
-          <SkeletonCard variant="lead" />
+          <div className="home-feature rounded-2xl p-4">
+            <Skeleton variant="headline" lines={3} />
+            <Skeleton variant="image" ratio="16/9" className="mt-3" />
+          </div>
           <SkeletonCard variant="row" />
           <SkeletonCard variant="row" />
         </div>
@@ -37,6 +33,13 @@ export function HomeSkeleton() {
             <SkeletonCard key={i} variant="compact" />
           ))}
         </div>
+      </div>
+
+      {/* Trending chip rail follows the lead story. */}
+      <div className="flex h-tap gap-2">
+        {[0, 1, 2, 3].map((i) => (
+          <Skeleton key={i} variant="block" className="h-full w-32 rounded-pill" />
+        ))}
       </div>
     </div>
   );

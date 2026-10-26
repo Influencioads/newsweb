@@ -28,6 +28,10 @@ import { relativeTime } from '@/utils/time';
  * Boxed variants (Lead / Secondary / Grid / Row) sit on `Card`; the list
  * variants (Kicker / Latest / Compact / Brief) stay hairline-separated rows
  * with a hover wash, because a column of boxes reads as noise.
+ *
+ * Every variant shows the story's photo — the owner's rule (2026-09-29): no
+ * story appears on the site without its picture, and none is published
+ * without one.
  */
 
 export interface ArticleCardProps {
@@ -37,10 +41,10 @@ export interface ArticleCardProps {
 /** Headline weight + hover, shared so every variant hovers identically. */
 const HEADLINE = 'font-bold text-ink transition-colors duration-base ease-standard group-hover:text-brand';
 
-/** Hairline row shell for the imageless list variants. */
+/** Hairline row shell for the list variants: thumbnail left, text right. */
 const ROW = 'border-b border-rule-soft last:border-0';
 const ROW_LINK =
-  'group -mx-2 block min-h-tap rounded-xl px-2 py-3 transition-[colors,transform,box-shadow,opacity] duration-base ease-standard hover:bg-paper-sub';
+  'group -mx-2 flex min-h-tap gap-3 rounded-xl px-2 py-3 transition-[colors,transform,box-shadow,opacity] duration-base ease-standard hover:bg-paper-sub';
 
 /** Headline text with the `lang` + font class of whichever script renders. */
 function useHeadline() {
@@ -185,40 +189,82 @@ function Media({
   );
 }
 
-/** Lead story — the big one at the top of the home and section grids. */
-export function LeadCard({ article }: ArticleCardProps) {
+/** The list variants' thumbnail: small, so a column of them stays a list.
+ * `self-start` on every thumbnail beside text: a flex row stretches its
+ * children to the text's height, which overrides the aspect ratio. */
+function Thumb({ article }: { article: Item }) {
+  return <Media article={article} ratio="4/3" sizes="96px" className="w-20 shrink-0 self-start sm:w-24" />;
+}
+
+/** Lead story — `featured` is reserved for the home page's top-story slider,
+ * where only the first slide's photo is fetched eagerly (`priority`). */
+export function LeadCard({
+  article,
+  featured = false,
+  priority = true,
+}: ArticleCardProps & { featured?: boolean; priority?: boolean }) {
   const headline = useHeadline()(article);
-  return (
-    <Card as="article" padding="sm" interactive>
-      <Link to={article.url} className="group block">
-        <div className="relative">
-          {/* The lead hero is the LCP element — eager, high priority (§10.3). */}
-          <Media
-            article={article}
-            ratio="16/9"
-            radius="2xl"
-            sizes="(max-width: 1024px) 100vw, 640px"
-            priority
-          />
+  const picture = (
+    <div className="relative">
+      <Media
+        article={article}
+        ratio="16/9"
+        radius="2xl"
+        sizes="(max-width: 1024px) 100vw, 640px"
+        priority={priority}
+      />
+      {!featured ? (
+        <>
           <div
             aria-hidden
             className="pointer-events-none absolute inset-x-0 bottom-0 h-24 rounded-b-2xl bg-gradient-to-t from-overlay/60 to-transparent"
           />
           {/* Right-aligned: NewsImage parks its AI-image label bottom-left. */}
           <Badges article={article} className="absolute inset-x-3 bottom-3 justify-end" />
-        </div>
-        <div className="mt-3">
-          <h2 lang={headline.lang} className={cn(headline.head, HEADLINE, 'te-clamp-3 text-headline-md sm:text-headline-lg')}>
-            {headline.text}
-          </h2>
-          {/* Summaries exist only in Telugu until AI translation lands (§7.3). */}
-          {article.summary_te ? (
-            <p lang="te" className="te te-clamp-3 mt-2 text-te-body-sm text-ink-soft">
-              {article.summary_te}
-            </p>
-          ) : null}
-          <Meta article={article} />
-        </div>
+        </>
+      ) : null}
+    </div>
+  );
+  const copy = (
+    <div className={featured ? 'px-4 pb-4 pt-5 sm:px-5' : 'mt-3'}>
+      {featured ? <Badges article={article} className="mb-2.5" /> : null}
+      <h2
+        lang={headline.lang}
+        className={cn(
+          headline.head,
+          featured
+            ? 'te-clamp-4 text-headline-lg font-extrabold text-on-ink transition-colors duration-base sm:text-headline-xl'
+            : cn(HEADLINE, 'te-clamp-3 text-headline-md sm:text-headline-lg'),
+        )}
+      >
+        {headline.text}
+      </h2>
+      {/* Summaries exist only in Telugu until AI translation lands (§7.3). */}
+      {article.summary_te ? (
+        <p lang="te" className={cn('te te-clamp-3 mt-2 text-te-body-sm', featured ? 'text-on-ink/85' : 'text-ink-soft')}>
+          {article.summary_te}
+        </p>
+      ) : null}
+      <Meta article={article} className={featured ? 'home-feature-meta' : undefined} />
+    </div>
+  );
+
+  if (featured) {
+    return (
+      <article className="home-feature overflow-hidden rounded-2xl border shadow-card transition-[transform,box-shadow] duration-base ease-standard hover:-translate-y-0.5 hover:shadow-raised focus-within:ring-2 focus-within:ring-brand/40 active:scale-[.98]">
+        <Link to={article.url} className="group block rounded-2xl focus-visible:outline-on-ink">
+          {copy}
+          <div className="px-3 pb-3 sm:px-4 sm:pb-4">{picture}</div>
+        </Link>
+      </article>
+    );
+  }
+
+  return (
+    <Card as="article" padding="sm" interactive>
+      <Link to={article.url} className="group block">
+        {picture}
+        {copy}
       </Link>
     </Card>
   );
@@ -234,7 +280,7 @@ export function SecondaryCard({ article }: ArticleCardProps) {
           article={article}
           ratio="4/3"
           sizes="(max-width: 768px) 112px, 128px"
-          className="w-28 shrink-0 sm:w-32"
+          className="w-28 shrink-0 self-start sm:w-32"
         />
         <div className="min-w-0 flex-1">
           <Badges article={article} className="mb-1.5" />
@@ -248,13 +294,13 @@ export function SecondaryCard({ article }: ArticleCardProps) {
   );
 }
 
-/** Brief — a single bulleted headline, no image. */
+/** Brief — a single headline beside its thumbnail. */
 export function BriefCard({ article }: ArticleCardProps) {
   const headline = useHeadline()(article);
   return (
     <li className={ROW}>
-      <Link to={article.url} className={cn(ROW_LINK, 'flex items-start gap-2')}>
-        <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-pill bg-brand" />
+      <Link to={article.url} className={ROW_LINK}>
+        <Thumb article={article} />
         <div className="min-w-0 flex-1">
           <Badges article={article} flagsOnly className="mb-1" />
           <span
@@ -298,7 +344,7 @@ export function RowCard({ article }: ArticleCardProps) {
           article={article}
           ratio="4/3"
           sizes="(max-width: 768px) 112px, 144px"
-          className="w-28 shrink-0 sm:w-36"
+          className="w-28 shrink-0 self-start sm:w-36"
         />
         <div className="min-w-0 flex-1">
           <Badges article={article} className="mb-1.5" />
@@ -318,20 +364,22 @@ export function RowCard({ article }: ArticleCardProps) {
 }
 
 /**
- * Mid-column story — badge kicker above the headline, byline below, separated
- * by a hairline. The broadsheet front-page pattern: a reader scans section +
- * headline without needing images.
+ * Mid-column story — badge kicker above the headline, byline below, beside
+ * its thumbnail, separated by a hairline.
  */
 export function KickerCard({ article }: ArticleCardProps) {
   const headline = useHeadline()(article);
   return (
     <article className={ROW}>
       <Link to={article.url} className={ROW_LINK}>
-        <Badges article={article} className="mb-1.5" />
-        <h3 lang={headline.lang} className={cn(headline.head, HEADLINE, 'te-clamp-3 text-headline-sm')}>
-          {headline.text}
-        </h3>
-        <Meta article={article} className="mt-1.5" />
+        <Thumb article={article} />
+        <div className="min-w-0 flex-1">
+          <Badges article={article} className="mb-1.5" />
+          <h3 lang={headline.lang} className={cn(headline.head, HEADLINE, 'te-clamp-3 text-headline-sm')}>
+            {headline.text}
+          </h3>
+          <Meta article={article} className="mt-1.5" />
+        </div>
       </Link>
     </article>
   );
@@ -346,31 +394,37 @@ export function LatestCard({ article }: ArticleCardProps) {
   return (
     <article className={ROW}>
       <Link to={article.url} className={ROW_LINK}>
-        {time ? (
-          <p lang={language} className={cn(s.body, 'mb-1 text-meta font-semibold text-brand')}>
-            {time}
-          </p>
-        ) : null}
-        <Badges article={article} className="mb-1.5" />
-        <h3 lang={headline.lang} className={cn(headline.head, HEADLINE, 'te-clamp-2 text-headline-xs')}>
-          {headline.text}
-        </h3>
+        <Thumb article={article} />
+        <div className="min-w-0 flex-1">
+          {time ? (
+            <p lang={language} className={cn(s.body, 'mb-1 text-meta font-semibold text-brand')}>
+              {time}
+            </p>
+          ) : null}
+          <Badges article={article} className="mb-1.5" />
+          <h3 lang={headline.lang} className={cn(headline.head, HEADLINE, 'te-clamp-2 text-headline-xs')}>
+            {headline.text}
+          </h3>
+        </div>
       </Link>
     </article>
   );
 }
 
-/** Compact list row used inside section blocks — no image, hairline separated. */
+/** Compact list row used inside section blocks — thumbnail, hairline separated. */
 export function CompactCard({ article }: ArticleCardProps) {
   const headline = useHeadline()(article);
   return (
     <article className={ROW}>
       <Link to={article.url} className={ROW_LINK}>
-        <Badges article={article} className="mb-1.5" />
-        <h3 lang={headline.lang} className={cn(headline.head, HEADLINE, 'te-clamp-2 text-headline-xs')}>
-          {headline.text}
-        </h3>
-        <Meta article={article} className="mt-1.5" />
+        <Thumb article={article} />
+        <div className="min-w-0 flex-1">
+          <Badges article={article} className="mb-1.5" />
+          <h3 lang={headline.lang} className={cn(headline.head, HEADLINE, 'te-clamp-2 text-headline-xs')}>
+            {headline.text}
+          </h3>
+          <Meta article={article} className="mt-1.5" />
+        </div>
       </Link>
     </article>
   );

@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { CheckCircle2, Pencil, Search } from 'lucide-react';
 
 import { AdminPage } from '@/components/admin/AdminPage';
+import { AiHintBadges } from '@/components/admin/AiHintBadges';
 import { DataTable, type DataTableColumn } from '@/components/admin/DataTable';
 import { WorkflowPill } from '@/components/admin/StatusPill';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
@@ -117,6 +118,7 @@ export default function PendingArticlesPage() {
             <span lang="en" className="mt-0.5 block font-mono text-meta text-muted">
               {a.short_id}
             </span>
+            <AiHintBadges article={a} className="mt-1" />
           </>
         );
       },

@@ -30,6 +30,12 @@ from app.workers.celery_app import celery
 
 logger = get_logger(__name__)
 
+#: Seconds. The pass stops starting work on its own well before this
+#: (`crawl_service.PASS_DEADLINE_S`); the soft limit is the backstop for a
+#: single call that hangs. "Run now" fetches first, so it gets longer.
+PASS_SOFT_LIMIT = 20 * 60
+RUN_NOW_SOFT_LIMIT = 30 * 60
+
 
 def _skip(db: Session, every_key: str | None, offset: int = 0) -> str | None:
     """Why this tick should do nothing, or None when it should run."""
@@ -45,7 +51,7 @@ def _skip(db: Session, every_key: str | None, offset: int = 0) -> str | None:
     return None
 
 
-@celery.task(name="crawl.hourly")
+@celery.task(name="crawl.hourly", soft_time_limit=PASS_SOFT_LIMIT)
 def crawl_hourly() -> dict[str, object]:
     with session_scope() as db:
         if skipped := _skip(db, "crawl.fetch_every_minutes", offset=5):
@@ -53,7 +59,7 @@ def crawl_hourly() -> dict[str, object]:
         return crawl_service.run_fetch_pass(db)
 
 
-@celery.task(name="crawl.rewrite_pass")
+@celery.task(name="crawl.rewrite_pass", soft_time_limit=PASS_SOFT_LIMIT)
 def crawl_rewrite_pass() -> dict[str, object]:
     with session_scope() as db:
         if skipped := _skip(db, "crawl.rewrite_every_minutes", offset=20):
@@ -61,7 +67,7 @@ def crawl_rewrite_pass() -> dict[str, object]:
         return crawl_service.run_rewrite_pass(db)
 
 
-@celery.task(name="crawl.breaking")
+@celery.task(name="crawl.breaking", soft_time_limit=PASS_SOFT_LIMIT)
 def crawl_breaking() -> dict[str, object]:
     """Fetch and rewrite the breaking beat on its own faster cadence."""
     with session_scope() as db:
@@ -79,7 +85,7 @@ def crawl_breaking() -> dict[str, object]:
         return out
 
 
-@celery.task(name="crawl.run_now")
+@celery.task(name="crawl.run_now", soft_time_limit=RUN_NOW_SOFT_LIMIT)
 def crawl_run_now(
     fetch: bool = True,
     rewrite: bool = True,

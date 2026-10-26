@@ -21,7 +21,8 @@ import { cn } from '@/utils/cn';
  *         A 120px thumbnail must not download the 1600px rendition — on the
  *         patchy district 4G we target, that is the difference between a page
  *         that loads and one that does not.
- *  §7.4   An AI-generated image renders a visible Telugu label. Non-optional.
+ *  §7.4   The AI label only shows when `ai_generated` is true, which the public
+ *         API never sends since 2026-10-02 (AI pictures go out `representative`).
  *  §12.5  Photo credit is displayed wherever a caption is shown.
  *
  * The blurhash is used as a cheap tinted placeholder rather than decoded into a

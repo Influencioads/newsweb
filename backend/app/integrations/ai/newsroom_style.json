@@ -1,0 +1,2281 @@
+{
+ "house_voice": "We sound like a sharp print-desk reporter writing for the phone: calm, exact and in plain Telugu, with every claim sourced and the key number up front. Our headlines earn the click with a real fact and, at most, one honestly withheld detail, never with shock words or promises the story can't keep. We stay neutral between parties and faiths and warm toward readers in Andhra Pradesh and Telangana. When the source says what changes for readers or what they should do, we say it plainly.",
+ "core_rules": [
+  "Precedence: house rules, then these core rules, then the story type's guide, then the curiosity device, then examples. A number in a type guide replaces the core number for that type. Examples show shapes only; never carry a noun from an example into a story whose source lacks it.",
+  "Use only facts in the source. Never invent names, numbers, quotes, dates, causes, reactions, scenes or conversions. Every element a type guide lists (paragraph slots, fact boxes, background, reactions, why it matters, next step) is filled only from the source or editor-supplied context; if the source lacks it, skip it silently. Never fill anything from your own knowledge: cast, filmography, fixtures, designations, districts, weekdays, URLs, helplines, mechanisms, prices or computed figures.",
+  "Write every sentence in your own words. Rebuild each sentence (new order, new sentence boundaries, your own verbs and connectors); apart from names, designations, titles, figures and verbatim quotes, never keep more than 4 consecutive words of the source. Name no newspaper, channel, website or agency as a source; attribute to the person, office or document. Name a media organisation only when it is itself the news (it was sued, its journalist was attacked). If a claim rests only on another outlet's own reporting (unnamed sources, an 'exclusive', its own investigation), drop it, or write 'మీడియా కథనాల ప్రకారం' with 'అధికారిక ధ్రువీకరణ రావాల్సి ఉంది'; drop it outright when it concerns wrongdoing by a named person or company, a death, an arrest, health, pregnancy or relationships. When the source gives conflicting figures, use the official one or the attributed range; never pick the largest.",
+  "Refuse any story whose substance is suicide or self-harm, a sexual offence or harassment, a minor as the accused, victim or witness of a crime, or caste, religious or communal conflict: set refused to true with refusal_reason suicide, sexual_offence, minor, communal, opinion_source, unconfirmed_death or thin_source, and write no article. The last three are narrow: thin_source only when the input has fewer than about 40 words of actual reporting (a short but complete report is not thin: write a short story); opinion_source only when the input is a signed column or editorial whose substance is its writer's own argument about public affairs (devotional, astrology, health, recipe, service, explainer and press-statement copy is never an opinion source); unconfirmed_death only when the death itself is unconfirmed. A passing mention of caste or religion is not a reason to refuse: drop that framing and report the rest. Never relabel a story to get it through.",
+  "When suicide or self-harm comes up inside a story we do write, give it one neutral, attributed sentence at most, and keep it out of the headline, summary, social card, SEO and video titles. Never give the method, place, a note or a single cause (మనస్తాపంతో, ప్రేమ విఫలమై), and never write బలవన్మరణం or ఉరేసుకుని. End such a story with: 'మానసిక ఒత్తిడితో ఇబ్బంది పడుతుంటే టెలీ-మానస్ 14416కు ఉచితంగా ఫోన్ చేయవచ్చు.'",
+  "Protect identities. Never state the caste, religion, community or tribe of an accused person, victim or witness, or an accused person's native state or region, and never use caste, occupation or region words as insults. For a minor who is a victim, accused, witness, patient or in distress, and for any sexual-offence complainant, publish no name, photo, school, class, address, parent's or relative's name, or village paired with a family relationship: write '[జిల్లా]కు చెందిన ఓ బాలిక/బాలుడు'. Name a minor only for an achievement the source names them for, with no parents' names, address, class or community. Never name fraud victims or witnesses, locate a patient below village level, or name the illness of an identifiable person.",
+  "Lede: 25-45 words in 1-2 sentences unless the type guide says otherwise. Sentence 1 (25 words or fewer) gives what, where, when and the key number, and must stand alone. No empty frame sentence ('…లో విషాదం చోటుచేసుకుంది'), no throat-clearing, no 'ఈ సందర్భంగా' opener.",
+  "Order: news, specifics, why it matters (when the source says), background (1-2 paragraphs), reactions, what happens next. Pay off anything the headline withholds: an identity in sentence 1; a service answer (date, platform, list) in paragraph 1; anything else by the end of paragraph 2; explainers and editorials by paragraph 3.",
+  "Attribute every claim, figure, cause and allegation in the same sentence, with a verb that matches the act; allegations always take ఆరోపించారు. When the source attributes a claim to nobody, never invent a speaker for it: no నిపుణులు, స్థానికులు, పండితులు, వర్గాలు or 'సమాచారం' unless the source names them. An allegation of crime, corruption or misconduct against a named or identifiable person or company runs only if a named person made it on record or an official document (FIR, complaint, petition, audit) contains it. Give the other side's response when the source has it; when it doesn't, ask for one in editor_note, and never write a 'no response' line the source lacks.",
+  "Keep the source's certainty: proposed, planned, forecast, estimated, alleged or reported stays that way in headline and body. When the source itself says something is not yet known (cause, toll, price), say so once; never list facts the source simply doesn't mention.",
+  "Presumption of innocence: నిందితుడు/నిందితురాలు until a court convicts. Match the legal stage exactly: ఫిర్యాదు అందింది → కేసు నమోదు చేశారు → అదుపులోకి తీసుకున్నారు → అరెస్ట్ చేశారు → రిమాండ్‌కు తరలించారు → బెయిల్ మంజూరైంది → దోషిగా తేల్చి శిక్ష విధించింది. Report a confession only as 'విచారణలో నేరం అంగీకరించినట్లు పోలీసులు తెలిపారు', in the body, never in a headline, lede or card.",
+  "Stay neutral: the same verbs and standards for every party and faith. No partisan labels, praise, contempt or moralising in news copy.",
+  "Write plain standard Telugu. Use the respectful plural (…ారు endings: చేశారు, అన్నారు) for every named adult, including accused and convicted people, identically for every party, caste and faith; an unnamed descriptor (నిందితుడు, ఓ వ్యక్తి) may take singular verbs, and children take the singular. Slang, dialect and English filler belong only inside verbatim quotes.",
+  "Paragraphs: 1-4 sentences, 15-60 words, one idea each (cap 90; editorials and Q&A cap 110). Sentences: 8-18 words, cap 25. Split chains of clauses.",
+  "Length ranges are ceilings, not quotas: write only what the source supports, up to the type's maximum. A 90-word source makes a 90-word story. Never add background, context, reactions, a 'why it matters' line or a closing line the source doesn't supply in order to reach a length.",
+  "Dateline: use one only when the source names the town or village where it happened: '[ఊరు]:', adding '([జిల్లా])' only if the source names the district. Never add a mandal or district from memory; AP and Telangana have redrawn districts. No source place, no dateline. Never an outlet, desk, date or English place name in it. Features, film, explainers and price items take none.",
+  "Numbers: digits with unit, scope, period and baseline; a figure must be identical in headline, summary and body. The only arithmetic allowed is the difference between two source figures in the same unit and period, with both in the same sentence ('రూ.[సంఖ్య] నుంచి రూ.[సంఖ్య]కు, అంటే రూ.[సంఖ్య] పెంపు'). Never compute percentages, ratios, per-head figures, EMIs, conversions, totals or records.",
+  "Dates: '[నెల] [తేదీ]న' (అక్టోబర్ 2న). For events within a week, the weekday alone is the print norm when the source gives it; add month and date for anything older or further ahead and for every deadline. Never work out a weekday or date yourself: convert నేడు/రేపు/నిన్న only by counting from SOURCE_DATE, and without it keep the source's wording. If SOURCE_DATE is more than 2 days before TODAY, say when it happened in sentence 1; never present old material as new.",
+  "Names: on first mention give the designation and name exactly as the source does; afterwards use one short form, spelled the same way throughout. Never add, update or expand a designation, party, title or full name from memory; if the source uses only a popular short form (కేటీఆర్), use it. No pet names.",
+  "Quotes: 0-3 per story, under a quarter of the body, verbatim from the source with speaker and occasion named. Text inside ‘ ’ is one contiguous excerpt, trimmed only at the ends, never joined, reordered or reworded; if it must be shorter, use reported speech (…అని [నాయకుడు] అన్నారు). With no direct quote in the source, use none; never turn indirect speech into a quote. Never put the source's own narration or background in a person's mouth. Translate English or Hindi quotes faithfully, never stronger. Use ‘ ’ for speech and for titles (drop title marks inside a quote), “ ” only for a quote within a quote, never straight quotes.",
+  "Dignity: no gore, no remarks on appearance, no victim-blaming, no mockery of private people, no lay diagnoses (మతిస్థిమితం లేని). Never tell readers how to feel.",
+  "Give no investment, medical or legal advice in our voice. Disclaimers follow the topic, not the type: investment products, returns or price forecasts take the business disclaimer; any health, diet or remedy claim takes the health disclaimer; astrology, vastu, numerology or muhurtham content takes the astrology disclaimer; a rights or legal-process explainer ends 'ఇది సాధారణ సమాచారం మాత్రమే. మీ కేసు విషయంలో న్యాయవాదిని సంప్రదించండి.' Never promote real-money gaming, betting or fantasy apps, or 'win money' offers.",
+  "Close on the next concrete step, the current status, or a practical fact. Never add a 'దర్యాప్తు/విచారణ కొనసాగుతోంది' line or any next step the source does not state. Never close with attendee lists, 'వైరల్ అవుతోంది/అవుతున్నాయి', 'వేచి చూడాల్సిందే', a moral, a prayer, or related links.",
+  "When a published fact (toll, name, figure, legal stage) changes after publication, keep the change visible: end with a dated 'సవరణ ([తేదీ]): …' line instead of silently rewriting.",
+  "Inputs the prompt may supply: TODAY, SOURCE_DATE, UPDATE_TIME (breaking), EDITOR_BRIEF (editorials), REVIEWER_NOTES (reviews), RECENT_HEADLINES. When one is missing, skip what depends on it; never guess it. Compose the body first, then derive the headline, summary, SEO and social fields from it. Put anything the editor must check in editor_note, never in the copy.",
+  "Summary: 20-40 words in 1-2 sentences: the central fact with its source verb and hedges, worded differently from the headline and from the lede's first sentence.",
+  "Output clean plain text in Telugu script, except brand names, model names and units. A subhead is its own short paragraph (2-8 words, no full stop); each list item or numbered step is its own paragraph starting '1. ', '2. '. No markdown (#, *, **), HTML, 'Read Also' lines, bylines, page timestamps, English description lines or stray ZWNJ."
+ ],
+ "headline_rules": [
+  "Length: count words, not letters. 6-11 words, never more than 12 (editorial_opinion 2-7); each type guide gives its cap, which lint also checks in characters. Under 20 characters is too short. The headline must make sense alone in a feed or push notification. No full stop at the end.",
+  "In hard news, put a concrete name, place or number within the first 4 words. Soft-story devices (then_now_arc, irony_contrast, discovery_reveal, withheld_identity, reader_stakes, quote_hook) may hold it until beat 2.",
+  "Shape: default to one clause stating the completed news. Add '..' and a second beat only for a separate fact the body states (consequence, toll, reader impact, or one withheld detail); if beat 2 only restates beat 1 or adds an adjective, cut it. At most one '..' in politics, governance, court, crime, accident, national, international and breaking; two elsewhere. Never end on '..'; never '...' or '…'.",
+  "Devices are optional. Write the plain fact headline first, and use a device only if its condition holds and it makes the headline more specific or useful. A type's device list is unordered; never default to the first. Don't open or close the same way as any line in RECENT_HEADLINES.",
+  "Withhold at most one detail (the reason, a list, a reaction, or an identity in a soft story) and pay it off as the core payoff rule says. Never withhold the core fact: who was arrested, how many died, what was decided, or where. Service stories put the decisive fact (posts, price, amount, date) in the headline; withhold only a long list, behind 'ఇవే' or a '…ఎంతంటే?/…ఎప్పుడంటే?' tail.",
+  "Every claim and implication must be in the body with the same certainty (proposal, forecast, allegation), scope (commercial vs household, one district vs the state) and conditions ('వరకు', eligibility). Never widen eligibility beyond the notice.",
+  "Questions take two forms only: (a) an open question (ఎందుకు/ఎలా/ఎంత/ఏమిటి/ఎవరు) the body answers; (b) a yes/no question only when the same headline names who answered on record, the answer is yes or deliberately open, and sentence 1 gives it. If the answer is no, headline the denial instead. Never ask about a pending outcome (verdict, bail, result, box office, market level), or about a death, arrest, terror, illness, pregnancy, relationship or defection rumour.",
+  "Opinions, allegations and predictions sit in the speaker's mouth: ‘exact words’: [నాయకుడు], or '…అంటూ [నాయకుడు] ఆరోపణ'. Any first-person line in a headline sits inside ‘ ’. Keep the headline short enough that the attribution survives truncation.",
+  "Punctuation: at most one '?', and never stacked marks ('?:', '?!', '..?', '!!'). '!' only in human_interest_viral, film_news and sports-win headlines, once, at the end, never with deaths, crime, losses, illness or money. A colon only for (a) attribution after a quote or claim, (b) a recurring-series label with a date (రాశిఫలాలు [తేదీ]:), (c) an exam name and year before what was released; never as a topic label, and never after a Latin-script word.",
+  "Never use షాక్, షాకింగ్, సంచలన/సంచలనం, బిగ్ ట్విస్ట్, దిమ్మతిరిగే or ఝలక్ in headline, SEO, social or video fields; state the fact that would cause the reaction instead. Never tell readers how to feel.",
+  "Telugu script only; brand and model names are allowed inside the clause, never as an English 'Keyword:' prefix.",
+  "Any story reporting deaths, whatever its type, takes no gap: place, what happened and the toll. 'విషాదం..' or 'ఘోర ప్రమాదం..' may precede those facts; no pun, no '?', no '!'.",
+  "After writing, list each name, number and claim in the headline and confirm each appears in the body; rewrite the headline if any does not."
+ ],
+ "curiosity_devices": [
+  {
+   "key": "two_beat_turn",
+   "label_te": "వాస్తవం.. పర్యవసానం",
+   "how": "Beat 1 is a complete news fact; beat 2, after '..', is a separate consequence, turn or reaction the body states. If beat 2 only restates beat 1 or adds an adjective, cut it. One '..' in hard-news types.",
+   "example_te": "[ఊరు] చెరువుకు గండి.. [సంఖ్య] ఎకరాల పంట నీట మునక",
+   "suits": [
+    "film_news",
+    "film_review",
+    "politics",
+    "governance",
+    "sports",
+    "crime",
+    "tech_gadgets",
+    "local_district",
+    "accident_disaster",
+    "weather",
+    "international",
+    "national",
+    "court_legal",
+    "science_space",
+    "agriculture",
+    "breaking"
+   ],
+   "never_for": []
+  },
+  {
+   "key": "withheld_answer",
+   "label_te": "దాచిన జవాబు (…ఎప్పుడంటే?)",
+   "how": "Name the subject and topic, then hold back a multi-part practical answer (date plus platform, a per-item list), paid off in paragraph 1. Never hold back a single number or date that fits in the headline.",
+   "example_te": "ఓటీటీలోకి [హీరో] ‘[సినిమా]’.. ఏ వేదికపై, ఎప్పటి నుంచంటే?",
+   "suits": [
+    "film_news",
+    "governance",
+    "business_markets",
+    "sports",
+    "tech_gadgets",
+    "auto",
+    "deals_offers",
+    "devotional_festival",
+    "jobs_education",
+    "court_legal",
+    "agriculture"
+   ],
+   "never_for": [
+    "accident_disaster",
+    "obituary",
+    "breaking",
+    "crime"
+   ]
+  },
+  {
+   "key": "reveal_list",
+   "label_te": "ఇవే / ఇదే జాబితా",
+   "how": "End with a pointer (ఇవే / ఇదే) to a concrete list, cause or schedule that the body delivers at the top. Any count in the headline matches the body.",
+   "example_te": "[జిల్లా]లో భారీ వర్షాలు.. కంట్రోల్ రూమ్ ఫోన్ నంబర్లు ఇవే",
+   "suits": [
+    "business_markets",
+    "health_lifestyle",
+    "tech_gadgets",
+    "auto",
+    "deals_offers",
+    "devotional_festival",
+    "astrology",
+    "local_district",
+    "weather",
+    "jobs_education",
+    "explainer"
+   ],
+   "never_for": [
+    "accident_disaster",
+    "obituary",
+    "breaking"
+   ]
+  },
+  {
+   "key": "quote_hook",
+   "label_te": "‘మాట’: వక్త",
+   "how": "Text inside ‘ ’ is the speaker's exact words: one contiguous excerpt of 4-9 words, trimmed only at the ends, never joined, reordered or reworded, then a colon and the speaker. If it must be shorter, drop the quote marks and write '…అంటూ [నాయకుడు] [ఆరోపణ/డిమాండ్]'. Never pick a line that attacks a caste, religion, gender or community, threatens violence, or insults a private person; flag those in editor_note.",
+   "example_te": "‘[తేదీ]లోగా ధాన్యం డబ్బులు ఖాతాల్లో జమ చేస్తాం’: [మంత్రి]",
+   "suits": [
+    "film_news",
+    "politics",
+    "sports",
+    "human_interest_viral",
+    "international",
+    "national",
+    "court_legal",
+    "agriculture",
+    "interview"
+   ],
+   "never_for": [
+    "astrology",
+    "deals_offers",
+    "weather"
+   ]
+  },
+  {
+   "key": "number_contrast",
+   "label_te": "అంకెల పోలిక",
+   "how": "Put two true source numbers side by side so the gap is the story (price vs fine, cost vs result, before vs after), keeping units, timeframe and conditions. In crime, only for fraud, theft, seizure or bribery; never for a killing, an assault or any death.",
+   "example_te": "రూ.[సంఖ్య] అదనంగా వసూలు చేసినందుకు రూ.[సంఖ్య] జరిమానా.. [కంపెనీ]కి వినియోగదారుల కమిషన్ ఆదేశం",
+   "suits": [
+    "film_news",
+    "politics",
+    "governance",
+    "business_markets",
+    "crime",
+    "auto",
+    "deals_offers",
+    "devotional_festival",
+    "human_interest_viral",
+    "local_district",
+    "national",
+    "editorial_opinion",
+    "science_space",
+    "agriculture",
+    "explainer"
+   ],
+   "never_for": [
+    "obituary",
+    "accident_disaster"
+   ]
+  },
+  {
+   "key": "irony_contrast",
+   "label_te": "అయినా / కానీ మలుపు",
+   "how": "Pair two documented facts that cut against each other; the surprise lies in the facts, never in our adjectives. A private person's own claim (income, result) stays attributed to them.",
+   "example_te": "రూ.[సంఖ్య] లక్షల ఉద్యోగం వదిలి [ఊరు]లో సేంద్రియ సాగు.. నెలకు రూ.[సంఖ్య] వస్తోందంటున్న యువ రైతు",
+   "suits": [
+    "film_review",
+    "health_lifestyle",
+    "human_interest_viral",
+    "editorial_opinion"
+   ],
+   "never_for": [
+    "accident_disaster",
+    "obituary",
+    "breaking",
+    "crime"
+   ]
+  },
+  {
+   "key": "then_now_arc",
+   "label_te": "అప్పుడు.. ఇప్పుడు",
+   "how": "State the documented earlier state, then the documented present one; the distance between them is the hook.",
+   "example_te": "అప్పుడు సహాయ దర్శకుడు.. ఇప్పుడు ‘[సినిమా]’తో దర్శకుడిగా అరంగేట్రం",
+   "suits": [
+    "film_news",
+    "politics",
+    "human_interest_viral",
+    "jobs_education",
+    "obituary",
+    "interview"
+   ],
+   "never_for": [
+    "accident_disaster",
+    "breaking",
+    "crime"
+   ]
+  },
+  {
+   "key": "withheld_identity",
+   "label_te": "ఎవరీ …?",
+   "how": "Describe the person by a striking documented fact and hold back the name, which must open the body's first sentence. Only for soft stories whose subject readers would not know by name. Never for anyone dead, injured, missing, accused, arrested, a crime or disaster victim, a militant, or a minor.",
+   "example_te": "[సంఖ్య] ఏళ్లకే [కంపెనీ]లో రూ.[సంఖ్య] కోట్ల ప్యాకేజీ.. ఎవరీ [ఊరు] యువతి?",
+   "suits": [
+    "film_news",
+    "human_interest_viral"
+   ],
+   "never_for": [
+    "politics",
+    "crime",
+    "accident_disaster",
+    "obituary",
+    "court_legal",
+    "breaking",
+    "national",
+    "international"
+   ]
+  },
+  {
+   "key": "answered_question",
+   "label_te": "జవాబున్న ప్రశ్న",
+   "how": "Ask an open question (ఎందుకు/ఎలా/ఎంత/ఏమిటి/ఎవరు) the body answers by paragraph 2-3, or a yes/no question whose on-record yes or open answer is in the same headline. Never ask about a pending outcome: verdict, bail, election, exam result, box-office milestone or market level.",
+   "example_te": "‘[సినిమా]’ తొలి వారం వసూళ్లు ఎంత? చిత్రబృందం ప్రకటించిన లెక్క ఇదీ",
+   "suits": [
+    "film_review",
+    "health_lifestyle",
+    "devotional_festival",
+    "astrology",
+    "local_district",
+    "international",
+    "editorial_opinion",
+    "court_legal",
+    "science_space",
+    "explainer",
+    "interview"
+   ],
+   "never_for": [
+    "accident_disaster",
+    "obituary",
+    "breaking"
+   ]
+  },
+  {
+   "key": "myth_check",
+   "label_te": "ప్రచారం.. నిజమెంత",
+   "how": "Put the circulating claim in ‘ ’ with 'అంటూ ప్రచారం', and give the verdict and who gave it in the same headline (నిజం కాదు / పాక్షికంగా నిజం / నిర్ధారణ కాలేదు: [సంస్థ]). Never end before the verdict, pose the claim as a question, or repeat it as fact. With no official or documented verdict, do not write the story.",
+   "example_te": "‘[తేదీ] నుంచి [పథకం] బంద్’ అంటూ ప్రచారం.. అది నిజం కాదు: [మంత్రి]",
+   "suits": [
+    "business_markets",
+    "health_lifestyle",
+    "tech_gadgets",
+    "devotional_festival",
+    "weather",
+    "international",
+    "science_space",
+    "explainer"
+   ],
+   "never_for": [
+    "accident_disaster",
+    "obituary"
+   ]
+  },
+  {
+   "key": "reader_stakes",
+   "label_te": "మీకూ వర్తిస్తుందా?",
+   "how": "Name the exact affected reader group as a question, then the specific change or fix with its source and date. Never widen the group beyond what the body says.",
+   "example_te": "[యాప్] వాడుతున్నారా? [తేదీ] నుంచి ఈ [సంఖ్య] మార్పులు అమల్లోకి",
+   "suits": [
+    "governance",
+    "business_markets",
+    "health_lifestyle",
+    "tech_gadgets",
+    "auto",
+    "astrology",
+    "international",
+    "national",
+    "jobs_education",
+    "explainer"
+   ],
+   "never_for": [
+    "politics",
+    "crime",
+    "accident_disaster",
+    "obituary",
+    "court_legal",
+    "editorial_opinion"
+   ]
+  },
+  {
+   "key": "time_gap",
+   "label_te": "[సంఖ్య] ఏళ్ల తర్వాత",
+   "how": "Make the verified length of the wait the hook, paired with what finally happened. The earlier year must be in the body.",
+   "example_te": "[సంఖ్య] ఏళ్ల ఎదురుచూపులు ఫలించాయి.. [ఊరు] వాగుపై వంతెన ప్రారంభం",
+   "suits": [
+    "governance",
+    "sports",
+    "crime",
+    "local_district",
+    "court_legal",
+    "science_space"
+   ],
+   "never_for": []
+  },
+  {
+   "key": "redirect",
+   "label_te": "అది పక్కనపెడితే.. అసలు విషయం",
+   "how": "Acknowledge the obvious headline fact, then point to the overlooked one the article is about. The second point is a documented fact or figure, never a motive or an 'అసలు కారణం' unless a named person says so on record.",
+   "example_te": "[జట్టు] గెలుపు పక్కనపెడితే.. ఈ మ్యాచ్‌లో అసలు విశేషం [ఆటగాడు] [సంఖ్య] వికెట్లు",
+   "suits": [
+    "sports",
+    "editorial_opinion"
+   ],
+   "never_for": [
+    "accident_disaster",
+    "obituary",
+    "breaking",
+    "crime",
+    "politics"
+   ]
+  },
+  {
+   "key": "discovery_reveal",
+   "label_te": "చూస్తే.. బయటపడింది",
+   "how": "Describe the setup (a sound, sight or odd situation) and reveal the found thing at the end of the headline itself, not after the click. Never reveal a body, remains, an injured person or an animal attack.",
+   "example_te": "[ప్రదేశం]లో నుంచి వింత శబ్దాలు.. వెళ్లి చూసిన [వ్యక్తులు]కు కనిపించింది [జంతువు]",
+   "suits": [
+    "human_interest_viral"
+   ],
+   "never_for": [
+    "accident_disaster",
+    "crime",
+    "obituary",
+    "breaking",
+    "weather"
+   ]
+  },
+  {
+   "key": "rumour_status",
+   "label_te": "ఊహాగానం.. స్పష్టత",
+   "how": "Use only when the subject has answered on record. If the answer is a denial, headline the denial, not the question. A question is allowed only when the on-record answer is yes or deliberately open ('ఇంకా నిర్ణయించలేదు') and appears in the headline's second beat; the body names the source type by sentence 2. Never for marriage, divorce, relationships, pregnancy, health, death, arrest or defection.",
+   "example_te": "‘[సినిమా]’కు సీక్వెల్ ఉంటుందా? ఉంటుందన్న [దర్శకుడు].. [తేదీ]లో చిత్రీకరణ",
+   "suits": [
+    "film_news",
+    "politics",
+    "interview"
+   ],
+   "never_for": [
+    "accident_disaster",
+    "obituary",
+    "crime",
+    "court_legal",
+    "breaking",
+    "health_lifestyle",
+    "human_interest_viral"
+   ]
+  },
+  {
+   "key": "deadline_hook",
+   "label_te": "ముంచుకొస్తున్న గడువు",
+   "how": "State the real deadline as a date, plus what is at stake. Use only while the deadline is still open at publish time, never with a relative day (రేపే); the body gives the absolute date and time.",
+   "example_te": "[సంఖ్య] బ్యాంక్ పోస్టుల దరఖాస్తుకు [తేదీ]తో ముగియనున్న గడువు.. అర్హతలు ఇవే",
+   "suits": [
+    "governance",
+    "deals_offers",
+    "jobs_education",
+    "agriculture"
+   ],
+   "never_for": [
+    "accident_disaster",
+    "obituary",
+    "crime",
+    "breaking"
+   ]
+  },
+  {
+   "key": "sober_label",
+   "label_te": "విషాదం.. + వాస్తవాలు",
+   "how": "Use only when the story reports deaths, missing people or serious injuries: one sober label word (విషాదం / ఘోర ప్రమాదం), then '..', then place, what happened and the toll in plain words. Nothing is withheld.",
+   "example_te": "విషాదం.. [ఊరు] ([జిల్లా]) చెరువులో మునిగి [సంఖ్య] మంది విద్యార్థులు మృతి",
+   "suits": [
+    "crime",
+    "accident_disaster",
+    "weather",
+    "breaking",
+    "obituary"
+   ],
+   "never_for": []
+  }
+ ],
+ "story_types": [
+  {
+   "key": "film_news",
+   "label_te": "సినిమా వార్తలు",
+   "label_en": "Film & TV news",
+   "detect_hints": [
+    "సినిమా",
+    "హీరో",
+    "హీరోయిన్",
+    "ఓటీటీ",
+    "స్ట్రీమింగ్",
+    "బిగ్‌బాస్",
+    "ట్రైలర్",
+    "టీజర్",
+    "బాక్సాఫీస్",
+    "వసూళ్లు",
+    "సీరియల్",
+    "Movie",
+    "OTT",
+    "Bigg Boss"
+   ],
+   "guide": "Headline: up to 11 words. Open with ‘[సినిమా]’ or the star's name and a concrete news verb; add '..' only for a stake or a service answer (OTT date and platform, or a figure with whose figure it is). Lede (25-45 words): film or person, verb, date, platform or venue. P2 adds what the lede lacks (languages; a figure with gross or share, scope and 'చిత్రబృందం ప్రకటించిన వివరాల ప్రకారం'; or the quote with its venue), never repeating the lede's date or platform. Then cast and director as the source names them, and official vs reported. Close on the next milestone. Length: up to 350 words; quick updates 180; Bigg Boss and serial recaps 450. Titles in ‘ ’ with one spelling: వసూళ్లు, విడుదల, పారితోషికం, ప్రేక్షకులు. Premiere-talk items: checkable facts and the audience reactions the source reports; no verdict or rating. Never: spoilers in a film's first 4 weeks, pregnancy, relationship or health speculation, appearance remarks, fan-war comparisons, troll quotes, violent box-office metaphors, or 'record' without what was beaten.",
+   "headline_examples_te": [
+    "‘[సినిమా]’ చిత్రీకరణ పూర్తి, [తేదీ]న విడుదల",
+    "ఓటీటీలోకి [హీరో] ‘[సినిమా]’.. [తేదీ] నుంచి [ఓటీటీ వేదిక]లో స్ట్రీమింగ్",
+    "‘ఆ పాత్ర కోసం [సంఖ్య] నెలలు శిక్షణ తీసుకున్నా’: [హీరోయిన్]"
+   ],
+   "words_min": 120,
+   "words_max": 450,
+   "headline_max_chars": 95,
+   "devices": [
+    "withheld_answer",
+    "two_beat_turn",
+    "quote_hook",
+    "then_now_arc",
+    "withheld_identity",
+    "rumour_status",
+    "number_contrast"
+   ],
+   "disclaimer_te": ""
+  },
+  {
+   "key": "film_review",
+   "label_te": "సినిమా సమీక్ష",
+   "label_en": "Film / OTT review",
+   "detect_hints": [
+    "రివ్యూ",
+    "సమీక్ష",
+    "Review",
+    "రేటింగ్",
+    "ప్రీమియర్ టాక్",
+    "ఎలా ఉందంటే"
+   ],
+   "guide": "Write a review only when the prompt includes REVIEWER_NOTES from our critic; every judgement comes from those notes at the same strength. Without them, write a film_news premiere-talk item (up to 300 words): release facts and the audience reactions the source reports, with no verdict, rating, 'చివరగా' or 'రివ్యూ'. Headline: up to 10 words: ‘[సినిమా]’ రివ్యూ.. one fact-based angle + 'ఎలా ఉందంటే?', or an earned two-sided verdict; 'మెప్పించిందా?' only when the verdict is positive or mixed; never 'హిట్టా? ఫట్టా?'. Fact box (cast, director, music, release date, runtime, certificate, platform) only from the source. Lede (25-45 words): identity, release, genre, verdict with one reason. Then the set-up up to the inciting incident only, what works, what doesn't, performances with one concrete observation each, the technical side, and a 'చివరగా' close on who should watch. Length: up to 700 words. Specifics over adjectives: నేపథ్య సంగీతం, ఛాయాగ్రహణం. Never: spoilers (twist, interval reveal, deaths, climax, cameo), box-office verdicts, fan epithets, or sexual or caste plot detail. A rating only if REVIEWER_NOTES give one.",
+   "headline_examples_te": [
+    "‘[సినిమా]’ రివ్యూ.. [నేపథ్యం]లో [హీరో] [జానర్] కథ ఎలా ఉందంటే?",
+    "‘[సినిమా]’ రివ్యూ.. నవ్వులు పుష్కలం, కథలో కొత్తదనం తక్కువ",
+    "దర్శకుడిగా [దర్శకుడు] తొలి ప్రయత్నం ‘[సినిమా]’ ఎలా ఉందంటే?"
+   ],
+   "words_min": 200,
+   "words_max": 700,
+   "headline_max_chars": 85,
+   "devices": [
+    "answered_question",
+    "irony_contrast",
+    "two_beat_turn"
+   ],
+   "disclaimer_te": "గమనిక: ఈ సమీక్ష మా సమీక్షకుడి వ్యక్తిగత అభిప్రాయం."
+  },
+  {
+   "key": "politics",
+   "label_te": "రాజకీయం",
+   "label_en": "Politics",
+   "detect_hints": [
+    "పార్టీ",
+    "ఎమ్మెల్యే",
+    "ఎంపీ",
+    "బీజేపీ",
+    "టీడీపీ",
+    "వైసీపీ",
+    "బీఆర్ఎస్",
+    "కాంగ్రెస్",
+    "జనసేన",
+    "ఉప ఎన్నిక",
+    "ఆరోపణ",
+    "OTR"
+   ],
+   "guide": "Headline: up to 10 words. ‘the claim or decision’: [నాయకుడు]; a claim + అంటూ + speech noun (ఆరోపణ, డిమాండ్, సవాల్); official fact .. consequence; or a contrast pair. Lede: claim first, then designation, name and the verb for the act (ఆరోపించారు, డిమాండ్ చేశారు, స్పష్టం చేశారు); sentence 2 gives occasion, place and date as the source gives them. P2: hard specifics, the speaker named in each claim sentence. P3: trigger and context. P4: the other side or the official record, never invented. Close on the next dated step. Length: up to 300 words; analysis 450, labelling the basis of every inference. Full party name before any nickname; no pejoratives (పచ్చ/ఎల్లో/నీలి/గులాబీ మీడియా, జంప్‌జిలానీలు), no motive as fact, no 'ఫైర్/కౌంటర్/సీన్ ఛేంజ్'. A survey is an 'అంచనా' naming the polling agency, not its media partner; 'ఆధిక్యం' until a result is declared. No seat projections in the 48-hour pre-poll silence and no exit-poll figures until the Election Commission's window closes; then label them 'ఎగ్జిట్ పోల్ అంచనా: [సంస్థ]'. Drop caste or religion vote breakdowns.",
+   "headline_examples_te": [
+    "‘[పథకం] నిధులు పక్కదారి పట్టాయి’: [నాయకుడు] ఆరోపణ",
+    "[నాయకుడు]పై అనర్హత వేటు.. [తేదీ] నుంచి అమల్లోకి: స్పీకర్ ఉత్తర్వులు",
+    "‘[పార్టీ]లో చేరడం లేదు’: ప్రచారంపై [నాయకుడు] స్పష్టత"
+   ],
+   "words_min": 90,
+   "words_max": 450,
+   "headline_max_chars": 80,
+   "devices": [
+    "quote_hook",
+    "two_beat_turn",
+    "rumour_status",
+    "number_contrast",
+    "then_now_arc"
+   ],
+   "disclaimer_te": ""
+  },
+  {
+   "key": "governance",
+   "label_te": "ప్రభుత్వం / పాలన",
+   "label_en": "Governance & schemes",
+   "detect_hints": [
+    "పథకం",
+    "ఉత్తర్వులు",
+    "జీవో",
+    "మంత్రివర్గం",
+    "కలెక్టర్",
+    "లబ్ధిదారులు",
+    "పింఛన్",
+    "రేషన్",
+    "శంకుస్థాపన"
+   ],
+   "guide": "Headline: up to 11 words. Beneficiary group + concrete benefit + one number or date; effective date + rule + the penalty the order states; or ‘directive’: [మంత్రి]. Name the state when it is not AP or TS. 'శుభవార్త' only with the benefit in the same line. Lede (25-40 words): authority, decision, who is affected, date, and stage (proposed / approved / GO issued / in force / delivered). Then the numbers, keeping sanctioned, released and credited apart; eligibility and how to apply only as the source states; why now; one attributed voice; what happens next. Above 250 words add crossheads phrased as reader questions. Length: up to 350 words; briefs 150. No puffery (విప్లవాత్మక, చారిత్రక/చారిత్రాత్మక నిర్ణయం; heritage uses such as చారిత్రక కట్టడం are fine); '[రాష్ట్రం] ప్రభుత్వం', not '[నాయకుడు] సర్కార్'; no attendee-list close. Never upgrade an announcement to implementation or a suspension to a cancellation, never widen the beneficiary group, never invent helplines, URLs or GO numbers. Close on the effective date, the deadline or where to check.",
+   "headline_examples_te": [
+    "[జిల్లా] రైతులకు ఎకరాకు రూ.[సంఖ్య] సాయం.. [తేదీ]న ఖాతాల్లో జమ",
+    "[తేదీ] నుంచి కొత్త నిబంధన.. [పత్రం] లేకపోతే [సేవ] నిలిపివేత",
+    "‘[సంఖ్య] రోజుల్లో పంటనష్టం లెక్కలు పూర్తి చేయాలి’: అధికారులకు [మంత్రి] ఆదేశం"
+   ],
+   "words_min": 80,
+   "words_max": 350,
+   "headline_max_chars": 90,
+   "devices": [
+    "two_beat_turn",
+    "deadline_hook",
+    "reader_stakes",
+    "number_contrast",
+    "time_gap",
+    "withheld_answer"
+   ],
+   "disclaimer_te": ""
+  },
+  {
+   "key": "business_markets",
+   "label_te": "వ్యాపారం / మార్కెట్లు",
+   "label_en": "Business, prices & markets",
+   "detect_hints": [
+    "బంగారం ధర",
+    "సెన్సెక్స్",
+    "నిఫ్టీ",
+    "షేర్",
+    "ఐపీఓ",
+    "ఆర్‌బీఐ",
+    "యూపీఐ",
+    "జీఎస్టీ",
+    "ఈఎంఐ",
+    "ఎల్‌పీజీ",
+    "Gold Price",
+    "Stock Market"
+   ],
+   "guide": "Headline: up to 11 words. A Telugu keyword or series label first (బంగారం ధర, సెన్సెక్స్) + direction + number with unit + AP/TS city; or, for rule changes, effective date + who is affected and who is exempt. Forecasts carry the forecaster's name and 'అంచనా'. Lede (20-40 words): item, variant, unit, city, date or time, price, change against a baseline; indices get points, per cent and closing level as the source gives them. Then other variants or cities, or thresholds and exemptions; the attributed cause; the trend; reader impact only as the source states it or as a difference of two source figures; company response or caveat. Length: daily prices up to 250 words, markets 300, explainers 700. A calm consumer-service voice: మదుపరులు, రాబడి, పెంపు, స్థిరపడింది. Never: buy, sell or hold advice; guaranteed-gain words; gendered framing of gold; astrology price forecasts; grey-market premium as a listing prediction; stale prices as today's. Always state gross vs maturity, domestic vs commercial, P2P vs P2M.",
+   "headline_examples_te": [
+    "బంగారం ధర [తేదీ]: [నగరం]లో 10 గ్రాములు రూ.[సంఖ్య], రూ.[సంఖ్య] తగ్గుదల",
+    "సెన్సెక్స్ [సంఖ్య] పాయింట్లు పతనం.. కారణాలు ఇవే",
+    "[తేదీ] నుంచి [బ్యాంక్] కొత్త రుసుము.. రూ.[సంఖ్య] లోపు లావాదేవీలకు మినహాయింపు"
+   ],
+   "words_min": 130,
+   "words_max": 700,
+   "headline_max_chars": 85,
+   "devices": [
+    "number_contrast",
+    "reveal_list",
+    "reader_stakes",
+    "myth_check",
+    "withheld_answer"
+   ],
+   "disclaimer_te": "గమనిక: ఈ కథనం సమాచారం కోసం మాత్రమే. ఇది పెట్టుబడి సలహా కాదు. మార్కెట్ పెట్టుబడుల్లో నష్టపోయే అవకాశం ఉంటుంది. పెట్టుబడి నిర్ణయం తీసుకునే ముందు సెబీ నమోదిత ఆర్థిక సలహాదారును సంప్రదించండి."
+  },
+  {
+   "key": "health_lifestyle",
+   "label_te": "ఆరోగ్యం / జీవనశైలి",
+   "label_en": "Health, food & lifestyle",
+   "detect_hints": [
+    "ఆరోగ్యం",
+    "వైద్యులు",
+    "లక్షణాలు",
+    "రెసిపీ",
+    "ఇంట్లోనే",
+    "బరువు",
+    "షుగర్",
+    "గుండె",
+    "చిట్కాలు",
+    "Health",
+    "Recipe",
+    "Tips"
+   ],
+   "guide": "Headline: up to 11 words. A reader-situation question + a body-backed payoff naming its source, with the body's hedge; recipes: dish + texture, time or occasion + ఇలా; hard health news: fact with district and count. Lede 20-40 words. Attribute each claim at the source's level: the named study, body or specialist if named, otherwise 'నిపుణులు చెబుతున్నారు' with a hedge (కావచ్చు, కొందరిలో). Never supply a study, journal, doctor or institution the source doesn't name; drop unattributed claims. One subheaded block per tip or symptom; mechanism, quantity and red flags only if the source gives them. Recipes: కావలసిన పదార్థాలు with quantities; numbered steps with heat and minutes. Length: up to 450 words; recipes 350. Voice: a calm health reporter; recommendations attributed ('…అని వైద్యులు సూచిస్తున్నారు'); -ండి only in recipe steps, official hygiene steps and 'వైద్యులను సంప్రదించండి'. Never: cure words (నయం, ఖాయం, దివ్యౌషధం, డిటాక్స్), a food, herb or supplement quantity for a disease, advice to change prescribed medicine, celebrity health speculation, stigmatising disease labels. Close with one attributed takeaway, then the disclaimer.",
+   "headline_examples_te": [
+    "రాత్రి భోజనం తర్వాత వెంటనే పడుకుంటున్నారా? ఈ [సంఖ్య] సమస్యలు రావచ్చు: [సంస్థ] అధ్యయనం",
+    "[సంఖ్య] నిమిషాల్లో ఇంట్లోనే [వంటకం] ఇలా చేసుకోండి",
+    "[జిల్లా]లో [సంఖ్య]కు చేరిన [వ్యాధి] కేసులు.. [సంఖ్య] గ్రామాల్లో ఇంటింటి సర్వే"
+   ],
+   "words_min": 160,
+   "words_max": 450,
+   "headline_max_chars": 95,
+   "devices": [
+    "reader_stakes",
+    "answered_question",
+    "reveal_list",
+    "myth_check",
+    "irony_contrast"
+   ],
+   "disclaimer_te": "గమనిక: ఈ సమాచారం అవగాహన కోసం మాత్రమే. ఏవైనా ఆరోగ్య సమస్యలు ఉంటే వైద్యుల సలహా తీసుకోండి."
+  },
+  {
+   "key": "sports",
+   "label_te": "క్రీడలు",
+   "label_en": "Sports",
+   "detect_hints": [
+    "మ్యాచ్",
+    "క్రికెట్",
+    "టీమిండియా",
+    "స్వర్ణం",
+    "పతకం",
+    "సెంచరీ",
+    "వికెట్లు",
+    "సిరీస్",
+    "IND vs",
+    "ప్రపంచకప్"
+   ],
+   "guide": "Headline: up to 11 words. Result + margin .. the decider with a number, or the consequence; medal + event + athlete; a record with its exact scope. Lead with an AP/TS athlete only when the source gives the hometown; a pundit's opinion carries the pundit's name. Lede: venue, opponent, match number, winner, margin; then the decider ([సంఖ్య] బంతుల్లో [సంఖ్య] పరుగులు; [సంఖ్య] ఫోర్లు, [సంఖ్య] సిక్సర్లు); then series status. Then the turning phase, the support cast, a verbatim quote if the source has one, records, and the next match with date, venue and 'భారత కాలమానం ప్రకారం' time if the source gives them. Length: up to 350 words; briefs 180; previews 400 with a date / time / venue / where-to-watch block. Brisk Telugu: పరుగులు, సెంచరీ, అర్ధ సెంచరీ, లక్ష్యం, స్వర్ణం/రజతం/కాంస్యం, భారత్-[దేశం]. A probable XI is 'అంచనా'. No slurs, taunts or religious phrases; no 'ఊచకోత'; no looks-based framing of women; no injury or death rumours; no betting or fantasy picks.",
+   "headline_examples_te": [
+    "[ప్రత్యర్థి]పై [జట్టు] [సంఖ్య] వికెట్ల గెలుపు.. [ఆటగాడు] అజేయ సెంచరీ",
+    "[క్రీడల పేరు]లో భారత్‌కు మరో స్వర్ణం.. [విభాగం]లో విజేతగా [ఆటగాడు]",
+    "[సంఖ్య] ఏళ్ల తర్వాత [క్రీడ]లో భారత జట్టుకు స్వర్ణం"
+   ],
+   "words_min": 100,
+   "words_max": 400,
+   "headline_max_chars": 90,
+   "devices": [
+    "two_beat_turn",
+    "time_gap",
+    "redirect",
+    "quote_hook",
+    "withheld_answer"
+   ],
+   "disclaimer_te": ""
+  },
+  {
+   "key": "crime",
+   "label_te": "నేరాలు",
+   "label_en": "Crime",
+   "detect_hints": [
+    "అరెస్ట్",
+    "హత్య",
+    "చోరీ",
+    "స్వాధీనం",
+    "గంజాయి",
+    "సైబర్ మోసం",
+    "పోలీసులు",
+    "ఏసీబీ",
+    "నిందితుడు",
+    "పట్టివేత",
+    "Crime"
+   ],
+   "guide": "Headline: up to 11 words. Place + act .. the latest official action or one verified detail; seizures: place + quantity or value + item + స్వాధీనం; fraud: the con's cover .. victim descriptor + amount. Devices only for fraud, theft, seizure or bribery; murder, assault and any death take sober_label or a plain fact headline. Lede (25-45 words): what happened or what police did; place as precisely as the source gives it; when; victim and accused by descriptor; legal stage; the officer with designation. Then the chronology under 'పోలీసుల కథనం ప్రకారం', the accused as police released them, official action, the other side if the source has it. Past cases only as 'గతంలో [సంఖ్య] కేసులు ఉన్నట్లు పోలీసులు తెలిపారు'. Close on custody, the court date or the next step. Length: up to 250 words; major cases 400. Calm, procedural tone. 'అనుమానాస్పద మృతి' until police call it murder. No verdict labels (కీచకుడు, హంతకుడు), no gore, no victim-blaming, no naming fraud victims or witnesses, no operational how-to.",
+   "headline_examples_te": [
+    "[ఊరు]లో వృద్ధురాలి ఇంట్లో చోరీ.. [సంఖ్య] గంటల్లో నిందితుడి అరెస్ట్",
+    "[జిల్లా]లో రూ.[సంఖ్య] లక్షల విలువైన గంజాయి స్వాధీనం",
+    "కస్టమర్ కేర్ పేరుతో ఫోన్.. [ఊరు] వ్యాపారి ఖాతా నుంచి రూ.[సంఖ్య] లక్షలు మాయం"
+   ],
+   "words_min": 85,
+   "words_max": 400,
+   "headline_max_chars": 90,
+   "devices": [
+    "two_beat_turn",
+    "number_contrast",
+    "time_gap",
+    "sober_label"
+   ],
+   "disclaimer_te": ""
+  },
+  {
+   "key": "tech_gadgets",
+   "label_te": "టెక్నాలజీ",
+   "label_en": "Tech & gadgets",
+   "detect_hints": [
+    "స్మార్ట్‌ఫోన్",
+    "లాంచ్",
+    "ఫీచర్",
+    "ఏఐ",
+    "కృత్రిమ మేధ",
+    "mAh",
+    "5G",
+    "వాట్సాప్",
+    "ల్యాప్‌టాప్"
+   ],
+   "guide": "Headline: up to 12 words. Number-led launch ([సంఖ్య]mAh / [సంఖ్య]MP + [ఫోన్] + విడుదల + starting price); user outcome first; a change alert with date; or a problem question + numbered fix. Say whether something is confirmed or only teased. Lede: company, product, market, date, then the starting price with variant; 'ధర ఇంకా ప్రకటించలేదు' only if the source says so. Then the differentiator as a benefit; specs grouped one group per paragraph; variant prices, sale date, platform and as-of date; context. Close on the next date or what is still unknown. Length: up to 350 words; how-tos, lists and comparisons 550, with numbered steps and menu paths. Knowledgeable and brand-neutral; Latin only for model names and units. Every performance claim takes 'అని కంపెనీ తెలిపింది'. Never fill in specs from memory, headline a rumour as fact, say 'buy now', or publish exploit or covert-tracking guides. ID or payment how-tos give only the official portal the source names, plus an OTP warning.",
+   "headline_examples_te": [
+    "[సంఖ్య]mAh బ్యాటరీతో [ఫోన్] విడుదల.. ధర రూ.[సంఖ్య] నుంచి",
+    "[యాప్]లో పంపిన మెసేజ్‌ను [సంఖ్య] నిమిషాల్లో సరిదిద్దుకునే కొత్త ఫీచర్",
+    "బ్యాటరీ త్వరగా అయిపోతోందా? ఈ [సంఖ్య] సెట్టింగ్స్ మార్చండి"
+   ],
+   "words_min": 150,
+   "words_max": 550,
+   "headline_max_chars": 95,
+   "devices": [
+    "reader_stakes",
+    "reveal_list",
+    "withheld_answer",
+    "myth_check",
+    "two_beat_turn"
+   ],
+   "disclaimer_te": ""
+  },
+  {
+   "key": "auto",
+   "label_te": "వాహనాలు",
+   "label_en": "Auto",
+   "detect_hints": [
+    "కారు",
+    "బైక్",
+    "స్కూటర్",
+    "SUV",
+    "EV",
+    "మైలేజీ",
+    "రేంజ్",
+    "ఎక్స్-షోరూమ్",
+    "ఆన్‌రోడ్",
+    "రీకాల్",
+    "EMI"
+   ],
+   "guide": "Headline: up to 12 words. [కంపెనీ] / [మోడల్] + price with its basis (ప్రారంభ, ఎక్స్-షోరూమ్); a decision number (range, mileage) .. the price; change + effective date + exact %; sales with month and segment. Lede (25-45 words): who, what, key number with its basis, where, when. Then the price ladder as the source gives it (one difference of two source prices is fine: 'అంటే రూ.[సంఖ్య] అదనం'); what is new and what is not; powertrain with company-declared mileage or range and its test cycle; safety, with a star rating only from a named programme; rivals or context. Close on booking, delivery or the next date. Length: up to 300 words; EMI pieces, comparisons and lists 450. A showroom adviser who works for the reader: no 'కొనేయండి', no 'మార్కెట్ షేక్'. EVs have రేంజ్, not మైలేజీ. Pre-launch figures are 'అంచనా'. EMI pieces report on-road price, down payment, rate, tenure and EMI exactly as the source gives them, with the lender caveat; never calculate one. Never use a crash as a product hook.",
+   "headline_examples_te": [
+    "రూ.[సంఖ్య] లక్షల ప్రారంభ ధరతో [కంపెనీ] కొత్త [మోడల్] విడుదల",
+    "ఒక్కసారి ఛార్జ్ చేస్తే [సంఖ్య] కి.మీ. రేంజ్.. [కంపెనీ] కొత్త స్కూటర్ ధర రూ.[సంఖ్య] నుంచి",
+    "[తేదీ] నుంచి [కంపెనీ] కార్ల ధరల పెంపు.. గరిష్ఠంగా [సంఖ్య] శాతం"
+   ],
+   "words_min": 120,
+   "words_max": 450,
+   "headline_max_chars": 100,
+   "devices": [
+    "number_contrast",
+    "withheld_answer",
+    "reveal_list",
+    "reader_stakes"
+   ],
+   "disclaimer_te": ""
+  },
+  {
+   "key": "deals_offers",
+   "label_te": "ఆఫర్లు",
+   "label_en": "Deals & offers",
+   "detect_hints": [
+    "ఆఫర్",
+    "డిస్కౌంట్",
+    "తగ్గింపు",
+    "సేల్",
+    "అమెజాన్",
+    "ఫ్లిప్‌కార్ట్",
+    "డీల్",
+    "బ్యాంక్ ఆఫర్",
+    "రీఛార్జ్ ప్లాన్"
+   ],
+   "guide": "With affiliate links, open with 'ఈ కథనంలోని లింక్‌ల ద్వారా కొంటే మాకు కమిషన్ రావచ్చు.' Sponsored items are labelled 'ప్రాయోజిత కథనం' and never written as news. Headline: up to 12 words: old price -> new price + కే + platform; or saving 'రూ.[సంఖ్య] వరకు' with the condition word (బ్యాంక్ కార్డు, ఎక్స్ఛేంజ్) in the headline; round-ups: price ceiling + count + ఇవే. Lede (25-45 words): product variant, platform, current price, base price, saving. Subheads: 'ధర, ఆఫర్లు' (base price, flat cut, bank offer with its cap, exchange 'వరకు'); 'ఎలా పొందాలి' (eligibility, cities, dates); 'ముఖ్య ఫీచర్లు' (attributed). Round-ups use identical blocks; a % only if the source gives it; a limitation only if the source states one. Length: up to 380 words; round-ups 750. One evaluative word at most; 'భారీ' only when the source states an unconditional cut of 20% or more. Never double-count bundles, call bundled items 'ఉచితం', invent urgency, claim 'lowest ever' unattributed, or run expired deals. Close with how to check, then the disclaimer, dated from the source or SOURCE_DATE (never TODAY).",
+   "headline_examples_te": [
+    "[సేల్]లో రూ.[సంఖ్య] [ఫోన్] రూ.[సంఖ్య]కే",
+    "[సేల్]లో [ఫోన్]పై రూ.[సంఖ్య] వరకు ఆదా.. బ్యాంక్ కార్డు, ఎక్స్ఛేంజ్ కలిపితే",
+    "రూ.[సంఖ్య] లోపు [సంఖ్య] 5జీ ఫోన్లు ఇవే.. [సేల్]లో ఆఫర్ ధరలు"
+   ],
+   "words_min": 150,
+   "words_max": 750,
+   "headline_max_chars": 95,
+   "devices": [
+    "number_contrast",
+    "withheld_answer",
+    "reveal_list",
+    "deadline_hook"
+   ],
+   "disclaimer_te": "గమనిక: పై ధరలు, ఆఫర్లు [తేదీ] [సమయం] నాటివి. విక్రేత వీటిని ఎప్పుడైనా మార్చవచ్చు. కొనే ముందు తాజా ధర, బ్యాంక్ ఆఫర్ షరతులు సరిచూసుకోండి."
+  },
+  {
+   "key": "devotional_festival",
+   "label_te": "భక్తి / పండుగలు",
+   "label_en": "Devotional & festivals",
+   "detect_hints": [
+    "ఆలయం",
+    "తిరుమల",
+    "శ్రీవారి",
+    "బ్రహ్మోత్సవాలు",
+    "దర్శనం",
+    "పూజా విధానం",
+    "పండుగ",
+    "ముహూర్తం",
+    "నిమజ్జనం"
+   ],
+   "guide": "Headline: up to 10 words. A service fact with its number (wait hours, date, deadline, ticket price); event + deity + seva or vahanam; festival + year: date, muhurtham and what the piece covers; or an 'ఎందుకు?' explainer whose body gives the traditional answer. Lede: the service number with an as-of time; or occasion, temple, day, seva and who led it; or the date and tithi window from the source. Then attributed figures; 1-3 sentences of significance framed as belief (పురాణాల ప్రకారం, భక్తులు విశ్వసిస్తారు); arrangements and fake-ticket warnings; what's next. Length: up to 300 words; bulletins 150; guides 550 with numbered subheads. Respectful and calm, with equal respect for every faith. Never: curse or dosha threats; promised boons, wealth or cures; miracles as fact; devotees' caste; comparisons between faiths; muhurthams we computed; booking URLs the source doesn't give. Guides close with a line that customs vary, then the disclaimer.",
+   "headline_examples_te": [
+    "[ఆలయం] సర్వదర్శనానికి [సంఖ్య] గంటలు.. [ప్రదేశం] వరకు క్యూలైన్",
+    "[ఊరు]లో [తేదీ]న [వాహనం]పై [దేవుడు] విహారం",
+    "[ఆచారం] ఎందుకు పాటిస్తారు? సంప్రదాయం చెప్పే కారణం ఇదే"
+   ],
+   "words_min": 80,
+   "words_max": 550,
+   "headline_max_chars": 85,
+   "devices": [
+    "withheld_answer",
+    "answered_question",
+    "reveal_list",
+    "number_contrast",
+    "myth_check"
+   ],
+   "disclaimer_te": "గమనిక: ఇందులోని అంశాలు సంప్రదాయ విశ్వాసాల ఆధారంగా ఇచ్చినవి."
+  },
+  {
+   "key": "astrology",
+   "label_te": "జ్యోతిష్యం",
+   "label_en": "Astrology, vastu & panchangam",
+   "detect_hints": [
+    "రాశిఫలాలు",
+    "రాశి",
+    "జ్యోతిష్యం",
+    "వాస్తు",
+    "పంచాంగం",
+    "సంచారం",
+    "వక్రగతి",
+    "యోగం",
+    "స్వప్న శాస్త్రం",
+    "Horoscope"
+   ],
+   "guide": "Headline: up to 12 words. A dated roundup with a split verdict; planet + movement + dates .. N signs + one life area; or a habit or dream topic + the tradition's answer. The count in the headline equals the signs covered. Write predictions only from our astrologer's material, and cover in each sign block only what it says; never add a positive line or a caution to balance it. Lede (20-35 words): the period or event with date, the signs favoured and the signs cautioned, framed once as astrology. Sign blocks in zodiac order with a text label, 30-55 words each: work, money, family. Health lines only about rest and routine (విశ్రాంతికి ప్రాధాన్యం ఇవ్వండి): no body part, illness, surgery or medicine. Length: up to 450 words; 12-sign roundups 700. Hedge (అవకాశం ఉంది, సూచనలు). Never: guarantees (ఖాయం, పక్కా, 100 శాతం); wealth showers; fear (గండం); investment calls; products; predictions about named people, parties, markets or companies; stigma by birth or sign. Close with a practical line, then the disclaimer.",
+   "headline_examples_te": [
+    "[తేదీ] రాశిఫలాలు: [సంఖ్య] రాశులకు అనుకూలం.. [రాశి] వారు ఖర్చుల విషయంలో జాగ్రత్త",
+    "[తేదీ] నుంచి [సంఖ్య] రోజులు [గ్రహం] వక్రగతి.. ఈ [సంఖ్య] రాశులకు ఉద్యోగంలో అనుకూలం",
+    "కలలో [దృశ్యం] కనిపిస్తే స్వప్న శాస్త్రం చెప్పే అర్థం ఇదే"
+   ],
+   "words_min": 80,
+   "words_max": 700,
+   "headline_max_chars": 90,
+   "devices": [
+    "reveal_list",
+    "reader_stakes",
+    "answered_question"
+   ],
+   "disclaimer_te": "గమనిక: ఈ కథనంలోని అంశాలు జ్యోతిష్య శాస్త్రం, సంప్రదాయ నమ్మకాల ఆధారంగా ఇచ్చినవి. వీటికి శాస్త్రీయ నిర్ధారణ లేదు. ఆరోగ్యం, డబ్బు, చట్టపరమైన విషయాల్లో నిర్ణయాలకు సంబంధిత నిపుణులను సంప్రదించండి."
+  },
+  {
+   "key": "human_interest_viral",
+   "label_te": "వైరల్ / మానవీయ కథనాలు",
+   "label_en": "Human interest & viral",
+   "detect_hints": [
+    "వైరల్",
+    "వింత",
+    "కాపాడిన",
+    "స్ఫూర్తి",
+    "ప్రయాణం",
+    "నెటిజన్లు",
+    "Viral",
+    "GK"
+   ],
+   "guide": "Headline: up to 11 words. The remarkable fact with a number; a from-to arc; an action chain (…వెళ్తే.. outcome); an irony; or a reveal stated in the headline. Lede (25-45 words): who (descriptor, adult's name), did what, where, when, and how we know it. A clip alone is not enough when it shows an accident, violence, a crime, a death or distress, or makes a claim about a named person: flag it in editor_note. For other clips, sentence 1 or 2 says 'ఈ వీడియో ఎక్కడ, ఎప్పుడు తీసినదో ధ్రువీకరణ కాలేదు', and private people in it stay unnamed unless quoted on record. Then events in time order, a quote if the source has one, why it is unusual, the response, and reach as stated. Close on current status. Length: up to 350 words (clips 200, profiles 500). Let facts carry the emotion. Never: slang, '-ట' hearsay, old clips as new, mocking private people, glorifying stunts. Print an appeal's account or UPI ID only if police, a hospital or an official verified it.",
+   "headline_examples_te": [
+    "[సంఖ్య] రోజుల్లో [సంఖ్య] గ్రామాల్లో [సంఖ్య] వేల మొక్కలు నాటిన [జిల్లా] యువకుడు",
+    "కూలి పనుల నుంచి [కంపెనీ] ఇంజినీర్ వరకు.. [ఊరు] యువతి ప్రయాణం",
+    "పొలంలో గుంత తవ్వుతుంటే.. [సంఖ్య] ఏళ్ల నాటి రాతి విగ్రహం బయటపడింది"
+   ],
+   "words_min": 80,
+   "words_max": 500,
+   "headline_max_chars": 90,
+   "devices": [
+    "discovery_reveal",
+    "then_now_arc",
+    "irony_contrast",
+    "number_contrast",
+    "withheld_identity",
+    "quote_hook"
+   ],
+   "disclaimer_te": ""
+  },
+  {
+   "key": "local_district",
+   "label_te": "జిల్లా వార్తలు",
+   "label_en": "Local & district",
+   "detect_hints": [
+    "మండలం",
+    "గ్రామం",
+    "ధర్నా",
+    "వినతిపత్రం",
+    "గ్రామస్తులు",
+    "సర్పంచ్",
+    "తహసీల్దార్",
+    "కలెక్టరేట్",
+    "తాగునీరు",
+    "రోడ్డు",
+    "జయంతి",
+    "వర్ధంతి"
+   ],
+   "guide": "Headline: up to 10 words. Place + concrete problem or decision + one detail (a count, rupees, years waited); protest + the demand; a service notice (what, where, when); or an honest question answered in P1. Name the place in Telugu, never 'ఆ ఊరిలో'. Lede (25-45 words): village or ward with mandal and district as the source gives them, who, what changed or went wrong, when, and why, attributed. Then specifics by landmark and number; the residents' complaint; the office's response, or 'స్పందన రావాల్సి ఉంది' only if the source says so; context; what next (deadline, assurance, timings, diversion). Length: up to 250 words; notices and ceremonies 150. Neighbourly, plain Telugu: వినతిపత్రం అందజేశారు, ధర్నా, రాస్తారోకో, హామీ ఇచ్చారు. No 'ఘనంగా' ceremony headlines, sermons, press-note honorifics or attendee rolls (3-4 names at most). Never state allegations against identifiable local figures as fact. Children in complaint stories stay unnamed.",
+   "headline_examples_te": [
+    "[ఊరు] పాఠశాలలో ఆరుబయటే [సంఖ్య] మంది విద్యార్థుల పాఠాలు",
+    "[సంఖ్య] ఏళ్లు, రూ.[సంఖ్య] కోట్లు.. అయినా [ఊరు] డ్రైనేజీ పనులు సగమే",
+    "[ఊరు]లో [తేదీ]న విద్యుత్ సరఫరా నిలిపివేత.. ప్రభావిత ప్రాంతాలు, వేళలు ఇవే"
+   ],
+   "words_min": 75,
+   "words_max": 250,
+   "headline_max_chars": 80,
+   "devices": [
+    "two_beat_turn",
+    "number_contrast",
+    "time_gap",
+    "reveal_list",
+    "answered_question"
+   ],
+   "disclaimer_te": ""
+  },
+  {
+   "key": "accident_disaster",
+   "label_te": "ప్రమాదాలు / విపత్తులు",
+   "label_en": "Accidents & disasters",
+   "detect_hints": [
+    "ప్రమాదం",
+    "ఢీకొని",
+    "దుర్మరణం",
+    "అగ్నిప్రమాదం",
+    "గల్లంతు",
+    "బోల్తా",
+    "సజీవ దహనం",
+    "కుప్పకూలిన"
+   ],
+   "guide": "Headline: up to 11 words, no gap: place + mechanism + toll, optionally after 'విషాదం..' or 'ఘోర ప్రమాదం..'. Allowed hooks: purpose-then-outcome from the source, a near-miss stated in full, a verified cause, a rescue with its count, an AP/TS victim in a distant event. Lede: place as precisely as the source gives it, day and time as the source gives them, the mechanism, and each figure the source gives for dead, injured and missing, separately and attributed; never state zero or infer a figure the source omits. Sentence 2 says who the victims were. Then the sequence; names as released (adults only: పేరు (వయసు), ఊరు); hospital and condition; the official response with amounts; cause status always with its source ('…వల్ల ప్రమాదం జరిగి ఉండవచ్చని పోలీసులు ప్రాథమికంగా భావిస్తున్నారు'). Close on the investigation or search status only when the source states it; else on the last stated fact. Length: up to 250 words; major events 450. Sober and exact: మృతి, గాయపడ్డారు, గల్లంతు. Never: puns, gore, fault in our voice, the missing counted as dead, suicides or attacks filed as accidents.",
+   "headline_examples_te": [
+    "[ఊరు] వద్ద జాతీయ రహదారిపై బస్సు, లారీ ఢీకొని [సంఖ్య] మంది మృతి",
+    "[ఊరు]కు చెందిన [సంఖ్య] మంది కూలీలు మృతి.. పనులకు వెళ్తుండగా [వాహనం] బోల్తా",
+    "[పట్టణం] గోదాంలో అగ్నిప్రమాదం.. [సంఖ్య] మంది కార్మికులు సురక్షితం"
+   ],
+   "words_min": 80,
+   "words_max": 450,
+   "headline_max_chars": 90,
+   "devices": [
+    "sober_label",
+    "two_beat_turn"
+   ],
+   "disclaimer_te": ""
+  },
+  {
+   "key": "weather",
+   "label_te": "వాతావరణం",
+   "label_en": "Weather",
+   "detect_hints": [
+    "వర్షం",
+    "వాయుగుండం",
+    "అల్పపీడనం",
+    "తుఫాను",
+    "ఐఎండీ",
+    "అలర్ట్",
+    "ఉష్ణోగ్రత",
+    "వరద",
+    "ద్రోణి",
+    "Weather"
+   ],
+   "guide": "Headline: up to 11 words. System -> named districts + time window; a measured number + station; an official alert colour + districts + end date; or a service consequence (holiday, control room). Use the agency's exact rung on the system ladder and its intensity word; forecasts say సూచన or అంచనా. Lede (20-40 words): where, when, how bad, and who says so (IMD, met centre, disaster management authority). Sentence 2: the cause, hedged. Then day-by-day or region-by-region paragraphs, AP and TS kept separate; numbers (మి.మీ., °C, km/h, alert level by district); attributed advisories; official action and helplines exactly as given. Close on the next bulletin or expected relief. Length: up to 300 words; briefs 130; cyclones 450. Voice: a calm duty officer. Never upgrade the category (a low is not a తుఫాను), the spread or the certainty; never invent a landfall or a cyclone name. No 'కుమ్మేయనున్న', no '!'. sober_label only when people died or are missing.",
+   "headline_examples_te": [
+    "బంగాళాఖాతంలో వాయుగుండం.. [జిల్లా], [జిల్లా] జిల్లాల్లో [సంఖ్య] రోజులు భారీ వర్ష సూచన",
+    "[ఊరు]లో [సంఖ్య] మి.మీ. కుండపోత.. నీట మునిగిన [సంఖ్య] కాలనీలు",
+    "భారీ వర్ష సూచనతో [జిల్లా]లో [తేదీ]న విద్యాసంస్థలకు సెలవు"
+   ],
+   "words_min": 60,
+   "words_max": 450,
+   "headline_max_chars": 90,
+   "devices": [
+    "two_beat_turn",
+    "reveal_list",
+    "myth_check",
+    "sober_label"
+   ],
+   "disclaimer_te": ""
+  },
+  {
+   "key": "international",
+   "label_te": "అంతర్జాతీయం",
+   "label_en": "International",
+   "detect_hints": [
+    "అమెరికా",
+    "చైనా",
+    "పాకిస్తాన్",
+    "పాకిస్థాన్",
+    "ఇజ్రాయెల్",
+    "ఇరాన్",
+    "వీసా",
+    "ఐక్యరాజ్యసమితి",
+    "అధ్యక్షుడు",
+    "ప్రవాస భారతీయులు",
+    "యుద్ధం"
+   ],
+   "guide": "Headline: up to 11 words. Event .. India/Telugu impact with a number; ‘quote’: [పదవి] [నాయకుడు]; number-led hard news naming the claimant of any one-sided figure; or an advisory for Indians abroad. Keep each verb's legal force: a power to impose is not 'imposed', a proposal is not 'scrapped'. Lede (20-40 words): actor, verb, country or city, day, source. Sentence 2: the number or the India angle. Then specifics; the India/Telugu angle by P3 if the source has one; background in 2-3 sentences with jargon glossed; reactions, with the other side for every conflict claim. Close on the next step or what is unconfirmed. Length: up to 350 words; major conflicts 450. Measured and neutral. No జోస్యం, 'మూడో ప్రపంచ యుద్ధం', 'బాంబుల వర్షం', slang about deaths, or country nicknames (డ్రాగన్, దాయాది). Wire-only claims: 'అంతర్జాతీయ వార్తా సంస్థల సమాచారం ప్రకారం' plus 'స్వతంత్రంగా ధ్రువీకరించలేదు'. Keep foreign currency as given. Never name a foreign media outlet or print an accused person's religion.",
+   "headline_examples_te": [
+    "[దేశం] కొత్త వీసా రుసుము.. [సంఖ్య] వేల మంది భారతీయ ఐటీ ఉద్యోగులపై భారం",
+    "‘[సంస్థ] ప్రమేయం తేలితే గట్టి జవాబు’: [దేశం] అధ్యక్షుడు [నాయకుడు]",
+    "[నగరం]పై డ్రోన్ దాడులు.. కనీసం [సంఖ్య] మంది పౌరులు మృతి: [అధికారి]"
+   ],
+   "words_min": 110,
+   "words_max": 450,
+   "headline_max_chars": 95,
+   "devices": [
+    "two_beat_turn",
+    "quote_hook",
+    "reader_stakes",
+    "answered_question",
+    "myth_check"
+   ],
+   "disclaimer_te": ""
+  },
+  {
+   "key": "national",
+   "label_te": "జాతీయం",
+   "label_en": "National",
+   "detect_hints": [
+    "కేంద్రం",
+    "కేంద్ర మంత్రివర్గం",
+    "ప్రధాని",
+    "పార్లమెంట్",
+    "లోక్‌సభ",
+    "ఎన్నికల సంఘం",
+    "రైల్వే",
+    "ఢిల్లీ"
+   ],
+   "guide": "Headline: up to 12 words. Lead with the new national decision or event, putting the AP/TS link first when the source has one (a Telugu-state share, a route, an MP). Statements use ‘quote’: speaker; rows in Parliament or between institutions show both sides. Lede (20-40 words), with a '[నగరం]:' dateline when the source gives one: decision, body and date, with the Telugu-state share or person by sentence 2. Then specifics; practical impact as lists (closures, rules, dates); the institution's or party's response; background in one dated sentence; the next step. Length: up to 350 words; major decisions 450. Report the PM's and central events by their one new or actionable element, not the ritual. Praise appears only in attributed quotes. Security stories rely on official statements: an encounter account is the police version ('పోలీసుల కథనం ప్రకారం'), family or rights-group allegations go in with ఆరోపించారు, and never 'హతం' in our voice.",
+   "headline_examples_te": [
+    "[సంఖ్య] కొత్త రైల్వే లైన్లకు కేంద్రం ఆమోదం.. [జిల్లా] మీదుగా [సంఖ్య] కి.మీ. మార్గం",
+    "[అంశం]పై కేంద్రం కొత్త నిబంధనలు.. తెలుగు రాష్ట్రాల్లో [సంఖ్య] లక్షల మందిపై ప్రభావం",
+    "‘[కోట్]’: పార్లమెంట్‌లో [రాష్ట్రం] ఎంపీ [నాయకుడు]"
+   ],
+   "words_min": 100,
+   "words_max": 450,
+   "headline_max_chars": 95,
+   "devices": [
+    "two_beat_turn",
+    "quote_hook",
+    "reader_stakes",
+    "number_contrast"
+   ],
+   "disclaimer_te": ""
+  },
+  {
+   "key": "jobs_education",
+   "label_te": "ఉద్యోగాలు / విద్య",
+   "label_en": "Jobs & education",
+   "detect_hints": [
+    "ఉద్యోగాలు",
+    "పోస్టులు",
+    "నోటిఫికేషన్",
+    "దరఖాస్తు",
+    "పరీక్ష",
+    "ఫలితాలు",
+    "హాల్‌టికెట్",
+    "టెట్",
+    "ఆర్ఆర్‌బీ",
+    "అప్రెంటిస్",
+    "Recruitment",
+    "Jobs"
+   ],
+   "guide": "Headline: up to 11 words. Recruiter + exact count + post .. one decision fact (minimum qualification, pay 'వరకు', or last date); exam name + year: what was released + date; or a rule change, old -> new. Never call apprenticeships, training seats or contract posts 'ఉద్యోగాలు' or 'ప్రభుత్వ ఉద్యోగం'; never widen eligibility. Lede (25-45 words): authority (full name and acronym as the source gives them), count, post, qualification, application window with closing date. Then the AP/TS share; a labelled vacancy break-up; eligibility and age as of the cut-off date; selection and exam pattern; pay or stipend; fee; a 'ముఖ్యమైన తేదీలు' block; application steps and the website only as the notification gives them, with fee payment only on the official portal. Close by telling readers to check the full notification. Length: up to 550 words; results, admit cards and schedules 220. Calm service voice: దరఖాస్తు, చివరి తేదీ, అర్హత. No 'గోల్డెన్ ఛాన్స్' or 'పక్కా', no unsupported urgency, no plans stated as notifications, no private recruiter numbers, no leaked questions.",
+   "headline_examples_te": [
+    "[కంపెనీ]లో [సంఖ్య] [పోస్టు] పోస్టులు.. [అర్హత] అర్హతతో [తేదీ] వరకు దరఖాస్తులు",
+    "[పరీక్ష] [సంవత్సరం]: షెడ్యూల్ విడుదల, [తేదీ] నుంచి కంప్యూటర్ ఆధారిత పరీక్షలు",
+    "[పోస్టుల] గరిష్ఠ వయోపరిమితి [సంఖ్య] నుంచి [సంఖ్య] ఏళ్లకు పెంపు.. ఎవరికి వర్తిస్తుందంటే?"
+   ],
+   "words_min": 85,
+   "words_max": 550,
+   "headline_max_chars": 90,
+   "devices": [
+    "deadline_hook",
+    "withheld_answer",
+    "reveal_list",
+    "reader_stakes",
+    "then_now_arc"
+   ],
+   "disclaimer_te": ""
+  },
+  {
+   "key": "editorial_opinion",
+   "label_te": "సంపాదకీయం / అభిప్రాయం",
+   "label_en": "Editorial & opinion",
+   "detect_hints": [
+    "సంపాదకీయం",
+    "విశ్లేషణ",
+    "అభిప్రాయం",
+    "వ్యాసం",
+    "వ్యంగ్యం",
+    "Story Board",
+    "ఎడిటోరియల్"
+   ],
+   "guide": "Write only from an EDITOR_BRIEF stating our position and prescriptions; never choose a position yourself. If the source is someone else's signed column or editorial, refuse with refusal_reason 'opinion_source'. Headline: 2-7 words: a verdict or warning; a claim-vs-record gap; an accountability question naming the documented gap; or 'X కాదు.. Y'. No '!' (satire labelled 'వ్యంగ్యం:' may use one). Never imply theft or misuse that no audit, court or official has found. Lede (40-70 words): the peg, the stake for AP/TS readers with one sourced fact, and the brief's thesis by the end of P1. Then context; 2-3 evidence paragraphs, each with a named source (report, Act section, GO, budget line, dated precedent); one paragraph with the other side's best argument; consequences in source numbers; the brief's prescriptions naming who must act; a short close echoing the headline. Length: up to 750 words in 6-9 paragraphs; columns 1,100 with Telugu subheads. Same tests for every party. No name-calling (వెన్నుపోటు, పనికిమాలిన), hagiography, allegations as fact, unsourced percentages, or words invented for living people. No EDITOR_BRIEF and not a signed column: write it as news for its desk, every view attributed, no position of ours.",
+   "headline_examples_te": [
+    "[జిల్లా] సాగునీటికి గండం",
+    "రూ.[సంఖ్య] కోట్లు కేటాయించి.. విడుదల రూ.[సంఖ్య] కోట్లే",
+    "జరిమానాలు కాదు.. రైతుకు భరోసా కావాలి"
+   ],
+   "words_min": 150,
+   "words_max": 1100,
+   "headline_max_chars": 60,
+   "devices": [
+    "number_contrast",
+    "irony_contrast",
+    "answered_question",
+    "redirect"
+   ],
+   "disclaimer_te": ""
+  },
+  {
+   "key": "court_legal",
+   "label_te": "కోర్టు / న్యాయం",
+   "label_en": "Court & legal",
+   "detect_hints": [
+    "హైకోర్టు",
+    "సుప్రీంకోర్టు",
+    "పిటిషన్",
+    "తీర్పు",
+    "బెయిల్",
+    "స్టే",
+    "ధర్మాసనం",
+    "విచారణ వాయిదా",
+    "కోర్టు ధిక్కరణ"
+   ],
+   "guide": "Headline: up to 11 words. Court + party + operative verb at the exact stage (కొట్టివేత, స్టే, బెయిల్, నోటీసులు, తీర్పు రిజర్వ్) .. consequence; the ruling as plain law with its condition; ‘directive’: [కోర్టు] with the deadline; or a split outcome ('నిరాకరణ.. కానీ'). A petition headline attributes the demand to the petitioner. Never ask about a pending outcome. Lede (30-55 words): court, verb, party, subject, date; the consequence or deadline by sentence 2; the ground by sentence 3. Then the grounds with Act, section or GO; both sides' arguments; dated background; the next hearing and who must comply. Length: up to 320 words; landmark rulings 450; procedural items 160. Sober and exact; the court is a neuter subject (ఆదేశించింది, పేర్కొంది). Keep orders, observations and the parties' claims apart. Never: 'కీలక ఆదేశాలు' without the order, predicting outcomes, imputing motives to judges, 'దోషి' before conviction, or one ruling sold as a rule for everyone. Rights explainers end with the legal disclaimer line.",
+   "headline_examples_te": [
+    "[అంశం]పై [నాయకుడు] పిటిషన్‌ను కొట్టివేసిన హైకోర్టు",
+    "‘[సంఖ్య] వారాల్లోగా [చర్య] పూర్తి చేయండి’: [జిల్లా] అధికారులకు హైకోర్టు ఆదేశం",
+    "[అంశం]పై స్టేకు సుప్రీంకోర్టు నిరాకరణ.. కానీ [మంత్రిత్వ శాఖ]కు [సంఖ్య] వారాల గడువు"
+   ],
+   "words_min": 85,
+   "words_max": 450,
+   "headline_max_chars": 90,
+   "devices": [
+    "two_beat_turn",
+    "quote_hook",
+    "answered_question",
+    "withheld_answer",
+    "time_gap"
+   ],
+   "disclaimer_te": ""
+  },
+  {
+   "key": "science_space",
+   "label_te": "సైన్స్ / అంతరిక్షం",
+   "label_en": "Science & space",
+   "detect_hints": [
+    "ఇస్రో",
+    "నాసా",
+    "రాకెట్",
+    "ఉపగ్రహం",
+    "అంతరిక్షం",
+    "శాస్త్రవేత్తలు",
+    "అధ్యయనం",
+    "కొత్త జాతి",
+    "గ్రహణం",
+    "గ్రహశకలం"
+   ],
+   "guide": "Headline: up to 11 words. A number-anchored finding with unit and timeframe; global event .. AP/TS/Indian connection at its real size; mission outcome .. caveat; first-in-N-years with the source's scope; or sky-watch service (when, where, how to see it from our cities). Lede (25-50 words): what was found or launched, who, where, when ('భారత కాలమానం ప్రకారం' for launches and sky events), and a stage-of-evidence verb (గుర్తించారు, అంచనా వేశారు, ప్రయోగశాలలో పరీక్షించారు). Then the journal or agency and key numbers; one sentence defining the essential term, with no names, numbers or dates from memory; why it matters locally if the source says; limits and stage; context. Close on the next step or the open question. Length: up to 450 words; explainers 650. Voice: a curious science teacher: ఉపగ్రహం, కక్ష్య, ప్రయోగం, వ్యోమగామి, గ్రహశకలం. Never: plans as achievements, fear framing for asteroids or climate, astrology in astronomy, cures from lab results, jingoism. Rare species' locations at district level only.",
+   "headline_examples_te": [
+    "హిమానీనదాల్లో [సంఖ్య] ఏళ్లలో [సంఖ్య] శాతం మంచు కరిగినట్లు ఉపగ్రహ అధ్యయనంలో వెల్లడి",
+    "నింగిలోకి [సంఖ్య] ఉపగ్రహాలు.. వాటిలో [సంఖ్య] [ఊరు] [కంపెనీ] తయారీవే",
+    "[తేదీ] రాత్రి పడమటి ఆకాశంలో చంద్రుడి పక్కనే [గ్రహం].. [ఊరు]లో ఎప్పుడు చూడవచ్చంటే?"
+   ],
+   "words_min": 170,
+   "words_max": 650,
+   "headline_max_chars": 85,
+   "devices": [
+    "number_contrast",
+    "two_beat_turn",
+    "time_gap",
+    "answered_question",
+    "myth_check"
+   ],
+   "disclaimer_te": ""
+  },
+  {
+   "key": "agriculture",
+   "label_te": "వ్యవసాయం",
+   "label_en": "Agriculture",
+   "detect_hints": [
+    "రైతులు",
+    "పంట",
+    "మద్దతు ధర",
+    "సాగు",
+    "ఎకరాలు",
+    "క్వింటాల్",
+    "ఖరీఫ్",
+    "రబీ",
+    "యాసంగి",
+    "కేవీకే",
+    "ఉద్యాన"
+   ],
+   "guide": "Headline: up to 11 words. Impact number + crop + place; cause .. effect on a named group of farmers (projections stay అంచనా); benefit + 'ఏ పంటకు ఎంతంటే?'; a national decision localised to the AP/TS share; or an attributed demand with its deadline. Lede (25-50 words): which crop and which farmers (exact scope), what changed, how much with the unit (క్వింటాల్‌కు, ఎకరాకు), when (season and date), and who decided or advised. Then crop by crop, old -> increase -> new as the source gives them; the attributed cause; local impact; a farmer's and an official's words where the source quotes them; what the farmer must do next. Length: up to 350 words; advisories and features 600. Plain, respectful and farmer-first. ఖరీఫ్/రబీ for AP, వానాకాలం/యాసంగి (రబీ) for TS; ఉద్యాన for horticulture. Never: 'గిఫ్ట్/బంపర్' for policy; income promises (కాసుల వర్షం, ATM); crop-switch advice; pesticide doses altered or invented; foreign trials implied to be local. Close on the deadline, the office or the enumeration step.",
+   "headline_examples_te": [
+    "[మండలం]లో ఈదురుగాలులకు [సంఖ్య] ఎకరాల్లో నేలవాలిన [పంట]",
+    "[పంట] సహా [సంఖ్య] రబీ పంటలకు మద్దతు ధర పెంపు.. ఏ పంటకు ఎంతంటే?",
+    "‘[తేదీ]లోగా [ప్రాజెక్టు] ఆయకట్టుకు నీరివ్వాలి, లేదంటే ధర్నా’: [నాయకుడు]"
+   ],
+   "words_min": 90,
+   "words_max": 600,
+   "headline_max_chars": 80,
+   "devices": [
+    "number_contrast",
+    "two_beat_turn",
+    "withheld_answer",
+    "deadline_hook",
+    "quote_hook"
+   ],
+   "disclaimer_te": ""
+  },
+  {
+   "key": "breaking",
+   "label_te": "తాజా వార్తలు",
+   "label_en": "Breaking / developing",
+   "detect_hints": [
+    "బ్రేకింగ్",
+    "తాజా సమాచారం",
+    "లైవ్",
+    "ప్రత్యక్ష ప్రసారం",
+    "Breaking",
+    "LIVE"
+   ],
+   "guide": "Headline: up to 11 words. Place + event verb .. the hardest confirmed number, or 'సురక్షితం' if the source says so. Updates lead with the changed fact ('[సంఖ్య]కు పెరిగిన మృతుల సంఖ్య'). No 'బ్రేకింగ్' label, no mood words (హైటెన్షన్, కలకలం), no '?', no '!'. A flash runs up to 150 words: a lede with what, where, when and the toll with its source ('ప్రాణనష్టం లేదని [అధికారి] తెలిపారు' only if the source says so; if the source is silent, say nothing about casualties); the response; one paragraph on what is confirmed and what is not yet known; reader impact (closures, diversions, helplines) only from the source; a status close. An update runs up to 350 words: a 'తాజా సమాచారం ([సమయం]):' top line using UPDATE_TIME (omit the time if absent), the new fact first, a one-clause recap, and what changed since the last version. Status verbs match the stage (detained ≠ arrested, recommendation ≠ dismissal). Apply the strictest confirmation threshold; a viral video is never confirmation.",
+   "headline_examples_te": [
+    "[ఊరు] ఆసుపత్రి అగ్నిప్రమాదంలో [సంఖ్య]కు పెరిగిన మృతుల సంఖ్య.. విచారణకు ఆదేశం",
+    "[నగరం]లో అర్ధరాత్రి వరకు మొబైల్ ఇంటర్నెట్ నిలిపివేత.. [సంఖ్య] మెట్రో స్టేషన్లు మూసివేత",
+    "[కేసు] కేసులో [తేదీ]న విచారణకు రావాలని [నాయకుడు]కు [సంస్థ] నోటీసులు"
+   ],
+   "words_min": 80,
+   "words_max": 350,
+   "headline_max_chars": 90,
+   "devices": [
+    "sober_label",
+    "two_beat_turn"
+   ],
+   "disclaimer_te": ""
+  },
+  {
+   "key": "explainer",
+   "label_te": "వివరణ కథనం",
+   "label_en": "Explainer",
+   "detect_hints": [
+    "ఎందుకు?",
+    "అంటే ఏమిటి",
+    "ఎలా?",
+    "ఏది నిజం",
+    "నిజమెంత",
+    "Explainer",
+    "పూర్తి వివరాలు"
+   ],
+   "guide": "Headline: up to 10 words. News peg + one answerable open question (ఎందుకు, ఎలా, ఏమిటి, ఎంత); 'what is inside .. impact on whom' with one '?' only; a service how-to naming the payoff; a myth-check with the verdict and who gave it in the same headline; or a number contrast + why. The body answers by P3. Lede (30-55 words): the peg, the question, and the short answer, or 'ఇంకా స్పష్టత రాలేదు' if the source says so. P2 defines the subject with 'అంటే' (general knowledge only without names, numbers or dates). P3: attributed, dated numbers with the source's own comparison. Then question subheads every 2-3 paragraphs: why or how it works, who is and isn't affected, what is not known, what happens next or what to do. Length: up to 800 words; typical 350-650. A patient teacher-reporter. Never: an 'Explainer:' label, worked examples with invented numbers, death-count projections, allegations as fact, diagnosing a named person's death, investment advice, invented URLs. Close on a practical takeaway or the next dated milestone.",
+   "headline_examples_te": [
+    "[వస్తువు] ధర [సంఖ్య] శాతం పెరిగింది.. కారణాలేమిటి?",
+    "[బిల్లు]లో ఏముంది.. [రాష్ట్రం] రైతులపై ప్రభావం ఎంత?",
+    "‘[తేదీ]లోగా [పత్రం] అప్‌డేట్ చేయకపోతే రద్దు’ సందేశం నిజం కాదు: [సంస్థ]"
+   ],
+   "words_min": 250,
+   "words_max": 800,
+   "headline_max_chars": 85,
+   "devices": [
+    "answered_question",
+    "myth_check",
+    "number_contrast",
+    "reveal_list",
+    "reader_stakes"
+   ],
+   "disclaimer_te": ""
+  },
+  {
+   "key": "obituary",
+   "label_te": "సంస్మరణ",
+   "label_en": "Obituary",
+   "detect_hints": [
+    "కన్నుమూత",
+    "కన్నుమూశారు",
+    "ఇక లేరు",
+    "అస్తమయం",
+    "అంత్యక్రియలు",
+    "పార్థివదేహం",
+    "సంతాపం"
+   ],
+   "guide": "Write only when the death is confirmed by family, the hospital, the person's party or organisation, or an official, named in the lede; a social-media post or another outlet's report alone is not confirmation, so refuse with 'unconfirmed_death'. If the death was by suicide or the deceased is a child, refuse. Headline: up to 10 words: '[పాత్ర/రంగం] [పేరు] కన్నుమూత' + one '..' detail the body proves (a career number, age, funeral); or circumstance + role + మృతి for sudden or on-duty deaths. No '!', no shock words, no tease about the cause; never phrase a relative's death as if the celebrity had died. Lede (25-50 words): full name as the source gives it, descriptor, age, కన్నుమూశారు; date, place, the confirmed cause, and who confirmed it. Then funeral arrangements as announced; up to 3 achievements the source gives; the life arc; 1-2 attributed reactions; survivors. Length: up to 300 words; major public figures 650; local notices 150. Formal and warm through specifics: పార్థివదేహం, అంత్యక్రియలు, ప్రభుత్వ లాంఛనాలతో. Controversy only late and attributed.",
+   "headline_examples_te": [
+    "సీనియర్ నటుడు [హీరో] కన్నుమూత.. [సంఖ్య]కు పైగా సినిమాల్లో నటన",
+    "మాజీ ఎమ్మెల్యే [నాయకుడు] కన్నుమూత.. [తేదీ]న [ఊరు]లో అంత్యక్రియలు",
+    "‘[సినిమా]’ దర్శకుడు [పేరు] కన్నుమూత"
+   ],
+   "words_min": 80,
+   "words_max": 650,
+   "headline_max_chars": 80,
+   "devices": [
+    "sober_label",
+    "then_now_arc"
+   ],
+   "disclaimer_te": ""
+  },
+  {
+   "key": "interview",
+   "label_te": "ఇంటర్వ్యూ",
+   "label_en": "Interview & statements",
+   "detect_hints": [
+    "ఇంటర్వ్యూ",
+    "పాడ్‌కాస్ట్",
+    "మనసులో మాట",
+    "ఏమన్నారంటే",
+    "మాట్లాడుతూ",
+    "స్పష్టత ఇచ్చిన"
+   ],
+   "guide": "Headline: up to 12 words. ‘exact words’: [పేరు]; a quote teaser .. topic + speaker (two segments at most); a rumour answered on record, under rumour_status; or a first-person turning point inside ‘ ’ + role and name. No 'షాకింగ్ కామెంట్స్' or 'సంచలన వ్యాఖ్యలు' tails, no 'ఎక్స్‌క్లూజివ్' on a pickup. Lede (30-60 words): who (role and best-known work, as the source gives them), the core statement in reported speech, the generic platform (ఓ ఇంటర్వ్యూలో, ఓ పాడ్‌కాస్ట్‌లో), when, and why now. P2 pays off the headline with a 1-3 sentence direct quote. Then context; a second strand; if a named third party is accused, their side; close on the speaker's forward-looking line. Pickups: up to 350 words with up to 4 quotes, under a quarter of the body; our own Q&As up to 1,000. The narrator stays neutral and narrates in Telugu. Repeated allegations stay 'ఆరోపించారు'; old clips say 'గతంలో'. Never use a trauma disclosure as the hook, or pick a line attacking a caste, religion, gender or community.",
+   "headline_examples_te": [
+    "‘[సినిమా] నా కెరీర్‌నే మలుపు తిప్పింది’: [హీరో]",
+    "‘[సినిమా]’ సీక్వెల్‌పై [దర్శకుడు] స్పష్టత.. [తేదీ]లో చిత్రీకరణ",
+    "‘అప్పు చేసి తొలి సినిమా తీశాను’: నిర్మాత [పేరు]"
+   ],
+   "words_min": 200,
+   "words_max": 1000,
+   "headline_max_chars": 95,
+   "devices": [
+    "quote_hook",
+    "rumour_status",
+    "then_now_arc",
+    "answered_question"
+   ],
+   "disclaimer_te": ""
+  }
+ ],
+ "language_rules": [
+  "ZWNJ (U+200C) goes only where a stem ending in a visible halant (a loanword, name or acronym: హైదరాబాద్, కేటీఆర్, ఫోన్) meets a following suffix or word part that starts with a consonant: హైదరాబాద్‌లో, కేటీఆర్‌కు, స్మార్ట్‌ఫోన్. Never inside a native conjunct (అమ్మ, ప్రభుత్వం) or after a letter without ్. Collapse runs to one; strip U+200B, U+206C/U+206D and literal nbsp/zwj/rsquo residue. A word-final ZWNJ after ్ is harmless; the cleaner strips it.",
+  "Attach case suffixes directly to loanwords, names, acronyms and numbers ([సంవత్సరం]లో, యూపీఐకి). Pick the dative by sound: -కి after a final ఇ/ఈ/ఐ/ఎ sound (20కి, 50కి, 1,000కి, కంపెనీకి, ఢిల్లీకి), -కు after everything else (25కు, 100కు, 600కు, హైదరాబాద్‌కు). '[సంఖ్య]కు' in examples is a slot, not a fixed suffix.",
+  "Acronyms in Telugu script with long vowels: సీఎం, బీజేపీ, టీడీపీ, బీఆర్ఎస్, వైసీపీ, ఎంపీ, ఐటీ, జీఎస్టీ; never a Telugu suffix on a Latin acronym. In the body, write ఆంధ్రప్రదేశ్ and ముఖ్యమంత్రి on first mention, then ఏపీ and సీఎం; always write తెలంగాణ in full.",
+  "Majority spellings: ళ్ల not ళ్ళ (మళ్లీ, ఏళ్లు); తర్వాత; నుంచి; చేశారు; ఢిల్లీ; హైకోర్టు; సుప్రీంకోర్టు; ఆసుపత్రి; తుఫాను; ధ్రువీకరణ; గరిష్ఠ. Months: జనవరి, ఫిబ్రవరి, మార్చి, ఏప్రిల్, మే, జూన్, జూలై, ఆగస్టు, సెప్టెంబర్, అక్టోబర్, నవంబర్, డిసెంబర్.",
+  "Money: రూ. directly before the digits (రూ.500). Lakh and above as digit + word (రూ.1.35 లక్షలు, రూ.[సంఖ్య] కోట్లు), with the oblique before a noun (రూ.5 కోట్ల నిధులు, రూ.2 లక్షల విలువైన). Exactly one is singular: రూ.లక్ష, రూ.కోటి, never రూ.1 లక్షలు. Indian commas below a lakh (రూ.75,000). No ₹, Rs, రు., or 'కోట్ల రూపాయలు' after a digit. Foreign amounts stay in their own currency (డాలర్లు).",
+  "Percentages: '[సంఖ్య] శాతం' in prose; % only in figure lists or a tight headline.",
+  "People: 1-7 in words (ఒకరు, ఇద్దరు, ముగ్గురు, నలుగురు, ఐదుగురు, ఆరుగురు, ఏడుగురు), with obliques ఇద్దరి, ముగ్గురి, ఐదుగురికి (ముగ్గురి అరెస్ట్); 8 and up as digit + మంది (8 మంది, 12 మందికి); never ఎనిమిదిగురు. When an example's '[సంఖ్య] మంది' is 1-7, use the word form. Western digits only; ordinals as digit + వ.",
+  "Times: day-part + hour + గంటలకు, minutes after a colon (ఉదయం 10 గంటలకు, రాత్రి 7:30 గంటలకు). No AM, PM or IST; for events abroad, launches and sky events write 'భారత కాలమానం ప్రకారం' before the time.",
+  "No translationese: no clause-joining మరియు, no యొక్క, no -చేయబడింది passives, no 'చేయడం జరిగింది'. Use commas, '-తో పాటు', the oblique case and active verbs. Ongoing events take the present progressive (సహాయక చర్యలు కొనసాగుతున్నాయి), not -తుంది.",
+  "Use Telugu where it exists: విడుదల (not రిలీజ్), దర్శకుడు (not డైరెక్టర్), వ్యాఖ్యలు (not కామెంట్స్), నిబంధనలు (not రూల్స్), పథకం (not స్కీమ్), స్పష్టత (not క్లారిటీ), శుభవార్త (not గుడ్ న్యూస్), హెచ్చరిక (not వార్నింగ్), ఎదురుదెబ్బ (not షాక్), కేవలం (not జస్ట్), ఆసుపత్రి (not హాస్పిటల్), హత్య (not మర్డర్), ఫిర్యాదు (not కంప్లైంట్), ప్రేక్షకులు (not ఆడియన్స్), వసూళ్లు (not కలెక్షన్లు), వినియోగదారులు (not యూజర్లు/కస్టమర్లు), జాతీయ రహదారి (not హైవే), విద్యుత్ (not కరెంట్), విద్యుదాఘాతం (not కరెంట్ షాక్), ఉద్యాన (not హార్టికల్చర్). Keep naturalised loans: ఫోన్, పోలీసులు, కంపెనీ, మ్యాచ్, సెంచరీ, సినిమా, ఓటీటీ, and official alert colours (ఎల్లో/ఆరెంజ్/రెడ్ అలర్ట్).",
+  "Latin script only for brand, product and model names, spec units (GB, mAh, Hz) and at most one bracketed gloss of the main proper noun. Not counting units, digit tokens and brand or model names, stay under 1.5 Latin words per 100 body words in hard news, 3 in business and other soft types, 8 in tech and auto, 10 in deals.",
+  "Drop శ్రీ, శ్రీమతి and గారు only as honorific words around a person's name (శ్రీ [పేరు], [పేరు] గారు, [పేరు]గారు); never from names, places or deities (శ్రీనివాస్, శ్రీకాకుళం, శ్రీశైలం, శ్రీలంక, శ్రీవారి) or inside words (బంగారు, అడిగారు). Match designations to gender (నటి, దర్శకురాలు, అధ్యక్షురాలు, నిందితురాలు, యువతి); title nouns stay singular for one person (అధ్యక్షుడు, not అధ్యక్షులు); masculine placeholders are slots, not a gender.",
+  "Write standard forms (ఇళ్లు, ఏళ్లు, చేశారు, చూడవచ్చు, ఏమిటి). Telangana colloquial forms (ఇండ్లు, ఏండ్లు, మార్చిర్రు) and contractions (చేస్కోండి, చూడొచ్చు, ఏంటి) appear only inside verbatim quotes.",
+  "Punctuation: one space after . , ? and :, none before, except inside abbreviations (రూ.500, కి.మీ., మి.మీ., డా.). No '!' in the body outside quotes. Never '!!', '??', '?!', '....', semicolons or straight quotes. Use '..' in the body only after 'మాట్లాడుతూ' or 'ప్రకారం'.",
+  "Weather systems in IMD order: అల్పపీడనం → వాయుగుండం → తీవ్ర వాయుగుండం → తుఫాను → తీవ్ర తుఫాను → అతి తీవ్ర తుఫాను; name further rungs only as IMD does.",
+  "For names with no settled spelling (-ష్ vs -శ్ endings), keep the source's spelling and use it identically in headline and body.",
+  "Proofread aspirates and clusters: సంబంధించిన, దర్యాప్తు, దిగ్భ్రాంతి, వేధింపులు, బాధ్యత, ఘటన, రిజిస్ట్రేషన్, ప్రాథమిక, అధ్వాన్నం. Re-read every sentence after removing a name so no gap is left."
+ ],
+ "canonical_spellings": [
+  {
+   "variant": "సిఎం",
+   "canonical": "సీఎం",
+   "evidence": "samples 147 vs 2; top token సీఎం 2037"
+  },
+  {
+   "variant": "బిజెపి",
+   "canonical": "బీజేపీ",
+   "evidence": "samples 41 vs 5; tokens 917 vs <115"
+  },
+  {
+   "variant": "భాజపా",
+   "canonical": "బీజేపీ",
+   "evidence": "single-outlet house acronym, 2 vs 41"
+  },
+  {
+   "variant": "టిడిపి",
+   "canonical": "టీడీపీ",
+   "evidence": "samples 35 vs 2; tokens 541"
+  },
+  {
+   "variant": "తెదేపా",
+   "canonical": "టీడీపీ",
+   "evidence": "two outlets only, 5 vs 35"
+  },
+  {
+   "variant": "బిఆర్ఎస్",
+   "canonical": "బీఆర్ఎస్",
+   "evidence": "samples 53 vs 3; tokens 517"
+  },
+  {
+   "variant": "భారాస",
+   "canonical": "బీఆర్ఎస్",
+   "evidence": "single outlet, 4 vs 53"
+  },
+  {
+   "variant": "వైకాపా",
+   "canonical": "వైసీపీ",
+   "evidence": "single outlet, 2 vs 63"
+  },
+  {
+   "variant": "కెటిఆర్",
+   "canonical": "కేటీఆర్",
+   "evidence": "samples 26 vs 4; tokens 445"
+  },
+  {
+   "variant": "కెసిఆర్",
+   "canonical": "కేసీఆర్",
+   "evidence": "samples 34 vs 1; tokens 443"
+  },
+  {
+   "variant": "ఎంపి",
+   "canonical": "ఎంపీ",
+   "evidence": "whole word only (not ఎంపిక); 54 vs 4"
+  },
+  {
+   "variant": "ఐటి",
+   "canonical": "ఐటీ",
+   "evidence": "whole word only (not inside ఐటిఐ-type acronyms); 40 vs 3"
+  },
+  {
+   "variant": "జిఎస్టి",
+   "canonical": "జీఎస్టీ",
+   "evidence": "14 vs 1"
+  },
+  {
+   "variant": "డిజిపి",
+   "canonical": "డీజీపీ",
+   "evidence": "10 vs 1"
+  },
+  {
+   "variant": "ఎపి",
+   "canonical": "ఏపీ",
+   "evidence": "whole word only (ఎపిసోడ్ appears 36 times); 160 vs 3"
+  },
+  {
+   "variant": "మోడీ",
+   "canonical": "మోదీ",
+   "evidence": "samples 109 vs 29; tokens 778 vs 258"
+  },
+  {
+   "variant": "తరువాత",
+   "canonical": "తర్వాత",
+   "evidence": "tokens 6865 vs 653; samples 275 vs 28"
+  },
+  {
+   "variant": "నుండి",
+   "canonical": "నుంచి",
+   "evidence": "tokens 12993 vs 2135"
+  },
+  {
+   "variant": "మళ్ళీ",
+   "canonical": "మళ్లీ",
+   "evidence": "tokens 1395 vs 263; all ళ్ల-words 9104 vs 379"
+  },
+  {
+   "variant": "వాళ్ళు",
+   "canonical": "వాళ్లు",
+   "evidence": "tokens 404 vs 116"
+  },
+  {
+   "variant": "చేసారు",
+   "canonical": "చేశారు",
+   "evidence": "tokens 6712 vs 157"
+  },
+  {
+   "variant": "చూసారు",
+   "canonical": "చూశారు",
+   "evidence": "same -శారు pattern as చేశారు (6712 vs 157)"
+  },
+  {
+   "variant": "రాసారు",
+   "canonical": "రాశారు",
+   "evidence": "same -శారు pattern as చేశారు (6712 vs 157)"
+  },
+  {
+   "variant": "అక్టోబరు",
+   "canonical": "అక్టోబర్",
+   "evidence": "tokens 2415 vs 393"
+  },
+  {
+   "variant": "సెప్టెంబరు",
+   "canonical": "సెప్టెంబర్",
+   "evidence": "tokens 1676 vs 450"
+  },
+  {
+   "variant": "నవంబరు",
+   "canonical": "నవంబర్",
+   "evidence": "samples 34 vs 2"
+  },
+  {
+   "variant": "డిసెంబరు",
+   "canonical": "డిసెంబర్",
+   "evidence": "samples 19 vs 1"
+  },
+  {
+   "variant": "జులై",
+   "canonical": "జూలై",
+   "evidence": "tokens 303 vs <115"
+  },
+  {
+   "variant": "ఆగష్టు",
+   "canonical": "ఆగస్టు",
+   "evidence": "samples 23 vs 1"
+  },
+  {
+   "variant": "తెలంగాణా",
+   "canonical": "తెలంగాణ",
+   "evidence": "samples 247 vs 6; tokens 1754"
+  },
+  {
+   "variant": "దిల్లీ",
+   "canonical": "ఢిల్లీ",
+   "evidence": "samples 89 vs 16 (mostly one outlet)"
+  },
+  {
+   "variant": "ముంబయి",
+   "canonical": "ముంబై",
+   "evidence": "samples 39 vs 9"
+  },
+  {
+   "variant": "బెంగుళూరు",
+   "canonical": "బెంగళూరు",
+   "evidence": "samples 27 vs 4"
+  },
+  {
+   "variant": "హైకోర్ట్",
+   "canonical": "హైకోర్టు",
+   "evidence": "90 vs 2"
+  },
+  {
+   "variant": "హై కోర్టు",
+   "canonical": "హైకోర్టు",
+   "evidence": "127 vs 1 (one word)"
+  },
+  {
+   "variant": "సుప్రీం కోర్టు",
+   "canonical": "సుప్రీంకోర్టు",
+   "evidence": "115 vs 10 (one word)"
+  },
+  {
+   "variant": "కోర్ట్",
+   "canonical": "కోర్టు",
+   "evidence": "74 vs 15"
+  },
+  {
+   "variant": "కమీషనర్",
+   "canonical": "కమిషనర్",
+   "evidence": "54 vs 2"
+  },
+  {
+   "variant": "చార్జీలు",
+   "canonical": "ఛార్జీలు",
+   "evidence": "27 vs 3"
+  },
+  {
+   "variant": "ఆస్పత్రి",
+   "canonical": "ఆసుపత్రి",
+   "evidence": "samples 61 vs 31; prescribed in the vocabulary list"
+  },
+  {
+   "variant": "తుపాను",
+   "canonical": "తుఫాను",
+   "evidence": "తుఫాను/తుఫాన్ 27 vs తుపాను 7 in samples"
+  },
+  {
+   "variant": "తుఫాన్",
+   "canonical": "తుఫాను",
+   "evidence": "one guide form for the weather ladder; తుఫాను 13, తుఫాన్ 14"
+  },
+  {
+   "variant": "ఐరాస",
+   "canonical": "ఐక్యరాజ్యసమితి",
+   "evidence": "ఐక్యరాజ్య 13 vs ఐరాస 8; house acronyms (భాజపా, తెదేపా) are already expanded"
+  },
+  {
+   "variant": "ఇంజనీర్",
+   "canonical": "ఇంజినీర్",
+   "evidence": "samples 13 vs 4"
+  },
+  {
+   "variant": "గరిష్ట",
+   "canonical": "గరిష్ఠ",
+   "evidence": "17 vs 13; standard ష్ఠ form, used in the guide's own examples"
+  },
+  {
+   "variant": "గరిష్టంగా",
+   "canonical": "గరిష్ఠంగా",
+   "evidence": "as గరిష్ట"
+  },
+  {
+   "variant": "కనిష్ట",
+   "canonical": "కనిష్ఠ",
+   "evidence": "same ష్ఠ form as గరిష్ఠ"
+  },
+  {
+   "variant": "ధృవీకరణ",
+   "canonical": "ధ్రువీకరణ",
+   "evidence": "dictionary form from ధ్రువ; corpus split 10 vs 3, so prescriptive"
+  },
+  {
+   "variant": "ధృవీకరించారు",
+   "canonical": "ధ్రువీకరించారు",
+   "evidence": "as ధ్రువీకరణ"
+  },
+  {
+   "variant": "ధృవీకరించలేదు",
+   "canonical": "ధ్రువీకరించలేదు",
+   "evidence": "as ధ్రువీకరణ; the rewrite prompt's literal uses the variant, so canonicalize fixes its output"
+  },
+  {
+   "variant": "ధృవీకరించింది",
+   "canonical": "ధ్రువీకరించింది",
+   "evidence": "as ధ్రువీకరణ"
+  },
+  {
+   "variant": "దర్యాఫ్తు",
+   "canonical": "దర్యాప్తు",
+   "evidence": "misspelling; 28 vs 1"
+  },
+  {
+   "variant": "సంబందించిన",
+   "canonical": "సంబంధించిన",
+   "evidence": "aspirate error; 118 vs 4"
+  },
+  {
+   "variant": "దిగ్బ్రాంతి",
+   "canonical": "దిగ్భ్రాంతి",
+   "evidence": "aspirate error; 6 vs 3"
+  },
+  {
+   "variant": "వేదింపులు",
+   "canonical": "వేధింపులు",
+   "evidence": "aspirate error; 10 vs 1"
+  },
+  {
+   "variant": "ద్రవ్యోల్భణం",
+   "canonical": "ద్రవ్యోల్బణం",
+   "evidence": "misspelling; 6 vs 1"
+  },
+  {
+   "variant": "నిర్థారించారు",
+   "canonical": "నిర్ధారించారు",
+   "evidence": "misspelling; 5 vs 1"
+  },
+  {
+   "variant": "బాద్యతలు",
+   "canonical": "బాధ్యతలు",
+   "evidence": "aspirate error; the bare form never occurs uninflected"
+  },
+  {
+   "variant": "బాద్యతల",
+   "canonical": "బాధ్యతల",
+   "evidence": "aspirate error; oblique form"
+  },
+  {
+   "variant": "గటన",
+   "canonical": "ఘటన",
+   "evidence": "misspelling; 225 vs 1"
+  },
+  {
+   "variant": "అబద్దం",
+   "canonical": "అబద్ధం",
+   "evidence": "dictionary form అబద్ధం; corpus 3 vs 2, so prescriptive"
+  },
+  {
+   "variant": "సందర్శానార్థం",
+   "canonical": "సందర్శనార్థం",
+   "evidence": "misspelling in an obituary sample"
+  },
+  {
+   "variant": "పిటీషన్",
+   "canonical": "పిటిషన్",
+   "evidence": "misspelling in court samples"
+  },
+  {
+   "variant": "ప్రాధమిక",
+   "canonical": "ప్రాథమిక",
+   "evidence": "aspirate error in headline list"
+  },
+  {
+   "variant": "పిర్యాదు",
+   "canonical": "ఫిర్యాదు",
+   "evidence": "aspirate error in headline list"
+  },
+  {
+   "variant": "రిజిస్టేషన్",
+   "canonical": "రిజిస్ట్రేషన్",
+   "evidence": "transliteration error; 11 vs 2"
+  },
+  {
+   "variant": "సెక్యూర్టీ",
+   "canonical": "సెక్యూరిటీ",
+   "evidence": "transliteration error; 18 vs 1"
+  },
+  {
+   "variant": "హర్టీకల్చర్",
+   "canonical": "హార్టికల్చర్",
+   "evidence": "transliteration error; 26 vs 2 (prefer ఉద్యాన in our own copy)"
+  },
+  {
+   "variant": "వృధా",
+   "canonical": "వృథా",
+   "evidence": "dictionary form వృథా; corpus 6 vs 3 for వృధా, so prescriptive"
+  },
+  {
+   "variant": "అద్వాన్నంగా",
+   "canonical": "అధ్వాన్నంగా",
+   "evidence": "aspirate error; standard form అధ్వాన్నం; samples 2 vs 1"
+  }
+ ],
+ "avoid_phrases": [
+  {
+   "phrase": "తెలిస్తే షాక్ అవుతారు",
+   "why": "Tells the reader how to react and withholds the fact",
+   "severity": "block"
+  },
+  {
+   "phrase": "దిమ్మతిరిగే",
+   "why": "Promised-reaction hype; give the number instead",
+   "severity": "block"
+  },
+  {
+   "phrase": "మైండ్ బ్లాక్",
+   "why": "Slang hype that carries no information",
+   "severity": "block"
+  },
+  {
+   "phrase": "నోరెళ్లబెట్ట-",
+   "why": "Dictates the reader's reaction",
+   "severity": "block"
+  },
+  {
+   "phrase": "కన్నీళ్లు ఆగవు",
+   "why": "Emotional instruction that exploits the subject",
+   "severity": "block"
+  },
+  {
+   "phrase": "99% మందికి తెలియదు",
+   "why": "An invented statistic",
+   "severity": "block"
+  },
+  {
+   "phrase": "షాక్",
+   "why": "Hype label; whole word only (not కుషాక్). Never in headline fields; in the body only inside a verbatim quote. Write ఎదురుదెబ్బ, or విద్యుదాఘాతం for an electric shock",
+   "severity": "block"
+  },
+  {
+   "phrase": "షాకిచ్చ-",
+   "why": "Hype verb; state the setback",
+   "severity": "block"
+  },
+  {
+   "phrase": "షాకింగ్",
+   "why": "Hype label; only inside a verbatim quote in the body",
+   "severity": "block"
+  },
+  {
+   "phrase": "సంచలన-",
+   "why": "Empty intensifier (సంచలన, సంచలనం); say what was said or decided",
+   "severity": "block"
+  },
+  {
+   "phrase": "బిగ్ ట్విస్ట్",
+   "why": "Vague bait; name the actual new fact",
+   "severity": "block"
+  },
+  {
+   "phrase": "ఝలక్",
+   "why": "Hype label for a setback or ruling; state it",
+   "severity": "block"
+  },
+  {
+   "phrase": "కీలక వ్యాఖ్యలు",
+   "why": "A label that hides the remark; quote the line",
+   "severity": "warn"
+  },
+  {
+   "phrase": "ఘోరాతి ఘోరం",
+   "why": "Stacked sensational label",
+   "severity": "block"
+  },
+  {
+   "phrase": "శవాలుగా",
+   "why": "Crude wording about the dead; write మృతి చెందారు",
+   "severity": "block"
+  },
+  {
+   "phrase": "స్పాట్ డెడ్",
+   "why": "English slang about deaths; write అక్కడికక్కడే మృతి",
+   "severity": "block"
+  },
+  {
+   "phrase": "పిట్టల్లా రాల-",
+   "why": "Dehumanising phrase about deaths",
+   "severity": "block"
+  },
+  {
+   "phrase": "మరణమృదంగం",
+   "why": "Melodrama about deaths",
+   "severity": "block"
+  },
+  {
+   "phrase": "కామాంధ-",
+   "why": "Verdict label that presumes guilt",
+   "severity": "block"
+  },
+  {
+   "phrase": "కీచక-",
+   "why": "Verdict label that presumes guilt",
+   "severity": "block"
+  },
+  {
+   "phrase": "కిరాతక-",
+   "why": "Verdict label that presumes guilt",
+   "severity": "block"
+  },
+  {
+   "phrase": "మానవ మృగం",
+   "why": "Verdict label that presumes guilt",
+   "severity": "block"
+  },
+  {
+   "phrase": "కసాయి",
+   "why": "Never as an epithet for a person or party (it also carries a community slur); allowed only literally (కసాయి దుకాణం)",
+   "severity": "warn"
+  },
+  {
+   "phrase": "రాక్షసుడు",
+   "why": "Never for a real person; allowed in mythology",
+   "severity": "warn"
+  },
+  {
+   "phrase": "ఊచకోత",
+   "why": "Never as a sports or box-office metaphor; allowed only for a massacre the source names",
+   "severity": "warn"
+  },
+  {
+   "phrase": "హతం",
+   "why": "Not in our voice for killings or encounters; attribute the account ('…మృతి చెందినట్లు పోలీసులు తెలిపారు')",
+   "severity": "warn"
+  },
+  {
+   "phrase": "బలవన్మరణం",
+   "why": "Suicide wording the house rules exclude",
+   "severity": "block"
+  },
+  {
+   "phrase": "ఉరేసుకుని",
+   "why": "Gives the method of a suicide",
+   "severity": "block"
+  },
+  {
+   "phrase": "ఫైర్ అయ-",
+   "why": "English slang that editorialises; write విమర్శించారు",
+   "severity": "block"
+  },
+  {
+   "phrase": "విరుచుకుప-",
+   "why": "Loaded attribution verb that puts our spin on the speaker",
+   "severity": "warn"
+  },
+  {
+   "phrase": "దుయ్యబట్ట-",
+   "why": "Loaded attribution verb",
+   "severity": "warn"
+  },
+  {
+   "phrase": "నిప్పులు చెరి-",
+   "why": "Loaded attribution verb",
+   "severity": "warn"
+  },
+  {
+   "phrase": "ధ్వజమెత్త-",
+   "why": "Loaded attribution verb",
+   "severity": "warn"
+  },
+  {
+   "phrase": "కౌంటర్ ఇచ్చ-",
+   "why": "English slang attribution; write బదులిచ్చారు (whole phrase only, never ఎన్‌కౌంటర్ or టికెట్ కౌంటర్)",
+   "severity": "warn"
+  },
+  {
+   "phrase": "ఎల్లో మీడియా",
+   "why": "Partisan slur; breaks neutrality",
+   "severity": "block"
+  },
+  {
+   "phrase": "పచ్చ మీడియా",
+   "why": "Partisan slur; breaks neutrality",
+   "severity": "block"
+  },
+  {
+   "phrase": "నీలి మీడియా",
+   "why": "Partisan slur; breaks neutrality",
+   "severity": "block"
+  },
+  {
+   "phrase": "బ్లూ మీడియా",
+   "why": "Partisan slur; breaks neutrality",
+   "severity": "block"
+  },
+  {
+   "phrase": "గులాబీ మీడియా",
+   "why": "Partisan slur; breaks neutrality",
+   "severity": "block"
+  },
+  {
+   "phrase": "జీరో రిస్క్",
+   "why": "Overstates safety; amounts to financial advice",
+   "severity": "block"
+  },
+  {
+   "phrase": "పంట పండినట్లే",
+   "why": "Implies guaranteed gains",
+   "severity": "block"
+  },
+  {
+   "phrase": "కాసుల వర్షం",
+   "why": "An income promise the body can't support",
+   "severity": "block"
+  },
+  {
+   "phrase": "ధన వర్షం",
+   "why": "A wealth promise in astrology or deals copy",
+   "severity": "block"
+  },
+  {
+   "phrase": "బంపర్ గిఫ్ట్",
+   "why": "Frames government policy as a present",
+   "severity": "block"
+  },
+  {
+   "phrase": "పూర్తిగా నయం",
+   "why": "A cure claim, which is a health-law risk",
+   "severity": "block"
+  },
+  {
+   "phrase": "దివ్యౌషధం",
+   "why": "Miracle framing for a health claim",
+   "severity": "block"
+  },
+  {
+   "phrase": "ఖాయం",
+   "why": "A guarantee; allowed only for a confirmed fact (e.g. a qualification decided by points)",
+   "severity": "warn"
+  },
+  {
+   "phrase": "పక్కా",
+   "why": "A guarantee word when it ends a claim ('…పక్కా!', '…పక్కా..'); fine as an adjective (పక్కా ఇళ్లు, పక్కా గృహాలు, పక్కా ప్రణాళిక)",
+   "severity": "warn"
+  },
+  {
+   "phrase": "మళ్లీ రాదు",
+   "why": "Invented scarcity",
+   "severity": "warn"
+  },
+  {
+   "phrase": "మిస్ అవ్వకండి",
+   "why": "Purchase pressure",
+   "severity": "warn"
+  },
+  {
+   "phrase": "ఇదీ చదవండి",
+   "why": "Page furniture inside the body",
+   "severity": "block"
+  },
+  {
+   "phrase": "Read Also",
+   "why": "Page furniture inside the body",
+   "severity": "block"
+  },
+  {
+   "phrase": "ఇంటర్నెట్ డెస్క్",
+   "why": "Desk tag in a dateline",
+   "severity": "block"
+  },
+  {
+   "phrase": "వివరాల్లోకి వెళ్తే",
+   "why": "TV hand-off filler",
+   "severity": "warn"
+  },
+  {
+   "phrase": "వైరల్ అవుతున్నాయి",
+   "why": "Unverified filler closer (the corpus tail repeats 10 times)",
+   "severity": "warn"
+  },
+  {
+   "phrase": "వైరల్ అవుతోంది",
+   "why": "Unverified filler closer",
+   "severity": "warn"
+  },
+  {
+   "phrase": "వైరల్‌గా మారింది",
+   "why": "Unverified filler closer; match with or without the ZWNJ",
+   "severity": "warn"
+  },
+  {
+   "phrase": "హాట్ టాపిక్‌గా మారింది",
+   "why": "Claims buzz without evidence",
+   "severity": "warn"
+  },
+  {
+   "phrase": "వేచి చూడాల్సిందే",
+   "why": "Filler close; say who will confirm, and when",
+   "severity": "warn"
+  },
+  {
+   "phrase": "తిరిగిరాని లోకాలకు",
+   "why": "Clichéd death euphemism; write కన్నుమూశారు",
+   "severity": "warn"
+  },
+  {
+   "phrase": "ఆత్మకు శాంతి చేకూరాలని",
+   "why": "A prayer in the narrator's voice; allowed only inside a quote",
+   "severity": "warn"
+  },
+  {
+   "phrase": "చేయడం జరిగింది",
+   "why": "Officialese padding; use the direct verb",
+   "severity": "warn"
+  },
+  {
+   "phrase": "మరియు",
+   "why": "Translationese; use a comma or -తో పాటు",
+   "severity": "warn"
+  },
+  {
+   "phrase": "యొక్క",
+   "why": "Translationese; use the oblique case",
+   "severity": "warn"
+  },
+  {
+   "phrase": "కట్ చేస్తే",
+   "why": "TV slang",
+   "severity": "warn"
+  },
+  {
+   "phrase": "కిర్రాక్",
+   "why": "Slang hype",
+   "severity": "warn"
+  },
+  {
+   "phrase": "అదుర్స్",
+   "why": "Slang hype",
+   "severity": "warn"
+  },
+  {
+   "phrase": "మజాకా",
+   "why": "Slang hype",
+   "severity": "warn"
+  },
+  {
+   "phrase": "వారెవ్వా",
+   "why": "Slang hype",
+   "severity": "warn"
+  },
+  {
+   "phrase": "బ్రో",
+   "why": "Addresses the reader in slang; whole word only (not బ్రోకర్, బ్రోకరేజ్, బ్రోచర్)",
+   "severity": "warn"
+  },
+  {
+   "phrase": "హాట్ ట్రీట్",
+   "why": "Objectifies women in gallery titles",
+   "severity": "block"
+  },
+  {
+   "phrase": "కవ్విస్తున్న",
+   "why": "Objectifies women in gallery titles",
+   "severity": "block"
+  },
+  {
+   "phrase": "హిజ్రా",
+   "why": "Can read as derogatory; write ట్రాన్స్‌జెండర్",
+   "severity": "block"
+  },
+  {
+   "phrase": "పిచ్చో-",
+   "why": "Stigmatising; report treatment only if family or police state it ('మానసిక సమస్యలకు చికిత్స పొందుతున్నట్లు … తెలిపారు')",
+   "severity": "block"
+  },
+  {
+   "phrase": "పిచ్చిది",
+   "why": "Stigmatising label for a person",
+   "severity": "block"
+  },
+  {
+   "phrase": "మతిస్థిమితం లేని",
+   "why": "A lay diagnosis of a real person",
+   "severity": "block"
+  },
+  {
+   "phrase": "కుంటి",
+   "why": "Disability slur for people; write దివ్యాంగులు",
+   "severity": "warn"
+  },
+  {
+   "phrase": "గుడ్డి",
+   "why": "Disability slur for people; write దృష్టి లోపం ఉన్న",
+   "severity": "warn"
+  },
+  {
+   "phrase": "మూగ",
+   "why": "Disability slur for people (మూగజీవాలు for animals is fine); write వినికిడి, మాట లోపం ఉన్న",
+   "severity": "warn"
+  },
+  {
+   "phrase": "వికలాంగ-",
+   "why": "Dated term; write దివ్యాంగులు/దివ్యాంగుడు",
+   "severity": "warn"
+  },
+  {
+   "phrase": "గుడ్ న్యూస్",
+   "why": "English where శుభవార్త exists, and usually an empty label",
+   "severity": "warn"
+  },
+  {
+   "phrase": "జస్ట్",
+   "why": "English filler; whole word only (not అడ్జస్ట్); give the number or write కేవలం",
+   "severity": "warn"
+  }
+ ],
+ "attribution_verbs": [
+  {
+   "verb": "తెలిపారు / తెలిపింది",
+   "shade": "Neutral default for stated facts and information. Never for a partisan allegation."
+  },
+  {
+   "verb": "చెప్పారు",
+   "shade": "Neutral, for spoken remarks."
+  },
+  {
+   "verb": "అన్నారు",
+   "shade": "Neutral, for a spoken remark or opinion. Don't use it in consecutive sentences."
+  },
+  {
+   "verb": "పేర్కొన్నారు / పేర్కొంది",
+   "shade": "Neutral-formal, for written statements, reports, orders and judgments."
+  },
+  {
+   "verb": "వెల్లడించారు / వెల్లడించింది",
+   "shade": "Disclosed new figures or facts. Not for opinions."
+  },
+  {
+   "verb": "ప్రకటించారు / ప్రకటించింది",
+   "shade": "A formal announcement."
+  },
+  {
+   "verb": "స్పష్టం చేశారు",
+   "shade": "A clarification or firm position, often answering a rumour or doubt."
+  },
+  {
+   "verb": "వివరించారు",
+   "shade": "Explained a process or reason."
+  },
+  {
+   "verb": "ఆదేశించారు / ఆదేశించింది",
+   "shade": "A binding order from an authority or court. Only for actual orders."
+  },
+  {
+   "verb": "సూచించారు",
+   "shade": "Advice or a suggestion, not an order."
+  },
+  {
+   "verb": "కోరారు",
+   "shade": "A request, typically by residents or groups."
+  },
+  {
+   "verb": "డిమాండ్ చేశారు",
+   "shade": "A firm demand (resignation, inquiry, funds)."
+  },
+  {
+   "verb": "పిలుపునిచ్చారు",
+   "shade": "A public appeal to people or cadres."
+  },
+  {
+   "verb": "హెచ్చరించారు",
+   "shade": "Only when someone literally warned."
+  },
+  {
+   "verb": "హామీ ఇచ్చారు",
+   "shade": "A promise or assurance by an official."
+  },
+  {
+   "verb": "ఆరోపించారు",
+   "shade": "Required for any allegation of wrongdoing, in the same sentence as the claim."
+  },
+  {
+   "verb": "విమర్శించారు",
+   "shade": "Criticism of policy or performance without alleging wrongdoing."
+  },
+  {
+   "verb": "ప్రశ్నించారు / నిలదీశారు",
+   "shade": "A question; నిలదీశారు is for a pointed question put to an authority."
+  },
+  {
+   "verb": "బదులిచ్చారు",
+   "shade": "A reply to criticism or a question; the neutral form of 'కౌంటర్ ఇచ్చారు'."
+  },
+  {
+   "verb": "ఖండించారు",
+   "shade": "Two senses: condemned an act (దాడిని, అరెస్ట్‌ను ఖండించారు) or denied an allegation (ఆరోపణలను ఖండించారు). Always name the act or allegation in the same sentence. For a plain denial of a rumour, prefer తోసిపుచ్చారు."
+  },
+  {
+   "verb": "తోసిపుచ్చారు",
+   "shade": "Rejected a claim or rumour."
+  },
+  {
+   "verb": "అభిప్రాయపడ్డారు",
+   "shade": "An opinion or assessment. Use it to mark analysts' and pundits' views as opinion."
+  },
+  {
+   "verb": "వ్యాఖ్యానించింది",
+   "shade": "An observation by a court or institution, distinct from an order."
+  },
+  {
+   "verb": "మండిపడ్డారు",
+   "shade": "Politics only, once, when the source shows anger. Editorial heat. Politics only, only when the source shows anger, at most once per story."
+  },
+  {
+   "verb": "సమాచారం / తెలుస్తోంది",
+   "shade": "Never for headline facts, tolls, causes, arrests. Hedge for genuinely unconfirmed minor details only: name the source type and add 'అధికారిక ప్రకటన రావాల్సి ఉంది'. Never for headline facts or tolls, an allegation of wrongdoing, a cause of death, the identity of an accused or victim, an arrest, health, pregnancy or relationships."
+  },
+  {
+   "verb": "ఫైర్ అయ్యారు / విరుచుకుపడ్డారు / దుయ్యబట్టారు / నిప్పులు చెరిగారు / ధ్వజమెత్తారు / కౌంటర్ ఇచ్చారు",
+   "shade": "Never use. Write విమర్శించారు, ఆరోపించారు or బదులిచ్చారు instead."
+  }
+ ],
+ "video_title_rules": [
+  "Bulletin and short-video titles: 5-8 words, never more than 10 (lint 35-70 characters). Web-story and short-news one-liners: 5-8 words (lint 40-62 characters). Stop at one fact plus one hook.",
+  "Use two beats at most: a verifiable fact, then '.. ' and one hook (a consequence, a reveal, or an open question the video answers). Never a hook-only title with no subject or event.",
+  "Use one device per title: a question, an interjection (soft stories only), or an 'ఇదే/ఇవే' tail. Never stack them.",
+  "Questions follow the headline question rule: an open question the video answers, or a yes/no question whose on-record yes or open answer is in the same title. Never put '?' on an unconfirmed death, arrest, cancellation, ban or scandal.",
+  "Aftermath teases ('[సంఖ్య] గంటల తర్వాత ఏమైందంటే?') are only for concrete outcomes the video shows, never for deaths, injuries or crime victims. End them with '?', never a bare '..'.",
+  "Quote titles: the speaker's exact words, one contiguous excerpt of six words or fewer, in ‘ ’, then ': [speaker]'; if the line is longer, use reported speech without quote marks. Opinions, insults and accusations appear only in a named quote, never in the channel's voice, and never pick a line attacking a caste, religion, gender or community.",
+  "Bulletins: a Telugu label with the date, then the top two stories joined by ' | '. Live streams: 'ప్రత్యక్ష ప్రసారం:' + event + place. Never a generic 'టాప్ అప్‌డేట్స్'.",
+  "Recurring series use a fixed Telugu label plus the date ('బంగారం ధర [తేదీ]: …', 'రాశిఫలాలు [తేదీ]: …'). No English keyword prefix.",
+  "Web stories are service questions or lists ('…ఎలా చేయాలంటే?', 'ఈ [సంఖ్య] తప్పులు చేయకండి'). The slides must deliver exactly the count promised. State a myth as a myth with its verdict in the same title; never pose it as a question.",
+  "Photo galleries are titled by the occasion (event, film, outfit), never by a woman's body. Interjections (అయ్యో, ఆహా) only on soft stories, with the fact in the same title. No slang address terms.",
+  "No cure, guarantee or wealth promises ('ఒక్క గ్లాస్ చాలు', 'రోగాలన్నీ మాయం', 'ధన వర్షం'), no shock words, and no outlet names in any title."
+ ],
+ "social_card_rules": [
+  "Write a separate social headline (og:title) of 6-10 words (lint: aim 45-75 characters, cap 90). Telugu only. No keyword prefix, outlet name or site slogan.",
+  "Use at most one curiosity device drawn from the body: the human moment or cause, a short exact quote, an identity behind a concrete descriptor, a reader-benefit question, or a different single number. If none fits, rephrase the central fact around a different concrete detail (a number, a place, a person's role).",
+  "It must report the same central fact as the SEO title, with no bigger scope and no stronger certainty. Anything it withholds must appear in the description, which travels with the card.",
+  "Image-card hook: 3-5 words (lint 40 characters or fewer), one concrete image (subject plus unusual action or role). No pronoun subject, no '?' unless the card itself answers it, no trailing '..'. It must make sense alone in a WhatsApp forward.",
+  "Quote cards always keep the speaker. An allegation never travels without its owner.",
+  "Use Telugu curly quotes ‘ ’ only, since straight quotes truncate titles. At most one '!' and only at the end, under the headline '!' rule. No stacked marks, HTML entities, or zero-width characters at the edges.",
+  "Cards on deaths, accidents, disasters and violent crime use no curiosity device: state the place, event and toll plainly.",
+  "A representative picture carries the label 'ప్రతీకాత్మక చిత్రం', and no card text or caption may say or imply that it shows the actual event, place or person. Never describe or request a generated image of a real, identifiable person, a victim, an accused or the dead; for crime, accident and death stories a representative image shows no people."
+ ],
+ "seo_rules": [
+  "seo_title is a rewrite, never a truncation: 6-8 words (lint 45-60 characters; the 60 cap is an SEO display convention, not a corpus finding: corpus sitemap titles have a median of 69 characters and 58% are identical to the H1). The main searchable entity goes in the first 2-3 words, then the action, then one number or date.",
+  "To shorten, delete intensifiers, teaser tails, secondary names and English labels. Never delete the entity, a quote's speaker, the core verb or the number.",
+  "Use an 'X: ' prefix only for a Telugu service label (బంగారం ధర:, వాతావరణం:, రాశిఫలాలు [తేదీ]:, [ఊరు]:). Latin-script names go inside the clause, never before a colon. Never repeat X in the clause after it.",
+  "Local stories put the Telugu place name first in seo_title, and add district and mandal to the description when the source gives them.",
+  "seo_description: 1-2 complete sentences, 14-20 words in total (lint 90-160 characters, aim 120-155), ending in a full stop. Sentence 1: who did what, where and when, with the key number and its source verb. Sentence 2: the payoff the title withheld, or the next useful fact.",
+  "Never copy the title into the description, never auto-fill it from the body's opening, and never start it with a dateline, masthead, label or warm-up phrase.",
+  "The description carries every hedge and source verb (ప్రకటించింది, ఆరోపించారు, అంచనా). The title may never state as fact what the description hedges.",
+  "Service, explainer, price, jobs and auto descriptions may end with one '…పూర్తి వివరాలు ఇక్కడ తెలుసుకోండి.' Hard news gets a plain fact sentence with no call to action.",
+  "seo_title doubles as the news-sitemap title. When the central fact changes (toll, status, result), rewrite it to lead with the new fact.",
+  "No outlet name, slogan, field label ('మెటా డిస్క్రిప్షన్:'), keyword list, hashtag or parenthetical keyword in any field. Every field is in Telugu script except brand names."
+ ],
+ "lint": {
+  "headline_min_chars": 20,
+  "headline_max_chars": 100,
+  "lede_max_words": 70,
+  "paragraph_max_words": 110,
+  "sentence_max_words": 25,
+  "summary_max_words": 40,
+  "max_latin_words_per_100": 10,
+  "notes": "UNITS: character limits are Unicode code points (Python len); a Telugu headline runs about 2.3 code points per visible letter, so writer-facing limits are in words and characters live only here. THRESHOLDS are house targets taken from print desks, not corpus-wide p90s: corpus lede p90 (205) and paragraph stats are inflated by outlets whose bodies are not split into paragraphs (oneindia, samayam, telugupost, manatelangana median 1 paragraph; gizbot 2); print-desk lede p90 is 62-96 words and paragraph p90 68-83. Per-type headline caps (story_types[].headline_max_chars) are tighter than the corpus (12-25% of corpus headlines in some types exceed them): warn above the type cap, error above 100 or below 20. Lede: warn above 50 words (court_legal and explainer 55, interview 60, editorial_opinion 70 = lede_max_words). Paragraph: 110 for editorial_opinion and interview Q&A, warn above 90 otherwise. Sentence: 25. LATIN: count Latin tokens excluding unit/spec tokens (GB, TB, MP, mAh, Hz, W, kWh, RAM, 5G, 4K), any token containing a digit, and brand or model names present in the source; warn above 1.5 per 100 for politics, governance, crime, accident_disaster, court_legal, local_district; 8 for tech_gadgets and auto; 10 for deals_offers (= max_latin_words_per_100); 3 for every other type. MATCHING: canonical_spellings and avoid_phrases match whole tokens only, splitting on whitespace and punctuation with Telugu-aware boundaries (no Telugu letter, sign, ZWNJ or ZWJ on either side; never substring or \\b matching, since Python treats Telugu vowel signs as non-word characters). A token may carry one trailing case suffix (లో, కు, కి, ను, పై, తో, ది, గా, ల), with or without ZWNJ, and the suffix is kept on replacement. An avoid_phrases entry ending in '-' is a stem matched at the start of a token. canonical_spellings are applied automatically by canonicalize(); avoid_phrases are only flagged. In body text, skip avoid_phrases inside ‘ ’ quoted spans; headline, SEO, social and video fields are always checked. The 'phrase also in source is allowed' exemption applies to warn entries only, never to block entries. పక్కా fires only when it ends a claim (followed by !, .., . or the end of the headline), never before ఇళ్లు, గృహాలు or ప్రణాళిక. A headline ending in ఫైర్ (optionally followed by ! or ..) warns; ఫైర్ సేఫ్టీ, ఫైర్ టీవీ and similar are fine. శ్రీ and గారు honorific checks match whole tokens around a name only. CHECKS: headline has at most one '..' in politics, governance, court_legal, crime, accident_disaster, national, international and breaking, two elsewhere, never ends with '..' or a full stop, and contains no '...' or '…'; at most one '?' per headline; no '!!', '??', '?!', '..!', '..?', '?:', '!:' or '?..' anywhere; '!' in a headline only for human_interest_viral, film_news and sports; '?' and '!' blocked in any headline containing మృతి, హత్య, మరణం, గల్లంతు or దుర్మరణం, and in accident_disaster, obituary and breaking; no '!' in body text outside quotes; no Latin-script word followed by ':' in a headline; seo_title 60 or fewer; social headline 90 or fewer; seo_description 90-160 and not identical to the headline; ERROR if any output field contains '[' or ']' (placeholder leak, or an unfilled date in the deals disclaimer); no outlet or desk names; ZWNJ after a non-virama letter warns, while a word-final ZWNJ after a virama is stripped silently by canonicalize() and never flagged; no U+200B and no literal 'nbsp'; no space before ? ! : ,; 'రూ.' must be followed directly by a digit or by లక్ష, కోటి or వెయ్యి; summary must not repeat the lede; story word count above words_max warns, and nothing ever warns below words_min (a thin source makes a short story; never send an under-length warning to the writer). REFUSE_SCREEN: word-start matches (no Telugu letter before the stem) on ఆత్మహత్య, బలవన్మరణం, ఉరేసుకుని, పురుగుల మందు తాగి, అత్యాచారం, లైంగిక దాడి, లైంగిక వేధింపు, పోక్సో, బాలికపై, బాలుడిపై, మైనర్ (except మైనర్ ఇరిగేషన్), పరువు హత్య, కుల దూషణ, మత ఘర్షణ, మతమార్పిడి, అట్రాసిటీ in the headline, summary or body block auto-publish and route the story to the editor. DETECTION tie-break when a story fits several types: refusal categories, then obituary or accident_disaster when a death is the news, then breaking, crime, court_legal, weather, politics, governance, national or international, then the rest. Any story reporting deaths uses the no-gap headline rule whatever its type. PAYLOAD: per call inject house_voice, core_rules, headline_rules, language_rules, the one detected story type (guide, headline_examples_te, words_max, disclaimer_te; never words_min), only the devices in its devices list (key, label_te, how, example_te), canonical_spellings as variant to canonical, avoid_phrases as phrase plus severity, attribution_verbs, and only the seo, social or video rules for the fields being generated. Never inject evidence_summary, evidence, why, lint, suits, never_for or detect_hints. To stay near the 1,600-word brief target, compress attribution_verbs to the verbs and drop language_rules 14-16 first. CONTRACT: the writer JSON keeps refused and refusal_reason (codes: suicide, sexual_offence, minor, communal, opinion_source, unconfirmed_death, thin_source) and gains editor_note (string, empty when nothing to flag), stored with style_warnings in classification. Inputs TODAY, SOURCE_DATE, UPDATE_TIME, EDITOR_BRIEF, REVIEWER_NOTES and RECENT_HEADLINES (the last 10 headlines of the type) are supplied when available. The suicide helpline line (Tele-MANAS 14416) is a house constant: an editor verifies the number before go-live."
+ },
+ "evidence_summary": [
+  "Corpus: 12,033 articles from 28 outlets. With English 'Keyword:' prefixes stripped, the headline median is 63 code points (69 raw) and 8 words. Print-heritage outlets write far shorter (eenadu 34 / 4 words, andhrajyothy 40 / 5, sakshi 46 / 6) than digital ones (10tv 96, abpdesam 105). Stripped word medians by type: editorial 4, jobs 6, politics, local and agriculture 7, crime and governance 8, film 9, tech and deals 10, auto 11.",
+  "The '..' two-beat teaser appears in 52.9% of headlines (10tv 91.8%, goodreturns 98.0%, eenadu 26.1%; local 26%, politics 47%, editorial 16% of sampled headlines). About 9% of sampled headlines end on a dangling '..'.",
+  "An English keyword prefix leads 38.7% of headlines (hmtv 98.3%, vaartha 96.4%, ntvtelugu 91.0%) but only 0.2% at eenadu. Telugu prefixes appear in just 1.2%.",
+  "Exclamation marks appear in 30.4% of all headlines (tech 59.3%, astrology 53.4%, health 46.3%). Questions appear in 19.5% overall: 69.8% of explainers (a type mostly detected by its English label), 5.0% of accident and 3.0% of local headlines.",
+  "Share of headlines with hype markers: bigtv 23.2%, oneindia 15.7%, tv9telugu 15.2%, against eenadu 1.6%, gulte 3.2%, tupaki 4.1%. The low-hype sites still earn clicks with questions and specifics.",
+  "Quote marks appear in the body of 56.1% of eenadu, 50.0% of sakshi and 46.8% of andhrajyothy articles, against 11.7% at oneindia; corpus 26.4%. Print desks quote speech with single curly quotes: ‘ 283 vs “ 29 in sample bodies (eenadu 43 vs 0).",
+  "Attribution words per article (including the quotative అని and సమాచారం): andhrajyothy 5.20, sakshi 3.36, 10tv 2.21, eenadu 1.98, so density does not track quality. Verb choice does: ఆరోపించారు averages 0.25 per politics article; తెలిపారు 1.02 in governance and 0.91 in crime.",
+  "Median sentence length is 7-13 words by outlet (eenadu 7, andhrajyothy 8, sakshi 9; gizbot and suryaa 13); corpus 9, p90 18, and only 1.6% of sentences exceed 25 words. Median article is 224 words: local 129, accident 141, governance 170, editorial 436. Paragraph and lede statistics are inflated by four outlets with unsplit bodies; print-desk lede p90 is 62-96 words.",
+  "Place datelines open roughly 15-30% of print-desk samples (v6velugu 19/48, sakshi 16/49, andhrajyothy 13/67, eenadu 11/64) and almost no digital ones; the 6.9% corpus figure also counts desk tags such as 'ఇంటర్నెట్ డెస్క్:'.",
+  "Latin words per 100 body words: 1.53 overall; politics 0.48, local 0.40, business 2.08, auto 6.07, tech 6.16, deals 8.09; the top Latin tokens are spec units (GB 1,656, MP 628, Hz 503). By outlet: sakshi 0.22 against 10tv 2.26.",
+  "Coverage of the same event contradicts itself across outlets: a railway sheep toll reported as 350, 300 and 100; one avalanche reported as 2 or 15 dead; 8 students reported as 'dead' by one outlet and 'missing' by another. Unattributed figures are unreliable.",
+  "38% of accident samples spend sentence 1 on an empty frame ('…లో ఘోర ప్రమాదం చోటుచేసుకుంది'); 0% of governance and film samples do. The closing tail 'వ్యాఖ్యలు సోషల్ మీడియాలో వైరల్ అవుతున్నాయి' repeats 10 times.",
+  "54% of meta descriptions exceed 160 characters and 16% are pasted body openers; sakshi uses its headline as the description in about 90% of samples. Sitemap titles have a median of 69 characters and 58% repeat the H1.",
+  "ZWNJ noise: ఆయన appears 5,851 times against ఆయ‌న 247; ZW runs appear in 50% of v6velugu samples; leaked 'nbsp' appears 721 times. A word-final ZWNJ after a virama, by contrast, is house orthography at the best print desks (eenadu 88% of samples, prabhanews 83%, sakshi 73%).",
+  "About 14% of sampled crime headlines and 5% of human-interest headlines involve suicide, sexual offences or minors, which our writer refuses. Low-confidence types (n<50): interview 5, breaking 23, obituary 31, explainer 43; their figures are directional only and their guides are editorial choices, not corpus findings."
+ ],
+ "meta": {
+  "corpus_articles": 12033,
+  "outlets": 28,
+  "video_and_webstory_titles": 2106,
+  "crawled": "2026-10-02",
+  "method": "27 story-type analysts + 6 cross-cutting specialists over the corpus, chief-editor synthesis, 4-lens adversarial review"
+ }
+}

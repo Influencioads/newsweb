@@ -18,6 +18,7 @@ from app.api.v1 import (
     cms_admin,
     cms_ai,
     cms_articles,
+    cms_assistant,
     cms_dashboard,
     cms_discovery,
     cms_ingestion,
@@ -62,6 +63,7 @@ api_router.include_router(cms_articles.router)
 api_router.include_router(cms_dashboard.router)
 api_router.include_router(cms_admin.router)
 api_router.include_router(cms_ai.router, dependencies=_AI_OFF)
+api_router.include_router(cms_assistant.router, dependencies=_AI_OFF)
 api_router.include_router(cms_discovery.router)
 api_router.include_router(cms_ingestion.router, dependencies=_AI_OFF)
 api_router.include_router(cms_voice.router, dependencies=_AI_OFF)

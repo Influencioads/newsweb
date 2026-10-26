@@ -31,9 +31,9 @@ function useShots() {
   return useQuery({
     queryKey: ['public', 'story-shots'],
     queryFn: async () => {
-      const shorts = (await publicApi.fetchShortNews({ offset: 0, limit: SHOTS_LIMIT })).articles;
-      if (shorts.length) return shorts;
-      // No short items written yet: the newest illustrated stories stand in.
+      // The newest illustrated stories. Short news can't feed this any more:
+      // since the short-news cards change it is a picture-only card with no
+      // headline or summary for a shot to show.
       const latest = (await publicApi.fetchFeed({ limit: SHOTS_LIMIT * 2 })).articles;
       return latest.filter((a) => a.hero?.url).slice(0, SHOTS_LIMIT);
     },

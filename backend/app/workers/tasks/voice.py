@@ -64,3 +64,56 @@ def backfill() -> dict[str, int]:
                 generated += 1
 
     return {"generated": generated, "skipped": 0}
+
+
+#: Stories older than this get their audio from their first listener instead;
+#: the window only bounds what each tick scans.
+SWEEP_WINDOW = timedelta(days=2)
+
+#: Renders per tick, so one sweep cannot hold a worker slot past the next.
+SWEEP_BATCH = 10
+
+
+@celery.task(name="voice.publish_sweep")
+def publish_sweep() -> dict[str, int]:
+    """§20 rule: every published story has its audio attached within a tick.
+
+    A sweep rather than a call inside publish: the editor's click never waits
+    on a provider, and the same pass catches scheduled publishes and edits to
+    a live story. Each render commits on its own so readers get it at once.
+    Known failures are not retried here (`ensure_audio` refuses without
+    `force`); the Voice screen's Retry does that.
+    """
+    generated = 0
+    with session_scope() as db:
+        if not (
+            settings_service.voice_enabled(db)
+            and settings_service.get_bool(db, "voice.auto_generate_on_publish")
+        ):
+            return {"generated": 0}
+
+        articles = db.scalars(
+            select(Article)
+            .where(
+                Article.status == ArticleStatus.PUBLISHED,
+                Article.deleted_at.is_(None),
+                Article.voice_enabled.is_(True),
+                Article.published_at >= utcnow() - SWEEP_WINDOW,
+            )
+            .order_by(Article.published_at.desc())
+        ).all()
+
+        for article in articles:
+            if generated >= SWEEP_BATCH:
+                break
+            if tts_service.existing_ready(db, article) is not None:
+                continue
+            try:
+                if tts_service.ensure_audio(db, article) is not None:
+                    generated += 1
+                db.commit()
+            except Exception:  # noqa: BLE001 — one story must not stall the rest
+                db.rollback()
+                logger.exception("voice_sweep_failed", article_id=article.id)
+
+    return {"generated": generated}

@@ -13,7 +13,7 @@ import { T } from '@/ui/Text';
 
 /**
  * RadioDial — the bulletin day drawn as a tuner: a frequency scale from 07:00
- * to 21:00 with a tick every half hour, the seven bulletin slots as stations,
+ * to 21:00 with a tick every half hour, the six bulletin slots as stations,
  * and a gold needle that glides to the one playing (or, when nothing plays,
  * the latest one on air).
  *
@@ -23,7 +23,7 @@ import { T } from '@/ui/Text';
  * the whole day from 07:00. The scale and the needle are decoration; the slot
  * buttons carry the meaning.
  */
-export const BULLETIN_SLOTS = [7, 9, 13, 15, 17, 19, 21] as const;
+export const BULLETIN_SLOTS = [7, 9, 15, 17, 19, 21] as const;
 
 const FIRST = BULLETIN_SLOTS[0];
 const SPAN = BULLETIN_SLOTS[BULLETIN_SLOTS.length - 1] - FIRST;

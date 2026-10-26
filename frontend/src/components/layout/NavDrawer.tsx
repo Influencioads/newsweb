@@ -1,10 +1,11 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Film, LogIn, MapPin, Newspaper, Radio, TrendingUp, UserRound, Video } from 'lucide-react';
+import { LogIn, MapPin, Newspaper, Radio, TrendingUp, UserRound, Video, Zap } from 'lucide-react';
 
 import { Sheet } from '@/components/ui/Dialog';
 import { Icon, type LucideIcon } from '@/components/ui/Icon';
+import { EPAPER_PUBLIC } from '@/features/epaper/api';
 import * as publicApi from '@/features/public/api';
 import { useI18n, useScript, type StringKey } from '@/i18n';
 import { useAuth } from '@/stores/auth';
@@ -42,13 +43,13 @@ export interface Shortcut {
 }
 
 /** Reader destinations that are not categories, in nav order. */
-export const SHORTCUTS: readonly Shortcut[] = [
+export const SHORTCUTS: readonly Shortcut[] = ([
   { to: '/live', key: 'ui.live', icon: Radio, live: true },
   { to: '/trending', key: 'ui.trending', icon: TrendingUp },
   { to: '/local', key: 'ui.local', icon: MapPin },
   { to: '/videos', key: 'ui.video', icon: Video },
-  { to: '/short-news', key: 'ui.shorts', icon: Film },
-];
+  { to: '/short-news', key: 'page.shortNews', icon: Zap },
+] satisfies Shortcut[]).filter((s) => publicApi.VIDEOS_PUBLIC || s.to !== '/videos');
 
 /** §12.5 — Grievance Officer, correction policy and AI disclosure, live at launch. */
 export const FOOTER_LINKS = [
@@ -114,12 +115,14 @@ export function NavDrawer({ open, onClose }: NavDrawerProps) {
           <li className="px-3 pb-2">
             <LanguageToggle />
           </li>
+          {EPAPER_PUBLIC && (
           <li>
             <NavLink to="/epaper" className={({ isActive }) => rowClass(isActive, s.body)}>
               <Icon icon={Newspaper} size="md" />
               {t('nav.epaper')}
             </NavLink>
           </li>
+          )}
           {SHORTCUTS.map((sc) => (
             <li key={sc.to}>
               <NavLink to={sc.to} className={({ isActive }) => rowClass(isActive, s.body)}>

@@ -119,3 +119,29 @@ class ArticleMedia(Base):
     sort: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     media: Mapped["Media"] = relationship(back_populates="article_links", lazy="joined")
+
+
+class ShortNewsCard(PKMixin, TimestampMixin, Base):
+    """One picture in the Short News swipe: a 4:5 or 9:16 card the desk added
+    (uploaded, or saved from the creative studio). The image IS the news; the
+    optional `article_id` only gives the reader a way into the full story."""
+
+    __tablename__ = "short_news_cards"
+    __table_args__ = (
+        Index("ix_short_news_cards_created_at", "created_at"),
+        MYSQL_TABLE_ARGS,
+    )
+
+    media_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("media.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    #: A story's card lives and dies with the story.
+    article_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("articles.id", ondelete="CASCADE"), nullable=True
+    )
+    created_by: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+    media: Mapped["Media"] = relationship(lazy="joined")
+    article = relationship("Article")

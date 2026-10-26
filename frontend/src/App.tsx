@@ -1,8 +1,10 @@
-import { lazy, Suspense, useEffect, type ComponentType } from 'react';
+import { lazy, Suspense, useEffect, type ComponentType, type ReactElement } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
 import { AppErrorBoundary, RouteFallback, ScrollToTop } from './components/app';
 import { useSiteConfig } from './components/layout/NavDrawer';
+import { EPAPER_PUBLIC } from './features/epaper/api';
+import { VIDEOS_PUBLIC } from './features/public/api';
 import { PlayerHost } from './components/player/PlayerHost';
 import { applyBrand, brandCss } from './utils/brand';
 import AdminLayout from './layouts/AdminLayout';
@@ -28,12 +30,15 @@ const ProfilePage = lazy(() => import('./pages/public/ProfilePage'));
 const SubmitPage = lazy(() => import('./pages/public/SubmitPage'));
 const EpaperPage = lazy(() => import('./pages/public/EpaperPage'));
 const MyEpaperPage = lazy(() => import('./pages/public/MyEpaperPage'));
+// While public E-Paper is paused, old/shared reader links land on home.
+const epaperGate = (page: ReactElement) => (EPAPER_PUBLIC ? page : <Navigate to="/" replace />);
 const BulletinPage = lazy(() => import('./pages/public/BulletinPage'));
 const ContributorApplyPage = lazy(() => import('./pages/public/ContributorApplyPage'));
 const LiveNewsPage = lazy(() => import('./pages/public/LiveNewsPage'));
 const ShortNewsPage = lazy(() => import('./pages/public/ShortNewsPage'));
 const VideosPage = lazy(() => import('./pages/public/VideosPage'));
 const VideoDetailPage = lazy(() => import('./pages/public/VideoDetailPage'));
+const videosGate = (page: ReactElement) => (VIDEOS_PUBLIC ? page : <Navigate to="/" replace />);
 const PolicyPage = lazy(() => import('./pages/public/PolicyPage'));
 const NotFoundPage = lazy(() => import('./pages/public/NotFoundPage'));
 
@@ -74,6 +79,8 @@ const AiSuggestionsPage = lazy(() => import('./pages/admin/AiSuggestions'));
 const ContentSourcesPage = lazy(() => import('./pages/admin/ContentSources'));
 const PendingArticlesPage = lazy(() => import('./pages/admin/PendingArticles'));
 const CreativeStudio = lazy(() => import('./pages/admin/CreativeStudio'));
+const ShortNewsAdmin = lazy(() => import('./pages/admin/ShortNewsAdmin'));
+const AssistantPage = lazy(() => import('./pages/admin/assistant/AssistantPage'));
 
 const management = () => import('./pages/admin/ManagementPages');
 const AuditPage = named(management, 'AuditPage');
@@ -156,12 +163,12 @@ export default function App() {
               <Route path="/bookmarks" element={<BookmarksPage />} />
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/following" element={<FollowingPage />} />
-              <Route path="/epaper" element={<EpaperPage />} />
-              <Route path="/epaper/:date" element={<EpaperPage />} />
-              <Route path="/epaper/:date/page/:page" element={<EpaperPage />} />
-              <Route path="/my-epaper" element={<MyEpaperPage />} />
-              <Route path="/my-epaper/edition/:personalId" element={<EpaperPage />} />
-              <Route path="/my-epaper/edition/:personalId/page/:page" element={<EpaperPage />} />
+              <Route path="/epaper" element={epaperGate(<EpaperPage />)} />
+              <Route path="/epaper/:date" element={epaperGate(<EpaperPage />)} />
+              <Route path="/epaper/:date/page/:page" element={epaperGate(<EpaperPage />)} />
+              <Route path="/my-epaper" element={epaperGate(<MyEpaperPage />)} />
+              <Route path="/my-epaper/edition/:personalId" element={epaperGate(<EpaperPage />)} />
+              <Route path="/my-epaper/edition/:personalId/page/:page" element={epaperGate(<EpaperPage />)} />
               <Route path="/bulletin" element={AI_FEATURES ? <BulletinPage /> : <Navigate to="/" replace />} />
               <Route path="/contributor" element={<ContributorApplyPage />} />
               <Route path="/topic/:slug" element={<TopicPage />} />
@@ -171,8 +178,8 @@ export default function App() {
               <Route path="/district/:slug" element={<DistrictPage />} />
               <Route path="/mandal/:slug" element={<MandalPage />} />
               <Route path="/photos" element={<PhotoGalleryPage />} />
-              <Route path="/videos" element={<VideosPage />} />
-              <Route path="/videos/:id" element={<VideoDetailPage />} />
+              <Route path="/videos" element={videosGate(<VideosPage />)} />
+              <Route path="/videos/:id" element={videosGate(<VideoDetailPage />)} />
               <Route path="/short-news" element={<ShortNewsPage />} />
               <Route path="/web-stories" element={<WebStoriesPage />} />
               <Route path="/author/:slug" element={<AuthorPage />} />
@@ -205,6 +212,7 @@ export default function App() {
               <Route path="/admin/epaper/:date/print" element={<EpaperPrintPage />} />
               <Route element={<AdminLayout />}>
                 <Route path="/admin/dashboard" element={<Dashboard />} />
+                <Route path="/admin/assistant" element={<AssistantPage />} />
                 <Route path="/admin/articles" element={<Articles />} />
                 <Route path="/admin/articles/new" element={<ArticleEditor />} />
                 <Route path="/admin/articles/:id/edit" element={<ArticleEditor />} />
@@ -223,6 +231,7 @@ export default function App() {
                 <Route path="/admin/taxonomy" element={<TaxonomyPage />} />
                 <Route path="/admin/media" element={<MediaPage />} />
                 <Route path="/admin/creative" element={AI_FEATURES ? <CreativeStudio /> : OFF} />
+                <Route path="/admin/short-news" element={<ShortNewsAdmin />} />
                 <Route path="/admin/users" element={<UsersPage />} />
                 <Route path="/admin/roles" element={<RolesPage />} />
                 <Route path="/admin/audit" element={<AuditPage />} />

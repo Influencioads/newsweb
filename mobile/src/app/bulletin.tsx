@@ -1,14 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
+import { Image } from 'expo-image';
 import { router, Stack } from 'expo-router';
 import { View } from 'react-native';
 
 import { api } from '@/api/client';
 import { ArticleAudio } from '@/components/ArticleAudio';
-import { bulletinId, bulletinTrack } from '@/components/BulletinCard';
+import { bulletinArt, bulletinId, bulletinTrack } from '@/components/BulletinCard';
 import { EmptyState, ErrorState, LoadingState } from '@/components/Feedback';
 import { RadioDial } from '@/components/player/RadioDial';
 import { useI18n } from '@/lib/i18n';
-import { space } from '@/lib/theme';
+import { radius, space } from '@/lib/theme';
 import { makeStyles, useColors } from '@/lib/useTheme';
 import { usePlayer } from '@/stores/player';
 import { Badge } from '@/ui/Badge';
@@ -19,10 +20,10 @@ import { Screen } from '@/ui/Screen';
 import { T } from '@/ui/Text';
 
 /**
- * Today's audio bulletins — seven a day, 07:00 to 21:00 IST, each with its own
+ * Today's audio bulletins — six a day, 07:00 to 21:00 IST, each with its own
  * name (`slot_label_te`, set on the server) — tuned like a radio.
  *
- * The radio dial up top shows the day's seven slots on a frequency scale: the
+ * The radio dial up top shows the day's six slots on a frequency scale: the
  * ones on air tune in (they start the day's queue at that bulletin), the rest
  * are inert, and the needle rests on the bulletin playing — or the latest on
  * air. "Play all" runs the day in order through the global player, which
@@ -87,8 +88,8 @@ export default function BulletinScreen() {
       <Stack.Screen options={{ title: t('screen.bulletin') }} />
       <T variant="bodySmall" color="muted" scaled style={styles.intro}>
         {L(
-          'రోజుకు ఏడు బులెటిన్లు, ఒక్కొక్కటి మూడు నిమిషాలు — ఉదయం 7 నుంచి రాత్రి 9 వరకు.',
-          'Seven three-minute bulletins a day, from 7am to 9pm.',
+          'రోజుకు ఆరు బులెటిన్లు, ఒక్కొక్కటి మూడు నిమిషాలు — ఉదయం 7 నుంచి రాత్రి 9 వరకు.',
+          'Six three-minute bulletins a day, from 7am to 9pm.',
           isTelugu,
         )}
       </T>
@@ -110,6 +111,17 @@ export default function BulletinScreen() {
 
       {live.map((bulletin) => (
         <Card key={`${bulletin.date}-${bulletin.slot}`} style={styles.card}>
+          {bulletinArt(bulletin.slot) ? (
+            // The art says "Click To Listen", so it tunes in; the player below stays the labelled control.
+            <PressableScale
+              haptic="select"
+              accessibilityLabel={`${t('article.listen')}: ${bulletin.slot_label_te ?? ''}`}
+              onPress={() => bulletin.slot != null && tuneTo(bulletin.slot)}
+              style={styles.art}
+            >
+              <Image source={bulletinArt(bulletin.slot)} style={styles.artImage} contentFit="contain" accessible={false} />
+            </PressableScale>
+          ) : null}
           <View style={styles.head}>
             <Badge
               tone="breaking"
@@ -186,6 +198,8 @@ const useStyles = makeStyles(() => ({
   body: { padding: space.lg, paddingBottom: space.xxl },
   intro: { marginBottom: space.md },
   card: { marginBottom: space.md, gap: space.sm },
+  art: { borderRadius: radius.md, overflow: 'hidden', backgroundColor: '#000000' },
+  artImage: { width: '100%', height: 104 },
   head: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   items: { gap: space.xs },
   item: { flexDirection: 'row', alignItems: 'center', gap: space.sm },

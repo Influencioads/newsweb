@@ -107,6 +107,16 @@ export default {
         'on-brand': 'rgb(var(--tn-on-brand) / <alpha-value>)',
         /** Foreground on a constant-dark panel (footer, ink cards, image scrims). */
         'on-ink': 'rgb(var(--tn-on-ink) / <alpha-value>)',
+        /**
+         * Third-party marks for the end-of-article share strip. Fixed in both
+         * themes (they are the networks' colours, not ours); each takes white
+         * text at >= 4.5:1, which is why WhatsApp is darker than its #25D366.
+         */
+        social: {
+          whatsapp: '#1B7F36',
+          x: '#0F172A',
+          telegram: '#0A6BA8',
+        },
       },
       fontFamily: {
         // Headlines and the wordmark: a serif Telugu voice — the editorial

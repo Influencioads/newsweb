@@ -92,3 +92,5 @@ setAuthFailureHandler(() => {
 /** §6.3 / §11 seniority thresholds, mirrored from `app/core/permissions.py`. */
 export const LEVEL_BREAKING_NEWS = 80;
 export const LEVEL_PUSH_APPROVE = 60;
+/** Admins may approve their own articles. */
+export const LEVEL_SELF_APPROVE = 90;

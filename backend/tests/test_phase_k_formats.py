@@ -225,7 +225,7 @@ class TestFormats:
                 article_id=article.id,
                 content_hash="upload-1"
                 if upload
-                else tts_service.content_hash(tts_service.spoken_text(article)),
+                else tts_service.words_hash(article),
                 status=AudioStatus.READY,
                 provider=tts_service.UPLOAD_PROVIDER if upload else "local",
                 url=f"https://cdn.example/audio/{article.short_id}.mp3",
@@ -403,6 +403,35 @@ class TestShareCard:
         media.deleted_at = utcnow()
         db.flush()
         assert share_card_service.hero_media_url(db, article) is None
+
+    def test_a_realistic_ai_hero_never_travels_as_a_bare_preview(self, db: Session) -> None:
+        """og:image has no room for "ప్రతీకాత్మక చిత్రం — AI", so a realistic AI
+        scene shared on WhatsApp would read as a photo of the event."""
+        article = make_article(db, short_id="card07")
+        media = Media(
+            type="image",
+            filename="ai.png",
+            mime="image/png",
+            bytes=99,
+            storage_provider="local",
+            storage_key="media/ai.png",
+            cdn_url="https://cdn.example/ai.png",
+            ai_generated=True,
+            meta={"representative": True},
+        )
+        db.add(media)
+        db.flush()
+        article.hero_media_id = media.id
+        db.flush()
+        assert share_card_service.hero_media_url(db, article) is None
+
+    def test_readers_get_an_ai_picture_as_a_stand_in_never_as_ai(self) -> None:
+        """Owner, 2026-10-02: no reader-facing AI label on pictures."""
+        from app.api.v1.public import _media_out
+
+        drawn = Media(id=1, cdn_url="https://cdn.example/ai.png", ai_generated=True, meta={})
+        out = _media_out(drawn)
+        assert out.ai_generated is False and out.representative is True
 
     def test_the_key_is_content_addressed(self, db: Session) -> None:
         """No database column and no invalidation logic: the bucket is the

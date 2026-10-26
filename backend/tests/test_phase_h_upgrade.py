@@ -44,12 +44,14 @@ from app.models.enums import (  # noqa: E402
     AiSuggestionStatus,
     ArticleStatus,
     ArticleType,
+    MediaType,
     RoleKey,
     ScopeType,
     UserStatus,
     WorkflowState,
 )
 from app.models.geo import District, Mandal  # noqa: E402
+from app.models.media import Media  # noqa: E402
 from app.models.user import Role, User, UserRole  # noqa: E402
 from app.services import auth_service, settings_service  # noqa: E402
 
@@ -134,6 +136,15 @@ BODY_TE = (
 def body_doc(text: str) -> dict:
     return {"type": "doc", "content": [
         {"type": "paragraph", "content": [{"type": "text", "text": text}]}]}
+
+
+def hero_id(db: Session) -> int:
+    """A usable photo: a story without one is never published."""
+    media = Media(type=MediaType.IMAGE, filename="hero.webp", mime="image/webp",
+                  storage_provider="local", storage_key="img/hero.webp")
+    db.add(media)
+    db.flush()
+    return media.id
 
 
 # --------------------------------------------------------------------------- #
@@ -395,7 +406,7 @@ class TestBreakingAndPins:
         author = staff_headers(db, role=RoleKey.SUB_EDITOR, email="h-author@test.example.com")
         chief = staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="h-chief@test.example.com")
         created = client.post("/api/v1/cms/articles", json={
-            "title_te": title, "body": body_doc(BODY_TE),
+            "title_te": title, "body": body_doc(BODY_TE), "hero_media_id": hero_id(db),
         }, headers=author).json()
         client.post(f"/api/v1/cms/articles/{created['id']}/submit", json={}, headers=author)
         client.post(f"/api/v1/cms/articles/{created['id']}/approve", json={}, headers=chief)
@@ -484,18 +495,23 @@ class TestVoice:
                      json={"values": {"voice.enabled": False, "voice.article_tts_enabled": False}}, headers=admin)
         settings_service.invalidate()
 
-    def test_spoken_text_is_hashed_for_reuse(self, db: Session) -> None:
-        from app.services import tts_service
+    def test_audio_is_keyed_by_words_not_reading_rules(
+        self, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from app.services import tts_service, tts_text
 
         article = db.execute(select(Article).where(
             Article.status == ArticleStatus.PUBLISHED)).scalars().first()
-        first = tts_service.content_hash(tts_service.spoken_text(article))
-        second = tts_service.content_hash(tts_service.spoken_text(article))
-        assert first == second, "§21 caching depends on a stable hash"
+        first = tts_service.words_hash(article)
+        assert tts_service.words_hash(article) == first, "§21 caching depends on a stable hash"
+
+        # A reading-rule change must not re-render (and re-bill) stored audio.
+        monkeypatch.setattr(tts_text, "assemble", lambda *parts: "changed rules")
+        assert tts_service.words_hash(article) == first
 
         article.title_te = article.title_te + " (సవరణ)"
         db.flush()
-        assert tts_service.content_hash(tts_service.spoken_text(article)) != first
+        assert tts_service.words_hash(article) != first
 
 
 # --------------------------------------------------------------------------- #
@@ -627,6 +643,7 @@ class TestDashboard:
         chief = staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="h-chief@test.example.com")
         created = client.post("/api/v1/cms/articles", json={
             "title_te": "షెడ్యూల్ పరీక్ష కథనం", "body": body_doc(BODY_TE),
+            "hero_media_id": hero_id(db),
         }, headers=author).json()
         aid = created["id"]
         client.post(f"/api/v1/cms/articles/{aid}/submit", json={}, headers=author)
@@ -657,7 +674,8 @@ class TestPlacementFromTheForm:
         chief = staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="h-chief@test.example.com")
         approver = staff_headers(db, role=RoleKey.ADMIN, email="h-approver@test.example.com")
         created = client.post("/api/v1/cms/articles", json={
-            "title_te": title, "body": body_doc(BODY_TE), **extra,
+            "title_te": title, "body": body_doc(BODY_TE), "hero_media_id": hero_id(db),
+            **extra,
         }, headers=chief).json()
         client.post(f"/api/v1/cms/articles/{created['id']}/submit", json={}, headers=chief)
         client.post(f"/api/v1/cms/articles/{created['id']}/approve", json={}, headers=approver)
@@ -721,10 +739,12 @@ class TestPlacementFromTheForm:
         created = self._approved(client, db, "ప్రచురణ తర్వాత పిన్")
         client.post(f"/api/v1/cms/articles/{created['id']}/publish", json={}, headers=chief)
 
-        # A published article cannot be PATCHed, which is exactly why placement
-        # has its own route.
-        assert client.patch(f"/api/v1/cms/articles/{created['id']}",
-                            json={"pin_home_minutes": 10}, headers=chief).status_code == 409
+        # A published article can be PATCHed now (2026-10-02), and the form's
+        # pin lands at once; the placement route still works on its own.
+        edited = client.patch(f"/api/v1/cms/articles/{created['id']}",
+                              json={"pin_home_minutes": 10}, headers=chief)
+        assert edited.status_code == 200, edited.text
+        assert {p["placement"] for p in edited.json()["active_pins"]} == {"home"}
 
         placed = client.post(f"/api/v1/cms/articles/{created['id']}/placement",
                              json={"pin_home_minutes": 10}, headers=chief)
@@ -740,7 +760,7 @@ class TestAudioAttachment:
         chief = staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="h-chief@test.example.com")
         approver = staff_headers(db, role=RoleKey.ADMIN, email="h-approver@test.example.com")
         created = client.post("/api/v1/cms/articles", json={
-            "title_te": title, "body": body_doc(BODY_TE),
+            "title_te": title, "body": body_doc(BODY_TE), "hero_media_id": hero_id(db),
         }, headers=chief).json()
         client.post(f"/api/v1/cms/articles/{created['id']}/submit", json={}, headers=chief)
         client.post(f"/api/v1/cms/articles/{created['id']}/approve", json={}, headers=approver)

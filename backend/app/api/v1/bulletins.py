@@ -39,7 +39,7 @@ from app.services import audit_service, bulletin_service, settings_service
 router = APIRouter(tags=["bulletins"])
 
 #: Same shape as the article audio route: revalidate at the browser, cache at
-#: the edge for two minutes. A bulletin changes at most seven times a day, but
+#: the edge for two minutes. A bulletin changes at most six times a day, but
 #: when it is pulled it must disappear quickly.
 _CACHE = "public, max-age=0, must-revalidate"
 _CDN_CACHE = "public, s-maxage=120, stale-while-revalidate=600"
@@ -143,7 +143,6 @@ def list_bulletins(
     return {
         "date": day.isoformat(),
         "enabled": settings_service.bulletin_enabled(db),
-        "requires_approval": bulletin_service.requires_approval(db),
         "items": [_cms_row(db, row) for row in rows],
         # Slots that have not been produced yet, so the screen can offer
         # "Run now" rather than simply showing nothing.

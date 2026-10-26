@@ -1,5 +1,5 @@
 import { api } from '@/api/client';
-import type { ArticleOrigin, AudioAssetRow, BulletinList, BulletinRow, ContentSource, KycProfileRow, KycStatus, Vertical, CrawlStatus, IngestQueueCounts, IngestedItem, IngestedRewrite, AiDraft, AiSuggestion, AudioState, CmsArticle, CmsArticleList, CmsAudioRef, CmsEditorOptions, CmsMediaRef, CmsOption, DashboardStats, SettingsPayload } from '@/types/cms';
+import type { ArticleOrigin, AssistantConversation, AssistantConversationSummary, AssistantJob, AssistantStatus, AudioAssetRow, BulletinList, BulletinRow, ContentSource, KycProfileRow, KycStatus, Vertical, CrawlStatus, IngestQueueCounts, IngestedItem, IngestedRewrite, AiDraft, AiSuggestion, AudioState, CmsArticle, CmsArticleList, CmsAudioRef, CmsEditorOptions, CmsMediaRef, CmsOption, DashboardStats, SettingsPayload } from '@/types/cms';
 export const fetchArticles=async(params?:{state?:string;search?:string;offset?:number;limit?:number})=>(await api.get<CmsArticleList>('/cms/articles',{params})).data;
 export const fetchArticle=async(id:number)=>(await api.get<CmsArticle>(`/cms/articles/${id}`)).data;
 export const createArticle=async(payload:Record<string,unknown>)=>(await api.post<CmsArticle>('/cms/articles',payload)).data;
@@ -17,6 +17,10 @@ export const reorderHomeSections=async(orderedIds:number[])=>(await api.put('/cm
 export const fetchPins=async<T>(includeExpired=false)=>(await api.get<T>('/cms/pins',{params:{include_expired:includeExpired}})).data;
 export const createPin=async(payload:Record<string,unknown>)=>(await api.post('/cms/pins',payload)).data;
 export const removePin=async(id:number)=>(await api.delete(`/cms/pins/${id}`)).data;
+export type ShortNewsCard={id:number;media_id:number;url:string;width:number|null;height:number|null;shape:'4:5'|'9:16'|null;article_id:number|null;article_short_id:string|null;article_title_te:string|null;created_at:string};
+export const fetchShortNewsCards=async(offset=0)=>(await api.get<{items:ShortNewsCard[];total:number}>('/cms/short-news',{params:{offset,limit:60}})).data;
+export const addShortNews=async(payload:{media_id:number;article_id?:number|null})=>(await api.post<ShortNewsCard>('/cms/short-news',payload)).data;
+export const removeShortNews=async(id:number)=>(await api.delete(`/cms/short-news/${id}`)).data;
 export const fetchTrendingScores=async<T>()=>(await api.get<T>('/cms/trending')).data;
 export const recomputeTrending=async()=>(await api.post('/cms/trending/recompute')).data;
 export const fetchAnalytics=async<T>()=>(await api.get<T>('/cms/analytics')).data;
@@ -26,6 +30,7 @@ export const fetchSubmissions=async<T>(status='pending')=>(await api.get<T>('/cm
 export const approveSubmission=async(id:number)=>(await api.post(`/cms/moderation/submissions/${id}/approve`)).data;
 export const rejectSubmission=async(id:number,note:string|null)=>(await api.post(`/cms/moderation/submissions/${id}/reject`,{note})).data;
 export const aiAssist=async<T>(payload:Record<string,unknown>)=>(await api.post<T>('/cms/ai/assist',payload)).data;
+export const aiHeadlines=async(payload:{article_id?:number;title_te?:string;body_plain?:string;summary_te?:string})=>(await api.post<{available:boolean;reason?:string|null;engine?:string;model?:string;story_type?:string|null;options?:Array<{text:string;device:string;label_te:string}>;seo_title?:string;seo_description?:string}>('/cms/ai/headlines',payload,{timeout:45_000})).data; // one model call, ~20 s: the global 20 s would abort a call that is still billed
 export const fetchAds=async<T>()=>(await api.get<T>('/cms/ads')).data;
 export const createAd=async(payload:Record<string,unknown>)=>(await api.post('/cms/ads',payload)).data;
 export const patchAd=async(id:number,payload:Record<string,unknown>)=>(await api.patch(`/cms/ads/${id}`,payload)).data;
@@ -43,7 +48,7 @@ export const pinComment=async(id:number,pinned:boolean)=>(await api.patch<{id:nu
 // --- §1 / §2 editor helpers ------------------------------------------------
 export const fetchEditorMandals=async(districtId:number)=>(await api.get<{items:CmsOption[]}>('/cms/dashboard/mandals',{params:{district_id:districtId}})).data.items;
 export const fetchEditorLocalities=async(mandalId:number)=>(await api.get<{items:Array<CmsOption&{kind:string}>}>('/cms/dashboard/localities',{params:{mandal_id:mandalId}})).data.items;
-export const uploadMedia=async(file:File,meta?:{alt_te?:string;credit?:string;source_type?:string})=>{const fd=new FormData();fd.append('file',file);if(meta?.alt_te)fd.append('alt_te',meta.alt_te);if(meta?.credit)fd.append('credit',meta.credit);if(meta?.source_type)fd.append('source_type',meta.source_type);return (await api.post<CmsMediaRef&{blurhash:string|null}>('/cms/media',fd,{headers:{'Content-Type':'multipart/form-data'}})).data};
+export const uploadMedia=async(file:File,meta?:{alt_te?:string;credit?:string;source_type?:string;ai_generated?:boolean})=>{const fd=new FormData();fd.append('file',file);if(meta?.alt_te)fd.append('alt_te',meta.alt_te);if(meta?.credit)fd.append('credit',meta.credit);if(meta?.source_type)fd.append('source_type',meta.source_type);if(meta?.ai_generated)fd.append('ai_generated','true');return (await api.post<CmsMediaRef&{blurhash:string|null}>('/cms/media',fd,{headers:{'Content-Type':'multipart/form-data'}})).data};
 export const fetchPendingArticles=async(params:Record<string,unknown>)=>(await api.get<CmsArticleList>('/cms/articles/pending',{params})).data;
 export const setBreaking=async(id:number,payload:{minutes?:number;clear?:boolean;repush?:boolean})=>(await api.post<CmsArticle>(`/cms/articles/${id}/breaking`,payload)).data;
 
@@ -124,14 +129,14 @@ export const decideKyc=async(id:number,action:'approve'|'reject'|'request-more',
 // the server's, not a convenience.
 export const setPanchayatPublish=async(id:number,granted:boolean)=>(await api.post<{id:number;granted_at:string|null;unpublished_article_ids:number[]}>(`/cms/kyc/${id}/panchayat-publish`,{granted,unpublish_live:true})).data;
 
-// --- §17 an illustration when no photograph exists -------------------------
+// --- §17 an AI picture when no photograph exists ---------------------------
 // `available:false` with a `reason` is a normal answer, not a failure: the
 // reason is a sentence written for the desk, so the caller shows it verbatim
 // rather than inventing its own wording. A refused sensitive topic arrives as
 // a 422 ApiError instead, carrying its own Telugu message.
-// The illustration carries no credit — nobody photographed it — so the media
+// The AI picture carries no credit — nobody photographed it — so the media
 // it returns is a CmsMediaRef minus that field, plus what the desk pressed the
-// button to learn: which model drew it and whether it became the hero.
+// button to learn: which model made it and whether it became the hero.
 type GeneratedImage=Omit<CmsMediaRef,'credit'>&{ai_generated:boolean;ai_model:string|null;is_hero:boolean};
 export const generateArticleImage=async(id:number,brief:string,force=false)=>(await api.post<{available:boolean;reason:string|null;media:GeneratedImage|null}>(`/cms/ai/articles/${id}/image`,{brief:brief||null,force})).data;
 
@@ -169,3 +174,14 @@ export const reorderCategories=async(orderedIds:number[])=>(await api.put('/cms/
 // --- §13 push campaigns ------------------------------------------------------
 // Only a `scheduled` campaign cancels; anything already sent is a 409.
 export const cancelCampaign=async(id:number)=>(await api.delete<{id:number;status:string}>(`/cms/notifications/${id}`)).data;
+
+// --- Sanjaya, the newsroom assistant ---------------------------------------
+// The POST only queues the turn (202) and the page polls the conversation, so
+// 30 s is headroom for a slow insert, not for the model: an abort here would
+// look like a network failure while the server carries on and bills.
+export const fetchAssistantStatus=async()=>(await api.get<AssistantStatus>('/cms/assistant/status')).data;
+export const fetchAssistantConversations=async(limit=30)=>(await api.get<{items:AssistantConversationSummary[]}>('/cms/assistant/conversations',{params:{limit}})).data.items;
+export const fetchAssistantConversation=async(id:number)=>(await api.get<AssistantConversation>(`/cms/assistant/conversations/${id}`)).data;
+export const sendAssistantMessage=async(body:{conversation_id:number|null;text:string})=>(await api.post<AssistantConversation>('/cms/assistant/messages',body,{timeout:30_000})).data;
+export const deleteAssistantConversation=async(id:number)=>(await api.delete(`/cms/assistant/conversations/${id}`)).data;
+export const fetchAssistantJob=async(id:number)=>(await api.get<AssistantJob>(`/cms/assistant/jobs/${id}`)).data;

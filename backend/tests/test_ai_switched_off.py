@@ -133,10 +133,11 @@ def test_the_kill_switch_defaults_to_letting_settings_decide(monkeypatch: pytest
 SETTINGS_SWITCHES = (
     "ai.enabled", "ai.auto_suggest", "ai.image_enabled", "ai.research_enabled",
     "crawl.enabled", "crawl.rewrite_enabled", "crawl.html_fallback_enabled",
-    "crawl.open_licence_images",
+    "crawl.open_licence_images", "crawl.auto_import", "crawl.image_scan",
+    "crawl.ai_illustrations",
     "voice.enabled", "voice.article_tts_enabled", "voice.auto_generate_on_publish",
     "voice.backfill_enabled",
-    "bulletin.enabled", "bulletin.ai_script_enabled", "epaper.audio_enabled",
+    "bulletin.enabled", "epaper.audio_enabled",
 )
 
 

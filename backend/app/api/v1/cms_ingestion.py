@@ -466,8 +466,15 @@ def import_item(
     p: Principal = Depends(require_permission("article.create")),
 ):
     """Creating the article needs `article.create` — the same permission a
-    person needs to file copy. A feed does not get a shortcut."""
+    person needs to file copy. A feed does not get a shortcut.
+
+    The item is claimed before anything is built: the crawl's automatic
+    import may have taken it a moment ago, and two articles from one story is
+    the outcome the 409 prevents. No AI picture is made from here — a web
+    request never pays for a picture nobody asked for."""
     item = ingestion_service.get_item(db, item_id)
+    if not ingestion_service.claim_item(db, item_id):
+        raise ingestion_service.already_in_review(item_id)
     options = payload or ImportIn()
     article = ingestion_service.import_item(
         db,
@@ -477,6 +484,7 @@ def import_item(
         mandal_id=options.mandal_id,
         district_id=options.district_id,
         category_id=options.category_id,
+        claimed=True,
     )
     audit_service.record(
         db,

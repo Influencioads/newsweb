@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import date, datetime
 
 
 @dataclass(slots=True)
@@ -55,6 +56,40 @@ class RewriteText:
     unverified: bool = False
     refused: bool = False
     refusal_reason: str | None = None
+    #: Where the model would file the story — the raw strings it returned for
+    #: the extra keys `taxonomy` asked for (category, subcategory, district,
+    #: place, tags, breaking). Untrusted: `crawl_service._classify` validates
+    #: every value against our own tables before anything reaches an article.
+    #: None when no taxonomy was offered, or on a refusal.
+    classification: dict | None = None
+    #: The house-style story type the model says it followed (validated
+    #: against `newsroom_style.type_keys`), and what it wants an editor to
+    #: check — kept out of the copy, per the guide. None when not asked.
+    story_type: str | None = None
+    editor_note: str | None = None
+
+
+@dataclass(slots=True)
+class HeadlineOption:
+    """One suggested headline: the words and the curiosity device it uses
+    (`straight` for the plain factual one)."""
+
+    text: str
+    device: str
+    label_te: str = ""
+
+
+@dataclass(slots=True)
+class ImageVerdict:
+    """What a vision model saw in one crawled photo.
+
+    `verdict` is one of clean / watermark / logo / text / graphic. A verdict is
+    all it is: the pipeline rejects a branded photo, it never cleans one, and
+    the bytes are never handed to an image edit or generation model.
+    """
+
+    verdict: str
+    reason: str = ""
 
 
 @dataclass(slots=True)
@@ -92,12 +127,23 @@ class AiProvider(ABC):
         never someone else's article text."""
 
     @abstractmethod
-    def write_draft(self, *, topic: str, notes: str, sources: list[dict]) -> DraftText:
+    def write_draft(
+        self,
+        *,
+        topic: str,
+        notes: str,
+        sources: list[dict],
+        story_type: str | None = None,
+        house_style: bool = True,
+    ) -> DraftText:
         """Write original Telugu copy about `topic`.
 
         `sources` carries publisher names and URLs so the model can attribute,
         not so it can reproduce: implementations must instruct the model to
         write in its own words and never to copy sentences.
+
+        `house_style` adds the newsroom style brief; a caller whose output is
+        not an article (the bulletin's spoken connectives) turns it off.
         """
 
     @abstractmethod
@@ -111,8 +157,24 @@ class AiProvider(ABC):
         language_in: str = "te",
         target_words: int = 220,
         credit_source: bool = True,
+        taxonomy: dict | None = None,
+        story_type: str | None = None,
+        feedback: str | None = None,
+        source_date: date | datetime | None = None,
     ) -> RewriteText:
         """Rewrite an external report as original Telugu copy.
+
+        `story_type` picks the house-style guide the model follows (None: it
+        is offered the likeliest three and reports its pick); `feedback` is
+        why the previous answer was rejected, for the one retry the crawl
+        allows; `source_date` is when the source was published, so relative
+        days (నేడు, నిన్న) are counted from it.
+
+        `taxonomy`, when given, also asks where the story belongs:
+        `{"categories": [{"slug", "name", "children": [{"slug", "name"}]}],
+        "districts": [name_en, ...]}` read live from our tables. The answer
+        comes back raw on `RewriteText.classification`; providers that cannot
+        classify ignore it.
 
         `body_text` is somebody else's words. Implementations must instruct the
         model to reproduce none of them, to add no fact the input does not
@@ -147,3 +209,23 @@ class AiProvider(ABC):
             headline=_clip(headline, 90),
             summary=_clip(summary or body, 170),
         )
+
+    def headline_options(
+        self, *, headline: str, summary: str, body: str, story_type: str | None = None
+    ) -> list[HeadlineOption]:
+        """Alternative headlines for our own story, for an editor to pick from.
+
+        Not abstract: the keyless answer is no ideas — there is no honest way
+        to invent a headline without a model.
+        """
+        return []
+
+    def inspect_image(self, raw: bytes) -> ImageVerdict | None:
+        """Look at one crawled photo and say whether the publisher branded it.
+
+        Not abstract: None means "cannot check" — no key, a provider without
+        image input — and the caller then behaves exactly as before the check
+        existed. `raw` is only looked at; it is never edited, cleaned or sent to
+        an image model.
+        """
+        return None

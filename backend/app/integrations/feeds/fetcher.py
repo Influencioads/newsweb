@@ -21,6 +21,8 @@ from __future__ import annotations
 import re
 import threading
 import time
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from urllib.parse import urljoin, urlparse
@@ -92,7 +94,42 @@ class FeedResult:
     feed_title: str | None = None
 
 
-def _robots_allows(url: str) -> bool:
+class BlockedURL(httpx.RequestError):
+    """The caller's `url_guard` refused a URL — raised before connecting."""
+
+
+def _guard_hooks(url_guard: Callable[[str], bool]) -> dict:
+    """httpx calls request hooks for the first request **and every redirect
+    hop**, before it connects — which is the whole point: a public page that
+    answers 302 to 169.254.169.254 is stopped at the hop, not after it."""
+
+    def check(request: httpx.Request) -> None:
+        if not url_guard(str(request.url)):
+            raise BlockedURL(f"refused {request.url.host}", request=request)
+
+    return {"request": [check]}
+
+
+def _get(url: str, url_guard: Callable[[str], bool] | None, **kwargs) -> httpx.Response:
+    if url_guard is None:
+        return httpx.get(url, **kwargs)
+    with httpx.Client(event_hooks=_guard_hooks(url_guard)) as client:
+        return client.get(url, **kwargs)
+
+
+@contextmanager
+def _stream(url: str, url_guard: Callable[[str], bool] | None, **kwargs) -> Iterator[httpx.Response]:
+    if url_guard is None:
+        with httpx.stream("GET", url, **kwargs) as response:
+            yield response
+        return
+    with httpx.Client(event_hooks=_guard_hooks(url_guard)) as client, client.stream(
+        "GET", url, **kwargs
+    ) as response:
+        yield response
+
+
+def _robots_allows(url: str, url_guard: Callable[[str], bool] | None = None) -> bool:
     """A disallowed feed URL is a publisher saying no. Honour it.
 
     A robots.txt we cannot fetch is treated as permissive, which is the
@@ -107,8 +144,9 @@ def _robots_allows(url: str) -> bool:
     if cached is None or (now - cached[1]) > _ROBOTS_TTL_SECONDS:
         parser: RobotFileParser | None = RobotFileParser()
         try:
-            response = httpx.get(
+            response = _get(
                 urljoin(origin, "/robots.txt"),
+                url_guard,
                 headers={"User-Agent": user_agent()},
                 timeout=10.0,
                 follow_redirects=True,
@@ -303,7 +341,7 @@ def fetch_feed(
 class PageResult:
     """The outcome of fetching one article page for the HTML fallback."""
 
-    status: str  # ok | blocked_by_robots | fetch_failed | http_{code} | not_html
+    status: str  # ok | blocked | blocked_by_robots | fetch_failed | http_{code} | not_html
     html: str | None = None
     final_url: str | None = None
     error: str | None = None
@@ -315,15 +353,26 @@ _MAX_PAGE_BYTES = 2_000_000
 
 
 def fetch_page(
-    url: str, *, timeout: float = 20.0, max_bytes: int = _MAX_PAGE_BYTES
+    url: str,
+    *,
+    timeout: float = 20.0,
+    max_bytes: int = _MAX_PAGE_BYTES,
+    url_guard: Callable[[str], bool] | None = None,
 ) -> PageResult:
     """Fetch one article page as HTML. Never raises, same contract as `fetch_feed`.
 
     Robots is checked against the **article URL**, not the feed URL: a
     publisher can allow their feed and disallow their article pages, and that
     distinction is exactly the one worth honouring.
+
+    `url_guard(url) -> bool` is asked about every URL this call would connect
+    to — the robots.txt, the page, and each redirect hop of both — before the
+    connection is made; a refusal is status `blocked`. For URLs a person typed
+    (the assistant's "read this page"); feed URLs an admin configured pass none.
     """
-    if not _robots_allows(url):
+    if url_guard is not None and not url_guard(url):
+        return PageResult(status="blocked", error="address refused")
+    if not _robots_allows(url, url_guard):
         logger.info("page_blocked_by_robots", url=url)
         return PageResult(status="blocked_by_robots", error="robots.txt disallows this URL")
 
@@ -333,8 +382,8 @@ def fetch_page(
         "Accept": "text/html,application/xhtml+xml;q=0.9",
     }
     try:
-        with httpx.stream(
-            "GET", url, headers=headers, timeout=timeout, follow_redirects=True
+        with _stream(
+            url, url_guard, headers=headers, timeout=timeout, follow_redirects=True
         ) as response:
             if response.status_code != 200:
                 return PageResult(status=f"http_{response.status_code}")
@@ -357,7 +406,8 @@ def fetch_page(
             final_url = str(response.url)
     except httpx.HTTPError as exc:
         logger.info("page_fetch_failed", url=url, error=str(exc)[:200])
-        return PageResult(status="fetch_failed", error=str(exc)[:200])
+        status = "blocked" if isinstance(exc, BlockedURL) else "fetch_failed"
+        return PageResult(status=status, error=str(exc)[:200])
 
     try:
         text = raw.decode(encoding, errors="replace")

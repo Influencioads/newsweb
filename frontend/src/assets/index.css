@@ -17,6 +17,7 @@
   --tn-brand: 13 71 161;          --tn-brand-dark: 10 55 128;
   --tn-brand-deep: 7 38 89;       --tn-brand-tint: 232 239 251;
   --tn-breaking: 190 10 20;       --tn-breaking-tint: 253 234 235;
+  --tn-breaking-deep: 98 8 22;
   --tn-breaking-border: 244 190 193;
   --tn-ink: 23 25 30;             --tn-ink-soft: 72 76 84;
   --tn-ink-panel: 34 37 43;       --tn-ink-deep: 16 18 22;
@@ -119,6 +120,83 @@
  * text-ink flips. (The `.dark .bg-white` compatibility shim is gone: every
  * surface now uses `bg-surface`, and text-white on fills stays white.) */
 .dark .bg-ink { background-color: rgb(var(--tn-ink-deep)); }
+
+/* Homepage-only editorial hierarchy. The deep base remains readable in both
+   themes even when admin-selected brand colours are lighter at night. */
+.home-feature {
+  color: rgb(var(--tn-on-ink));
+  border-color: rgb(var(--tn-brand) / .28);
+  background-color: rgb(var(--tn-brand-deep));
+  background: linear-gradient(125deg,
+    rgb(var(--tn-brand-deep)) 0%,
+    color-mix(in srgb, rgb(var(--tn-brand-deep)) 76%, rgb(var(--tn-brand))) 62%,
+    color-mix(in srgb, rgb(var(--tn-brand-deep)) 77%, rgb(var(--tn-breaking))) 100%);
+}
+
+.home-feature-meta { color: rgb(var(--tn-on-ink) / .78); }
+
+.home-section-band {
+  --home-band-base: rgb(var(--tn-brand-deep));
+  --home-band-accent: rgb(var(--tn-brand));
+  background-color: var(--home-band-base);
+  background: linear-gradient(104deg,
+    var(--home-band-base),
+    color-mix(in srgb, var(--home-band-base) 55%, var(--home-band-accent)));
+  box-shadow: 0 5px 18px -12px rgb(var(--tn-brand-deep) / .65);
+}
+
+.home-section-band[data-band-tone="national"] { --home-band-accent: rgb(var(--tn-brand)); }
+.home-section-band[data-band-tone="breaking"] {
+  --home-band-base: rgb(var(--tn-breaking-deep));
+  --home-band-accent: rgb(var(--tn-breaking));
+}
+.home-section-band[data-band-tone="international"] {
+  --home-band-base: rgb(var(--tn-ink-deep));
+  --home-band-accent: rgb(var(--tn-info));
+}
+.home-section-band[data-band-tone="business"] { --home-band-accent: rgb(var(--tn-success)); }
+.home-section-band[data-band-tone="exclusive"] {
+  --home-band-base: rgb(var(--tn-ink-deep));
+  --home-band-accent: rgb(var(--tn-ai));
+  --home-band-accent: color-mix(in srgb, rgb(var(--tn-ai)) 55%, rgb(var(--tn-breaking)));
+}
+.home-section-band[data-band-tone="politics"] { --home-band-accent: rgb(var(--tn-exclusive)); }
+.home-section-band[data-band-tone="cinema"] { --home-band-accent: rgb(var(--tn-ai)); }
+.home-section-band[data-band-tone="sports"] {
+  --home-band-base: rgb(var(--tn-ink-deep));
+  --home-band-accent: rgb(var(--tn-success));
+}
+.home-section-band[data-band-tone="jobs"] { --home-band-accent: rgb(var(--tn-partial)); }
+.home-section-band[data-band-tone="health"] {
+  --home-band-base: rgb(var(--tn-ink-deep));
+  --home-band-accent: rgb(var(--tn-info));
+}
+.home-section-band[data-band-tone="lifestyle"] {
+  --home-band-base: rgb(var(--tn-ink-deep));
+  --home-band-accent: rgb(var(--tn-ai));
+}
+.home-section-band[data-band-tone="travel"] { --home-band-accent: rgb(var(--tn-info)); }
+.home-section-band[data-band-tone="food"] {
+  --home-band-base: rgb(var(--tn-breaking-deep));
+  --home-band-accent: rgb(var(--tn-exclusive));
+}
+.home-section-band[data-band-tone="crime"] {
+  --home-band-base: rgb(var(--tn-ink-deep));
+  --home-band-accent: rgb(var(--tn-ink-panel));
+}
+.home-section-band[data-band-tone="devotional"] {
+  --home-band-base: rgb(var(--tn-ink-deep));
+  --home-band-accent: rgb(var(--tn-partial));
+}
+.home-section-band[data-band-tone="inspiring"] { --home-band-accent: rgb(var(--tn-ai)); }
+.home-section-band[data-band-tone="regional"] { --home-band-accent: rgb(var(--tn-brand-dark)); }
+
+.breaking-gradient-band {
+  background-color: rgb(var(--tn-breaking-deep));
+  background: linear-gradient(100deg,
+    rgb(var(--tn-breaking-deep)),
+    color-mix(in srgb, rgb(var(--tn-breaking-deep)) 58%, rgb(var(--tn-breaking))));
+}
 
 @layer base {
   html {
@@ -357,7 +435,54 @@
   @media (prefers-reduced-motion: reduce) {
     .animate-eq,
     .animate-ring,
-    .animate-spin-slow { animation: none !important; }
+    .animate-spin-slow,
+    .logo-cube > span { animation: none !important; }
+  }
+
+  /* Brand cube (PublicLayout LogoCube), pinned bottom-left above the player
+     dock and the article bottom bar, under dialogs and toasts; clicks pass
+     through. White and blue T faces, red top and bottom. Logo colours are
+     literal: the logo image does not follow the theme, so neither does its
+     cube. Still under reduced motion, at an angle. */
+  .logo-cube {
+    --cube: 56px;
+    position: fixed;
+    z-index: 30;
+    left: 16px;
+    bottom: calc(16px + var(--player-dock-h, 0px) + var(--bottom-bar-h, 0px));
+    width: var(--cube);
+    height: var(--cube);
+    perspective: calc(var(--cube) * 7);
+    pointer-events: none;
+  }
+  @media (min-width: 768px) { .logo-cube { --cube: 80px; left: 24px; bottom: calc(24px + var(--player-dock-h, 0px) + var(--bottom-bar-h, 0px)); } }
+  .logo-cube > span {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transform: rotateX(-22deg) rotateY(-30deg);
+    animation: logo-cube 7s linear infinite;
+  }
+  .logo-cube [data-face] {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: #fff;
+    border: 1.5px solid #0d47a1;
+  }
+  .logo-cube img { width: 84%; height: auto; }
+  .logo-cube [data-face='front'] { transform: translateZ(calc(var(--cube) / 2)); }
+  .logo-cube [data-face='back'] { transform: rotateY(180deg) translateZ(calc(var(--cube) / 2)); }
+  .logo-cube [data-face='right'] { transform: rotateY(90deg) translateZ(calc(var(--cube) / 2)); background: #0d47a1; }
+  .logo-cube [data-face='left'] { transform: rotateY(-90deg) translateZ(calc(var(--cube) / 2)); background: #0d47a1; }
+  .logo-cube [data-face='top'] { transform: rotateX(90deg) translateZ(calc(var(--cube) / 2)); background: #d0101a; border-color: #d0101a; }
+  .logo-cube [data-face='bottom'] { transform: rotateX(-90deg) translateZ(calc(var(--cube) / 2)); background: #d0101a; border-color: #d0101a; }
+  @keyframes logo-cube {
+    from { transform: rotateX(-22deg) rotateY(-30deg); }
+    to { transform: rotateX(-22deg) rotateY(330deg); }
   }
 
   .no-scrollbar { scrollbar-width: none; }

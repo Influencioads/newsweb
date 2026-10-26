@@ -48,7 +48,7 @@ from app.schemas.epaper import (
     SlotOut,
     TemplatePlanOut,
 )
-from app.services import epaper_pdf, settings_service
+from app.services import epaper_pdf, media_service, settings_service
 from app.services.epaper_layouts import (
     OVERFLOW_LAYOUT,
     SIZE_RANK,
@@ -407,11 +407,15 @@ def _hero_urls(db: Session, media_ids: set[int]) -> dict[int, _Hero]:
     if not media_ids:
         return {}
     rows = db.execute(
-        select(Media.id, Media.cdn_url, Media.caption_te, Media.credit).where(
-            Media.id.in_(media_ids)
-        )
+        select(
+            Media.id, Media.cdn_url, Media.caption_te, Media.credit, Media.source_type
+        ).where(Media.id.in_(media_ids))
     ).all()
-    return {media_id: _Hero(url, caption, credit) for media_id, url, caption, credit in rows}
+    # The sheet is public: a borrowed photo's credit stays in the CMS (2026-10-03).
+    return {
+        media_id: _Hero(url, caption, credit if kind in media_service.CREDIT_EXEMPT else None)
+        for media_id, url, caption, credit, kind in rows
+    }
 
 
 def _words(article: Article) -> int:

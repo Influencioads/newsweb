@@ -163,6 +163,7 @@ async def upload_media(
     caption_te: str | None = Form(None),
     credit: str | None = Form(None),
     source_type: str = Form("own"),
+    ai_generated: bool = Form(False),
     db: Session = Depends(get_db),
     p: Principal = Depends(require_permission("media.upload")),
 ):
@@ -183,6 +184,8 @@ async def upload_media(
         caption_te=caption_te,
         credit=credit,
         source_type=source_type,
+        # §7.4: an AI-made picture carries the visible label wherever it shows.
+        ai_generated=ai_generated,
     )
     audit_service.record(
         db,
@@ -190,7 +193,7 @@ async def upload_media(
         entity_type="media",
         entity_id=media.id,
         actor=p.user,
-        after={"filename": media.filename, "bytes": media.bytes},
+        after={"filename": media.filename, "bytes": media.bytes, "ai_generated": ai_generated},
         request=request,
     )
     return {

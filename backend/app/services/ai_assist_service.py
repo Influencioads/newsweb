@@ -17,6 +17,11 @@ work without a model:
 When provider keys land, an LLM adapter replaces individual functions behind
 the same response shape; the endpoint and UI do not change. The response
 carries `engine` so the CMS can label the provenance honestly.
+
+Two house-style additions (`newsroom_style`): `assist` also says which story
+type the copy reads as and lints it — free and deterministic — and
+`headline_ideas` is the one paid call here, a set of alternative headlines
+from the editorial model, billed to the editor who asked.
 """
 
 from __future__ import annotations
@@ -28,8 +33,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.base import utcnow
+from app.db.session import session_scope
+from app.integrations.ai import get_ai, newsroom_style
 from app.models.content import Article, Tag, TermGlossary
 from app.models.enums import ArticleStatus, TagType
+from app.services import ai_usage_service, settings_service
 from app.telugu.normalize import normalize_text
 
 ENGINE = "heuristic-v1"
@@ -232,6 +240,8 @@ def assist(
     exclude_article_id: int | None = None,
 ) -> dict:
     text = f"{title_te}\n{body_plain}"
+    story_type = newsroom_style.detect_type(title_te, body_plain)
+    paragraphs = [p.strip() for p in (body_plain or "").splitlines() if p.strip()]
     return {
         "engine": ENGINE,
         "duplicates": find_duplicates(
@@ -248,4 +258,69 @@ def assist(
         "seo": suggest_seo(
             title_te=title_te, summary_te=summary_te, body_plain=body_plain
         ),
+        # The house style's checks on the editor's own copy: no model, no cost.
+        "story_type": story_type,
+        "style_issues": newsroom_style.lint_copy(
+            title_te, summary_te or "", paragraphs, story_type=story_type
+        ),
+    }
+
+
+def headline_ideas(
+    db: Session,
+    *,
+    title_te: str,
+    body_plain: str,
+    summary_te: str | None,
+    actor_id: int | None,
+) -> dict:
+    """Alternative headlines and an SEO pair, from the editorial model.
+
+    AI off, or no key, answers `available: false` with the reason rather than
+    an error: there is no keyless way to suggest a headline honestly, and the
+    button must say why it gave nothing. Otherwise one call, billed to the
+    editor (quota and budget first, as every actor-billed call is); a failed
+    call is billed on its own session so the request's rollback cannot take
+    the row. The options are already checked by the provider — Telugu, within
+    the type's ceiling, no figure the story lacks, no banned phrase.
+    """
+    if not settings_service.ai_enabled(db):
+        return {"available": False, "reason": "AI is switched off."}
+    provider = get_ai(**settings_service.ai_credentials(db))
+    if provider.key == "heuristic":
+        return {"available": False, "reason": "No AI provider key is configured."}
+    story_type = newsroom_style.detect_type(title_te, body_plain)
+    ai_usage_service.guard(db, actor_id)
+    try:
+        options = provider.headline_options(
+            headline=title_te,
+            summary=summary_te or "",
+            body=body_plain,
+            story_type=story_type,
+        )
+    except Exception as exc:  # noqa: BLE001 — a malformed answer is still billed
+        with session_scope() as ledger:
+            ai_usage_service.record(
+                ledger, operation="headlines", provider=provider.key,
+                model=getattr(provider, "model_name", None), actor_id=actor_id,
+                usage=getattr(provider, "last_usage", None), ok=False,
+                error=str(getattr(exc, "details", exc))[:300],
+            )
+        raise
+    ai_usage_service.record(
+        db, operation="headlines", provider=provider.key,
+        model=getattr(provider, "model_name", None), actor_id=actor_id,
+        usage=getattr(provider, "last_usage", None),
+    )
+    seo = getattr(provider, "last_seo", None) or {}
+    return {
+        "available": True,
+        "engine": provider.key,
+        "model": getattr(provider, "model_name", None),
+        "story_type": story_type,
+        "options": [
+            {"text": o.text, "device": o.device, "label_te": o.label_te} for o in options
+        ],
+        "seo_title": seo.get("seo_title", ""),
+        "seo_description": seo.get("seo_description", ""),
     }

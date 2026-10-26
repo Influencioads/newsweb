@@ -9,6 +9,7 @@ import type {
   MandalOut,
   SearchMeta,
   SearchResults,
+  ShortNewsFeed,
   ReactionKind,
   ReactionSummary,
   SiteConfig,
@@ -72,12 +73,8 @@ export async function fetchVideos(params?: {
   return data;
 }
 
-export async function fetchShortNews(params?: {
-  category?: string;
-  offset?: number;
-  limit?: number;
-}): Promise<CategoryFeed> {
-  const { data } = await api.get<CategoryFeed>('/public/short-news', { params });
+export async function fetchShortNews(params?: { offset?: number; limit?: number }): Promise<ShortNewsFeed> {
+  const { data } = await api.get<ShortNewsFeed>('/public/short-news', { params });
   return data;
 }
 

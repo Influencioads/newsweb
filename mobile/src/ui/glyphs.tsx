@@ -57,6 +57,30 @@ export function WhatsAppGlyph({ size = 20, color, style }: GlyphProps) {
   );
 }
 
+/** The X (Twitter) mark. Solid, filled with `color`. */
+export function XGlyph({ size = 20, color, style }: GlyphProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
+      <Path
+        fill={color}
+        d="M18.9 1.15h3.68l-8.04 9.2L24 22.85h-7.4l-5.8-7.59-6.64 7.59H.47l8.6-9.83L0 1.15h7.6l5.24 6.93Zm-1.29 19.5h2.04L6.49 3.24H4.3Z"
+      />
+    </Svg>
+  );
+}
+
+/** Telegram: the paper plane cut out of a solid disc. */
+export function TelegramGlyph({ size = 20, color, style }: GlyphProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
+      <Path
+        fill={color}
+        d="M12 0a12 12 0 1 0 0 24 12 12 0 0 0 0-24Zm4.91 7.22c.1 0 .32.02.47.14.1.08.16.2.17.33.02.09.04.3.02.47-.18 1.9-.96 6.5-1.36 8.63-.17.9-.5 1.2-.82 1.23-.7.06-1.23-.46-1.9-.9-1.06-.7-1.65-1.13-2.68-1.8-1.18-.78-.42-1.21.26-1.91.18-.19 3.25-2.98 3.3-3.23.01-.03.02-.15-.05-.21s-.17-.04-.25-.03c-.1.03-1.79 1.14-5.06 3.35-.48.33-.91.49-1.3.48-.43-.01-1.26-.24-1.87-.44-.75-.25-1.35-.37-1.3-.79.03-.22.33-.44.9-.66 3.5-1.53 5.83-2.53 7-3.02 3.33-1.38 4.02-1.62 4.47-1.63Z"
+      />
+    </Svg>
+  );
+}
+
 /**
  * Share. Three linked nodes — the graph, not lucide's box-with-an-arrow,
  * which reads as "export a file" more than "send this to someone".
@@ -124,6 +148,22 @@ export function PlaceGlyph({ size = 20, color, strokeWidth = 1.75, style }: Glyp
         strokeLinejoin="round"
       />
       <Circle cx={12} cy={9.5} r={2.4} stroke={color} strokeWidth={strokeWidth} />
+    </Svg>
+  );
+}
+
+/**
+ * Listen. A transistor radio whose antenna is sending — the house's "on air"
+ * mark, where every other news app shows the same stock headphones.
+ */
+export function ListenGlyph({ size = 20, color, strokeWidth = 1.75, style }: GlyphProps) {
+  const ink = { stroke: color, strokeWidth };
+  return (
+    <Svg width={size} height={size} {...BASE} style={style}>
+      <Rect x={2.5} y={11} width={19} height={10} rx={2.5} {...ink} />
+      <Circle cx={8} cy={16} r={2.5} {...ink} />
+      <Path d="M7 11 14 5.5M14.5 14.5h3.5M14.5 17.5h3.5" {...ink} />
+      <Path d="M15.3 3.25a2.6 2.6 0 0 1 1.14 3.14M16.5 1.17a5 5 0 0 1 2.2 6.04" {...ink} />
     </Svg>
   );
 }

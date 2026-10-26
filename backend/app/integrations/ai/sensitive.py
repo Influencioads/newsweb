@@ -53,8 +53,9 @@ _TOPICS: dict[str, tuple[str, ...]] = {
         "mob attack", "hate crime",
     ),
     "sexual_assault": (
-        "అత్యాచారం", "లైంగిక", "వేధింపుల", "అఘాయిత్యం",
-        "rape", "raped", "gang rape", "sexual assault",
+        "అత్యాచార", "లైంగిక", "వేధింపుల", "అఘాయిత్య",
+        "rape", "raped", "gang rape", "sexual assault", "sexually assaulted",
+        "sexually abused", "sexually harassed",
         "sexual harassment", "molest", "molested", "molestation",
     ),
     "minor": (

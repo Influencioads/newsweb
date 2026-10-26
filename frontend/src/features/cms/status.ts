@@ -109,6 +109,11 @@ export const STATUS_TONES: StatusRegistry = {
   discarded: entry('muted', 'విస్మరించారు', 'Discarded'),
   imported: entry('success', 'తీసుకున్నారు', 'Imported'),
   duplicate: entry('muted', 'ఇప్పటికే ఉంది', 'Duplicate'),
+  // Background jobs and assistant turns (Sanjaya).
+  queued: entry('muted', 'వరుసలో ఉంది', 'Queued'),
+  running: entry('info', 'నడుస్తోంది', 'Running'),
+  done: entry('success', 'పూర్తయింది', 'Done'),
+  idle: entry('muted', 'ఖాళీగా ఉంది', 'Idle'),
   // Polls, pins, web stories, homepage blocks.
   active: entry('success', 'క్రియాశీలం', 'Active'),
   inactive: entry('muted', 'నిష్క్రియం', 'Inactive'),

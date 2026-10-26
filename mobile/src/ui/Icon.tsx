@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  Megaphone,
   ArrowRight,
   Bell,
   Bookmark,
@@ -93,7 +94,7 @@ import {
 import type { StyleProp, ViewStyle } from 'react-native';
 
 import { useColors } from '@/lib/useTheme';
-import { CommentGlyph, PlaceGlyph, ShareGlyph, WhatsAppGlyph } from '@/ui/glyphs';
+import { CommentGlyph, ListenGlyph, PlaceGlyph, ShareGlyph, WhatsAppGlyph } from '@/ui/glyphs';
 
 /**
  * Icon — the only way glyphs enter the app (audit-ui rejects emoji and
@@ -104,6 +105,7 @@ import { CommentGlyph, PlaceGlyph, ShareGlyph, WhatsAppGlyph } from '@/ui/glyphs
  */
 const MAP = {
   home: House,
+  megaphone: Megaphone,
   mapPin: MapPin,
   pin: Pin,
   play: Play,
@@ -194,12 +196,13 @@ const MAP = {
   checkCircle2: CircleCheck,
   xCircle: CircleX,
   loader2: LoaderCircle,
-  // The house's own marks — see ui/glyphs.tsx for why these four are not
+  // The house's own marks — see ui/glyphs.tsx for why these are not
   // lucide. Same 24 grid and the same props, so they need no special casing.
   whatsapp: WhatsAppGlyph,
   share: ShareGlyph,
   comment: CommentGlyph,
   place: PlaceGlyph,
+  listen: ListenGlyph,
 } as const;
 
 export type IconName = keyof typeof MAP;

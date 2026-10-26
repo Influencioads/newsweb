@@ -1,7 +1,8 @@
 import { Suspense, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 
 import { RouteFallback, SkipLink } from '@/components/app';
+import { BottomNav } from '@/components/layout/BottomNav';
 import { BreakingTicker } from '@/components/layout/BreakingTicker';
 import { CategoryNav } from '@/components/layout/CategoryNav';
 import { Masthead } from '@/components/layout/Masthead';
@@ -24,6 +25,9 @@ export default function PublicLayout() {
   const { language } = useI18n();
   const authStatus = useAuth((s) => s.status);
   const bootstrap = useAuth((s) => s.bootstrap);
+  // The WOW home page carries only what the concept pitch lists; the breaking
+  // ticker is a news-desk element, so it shows on every other page instead.
+  const isHome = useLocation().pathname === '/';
 
   // Keep <html lang> correct on first paint as well as after a switch.
   useEffect(() => {
@@ -45,7 +49,7 @@ export default function PublicLayout() {
         <Masthead />
       </header>
       <CategoryNav />
-      <BreakingTicker />
+      {isHome ? null : <BreakingTicker />}
 
       <main id="main" tabIndex={-1} className="flex-1 outline-none">
         <Suspense fallback={<RouteFallback />}>
@@ -54,6 +58,7 @@ export default function PublicLayout() {
       </main>
 
       <PolicyFooter />
+      <BottomNav />
     </div>
   );
 }

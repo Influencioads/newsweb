@@ -57,6 +57,9 @@ export const SHORTCUTS: readonly Shortcut[] = [
 ];
 
 /** §12.5 — Grievance Officer, correction policy and AI disclosure, live at launch. */
+/** Footer "Company" column: the first five of FOOTER_LINKS. The rest are policies. */
+export const ABOUT_LINK_COUNT = 5;
+
 export const FOOTER_LINKS = [
   ['/about', 'footer.about'],
   ['/contact', 'footer.contact'],

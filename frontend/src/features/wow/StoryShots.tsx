@@ -303,7 +303,8 @@ function Poster({ article }: { article: ArticleCard }) {
  *   - close (✕ or Esc) goes back to where the reader came from.
  *
  * On a desktop the 9:16 poster sits in the middle over a blurred copy of its
- * photo, with round previous / next buttons beside it. Readers who prefer
+ * photo, with round previous / next buttons beside it; on a phone a
+ * Previous / Next bar sits under the poster. Readers who prefer
  * reduced motion get no autoplay — they step through by hand.
  */
 export default function StoryShotsPage() {
@@ -525,6 +526,40 @@ export default function StoryShotsPage() {
           className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-pill bg-on-ink/15 text-on-ink transition hover:bg-on-ink/25 disabled:invisible md:flex"
         >
           <Icon icon={ChevronRight} size="lg" />
+        </button>
+      </div>
+
+      {/* Phone: previous / next bar under the poster, so moving on never
+          depends on knowing the tap zones or the swipe. */}
+      <div className="relative flex items-center justify-between gap-3 border-t border-on-ink/10 bg-ink-deep px-3 py-2 md:hidden">
+        <button
+          type="button"
+          onClick={prev}
+          disabled={index === 0}
+          aria-label={te ? 'మునుపటి' : 'Previous'}
+          className={cn(
+            s.body,
+            'flex min-h-tap items-center gap-1.5 rounded-pill bg-on-ink/15 pl-2 pr-4 text-ui-sm font-bold text-on-ink transition active:scale-[.97] disabled:invisible',
+          )}
+        >
+          <Icon icon={ChevronLeft} size="md" />
+          {te ? 'మునుపటి' : 'Previous'}
+        </button>
+        <span className="font-sans text-meta tabular-nums text-on-ink/75">
+          {index + 1} / {items.length}
+        </span>
+        <button
+          type="button"
+          onClick={next}
+          disabled={index === items.length - 1}
+          aria-label={te ? 'తదుపరి' : 'Next'}
+          className={cn(
+            s.body,
+            'flex min-h-tap items-center gap-1.5 rounded-pill bg-wow-deep pl-4 pr-2 text-ui-sm font-bold text-on-wow transition active:scale-[.97] disabled:invisible',
+          )}
+        >
+          {te ? 'తదుపరి' : 'Next'}
+          <Icon icon={ChevronRight} size="md" />
         </button>
       </div>
 

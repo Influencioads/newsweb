@@ -5,12 +5,12 @@ import { PageContainer } from '@/components/ui/Layout';
 import { useI18n, useScript, type StringKey } from '@/i18n';
 import { cn } from '@/utils/cn';
 
-import { FOOTER_LINKS, useSiteConfig } from './NavDrawer';
+import { ABOUT_LINK_COUNT, FOOTER_LINKS, useSiteConfig } from './NavDrawer';
 
 /**
  * PolicyFooter — constant-dark footer: sections / product / compliance link
- * columns (one `nav` landmark, three headed lists; the policies list runs in
- * two columns), then the wordmark and the
+ * columns (one `nav` landmark, four headed lists: sections, product, company,
+ * policies), then the wordmark and the
  * copyright line. Nothing here goes below `text-meta`.
  */
 
@@ -80,9 +80,17 @@ export function PolicyFooter() {
               </li>
             ))}
           </Column>
-          {/* The longest list, so it runs in two columns rather than one tall one. */}
-          <Column title={t('ui.compliance')} className="col-span-2" listClassName="grid grid-cols-2 gap-x-6">
-            {FOOTER_LINKS.map(([to, key]) => (
+          <Column title={t('ui.aboutUs')}>
+            {FOOTER_LINKS.slice(0, ABOUT_LINK_COUNT).map(([to, key]) => (
+              <li key={to}>
+                <Link to={to} className={cn(s.body, LINK)}>
+                  {t(key)}
+                </Link>
+              </li>
+            ))}
+          </Column>
+          <Column title={t('ui.compliance')}>
+            {FOOTER_LINKS.slice(ABOUT_LINK_COUNT).map(([to, key]) => (
               <li key={to}>
                 <Link to={to} className={cn(s.body, LINK)}>
                   {t(key)}

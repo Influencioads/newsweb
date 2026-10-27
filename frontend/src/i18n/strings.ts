@@ -233,6 +233,7 @@ export const STRINGS = {
   'ui.sections': { te: 'విభాగాలు', en: 'Sections' },
   'ui.product': { te: 'ప్రొడక్ట్', en: 'Product' },
   'ui.compliance': { te: 'నిబంధనలు & విధానాలు', en: 'Policies' },
+  'ui.aboutUs': { te: 'సంస్థ', en: 'Company' },
   'ui.liveBlog': { te: 'లైవ్ బ్లాగ్', en: 'Live blog' },
   'ui.photos': { te: 'ఫోటోలు', en: 'Photos' },
   'ui.videos': { te: 'వీడియోలు', en: 'Videos' },

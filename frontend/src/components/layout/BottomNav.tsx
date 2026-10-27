@@ -49,7 +49,7 @@ export function BottomNav() {
   const items: Item[] = [
     { to: '/', te: 'హోమ్', en: 'Home', icon: Home, end: true },
     { to: '/story-shots', te: 'స్టోరీస్', en: 'Stories', icon: GalleryVerticalEnd },
-    { to: '/radio', te: 'రేడియో', en: 'Radio', icon: Radio },
+    { to: '/radio', te: 'రేడియో', en: 'Radio', icon: Radio, primary: true },
     { to: '/nominate', te: 'నామినేట్', en: 'Nominate', icon: Award, primary: true },
     { to: authed ? '/profile' : '/login', te: 'ప్రొఫైల్', en: 'Profile', icon: UserRound },
   ];

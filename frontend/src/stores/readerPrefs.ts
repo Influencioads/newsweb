@@ -12,10 +12,9 @@ import { persist, createJSONStorage } from 'zustand/middleware';
  * §10.2 requires the district edition selector to persist in localStorage too,
  * so it lives here rather than in a second store.
  *
- * §1.1 dark mode is three-state: `system` follows `prefers-color-scheme` (and
- * tracks it live), `light` / `dark` are the reader's explicit choice. The
- * inline script in index.html reads the same persisted key before first paint
- * so a dark reader never sees a light flash.
+ * Theme: WOW Indian is light-only (see resolveTheme). The three-state store is
+ * kept so dark mode can come back by changing that one function and the inline
+ * script in index.html.
  */
 
 export const FONT_STEPS = ['A-', 'A', 'A+', 'A++'] as const;
@@ -58,14 +57,14 @@ function applyScale(step: FontStep): void {
   document.documentElement.style.setProperty('--reader-scale', String(SCALE[step]));
 }
 
-function systemPrefersDark(): boolean {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches;
-}
-
-export function resolveTheme(theme: Theme): ResolvedTheme {
-  if (theme === 'system') return systemPrefersDark() ? 'dark' : 'light';
-  return theme;
+/**
+ * WOW Indian is a light-theme site: every setting resolves to light, so a
+ * phone or computer in dark mode still gets the white page. The stored
+ * preference is kept (and the dark tokens stay in index.css) in case the
+ * desk turns dark mode back on — that is this one function.
+ */
+export function resolveTheme(_theme: Theme): ResolvedTheme {
+  return 'light';
 }
 
 function applyTheme(resolved: ResolvedTheme): void {

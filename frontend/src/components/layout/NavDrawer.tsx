@@ -47,12 +47,12 @@ export interface Shortcut {
 
 /**
  * Reader destinations that are not categories, in nav order. WOW Radio and
- * Nominate Your Local Hero lead as two separate filled buttons — orange and
- * green — then Story Shots; the main categories that follow come from the
+ * Nominate Your Local Hero lead as two separate green buttons, then Story
+ * Shots; the main categories that follow come from the
  * site config (the WOW categories, show_in_nav).
  */
 export const SHORTCUTS: readonly Shortcut[] = [
-  { to: '/radio', key: 'ui.wowRadio', icon: AudioLines, highlight: 'wow' },
+  { to: '/radio', key: 'ui.wowRadio', icon: AudioLines, highlight: 'hero' },
   { to: '/nominate', key: 'ui.nominate', icon: Award, highlight: 'hero' },
   { to: '/story-shots', key: 'ui.storyShots', icon: GalleryVerticalEnd },
 ];

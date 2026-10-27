@@ -19,7 +19,8 @@
           var raw = localStorage.getItem('tn.reader-prefs');
           var st = raw ? (JSON.parse(raw).state || {}) : {};
           var theme = st.theme || 'system';
-          var dark = theme === 'dark' || (theme === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          // WOW Indian is light-only (stores/readerPrefs.ts resolveTheme).
+          var dark = false;
           var root = document.documentElement;
           if (dark) root.classList.add('dark');
           root.style.colorScheme = dark ? 'dark' : 'light';

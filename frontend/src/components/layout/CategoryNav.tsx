@@ -140,8 +140,8 @@ export function CategoryNav() {
               {SHORTCUTS.map((sc) => (
                 <li key={sc.to} className="contents">
                   {sc.highlight ? (
-                    // WOW Radio (orange) and Nominate Your Local Hero (green):
-                    // two separate filled buttons, apart from the category links.
+                    // WOW Radio and Nominate Your Local Hero: two separate green
+                    // buttons, apart from the category links.
                     <NavLink
                       to={sc.to}
                       data-pill=""

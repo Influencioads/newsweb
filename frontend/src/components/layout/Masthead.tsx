@@ -111,7 +111,7 @@ export function Masthead() {
         >
           <img src="/wow-indian-logo.webp" alt="వావ్ ఇండియన్ · WowIndian" width={960} height={260} className="h-16 w-auto md:h-20" />
           {/* Brand line: Ordinary People. Extraordinary Stories. */}
-          <span lang="en" className="mt-0.5 font-sans text-ui-sm font-bold tracking-wide text-wow-deep">
+          <span lang="en" className="mt-0.5 whitespace-nowrap text-center font-sans text-ui-sm font-bold tracking-wide text-wow-deep md:text-meta lg:text-ui-sm">
             Ordinary People. Extraordinary Stories.
           </span>
         </Link>

@@ -83,7 +83,7 @@ export function HeroBanner({ stories }: { stories: ArticleCard[] }) {
       />
       <div aria-hidden className="absolute -left-20 -top-24 -z-10 h-72 w-72 rounded-full bg-wow/25 blur-3xl" />
 
-      <div className="flex min-h-[440px] flex-col justify-end gap-4 p-5 sm:p-7 md:min-h-[480px] md:max-w-[62%] md:justify-center md:p-10 lg:min-h-[520px]">
+      <div className="flex min-h-[440px] flex-col justify-end gap-4 p-5 pt-16 sm:p-7 sm:pt-16 md:min-h-[480px] md:max-w-[62%] md:justify-center md:p-10 lg:min-h-[520px]">
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-pill bg-wow-deep px-3 py-1 font-sans text-meta font-bold uppercase tracking-wide text-on-wow">
             <Icon icon={Sparkles} size="xs" />
@@ -125,14 +125,15 @@ export function HeroBanner({ stories }: { stories: ArticleCard[] }) {
         </div>
       </div>
 
-      {/* Controls: arrows + numbered tabs, bottom right. */}
+      {/* Controls: arrows + tabs. Top right on a phone, where they cannot sit on
+          the Read / Share buttons; bottom right from md up. */}
       {slides.length > 1 ? (
-        <div className="absolute bottom-4 right-4 flex items-center gap-2 md:bottom-6 md:right-6">
+        <div className="absolute right-3 top-3 flex items-center gap-1 md:bottom-6 md:right-6 md:top-auto md:gap-2">
           <button
             type="button"
             onClick={() => go(index - 1)}
             aria-label={te ? 'మునుపటి కథ' : 'Previous story'}
-            className="flex h-tap w-tap items-center justify-center rounded-pill bg-on-ink/15 text-on-ink backdrop-blur transition hover:bg-on-ink/30"
+            className="flex h-10 w-10 items-center justify-center rounded-pill bg-on-ink/15 text-on-ink backdrop-blur transition hover:bg-on-ink/30 md:h-tap md:w-tap"
           >
             <Icon icon={ChevronLeft} size="md" />
           </button>
@@ -160,7 +161,7 @@ export function HeroBanner({ stories }: { stories: ArticleCard[] }) {
             type="button"
             onClick={() => go(index + 1)}
             aria-label={te ? 'తదుపరి కథ' : 'Next story'}
-            className="flex h-tap w-tap items-center justify-center rounded-pill bg-on-ink/15 text-on-ink backdrop-blur transition hover:bg-on-ink/30"
+            className="flex h-10 w-10 items-center justify-center rounded-pill bg-on-ink/15 text-on-ink backdrop-blur transition hover:bg-on-ink/30 md:h-tap md:w-tap"
           >
             <Icon icon={ChevronRight} size="md" />
           </button>

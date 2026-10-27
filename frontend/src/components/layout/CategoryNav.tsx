@@ -183,7 +183,7 @@ export function CategoryNav() {
               <li className="contents">
                 <NavLink to="/explore" className={({ isActive }) => linkClass(isActive, s.body, s.te)}>
                   <Icon icon={LayoutGrid} size="sm" />
-                  {t('ui.moreCategories')}
+                  {t('ui.allCategories')}
                 </NavLink>
               </li>
             </ul>

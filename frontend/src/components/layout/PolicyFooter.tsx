@@ -9,7 +9,8 @@ import { FOOTER_LINKS, useSiteConfig } from './NavDrawer';
 
 /**
  * PolicyFooter — constant-dark footer: sections / product / compliance link
- * columns (one `nav` landmark, three headed lists), then the wordmark and the
+ * columns (one `nav` landmark, three headed lists; the policies list runs in
+ * two columns), then the wordmark and the
  * copyright line. Nothing here goes below `text-meta`.
  */
 
@@ -27,12 +28,22 @@ const LINK =
   'flex min-h-tap items-center py-2 text-ui-sm text-muted-inverse ' +
   'transition-[colors,transform,box-shadow] duration-base ease-standard hover:text-on-ink';
 
-function Column({ title, children }: { title: string; children: ReactNode }) {
+function Column({
+  title,
+  children,
+  className,
+  listClassName,
+}: {
+  title: string;
+  children: ReactNode;
+  className?: string;
+  listClassName?: string;
+}) {
   const s = useScript();
   return (
-    <div>
+    <div className={cn('min-w-0', className)}>
       <h2 className={cn(s.head, 'mb-2 text-headline-xs font-bold text-on-ink')}>{title}</h2>
-      <ul>{children}</ul>
+      <ul className={listClassName}>{children}</ul>
     </div>
   );
 }
@@ -47,7 +58,7 @@ export function PolicyFooter() {
     <footer className="mt-10 bg-ink text-on-ink">
       <PageContainer width="site">
         {/* `ui.more`, not `ui.explore` — the header rail already owns that name. */}
-        <nav aria-label={t('ui.more')} className="grid gap-8 py-10 md:grid-cols-3">
+        <nav aria-label={t('ui.more')} className="grid grid-cols-2 gap-x-6 gap-y-8 py-10 md:grid-cols-4">
           <Column title={t('ui.sections')}>
             {categories.map((c) => {
               const f = s.forText(c.name_te, c.name_en);
@@ -69,7 +80,8 @@ export function PolicyFooter() {
               </li>
             ))}
           </Column>
-          <Column title={t('ui.compliance')}>
+          {/* The longest list, so it runs in two columns rather than one tall one. */}
+          <Column title={t('ui.compliance')} className="col-span-2" listClassName="grid grid-cols-2 gap-x-6">
             {FOOTER_LINKS.map(([to, key]) => (
               <li key={to}>
                 <Link to={to} className={cn(s.body, LINK)}>

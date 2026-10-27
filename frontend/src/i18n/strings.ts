@@ -162,6 +162,7 @@ export const STRINGS = {
   'ui.previous': { te: 'మునుపటి', en: 'Previous' },
   'ui.more': { te: 'మరిన్ని', en: 'More' },
   'ui.moreCategories': { te: 'మరిన్ని కేటగిరీలు', en: 'More categories' },
+  'ui.allCategories': { te: 'అన్ని కేటగిరీలు', en: 'All categories' },
   'ui.loadMore': { te: 'మరిన్ని లోడ్ చేయండి', en: 'Load more' },
   'ui.showAll': { te: 'అన్నీ చూపించు', en: 'Show all' },
   'ui.search': { te: 'వెతకండి', en: 'Search' },

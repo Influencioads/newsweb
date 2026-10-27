@@ -7,7 +7,7 @@ import { useI18n, useScript } from '@/i18n';
 import { cn } from '@/utils/cn';
 import { useDocumentTitle } from '@/utils/motion';
 
-import { MAIN_FEATURES, MORE_FEATURES, type WowFeature } from './categories';
+import { MAIN_FEATURES, MORE_FEATURES, WOW_FEATURES, type WowFeature } from './categories';
 
 /**
  * Explore WOW — category cards (icon and title on one line, tagline below).
@@ -100,27 +100,20 @@ export function ExploreWow() {
   );
 }
 
-/** /explore — every WOW category on its own page: the main six, then the rest. */
+/** /explore — every WOW category on one page, the main six first. */
 export default function ExplorePage() {
   const { language } = useI18n();
   const te = language === 'te';
   useDocumentTitle(te ? 'అన్ని కేటగిరీలు' : 'All categories');
   return (
-    <PageContainer width="site" className="space-y-8 py-7 md:py-10">
+    <PageContainer width="site" className="space-y-6 py-7 md:py-10">
       <PageHeader
         icon={LayoutGrid}
         title={te ? 'అన్ని కేటగిరీలు' : 'All categories'}
         subtitle={te ? 'ప్రతి కథలో ఒక WOW! మీకు నచ్చిన విభాగం ఎంచుకోండి.' : 'Every story has a WOW! Pick a section.'}
         spacing="none"
       />
-      <section aria-labelledby="explore-main" className="space-y-4">
-        <SectionHeader title={<span id="explore-main">{te ? 'ప్రధాన కేటగిరీలు' : 'Main categories'}</span>} />
-        <FeatureGrid features={MAIN_FEATURES} />
-      </section>
-      <section aria-labelledby="explore-more" className="space-y-4">
-        <SectionHeader title={<span id="explore-more">{te ? 'మరిన్ని కేటగిరీలు' : 'More categories'}</span>} />
-        <FeatureGrid features={MORE_FEATURES} />
-      </section>
+      <FeatureGrid features={WOW_FEATURES} />
     </PageContainer>
   );
 }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { AudioLines, Award, Bell, MapPin, Newspaper, SlidersHorizontal, UserRound } from 'lucide-react';
+import { Bell, MapPin, Newspaper, SlidersHorizontal, UserRound } from 'lucide-react';
 
 import { LocationPicker, useReaderPlace, useReaderPlaceName } from '@/components/location/LocationPicker';
 import { Button, ButtonLink, IconButton, IconButtonLink } from '@/components/ui/Button';
@@ -10,8 +10,10 @@ import { Dialog } from '@/components/ui/Dialog';
 import { PageContainer } from '@/components/ui/Layout';
 import * as notificationsApi from '@/features/engagement/notificationsApi';
 import { EPAPER_PUBLIC } from '@/features/epaper/api';
-import { LANGUAGE_LABELS, useI18n } from '@/i18n';
+import { LANGUAGE_LABELS, useI18n, useScript } from '@/i18n';
 import { useAuth } from '@/stores/auth';
+import { cn } from '@/utils/cn';
+import { formatFullDate } from '@/utils/time';
 
 import { LanguageToggle } from './LanguageToggle';
 import { ReaderSettings } from './ReaderSettings';
@@ -45,8 +47,8 @@ function NotificationBell() {
 }
 
 /**
- * The reader's area, always in the chrome. The name shows from 1440px, where
- * the header has room beside the Nominate button; below that only the pin, because a signed-in
+ * The reader's area, always in the chrome. The name shows from 1200px, where the
+ * site container stops growing; below that only the pin, because a signed-in
  * reader's actions column has no room for a label. Opens the one cascade, down
  * to the village; every choice applies at once. Nothing is ever detected — the
  * reader picks.
@@ -60,7 +62,7 @@ function LocationButton() {
   return (
     <>
       <Button variant="ghost" size="sm" icon={MapPin} aria-label={label} title={label} onClick={() => setOpen(true)}>
-        <span className="hidden max-w-[9rem] truncate min-[1440px]:block">{name ?? t('reader.chooseLocation')}</span>
+        <span className="hidden max-w-[9rem] truncate min-[1200px]:block">{name ?? t('reader.chooseLocation')}</span>
       </Button>
       <Dialog
         open={open}
@@ -78,6 +80,7 @@ function LocationButton() {
 
 export function Masthead() {
   const { t, pick, language, setLanguage } = useI18n();
+  const s = useScript();
   const [settings, setSettings] = useState(false);
   const authStatus = useAuth((a) => a.status);
   const me = useAuth((a) => a.me);
@@ -100,17 +103,7 @@ export function Masthead() {
           <Chip as="button" lang={other} className="md:hidden" onClick={() => setLanguage(other)}>
             {LANGUAGE_LABELS[other]}
           </Chip>
-          {/* WOW Radio: its own orange button in the header (not in the menu). */}
-          <ButtonLink
-            to="/radio"
-            variant="wow"
-            size="sm"
-            icon={AudioLines}
-            aria-label={t('ui.wowRadio')}
-            className="hidden rounded-pill md:inline-flex"
-          >
-            <span className="hidden lg:inline">{t('ui.wowRadio')}</span>
-          </ButtonLink>
+          <p className={cn(s.body, 'hidden text-meta text-muted xl:block')}>{formatFullDate(new Date(), language)}</p>
         </div>
 
         <Link
@@ -125,18 +118,6 @@ export function Masthead() {
         </Link>
 
         <div className="flex shrink-0 items-center justify-end gap-1">
-          {/* Nominate Your Local Hero: its own green button in the header. */}
-          <ButtonLink
-            to="/nominate"
-            variant="hero"
-            size="sm"
-            icon={Award}
-            aria-label={t('ui.nominate')}
-            className="mr-1 hidden rounded-pill md:inline-flex"
-          >
-            <span className="hidden lg:inline min-[1280px]:hidden">{language === 'te' ? 'నామినేట్ చేయండి' : 'Nominate'}</span>
-            <span className="hidden min-[1280px]:inline">{t('ui.nominate')}</span>
-          </ButtonLink>
           {EPAPER_PUBLIC && (
           <ButtonLink
             to="/epaper"

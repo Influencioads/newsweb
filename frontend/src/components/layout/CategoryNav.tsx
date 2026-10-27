@@ -140,18 +140,21 @@ export function CategoryNav() {
               {SHORTCUTS.map((sc) => (
                 <li key={sc.to} className="contents">
                   {sc.highlight ? (
-                    // Nominate Your Local Hero: a green pill, so the call to
-                    // action stands out from the category links around it.
+                    // WOW Radio (orange) and Nominate Your Local Hero (green):
+                    // two separate filled buttons, apart from the category links.
                     <NavLink
                       to={sc.to}
                       data-pill=""
                       className={({ isActive }) =>
                         cn(
-                          'mx-1 my-1.5 flex min-h-[36px] shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-pill px-3.5 font-bold',
-                          'transition-colors duration-base ease-standard',
+                          'mx-1 my-1.5 flex min-h-[36px] shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-pill px-3.5 font-bold shadow-card',
+                          'transition-[background-color,box-shadow] duration-base ease-standard',
                           s.body,
                           s.te ? 'text-te-body-xs' : 'text-ui',
-                          isActive ? 'bg-hero text-on-ink' : 'bg-hero-tint text-hero-text hover:bg-hero hover:text-on-ink',
+                          sc.highlight === 'wow'
+                            ? 'bg-wow-deep text-on-wow hover:bg-wow-deep/90'
+                            : 'bg-hero text-on-ink hover:bg-hero/90',
+                          isActive && 'ring-2 ring-ink/20 ring-offset-1',
                         )
                       }
                     >

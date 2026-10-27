@@ -41,24 +41,20 @@ export interface Shortcut {
   icon: LucideIcon;
   /** Marks the live destination (amber Radio icon in the rail). */
   live?: boolean;
-  /** Drawn as a green pill in the rail (Nominate Your Local Hero). */
-  highlight?: boolean;
+  /** Drawn as a filled button in the rail: `wow` orange (WOW Radio), `hero` green (Nominate). */
+  highlight?: 'wow' | 'hero';
 }
 
 /**
- * Reader destinations that are not categories, in nav order; the main
- * categories that follow come from the site config (the WOW categories,
- * show_in_nav). WOW Radio and Nominate Your Local Hero are separate buttons in
- * the header (Masthead) and the bottom bar, not menu items.
+ * Reader destinations that are not categories, in nav order. WOW Radio and
+ * Nominate Your Local Hero lead as two separate filled buttons — orange and
+ * green — then Story Shots; the main categories that follow come from the
+ * site config (the WOW categories, show_in_nav).
  */
 export const SHORTCUTS: readonly Shortcut[] = [
+  { to: '/radio', key: 'ui.wowRadio', icon: AudioLines, highlight: 'wow' },
+  { to: '/nominate', key: 'ui.nominate', icon: Award, highlight: 'hero' },
   { to: '/story-shots', key: 'ui.storyShots', icon: GalleryVerticalEnd },
-];
-
-/** The two signature buttons, listed at the top of the phone menu. */
-export const DRAWER_SPECIALS: readonly Shortcut[] = [
-  { to: '/radio', key: 'ui.wowRadio', icon: AudioLines, highlight: true },
-  { to: '/nominate', key: 'ui.nominate', icon: Award, highlight: true },
 ];
 
 /** §12.5 — Grievance Officer, correction policy and AI disclosure, live at launch. */
@@ -136,15 +132,15 @@ export function NavDrawer({ open, onClose }: NavDrawerProps) {
             </NavLink>
           </li>
           )}
-          {[...DRAWER_SPECIALS, ...SHORTCUTS].map((sc) => (
+          {SHORTCUTS.map((sc) => (
             <li key={sc.to}>
               <NavLink
                 to={sc.to}
                 className={({ isActive }) =>
                   cn(
                     rowClass(isActive, s.body),
-                    sc.highlight && !isActive && sc.to === '/radio' && 'bg-wow-tint text-wow-deep hover:bg-wow-tint',
-                    sc.highlight && !isActive && sc.to === '/nominate' && 'bg-hero-tint text-hero-text hover:bg-hero-tint',
+                    sc.highlight === 'wow' && !isActive && 'bg-wow-tint text-wow-deep hover:bg-wow-tint',
+                    sc.highlight === 'hero' && !isActive && 'bg-hero-tint text-hero-text hover:bg-hero-tint',
                   )
                 }
               >

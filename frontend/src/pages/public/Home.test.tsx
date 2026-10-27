@@ -67,23 +67,23 @@ function renderHome(payload: HomePayload) {
 
 afterEach(() => useLanguage.setState({ language: 'te' }));
 
-/** The WOW home page (Pallavi's design): Featured Story, Explore WOW, Story
- *  Shots, WOW Radio beside the Nominate call, Trending, Featured Heroes. */
+/** The WOW home page: hero banner, WOW Radio beside the Nominate call,
+ *  Explore WOW, Story Shots, Trending, Featured Heroes. */
 describe('Home (WOW layout)', () => {
   function follows(a: Element, b: Element) {
     return Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
   }
 
-  it('leads with the featured story, then the WOW shelves in order', () => {
+  it('leads with the hero banner, then WOW Radio, Nominate and Explore WOW', () => {
     renderHome(homePayload());
     const lead = screen.getByRole('heading', { name: 'ముఖ్య కథనం' });
-    const explore = document.getElementById('explore-wow')!;
     const radio = screen.getByRole('heading', { name: /WOW Radio/ });
     const nominate = document.getElementById('nominate-cta')!;
-    expect(lead.closest('article')).toBeInTheDocument();
-    expect(follows(lead, explore)).toBe(true);
-    expect(follows(explore, radio)).toBe(true);
+    const explore = document.getElementById('explore-wow')!;
+    expect(lead.closest('section[aria-roledescription="carousel"]')).toBeInTheDocument();
+    expect(follows(lead, radio)).toBe(true);
     expect(follows(radio, nominate)).toBe(true);
+    expect(follows(nominate, explore)).toBe(true);
   });
 
   it('keeps the lead out of the trending list', () => {

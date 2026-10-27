@@ -38,7 +38,7 @@ export function NominateCta({ compact = false }: { compact?: boolean }) {
   return (
     <section
       aria-labelledby="nominate-cta"
-      className="relative flex h-full flex-col justify-between gap-5 overflow-hidden rounded-2xl border border-wow/40 bg-wow-tint p-5 md:p-6"
+      className="relative flex h-full flex-col justify-between gap-5 overflow-hidden rounded-2xl border-2 border-wow bg-wow-tint p-5 shadow-raised md:p-6"
     >
       <div
         aria-hidden

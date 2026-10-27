@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ImagePlus, Save, X } from 'lucide-react';
@@ -18,6 +18,7 @@ import { useI18n } from '@/i18n';
 import { useAuth } from '@/stores/auth';
 
 import { AssistPanel } from './editor/AssistPanel';
+import { BodyImages } from './editor/BodyImages';
 import { ConvertPanel } from './editor/ConvertPanel';
 import { EngagementPanel } from './editor/EngagementPanel';
 import { MetaSidebar } from './editor/MetaSidebar';
@@ -32,7 +33,8 @@ import { AI_FEATURES } from '@/utils/features';
  * Story column: headline, standfirst, body, byline & source, SEO. Sticky
  * sidebar (./editor/MetaSidebar): status, flags, schedule, category, location,
  * tags, placement, media, audio. The form model and API mapping live in
- * ./editor/form.ts; the body is still a plain textarea over Tiptap JSON.
+ * ./editor/form.ts; the body is still a plain textarea over Tiptap JSON, with
+ * up to two pictures placed between paragraphs (./editor/BodyImages).
  */
 
 function EditorSkeleton() {
@@ -74,6 +76,7 @@ export default function ArticleEditor() {
   const [form, setForm] = useState<ArticleForm>(EMPTY_FORM);
   const [baseline, setBaseline] = useState<ArticleForm>(EMPTY_FORM);
   const set = (patch: Partial<ArticleForm>) => setForm((f) => ({ ...f, ...patch }));
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const next = existing.data ? fromArticle(existing.data) : EMPTY_FORM;
@@ -160,8 +163,22 @@ export default function ArticleEditor() {
                 hint={form.isShort ? L('ఉంటే "పూర్తి కథనం" బటన్ కనిపిస్తుంది', 'If filled, readers get a "Read full" button') : undefined}
                 error={errors('body')}
               >
-                <Textarea script="te" required={!form.isShort} rows={form.isShort ? 6 : 16} value={form.body} onChange={(e) => set({ body: e.target.value })} />
+                <Textarea
+                  ref={bodyRef}
+                  script="te"
+                  required={!form.isShort}
+                  rows={form.isShort ? 6 : 16}
+                  value={form.body}
+                  onChange={(e) => set({ body: e.target.value })}
+                />
               </Field>
+              {/* Up to two more pictures between paragraphs, besides the main image. */}
+              <BodyImages
+                body={form.body}
+                images={form.bodyImages}
+                textareaRef={bodyRef}
+                onChange={(body, bodyImages) => set({ body, bodyImages })}
+              />
               <p className="font-sans text-meta tabular-nums text-muted">
                 {words} {t('admin.wordCount')}
               </p>

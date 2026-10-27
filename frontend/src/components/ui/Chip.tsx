@@ -210,7 +210,7 @@ export function ChipRail({ ariaLabel, snap = true, fadeEdges = true, children, c
     };
   }, [measure]);
 
-  // The arrow that reaches an edge unmounts; if it held focus, hand focus to the
+  // The arrow that reaches an edge hides; if it held focus, hand focus to the
   // other arrow once the edge state has flipped (the unmount is already done by
   // the time any effect runs, so the intent is recorded here in `nudge`).
   useEffect(() => {
@@ -236,19 +236,35 @@ export function ChipRail({ ariaLabel, snap = true, fadeEdges = true, children, c
 
   const overflowing = !(edges.start && edges.end);
   const arrows = hoverable && overflowing;
-  // Positioning lives on a wrapper: IconButton sets `relative` itself, and in
-  // Tailwind's stylesheet order `.relative` outranks `.absolute`, so putting
-  // `absolute` on the button leaves the arrows in flow, stacked under the rail.
-  const arrowWrap = 'absolute top-1/2 z-10 -translate-y-1/2';
+  // The arrows sit beside the track, not over it, so there is always clear
+  // space between an arrow and the first or last chip. At an edge the arrow
+  // goes invisible but keeps its place, so the rail does not jump as it scrolls.
+  const arrow = (dir: -1 | 1) => {
+    const atEdge = dir === -1 ? edges.start : edges.end;
+    return (
+      <div className={cn('shrink-0', atEdge && 'invisible')} aria-hidden={atEdge || undefined}>
+        <IconButton
+          ref={dir === -1 ? prevBtn : nextBtn}
+          icon={dir === -1 ? ChevronLeft : ChevronRight}
+          label={t(dir === -1 ? 'ui.scrollLeft' : 'ui.scrollRight')}
+          variant="secondary"
+          tabIndex={atEdge ? -1 : undefined}
+          onClick={() => nudge(dir)}
+          className="shadow-card"
+        />
+      </div>
+    );
+  };
 
   return (
-    <div className={cn('relative', className)}>
+    <div className={cn('flex items-center', arrows && 'gap-3', className)}>
+      {arrows && arrow(-1)}
       <div
         ref={track}
         role="group"
         aria-label={ariaLabel}
         className={cn(
-          'no-scrollbar scroll-touch overflow-x-auto',
+          'no-scrollbar scroll-touch min-w-0 flex-1 overflow-x-auto',
           snap && 'snap-x',
           // .fade-l / .fade-r (index.css) fade only the side that has more to show.
           fadeEdges && overflowing && 'fade-edges',
@@ -261,31 +277,7 @@ export function ChipRail({ ariaLabel, snap = true, fadeEdges = true, children, c
           {children}
         </div>
       </div>
-
-      {arrows && !edges.start && (
-        <div className={cn(arrowWrap, 'left-0')}>
-          <IconButton
-            ref={prevBtn}
-            icon={ChevronLeft}
-            label={t('ui.scrollLeft')}
-            variant="secondary"
-            onClick={() => nudge(-1)}
-            className="shadow-card"
-          />
-        </div>
-      )}
-      {arrows && !edges.end && (
-        <div className={cn(arrowWrap, 'right-0')}>
-          <IconButton
-            ref={nextBtn}
-            icon={ChevronRight}
-            label={t('ui.scrollRight')}
-            variant="secondary"
-            onClick={() => nudge(1)}
-            className="shadow-card"
-          />
-        </div>
-      )}
+      {arrows && arrow(1)}
     </div>
   );
 }

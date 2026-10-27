@@ -195,6 +195,29 @@ class TestArticleForm:
         assert fetched["sub_title_te"] == "మొదటి దశలో పన్నెండు స్టేషన్లు"
         assert len(fetched["tags"]) == 2
 
+    def test_pictures_between_paragraphs_round_trip(self, client: TestClient, db: Session) -> None:
+        """Up to two pictures sit between paragraphs (frontend editor/BodyImages)."""
+        editor = staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="h-editor@test.example.com")
+        category = db.execute(select(Category).where(Category.slug == "real-heroes")).scalar_one()
+
+        def picture(media_id: int, caption: str) -> dict:
+            return {"type": "image", "attrs": {
+                "src": f"/media/images/body-{media_id}/800.webp", "media_id": media_id,
+                "alt": caption, "caption": caption, "credit": "WOW", "width": 800, "height": 600}}
+
+        para = body_doc(BODY_TE)["content"][0]
+        body = {"type": "doc", "content": [para, picture(11, "మొదటి చిత్రం"), para, picture(12, "రెండో చిత్రం"), para]}
+        r = client.post("/api/v1/cms/articles", json={
+            "title_te": "కథనం మధ్యలో చిత్రాలు", "body": body, "category_id": category.id,
+        }, headers=editor)
+        assert r.status_code == 201, r.text
+
+        stored = client.get(f"/api/v1/cms/articles/{r.json()['id']}", headers=editor).json()["body"]
+        kinds = [n["type"] for n in stored["content"]]
+        assert kinds == ["paragraph", "image", "paragraph", "image", "paragraph"]
+        assert stored["content"][1]["attrs"]["media_id"] == 11
+        assert stored["content"][3]["attrs"]["caption"] == "రెండో చిత్రం"
+
     def test_mandal_outside_district_is_rejected(self, client: TestClient, db: Session) -> None:
         editor = staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="h-editor@test.example.com")
         krishna = db.execute(select(District).where(District.slug == "krishna")).scalar_one()

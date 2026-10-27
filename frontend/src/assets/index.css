@@ -22,6 +22,11 @@
      (white text clears AA on it), `wow-tint` for soft backgrounds. */
   --tn-wow: 234 108 0;            --tn-wow-deep: 194 65 12;
   --tn-wow-tint: 255 240 228;     --tn-on-wow: 255 255 255;
+  /* Share buttons: each network's own colour, darkened where needed so white
+     text clears AA. The same in both themes, like the logos they stand for. */
+  --tn-social-whatsapp: 30 126 52;  --tn-social-facebook: 8 102 255;
+  --tn-social-instagram: 193 53 132; --tn-social-telegram: 10 105 168;
+  --tn-social-x: 15 20 25;
   --tn-breaking-border: 244 190 193;
   --tn-ink: 23 25 30;             --tn-ink-soft: 72 76 84;
   --tn-ink-panel: 34 37 43;       --tn-ink-deep: 16 18 22;

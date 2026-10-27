@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Menu, Search } from 'lucide-react';
+import { LayoutGrid, Menu, Search } from 'lucide-react';
 
 import { IconButton, IconButtonLink } from '@/components/ui/Button';
 import { ChipRail } from '@/components/ui/Chip';
@@ -70,7 +70,8 @@ export function CategoryNav() {
   const measure = useCallback(() => {
     const root = rail.current;
     const active = root?.querySelector<HTMLElement>('a[aria-current="page"]');
-    if (!root || !active) {
+    // The highlighted pills mark themselves active by filling; no underline.
+    if (!root || !active || active.dataset.pill !== undefined) {
       setBar(null);
       return;
     }
@@ -138,10 +139,31 @@ export function CategoryNav() {
               </li>
               {SHORTCUTS.map((sc) => (
                 <li key={sc.to} className="contents">
-                  <NavLink to={sc.to} className={({ isActive }) => linkClass(isActive, s.body, s.te)}>
-                    {sc.live && <Icon icon={sc.icon} size="sm" className="text-breaking" />}
-                    {t(sc.key)}
-                  </NavLink>
+                  {sc.highlight ? (
+                    // WOW Radio and Nominate: orange pills, so the two signature
+                    // features stand out from the category links around them.
+                    <NavLink
+                      to={sc.to}
+                      data-pill=""
+                      className={({ isActive }) =>
+                        cn(
+                          'mx-1 my-1.5 flex min-h-[36px] shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-pill px-3.5 font-bold',
+                          'transition-colors duration-base ease-standard',
+                          s.body,
+                          s.te ? 'text-te-body-xs' : 'text-ui',
+                          isActive ? 'bg-wow-deep text-on-wow' : 'bg-wow-tint text-wow-deep hover:bg-wow-deep hover:text-on-wow',
+                        )
+                      }
+                    >
+                      <Icon icon={sc.icon} size="sm" />
+                      {t(sc.key)}
+                    </NavLink>
+                  ) : (
+                    <NavLink to={sc.to} className={({ isActive }) => linkClass(isActive, s.body, s.te)}>
+                      {sc.live && <Icon icon={sc.icon} size="sm" className="text-breaking" />}
+                      {t(sc.key)}
+                    </NavLink>
+                  )}
                 </li>
               ))}
               {categories.map((c) => {
@@ -158,6 +180,12 @@ export function CategoryNav() {
                   </li>
                 );
               })}
+              <li className="contents">
+                <NavLink to="/explore" className={({ isActive }) => linkClass(isActive, s.body, s.te)}>
+                  <Icon icon={LayoutGrid} size="sm" />
+                  {t('ui.allCategories')}
+                </NavLink>
+              </li>
             </ul>
             {/* The one active underline. Mounted only once measured, so it never slides in from zero. */}
             {bar && (

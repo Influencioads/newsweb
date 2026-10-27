@@ -34,6 +34,13 @@ export default {
           tint: 'rgb(var(--tn-wow-tint) / <alpha-value>)',
         },
         'on-wow': 'rgb(var(--tn-on-wow) / <alpha-value>)',
+        social: {
+          whatsapp: 'rgb(var(--tn-social-whatsapp) / <alpha-value>)',
+          facebook: 'rgb(var(--tn-social-facebook) / <alpha-value>)',
+          instagram: 'rgb(var(--tn-social-instagram) / <alpha-value>)',
+          telegram: 'rgb(var(--tn-social-telegram) / <alpha-value>)',
+          x: 'rgb(var(--tn-social-x) / <alpha-value>)',
+        },
         breaking: {
           DEFAULT: 'rgb(var(--tn-breaking) / <alpha-value>)',
           tint: 'rgb(var(--tn-breaking-tint) / <alpha-value>)',
@@ -114,16 +121,6 @@ export default {
         'on-brand': 'rgb(var(--tn-on-brand) / <alpha-value>)',
         /** Foreground on a constant-dark panel (footer, ink cards, image scrims). */
         'on-ink': 'rgb(var(--tn-on-ink) / <alpha-value>)',
-        /**
-         * Third-party marks for the end-of-article share strip. Fixed in both
-         * themes (they are the networks' colours, not ours); each takes white
-         * text at >= 4.5:1, which is why WhatsApp is darker than its #25D366.
-         */
-        social: {
-          whatsapp: '#1B7F36',
-          x: '#0F172A',
-          telegram: '#0A6BA8',
-        },
       },
       fontFamily: {
         // Headlines and the wordmark: a serif Telugu voice — the editorial
@@ -190,8 +187,8 @@ export default {
         dock: 'var(--player-dock-h, 0px)',
       },
       maxWidth: {
-        site: '1200px',
-        page: '960px',
+        site: '1360px',
+        page: '1040px',
         wrap: '880px',
         article: '680px', // mockup 1c article measure
         form: '560px',

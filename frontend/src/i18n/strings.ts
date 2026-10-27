@@ -27,7 +27,7 @@ export const LANGUAGE_LABELS: Record<Language, string> = {
 export const STRINGS = {
   // --- masthead / chrome ---------------------------------------------------
   'site.name': { te: 'వావ్ ఇండియన్', en: 'WowIndian' },
-  'site.tagline': { te: 'డిస్కవర్. ఇన్‌స్పైర్. లెర్న్. షేర్.', en: 'Discover. Inspire. Learn. Share.' },
+  'site.tagline': { te: 'Ordinary People. Extraordinary Stories.', en: 'Ordinary People. Extraordinary Stories.' },
   'nav.home': { te: 'హోమ్', en: 'Home' },
   'nav.epaper': { te: 'ఈ-పేపర్', en: 'E-Paper' },
   'nav.search': { te: 'వెతకండి', en: 'Search' },
@@ -163,6 +163,8 @@ export const STRINGS = {
   'ui.next': { te: 'తదుపరి', en: 'Next' },
   'ui.previous': { te: 'మునుపటి', en: 'Previous' },
   'ui.more': { te: 'మరిన్ని', en: 'More' },
+  'ui.moreCategories': { te: 'మరిన్ని కేటగిరీలు', en: 'More categories' },
+  'ui.allCategories': { te: 'అన్ని కేటగిరీలు', en: 'All categories' },
   'ui.loadMore': { te: 'మరిన్ని లోడ్ చేయండి', en: 'Load more' },
   'ui.showAll': { te: 'అన్నీ చూపించు', en: 'Show all' },
   'ui.search': { te: 'వెతకండి', en: 'Search' },
@@ -176,6 +178,7 @@ export const STRINGS = {
   'ui.copied': { te: 'కాపీ అయింది', en: 'Copied' },
   'ui.copyLink': { te: 'లింక్ కాపీ చేయండి', en: 'Copy link' },
   'ui.share': { te: 'షేర్ చేయండి', en: 'Share' },
+  'ui.instagramCopied': { te: 'లింక్ కాపీ అయింది — ఇన్‌స్టాగ్రామ్‌లో పేస్ట్ చేయండి', en: 'Link copied — paste it in Instagram' },
   'ui.play': { te: 'ప్లే', en: 'Play' },
   'ui.pause': { te: 'పాజ్', en: 'Pause' },
   'ui.speed': { te: 'వేగం', en: 'Speed' },
@@ -234,6 +237,7 @@ export const STRINGS = {
   'ui.sections': { te: 'విభాగాలు', en: 'Sections' },
   'ui.product': { te: 'ప్రొడక్ట్', en: 'Product' },
   'ui.compliance': { te: 'నిబంధనలు & విధానాలు', en: 'Policies' },
+  'ui.aboutUs': { te: 'సంస్థ', en: 'Company' },
   'ui.liveBlog': { te: 'లైవ్ బ్లాగ్', en: 'Live blog' },
   'ui.photos': { te: 'ఫోటోలు', en: 'Photos' },
   'ui.videos': { te: 'వీడియోలు', en: 'Videos' },

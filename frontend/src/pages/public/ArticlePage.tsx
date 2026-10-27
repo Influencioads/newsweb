@@ -18,7 +18,7 @@ import {
   type TrackMeta,
 } from '@/components/article/AudioPlayer';
 import { ReaderToolbar, ReadingProgress } from '@/components/article/ReaderToolbar';
-import { ShareSheet, ShareStrip } from '@/components/article/ShareSheet';
+import { ShareBlock, ShareSheet } from '@/components/article/ShareSheet';
 import { Badge } from '@/components/ui/Badge';
 import { Button, ButtonLink, IconButton } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -463,8 +463,8 @@ export default function ArticlePage() {
                   </Card>
                 ) : null}
 
-                {/* Where the story ends: the four share paths, always in view. */}
-                <ShareStrip shortId={data.short_id} url={data.url} title={shareTitle} className="mt-7" />
+                {/* Where the story ends: WhatsApp, Facebook, Instagram, Telegram, X — always in view. */}
+                <ShareBlock className="mt-7" shortId={data.short_id} url={data.url} title={shareTitle} />
 
                 {/* Like · comment · save · share · report (§5) */}
                 <EngagementBar article={data} />

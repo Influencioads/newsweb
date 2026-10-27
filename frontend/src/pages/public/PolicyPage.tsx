@@ -351,7 +351,7 @@ const PAGES: Record<string, PolicyEntry> = {
           id: 'exclusions',
           heading: 'మినహాయింపులు',
           body: [
-            'కుల, మత, మతపరమైన ఘటనలు, లైంగిక దాడులు, ఆత్మహత్యలు, మైనర్లకు సంబంధించిన కథనాలు పూర్తిగా జర్నలిస్టులే రాస్తారు.',
+            'కుల, మత, లైంగిక దాడులు, ఆత్మహత్యలు, మైనర్లకు సంబంధించిన కథనాలు పూర్తిగా జర్నలిస్టులే రాస్తారు.',
           ],
         },
       ],
@@ -373,7 +373,7 @@ const PAGES: Record<string, PolicyEntry> = {
           id: 'exclusions',
           heading: 'Exclusions',
           body: [
-            'Stories involving caste, religion, communal incidents, sexual assault, suicide or minors are written entirely by journalists.',
+            'Stories involving caste, religion, sexual assault, suicide or minors are written entirely by journalists.',
           ],
         },
       ],

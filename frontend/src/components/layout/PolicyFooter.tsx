@@ -5,14 +5,15 @@ import { PageContainer } from '@/components/ui/Layout';
 import { EPAPER_PUBLIC } from '@/features/epaper/api';
 import { VIDEOS_PUBLIC } from '@/features/public/api';
 import { useI18n, useScript, type StringKey } from '@/i18n';
+import { WOW_FEATURES } from '@/features/wow/categories';
 import { cn } from '@/utils/cn';
 
-import { ABOUT_LINK_COUNT, FOOTER_LINKS, useSiteConfig } from './NavDrawer';
+import { ABOUT_LINK_COUNT, FOOTER_LINKS } from './NavDrawer';
 
 /**
  * PolicyFooter — constant-dark footer: sections / product / compliance link
- * columns (one `nav` landmark, four headed lists: sections, product, company,
- * policies), then the wordmark and the
+ * columns (one `nav` landmark, four headed lists: the twelve WOW sections,
+ * product, company, policies), then the wordmark and the
  * copyright line. Nothing here goes below `text-meta`.
  */
 
@@ -20,9 +21,7 @@ const PRODUCT_LINKS: readonly (readonly [string, StringKey])[] = ([
   ['/live-blog', 'ui.liveBlog'],
   ['/photos', 'ui.photos'],
   ['/videos', 'ui.videos'],
-  ['/web-stories', 'ui.webStories'],
   ['/epaper', 'nav.epaper'],
-  ['/short-news', 'page.shortNews'],
   ['/my-epaper', 'page.myEpaper'],
 ] satisfies (readonly [string, StringKey])[]).filter(
   ([to]) => (EPAPER_PUBLIC || !to.includes('epaper')) && (VIDEOS_PUBLIC || to !== '/videos'),
@@ -55,21 +54,20 @@ function Column({
 export function PolicyFooter() {
   const { t, pick } = useI18n();
   const s = useScript();
-  const { data: config } = useSiteConfig();
-  const categories = config?.categories.filter((c) => c.show_in_nav) ?? [];
 
   return (
     <footer className="mt-10 bg-ink text-on-ink">
       <PageContainer width="site">
         {/* `ui.more`, not `ui.explore` — the header rail already owns that name. */}
-        <nav aria-label={t('ui.more')} className="grid grid-cols-2 gap-x-6 gap-y-8 py-10 md:grid-cols-4">
-          <Column title={t('ui.sections')}>
-            {categories.map((c) => {
-              const f = s.forText(c.name_te, c.name_en);
+        <nav aria-label={t('ui.more')} className="grid grid-cols-2 gap-x-6 gap-y-8 py-10 md:grid-cols-5">
+          {/* All twelve WOW categories, in two columns. */}
+          <Column title={t('ui.sections')} className="col-span-2" listClassName="grid grid-cols-2 gap-x-6">
+            {WOW_FEATURES.map((f) => {
+              const label = s.forText(f.te, f.en);
               return (
-                <li key={c.slug}>
-                  <Link to={`/section/${c.slug}`} lang={f.lang} className={cn(f.cls, LINK)}>
-                    {pick(c.name_te, c.name_en)}
+                <li key={f.slug}>
+                  <Link to={f.to} lang={label.lang} className={cn(label.cls, LINK)}>
+                    {pick(f.te, f.en)}
                   </Link>
                 </li>
               );

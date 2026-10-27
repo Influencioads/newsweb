@@ -140,8 +140,8 @@ export function CategoryNav() {
               {SHORTCUTS.map((sc) => (
                 <li key={sc.to} className="contents">
                   {sc.highlight ? (
-                    // WOW Radio and Nominate: orange pills, so the two signature
-                    // features stand out from the category links around them.
+                    // Nominate Your Local Hero: a green pill, so the call to
+                    // action stands out from the category links around it.
                     <NavLink
                       to={sc.to}
                       data-pill=""
@@ -151,7 +151,7 @@ export function CategoryNav() {
                           'transition-colors duration-base ease-standard',
                           s.body,
                           s.te ? 'text-te-body-xs' : 'text-ui',
-                          isActive ? 'bg-wow-deep text-on-wow' : 'bg-wow-tint text-wow-deep hover:bg-wow-deep hover:text-on-wow',
+                          isActive ? 'bg-hero text-on-ink' : 'bg-hero-tint text-hero-text hover:bg-hero hover:text-on-ink',
                         )
                       }
                     >

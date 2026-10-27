@@ -38,21 +38,21 @@ export function NominateCta({ compact = false }: { compact?: boolean }) {
   return (
     <section
       aria-labelledby="nominate-cta"
-      className="relative flex h-full flex-col justify-between gap-5 overflow-hidden rounded-2xl border-2 border-wow bg-wow-tint p-5 shadow-raised md:p-6"
+      className="relative flex h-full flex-col justify-between gap-5 overflow-hidden rounded-2xl border-2 border-hero bg-hero-tint p-5 shadow-raised md:p-6"
     >
       <div
         aria-hidden
-        className="pointer-events-none absolute -bottom-10 -right-6 text-wow/15"
+        className="pointer-events-none absolute -bottom-10 -right-6 text-hero/15"
       >
         <Award size={compact ? 140 : 180} strokeWidth={1.25} />
       </div>
       <div className="relative space-y-2">
-        <span className={cn(s.body, 'inline-flex items-center gap-1.5 rounded-pill bg-wow-deep px-3 py-1 text-meta font-bold text-on-wow')}>
+        <span className={cn(s.body, 'inline-flex items-center gap-1.5 rounded-pill bg-hero px-3 py-1 text-meta font-bold text-on-ink')}>
           <Icon icon={HeartHandshake} size="xs" />
-          {te ? 'లోకల్ హీరోను నామినేట్ చేయండి' : 'Nominate Your Local Hero'}
+          {te ? 'మీ లోకల్ హీరోని నామినేట్ చేయండి' : 'Nominate Your Local Hero'}
         </span>
         <h2 id="nominate-cta" lang="te" className="th text-headline-md font-bold text-ink md:text-headline-lg">
-          మీ ఊరి హీరోను ప్రపంచానికి పరిచయం చేయండి!
+          మీ లోకల్ హీరోను ప్రపంచానికి పరిచయం చేయండి!
         </h2>
         <p className={cn(s.body, s.te ? 'text-te-body-xs' : 'text-ui', 'max-w-prose text-ink-soft')}>
           {te
@@ -64,7 +64,7 @@ export function NominateCta({ compact = false }: { compact?: boolean }) {
         <ButtonLink
           to="/nominate"
           size="lg"
-          variant="wow"
+          variant="hero"
           icon={Award}
         >
           {te ? 'ఇప్పుడే నామినేట్ చేయండి' : 'Nominate now'}

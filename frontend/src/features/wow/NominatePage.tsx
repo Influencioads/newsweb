@@ -21,7 +21,7 @@ import { useDocumentTitle } from '@/utils/motion';
 import { HERO_CATEGORIES, LOCAL_HERO_SLUG } from './categories';
 
 /**
- * Nominate Your Local Hero (pitch §4) — "మీ ఊరి హీరోను ప్రపంచానికి పరిచయం చేయండి!"
+ * Nominate Your Local Hero (pitch §4) — "మీ లోకల్ హీరోను ప్రపంచానికి పరిచయం చేయండి!"
  *
  * A nomination is filed as a reader submission in the Local Hero section, so
  * it lands in the existing moderation queue (CMS → Review) and follows the
@@ -92,7 +92,7 @@ export default function NominatePage() {
   const te = language === 'te';
   const L = (teText: string, enText: string) => (te ? teText : enText);
   const bodyCls = cn(s.body, s.te ? 'text-te-body-xs' : 'text-ui');
-  useDocumentTitle(L('లోకల్ హీరోను నామినేట్ చేయండి', 'Nominate Your Local Hero'));
+  useDocumentTitle(L('మీ లోకల్ హీరోని నామినేట్ చేయండి', 'Nominate Your Local Hero'));
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -200,9 +200,9 @@ export default function NominatePage() {
           <PageHeader
             icon={Award}
             eyebrow={L('సిగ్నేచర్ ఫీచర్', 'Signature feature')}
-            title={L('లోకల్ హీరోను నామినేట్ చేయండి', 'Nominate Your Local Hero')}
+            title={L('మీ లోకల్ హీరోని నామినేట్ చేయండి', 'Nominate Your Local Hero')}
             subtitle={L(
-              'మీ ఊరి హీరోను ప్రపంచానికి పరిచయం చేయండి! ఉపాధ్యాయులు, రైతులు, ఆవిష్కర్తలు, సామాజిక సేవకులు, విద్యార్థులు, గ్రామ వాలంటీర్లు — మంచి మార్పు తెస్తున్న ఎవరినైనా నామినేట్ చేయవచ్చు.',
+              'మీ లోకల్ హీరోను ప్రపంచానికి పరిచయం చేయండి! ఉపాధ్యాయులు, రైతులు, ఆవిష్కర్తలు, సామాజిక సేవకులు, విద్యార్థులు, గ్రామ వాలంటీర్లు — మంచి మార్పు తెస్తున్న ఎవరినైనా నామినేట్ చేయవచ్చు.',
               'Introduce your village hero to the world! Nominate teachers, farmers, innovators, social workers, students, village volunteers — anyone making a positive impact.',
             )}
             spacing="none"
@@ -369,7 +369,7 @@ export default function NominatePage() {
               </fieldset>
 
               <div className="flex flex-wrap items-center gap-3 pt-2">
-                <Button type="submit" variant="wow" size="lg" icon={Award} pending={submit.isPending}>
+                <Button type="submit" variant="hero" size="lg" icon={Award} pending={submit.isPending}>
                   {status === 'authenticated'
                     ? L('నామినేషన్ పంపండి', 'Send nomination')
                     : L('సైన్ ఇన్ చేసి పంపండి', 'Sign in and send')}

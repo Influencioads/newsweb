@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { AudioLines, Award, GalleryVerticalEnd, LogIn, Newspaper, TrendingUp, UserRound } from 'lucide-react';
+import { Award, GalleryVerticalEnd, LogIn, Newspaper, UserRound } from 'lucide-react';
 
 import { Sheet } from '@/components/ui/Dialog';
 import { Icon, type LucideIcon } from '@/components/ui/Icon';
@@ -41,20 +41,19 @@ export interface Shortcut {
   icon: LucideIcon;
   /** Marks the live destination (amber Radio icon in the rail). */
   live?: boolean;
-  /** Drawn as an orange pill in the rail: the site's two signature features. */
+  /** Drawn as a green pill in the rail (Nominate Your Local Hero). */
   highlight?: boolean;
 }
 
 /**
- * Reader destinations that are not categories, in nav order. WOW Radio and
- * Nominate Your Local Hero lead, highlighted; the main categories that follow
- * come from the site config (the WOW categories, show_in_nav).
+ * Reader destinations that are not categories, in nav order. Nominate Your
+ * Local Hero leads as a green pill; the main categories that follow come from
+ * the site config (the WOW categories, show_in_nav). WOW Radio lives on the
+ * home page and in the bottom bar rather than the menu.
  */
 export const SHORTCUTS: readonly Shortcut[] = [
-  { to: '/radio', key: 'ui.wowRadio', icon: AudioLines, highlight: true },
   { to: '/nominate', key: 'ui.nominate', icon: Award, highlight: true },
   { to: '/story-shots', key: 'ui.storyShots', icon: GalleryVerticalEnd },
-  { to: '/trending', key: 'ui.trending', icon: TrendingUp },
 ];
 
 /** §12.5 — Grievance Officer, correction policy and AI disclosure, live at launch. */
@@ -137,7 +136,7 @@ export function NavDrawer({ open, onClose }: NavDrawerProps) {
               <NavLink
                 to={sc.to}
                 className={({ isActive }) =>
-                  cn(rowClass(isActive, s.body), sc.highlight && !isActive && 'bg-wow-tint text-wow-deep hover:bg-wow-tint')
+                  cn(rowClass(isActive, s.body), sc.highlight && !isActive && 'bg-hero-tint text-hero-text hover:bg-hero-tint')
                 }
               >
                 <Icon icon={sc.icon} size="md" className={sc.live ? 'text-breaking' : undefined} />

@@ -34,6 +34,11 @@ export default {
           tint: 'rgb(var(--tn-wow-tint) / <alpha-value>)',
         },
         'on-wow': 'rgb(var(--tn-on-wow) / <alpha-value>)',
+        hero: {
+          DEFAULT: 'rgb(var(--tn-hero) / <alpha-value>)',
+          tint: 'rgb(var(--tn-hero-tint) / <alpha-value>)',
+          text: 'rgb(var(--tn-hero-text) / <alpha-value>)',
+        },
         social: {
           whatsapp: 'rgb(var(--tn-social-whatsapp) / <alpha-value>)',
           facebook: 'rgb(var(--tn-social-facebook) / <alpha-value>)',

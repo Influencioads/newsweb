@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Ghost, Lightbulb, Pause, Play, Radio, Square, Sunrise, Zap, type LucideIcon } from 'lucide-react';
+import { Ghost, Lightbulb, Pause, Play, Square, Sunrise, Zap, type LucideIcon } from 'lucide-react';
 
 import { Icon } from '@/components/ui/Icon';
 import { PageContainer } from '@/components/ui/Layout';
@@ -184,12 +184,29 @@ export function WowRadio({ variant = 'card' }: { variant?: 'card' | 'page' }) {
         className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-wow/25 blur-3xl"
       />
 
+      {/* The WOW Radio logo as a banner on the radio page. */}
+      {page ? (
+        <img
+          src="/wow-radio.webp"
+          alt={te ? 'వావ్ రేడియో' : 'WOW Radio'}
+          width={960}
+          height={540}
+          className="relative mb-5 aspect-[16/7] w-full rounded-xl object-cover shadow-raised"
+        />
+      ) : null}
+
       {/* Header */}
       <div className="relative flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="flex h-12 w-12 items-center justify-center rounded-pill bg-wow-deep text-on-wow shadow-raised">
-            <Icon icon={Radio} size="lg" />
-          </span>
+          {!page ? (
+            <img
+              src="/wow-radio.webp"
+              alt=""
+              width={960}
+              height={540}
+              className="h-14 w-auto shrink-0 rounded-xl object-cover shadow-raised ring-1 ring-on-ink/20 md:h-16"
+            />
+          ) : null}
           <div>
             <p className="inline-flex items-center gap-1.5 font-sans text-eyebrow font-bold uppercase text-wow">
               <span className="relative flex h-2 w-2">

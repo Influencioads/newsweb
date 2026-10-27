@@ -109,10 +109,10 @@ export function Masthead() {
           to="/"
           className="order-first col-span-2 flex min-w-0 flex-col items-center rounded-xl md:order-none md:col-span-1"
         >
-          <img src="/logo.webp" alt="వావ్ ఇండియన్ · WowIndian" width={960} height={257} className="h-16 w-auto md:h-20" />
-          {/* Brand line from the pitch: The Inspiring Indian — Discover. Inspire. Learn. Share. */}
-          <span lang="en" className="-mt-0.5 font-sans text-eyebrow font-bold uppercase text-wow-deep">
-            Discover · Inspire · Learn · Share
+          <img src="/wow-indian-logo.webp" alt="వావ్ ఇండియన్ · WowIndian" width={960} height={260} className="h-16 w-auto md:h-20" />
+          {/* Brand line: Ordinary People. Extraordinary Stories. */}
+          <span lang="en" className="mt-0.5 font-sans text-ui-sm font-bold tracking-wide text-wow-deep">
+            Ordinary People. Extraordinary Stories.
           </span>
         </Link>
 

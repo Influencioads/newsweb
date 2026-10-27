@@ -33,7 +33,7 @@ import { AI_FEATURES } from '@/utils/features';
 
 type Target = 'hero' | 'gallery';
 
-interface LibraryItem {
+export interface LibraryItem {
   id: number;
   url: string;
   alt_te: string | null;
@@ -45,7 +45,7 @@ interface LibraryItem {
   ai_generated?: boolean;
 }
 
-const toRef = (m: LibraryItem): CmsMediaRef => ({
+export const toRef = (m: LibraryItem): CmsMediaRef => ({
   id: m.id,
   url: m.url,
   alt_te: m.alt_te ?? null,
@@ -54,9 +54,9 @@ const toRef = (m: LibraryItem): CmsMediaRef => ({
   height: m.height ?? null,
 });
 
-const ACCEPT = 'image/jpeg,image/png,image/webp';
+export const ACCEPT = 'image/jpeg,image/png,image/webp';
 
-function Tile({
+export function Tile({
   item,
   selected,
   onClick,

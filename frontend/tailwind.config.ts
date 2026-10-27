@@ -34,6 +34,13 @@ export default {
           tint: 'rgb(var(--tn-wow-tint) / <alpha-value>)',
         },
         'on-wow': 'rgb(var(--tn-on-wow) / <alpha-value>)',
+        social: {
+          whatsapp: 'rgb(var(--tn-social-whatsapp) / <alpha-value>)',
+          facebook: 'rgb(var(--tn-social-facebook) / <alpha-value>)',
+          instagram: 'rgb(var(--tn-social-instagram) / <alpha-value>)',
+          telegram: 'rgb(var(--tn-social-telegram) / <alpha-value>)',
+          x: 'rgb(var(--tn-social-x) / <alpha-value>)',
+        },
         breaking: {
           DEFAULT: 'rgb(var(--tn-breaking) / <alpha-value>)',
           tint: 'rgb(var(--tn-breaking-tint) / <alpha-value>)',

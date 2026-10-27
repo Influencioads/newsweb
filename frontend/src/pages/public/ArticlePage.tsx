@@ -10,7 +10,7 @@ import { ArticleRenderer } from '@/components/article/ArticleRenderer';
 import { ArticleVideo } from '@/components/article/ArticleVideo';
 import { AudioPlayer, audioQuery, PILL, type TrackMeta } from '@/components/article/AudioPlayer';
 import { ReaderToolbar, ReadingProgress } from '@/components/article/ReaderToolbar';
-import { ShareSheet } from '@/components/article/ShareSheet';
+import { ShareBlock, ShareSheet } from '@/components/article/ShareSheet';
 import { Badge } from '@/components/ui/Badge';
 import { Button, ButtonLink, IconButton } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -493,6 +493,8 @@ export default function ArticlePage() {
 
                 {/* The rest of the desk's take on this story. */}
                 <ArticleGallery images={data.gallery} />
+
+                <ShareBlock className="mt-8" shortId={data.short_id} url={data.url} title={shareTitle} />
 
                 {data.tags.length > 0 ? (
                   <div className="mt-6 flex flex-wrap gap-2">

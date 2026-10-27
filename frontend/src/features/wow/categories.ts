@@ -1,4 +1,5 @@
 import {
+  Briefcase,
   Cpu,
   Flag,
   GalleryVerticalEnd,
@@ -18,7 +19,8 @@ import {
 } from 'lucide-react';
 
 /**
- * The 15 WOW content features from the "WOW Indian Telugu" concept pitch.
+ * The WOW content features: the 15 from the "WOW Indian Telugu" concept pitch
+ * plus Business Guru.
  *
  * Each one is a category (slug) in the CMS, except WOW Radio and Story Shots,
  * which are experiences with their own routes. The slugs must match the rows
@@ -67,6 +69,15 @@ export const WOW_FEATURES: readonly WowFeature[] = [
     focusEn: 'Entrepreneurs, innovations and business journeys',
     icon: Rocket,
     to: section('startup-stories'),
+  },
+  {
+    slug: 'business-guru',
+    te: 'బిజినెస్ గురు',
+    en: 'Business Guru',
+    focusTe: 'వ్యాపార పాఠాలు, డబ్బు చిట్కాలు, విజయ సూత్రాలు',
+    focusEn: 'Business lessons, money tips and success mantras',
+    icon: Briefcase,
+    to: section('business-guru'),
   },
   {
     slug: 'jai-telugoda',

@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { AudioLines, Award, Film, GalleryVerticalEnd, LogIn, MapPin, Newspaper, Radio, TrendingUp, UserRound, Video } from 'lucide-react';
+import { AudioLines, Award, GalleryVerticalEnd, LogIn, Newspaper, TrendingUp, UserRound } from 'lucide-react';
 
 import { Sheet } from '@/components/ui/Dialog';
 import { Icon, type LucideIcon } from '@/components/ui/Icon';
@@ -39,18 +39,20 @@ export interface Shortcut {
   icon: LucideIcon;
   /** Marks the live destination (amber Radio icon in the rail). */
   live?: boolean;
+  /** Drawn as an orange pill in the rail: the site's two signature features. */
+  highlight?: boolean;
 }
 
-/** Reader destinations that are not categories, in nav order. */
+/**
+ * Reader destinations that are not categories, in nav order. WOW Radio and
+ * Nominate Your Local Hero lead, highlighted; the main categories that follow
+ * come from the site config (the WOW categories, show_in_nav).
+ */
 export const SHORTCUTS: readonly Shortcut[] = [
+  { to: '/radio', key: 'ui.wowRadio', icon: AudioLines, highlight: true },
+  { to: '/nominate', key: 'ui.nominate', icon: Award, highlight: true },
   { to: '/story-shots', key: 'ui.storyShots', icon: GalleryVerticalEnd },
-  { to: '/radio', key: 'ui.wowRadio', icon: AudioLines },
-  { to: '/nominate', key: 'ui.nominate', icon: Award },
-  { to: '/live', key: 'ui.live', icon: Radio, live: true },
   { to: '/trending', key: 'ui.trending', icon: TrendingUp },
-  { to: '/local', key: 'ui.local', icon: MapPin },
-  { to: '/videos', key: 'ui.video', icon: Video },
-  { to: '/short-news', key: 'ui.shorts', icon: Film },
 ];
 
 /** §12.5 — Grievance Officer, correction policy and AI disclosure, live at launch. */
@@ -125,7 +127,12 @@ export function NavDrawer({ open, onClose }: NavDrawerProps) {
           </li>
           {SHORTCUTS.map((sc) => (
             <li key={sc.to}>
-              <NavLink to={sc.to} className={({ isActive }) => rowClass(isActive, s.body)}>
+              <NavLink
+                to={sc.to}
+                className={({ isActive }) =>
+                  cn(rowClass(isActive, s.body), sc.highlight && !isActive && 'bg-wow-tint text-wow-deep hover:bg-wow-tint')
+                }
+              >
                 <Icon icon={sc.icon} size="md" className={sc.live ? 'text-breaking' : undefined} />
                 {t(sc.key)}
               </NavLink>

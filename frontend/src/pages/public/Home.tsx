@@ -4,7 +4,8 @@ import { PageContainer } from '@/components/ui/Layout';
 import { EmptyState, QueryState } from '@/components/ui/State';
 import * as publicApi from '@/features/public/api';
 import { ExploreWow } from '@/features/wow/ExploreWow';
-import { FeaturedStory, TrendingArticles } from '@/features/wow/FeaturedStory';
+import { TrendingArticles } from '@/features/wow/FeaturedStory';
+import { HeroBanner } from '@/features/wow/HeroBanner';
 import { FeaturedHeroes, NominateCta } from '@/features/wow/LocalHeroes';
 import { StoryShotsStrip } from '@/features/wow/StoryShots';
 import { WowRadio } from '@/features/wow/WowRadio';
@@ -15,13 +16,13 @@ import { useDocumentTitle } from '@/utils/motion';
 import { HomeSkeleton } from './home/HomeSkeleton';
 
 /**
- * Reader home page — exactly the blocks the "WOW Indian Telugu" concept pitch
- * names for the homepage (§2) and the website experience (§5), in its order:
+ * Reader home page — the blocks the "WOW Indian Telugu" concept pitch names
+ * for the homepage (§2) and the website experience (§5):
  *
- *   Featured Story (16:9 banner, Read / Share)
- *   Explore WOW (the 15 content features)
- *   Story Shots (swipeable visual stories)
- *   WOW Radio + Nominate Your Local Hero
+ *   Hero banner (rotating top stories, Read / Share)
+ *   WOW Radio + Nominate Your Local Hero — the highlighted signature features
+ *   Explore WOW (the WOW content categories)
+ *   Story Shots (infographic shelf)
  *   Trending Articles
  *   Featured Local Heroes
  *
@@ -57,16 +58,17 @@ export default function Home() {
             data.sections.find((section) => section.key === 'trending')?.articles ?? data.latest;
           return (
             <>
-              {data.lead ? <FeaturedStory article={data.lead} /> : null}
+              {data.lead ? <HeroBanner stories={[data.lead, ...data.secondary]} /> : null}
 
-              <ExploreWow />
-
-              <StoryShotsStrip />
-
+              {/* The two signature features, highlighted straight under the banner. */}
               <div className="grid gap-5 lg:grid-cols-[1.35fr_1fr]">
                 <WowRadio />
                 <NominateCta />
               </div>
+
+              <ExploreWow />
+
+              <StoryShotsStrip />
 
               <TrendingArticles articles={trending.filter((a) => a.short_id !== data.lead?.short_id)} />
 

@@ -271,32 +271,32 @@ class TestSearch:
 # configurable home (§23–24)
 # --------------------------------------------------------------------------- #
 class TestConfigurableHome:
-    def _cinema(self, db: Session) -> Category:
-        return db.execute(select(Category).where(Category.slug == "cinema")).scalar_one()
+    def _nav_category(self, db: Session) -> Category:
+        return db.execute(select(Category).where(Category.slug == "wow-news")).scalar_one()
 
     def test_home_renders_enabled_sections_in_config_order(
         self, client: TestClient, db: Session
     ) -> None:
         # The broadsheet top (lead/secondary/mid/briefs) consumes the 17 newest
         # stories before sections are assembled, so give the page enough filler
-        # that the older cinema stories are left for the cinema section block.
+        # that the older WOW News stories are left for the WOW News section block.
         for i in range(18):
             make_article(db, title_te=f"తాజా వార్త {i}", minutes_ago=1)
-        cinema = self._cinema(db)
+        category = self._nav_category(db)
         for i in range(4):
-            make_article(db, title_te=f"సినిమా కథనం {i}", category=cinema, minutes_ago=200 + i)
+            make_article(db, title_te=f"సినిమా కథనం {i}", category=category, minutes_ago=200 + i)
         db.commit()
 
         r = client.get("/api/v1/public/home")
         assert r.status_code == 200
         keys = [s["key"] for s in r.json()["sections"]]
-        assert "cinema" in keys
+        assert "wow-news" in keys
 
     def test_disabling_a_section_removes_it_without_deploy(
         self, client: TestClient, db: Session
     ) -> None:
         section = db.execute(
-            select(HomepageSection).where(HomepageSection.key == "cinema")
+            select(HomepageSection).where(HomepageSection.key == "wow-news")
         ).scalar_one()
         token = staff_token(db)
 
@@ -308,7 +308,7 @@ class TestConfigurableHome:
         assert r.status_code == 200, r.text
 
         home = client.get("/api/v1/public/home").json()
-        assert "cinema" not in [s["key"] for s in home["sections"]]
+        assert "wow-news" not in [s["key"] for s in home["sections"]]
 
         # Re-enable for later tests.
         client.patch(

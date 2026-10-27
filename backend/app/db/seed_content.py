@@ -43,47 +43,48 @@ logger = get_logger("seed.content")
 
 DEMO_SOURCE_TYPE = "demo"
 
-# (slug, name_te, name_en, show_in_nav) — the §1.2 nav, in the document's own
-# order: National, [Local is a feed route], International, Politics, Cinema,
-# Sports, Business, Jobs, Health, Lifestyle, Travel, Food, Crime, Devotional,
-# Inspiring Stories, Zero-to-Hero, Best Deals. AP/Telangana follow as the two
-# home-state editions (the doc's "Local" umbrella, kept as browsable sections).
-# Home/Trending/Local are routes, not categories. Tuple position is the sort.
+# (slug, name_te, name_en, show_in_nav). Tuple position is the sort; rows with
+# show_in_nav True are the main navigation. Home/Trending/Local are routes,
+# not categories.
 CATEGORIES: tuple[tuple[str, str, str, bool], ...] = (
-    ("national", "జాతీయం", "National", True),
-    ("world", "అంతర్జాతీయం", "International", True),
-    ("politics", "రాజకీయం", "Politics", True),
-    ("cinema", "సినిమా", "Cinema", True),
-    ("sports", "క్రీడలు", "Sports", True),
-    ("business", "బిజినెస్", "Business", True),
-    ("jobs", "ఉద్యోగాలు", "Jobs", True),
-    ("health", "ఆరోగ్యం", "Health", True),
-    ("lifestyle", "లైఫ్‌స్టైల్", "Lifestyle", True),
-    ("travel", "పర్యాటకం", "Travel", True),
-    ("food", "రుచులు", "Food", True),
-    ("crime", "క్రైమ్", "Crime", True),
-    ("devotional", "భక్తి", "Devotional", True),
-    ("inspiring", "స్ఫూర్తి", "Inspiring Stories", True),
+    # WOW Indian Telugu main categories (concept pitch §3, plus Business Guru).
+    # These are the site's top navigation, in this order. The slugs must match
+    # frontend/src/features/wow/categories.ts. WOW Radio and Story Shots are
+    # routes, not categories.
+    ("real-heroes", "రియల్ హీరోస్", "Real Heroes", True),
+    ("morning-mantra", "మార్నింగ్ మంత్ర", "Morning Mantra", True),
+    ("startup-stories", "స్టార్టప్ స్టోరీస్", "Startup Stories", True),
+    ("business-guru", "బిజినెస్ గురు", "Business Guru", True),
+    ("jai-telugoda", "జై తెలుగోడా", "Jai Telugoda", True),
+    ("local-hero", "లోకల్ హీరో", "Local Hero", True),
     ("zero-to-hero", "జీరో టు హీరో", "Zero to Hero", True),
-    ("best-deals", "బెస్ట్ డీల్స్", "Best Deals", True),
-    ("andhra-pradesh", "ఆంధ్రప్రదేశ్", "Andhra Pradesh", True),
-    ("telangana", "తెలంగాణ", "Telangana", True),
-    # WOW Indian Telugu content features (concept pitch §3). Kept out of the
-    # top nav (show_in_nav False) — readers reach them from the home page's
-    # Explore WOW grid (frontend/src/features/wow/categories.ts), whose slugs
-    # must match these. Zero to Hero above is the 15th.
-    ("real-heroes", "రియల్ హీరోస్", "Real Heroes", False),
-    ("morning-mantra", "మార్నింగ్ మంత్ర", "Morning Mantra", False),
-    ("startup-stories", "స్టార్టప్ స్టోరీస్", "Startup Stories", False),
-    ("jai-telugoda", "జై తెలుగోడా", "Jai Telugoda", False),
-    ("local-hero", "లోకల్ హీరో", "Local Hero", False),
-    ("my-village-story", "మై విలేజ్ స్టోరీ", "My Village Story", False),
-    ("wow-idea", "వావ్ ఐడియా", "WOW Idea", False),
-    ("wow-news", "వావ్ న్యూస్", "WOW News", False),
-    ("my-story", "మై స్టోరీ", "My Story", False),
-    ("wow-tech", "వావ్ టెక్", "WOW Tech", False),
-    ("mystery", "మిస్టరీ", "Mystery", False),
-    ("wow-puranam", "వావ్ పురాణం", "WOW Puranam", False),
+    ("my-village-story", "మై విలేజ్ స్టోరీ", "My Village Story", True),
+    ("wow-idea", "వావ్ ఐడియా", "WOW Idea", True),
+    ("wow-news", "వావ్ న్యూస్", "WOW News", True),
+    ("my-story", "మై స్టోరీ", "My Story", True),
+    ("wow-tech", "వావ్ టెక్", "WOW Tech", True),
+    ("mystery", "మిస్టరీ", "Mystery", True),
+    ("wow-puranam", "వావ్ పురాణం", "WOW Puranam", True),
+    # The original news sections. Kept so existing stories keep their home and
+    # URLs, but no longer in the main navigation (show_in_nav False); an admin
+    # can bring any back from the Taxonomy page.
+    ("national", "జాతీయం", "National", False),
+    ("world", "అంతర్జాతీయం", "International", False),
+    ("politics", "రాజకీయం", "Politics", False),
+    ("cinema", "సినిమా", "Cinema", False),
+    ("sports", "క్రీడలు", "Sports", False),
+    ("business", "బిజినెస్", "Business", False),
+    ("jobs", "ఉద్యోగాలు", "Jobs", False),
+    ("health", "ఆరోగ్యం", "Health", False),
+    ("lifestyle", "లైఫ్‌స్టైల్", "Lifestyle", False),
+    ("travel", "పర్యాటకం", "Travel", False),
+    ("food", "రుచులు", "Food", False),
+    ("crime", "క్రైమ్", "Crime", False),
+    ("devotional", "భక్తి", "Devotional", False),
+    ("inspiring", "స్ఫూర్తి", "Inspiring Stories", False),
+    ("best-deals", "బెస్ట్ డీల్స్", "Best Deals", False),
+    ("andhra-pradesh", "ఆంధ్రప్రదేశ్", "Andhra Pradesh", False),
+    ("telangana", "తెలంగాణ", "Telangana", False),
     ("districts", "జిల్లాలు", "Districts", False),
     ("opinion", "అభిప్రాయం", "Opinion", False),
 )
@@ -1279,6 +1280,23 @@ DEMO_ARTICLES: tuple[tuple, ...] = (
 )
 
 
+#: Demo stories written for the old news sections, filed under the WOW category
+#: that now carries that kind of story, so the WOW navigation has content in a
+#: fresh dev database. Demo data only; real stories are filed by editors.
+DEMO_WOW_HOME: dict[str, str] = {
+    "inspiring": "real-heroes",
+    "business": "business-guru",
+    "devotional": "morning-mantra",
+    "world": "wow-news",
+    "national": "wow-news",
+    "lifestyle": "my-story",
+    "travel": "my-village-story",
+    "sports": "jai-telugoda",
+    "jobs": "wow-news",
+    "cinema": "wow-news",
+}
+
+
 def seed_demo_articles(
     db: Session, categories: dict[str, Category], tags: dict[str, Tag]
 ) -> int:
@@ -1331,7 +1349,7 @@ def seed_demo_articles(
             body_html=body_html,
             word_count=words,
             reading_time_sec=reading_sec,
-            category_id=categories[cat_slug].id if cat_slug in categories else None,
+            category_id=categories[home].id if (home := DEMO_WOW_HOME.get(cat_slug, cat_slug)) in categories else None,
             district_id=districts[district_slug].id
             if district_slug in districts
             else None,

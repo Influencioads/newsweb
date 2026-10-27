@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useColorScheme , StyleSheet } from 'react-native';
+import { useColorScheme, StyleSheet, type ImageStyle, type TextStyle, type ViewStyle } from 'react-native';
 
 import { palettes, type Palette, type ThemeName } from '@/lib/theme';
 import { usePrefs } from '@/stores/prefs';
@@ -33,7 +33,12 @@ export function useColors(): Palette {
  *     const useStyles = makeStyles((color) => ({ page: { backgroundColor: color.canvas } }));
  *     function Screen() { const styles = useStyles(); … }
  */
-export function makeStyles<T extends StyleSheet.NamedStyles<T>>(
+/** One style object per key — React Native 0.88 dropped its exported
+ *  `StyleSheet.NamedStyles`, so the constraint that keeps literal types like
+ *  `'row'` (instead of `string`) lives here. */
+type NamedStyles<T> = { [P in keyof T]: ViewStyle | TextStyle | ImageStyle };
+
+export function makeStyles<T extends NamedStyles<T>>(
   factory: (color: Palette) => T,
 ): () => T {
   const cache = new Map<ThemeName, T>();

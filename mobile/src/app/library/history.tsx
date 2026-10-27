@@ -98,7 +98,7 @@ export default function HistoryScreen() {
           refreshControl={
             <RefreshControl
               refreshing={feed.isRefetching && !feed.isFetchingNextPage}
-              onRefresh={() => feed.refetch()}
+              onRefresh={() => void feed.refetch()}
               tintColor={color.brand}
               colors={[color.brand]}
               progressBackgroundColor={color.surface}

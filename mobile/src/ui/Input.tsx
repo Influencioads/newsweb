@@ -1,4 +1,4 @@
-import { createContext, forwardRef, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, forwardRef, useContext, useEffect, useState, type ComponentRef, type ReactNode } from 'react';
 import {
   AccessibilityInfo,
   TextInput,
@@ -101,7 +101,7 @@ export interface InputProps extends Omit<TextInputProps, 'style'> {
  * chosen by `lang` and is not overridable — that keeps every Telugu input
  * on the safe line-height.
  */
-export const Input = forwardRef<TextInput, InputProps>(function Input(
+export const Input = forwardRef<ComponentRef<typeof TextInput>, InputProps>(function Input(
   {
     invalid = false,
     leading,

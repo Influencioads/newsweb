@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 
 import { ShareButton } from '@/components/article/ShareSheet';
-import { NewsImage } from '@/components/media/NewsImage';
 import { ButtonLink } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { useI18n, useScript } from '@/i18n';
@@ -56,34 +55,10 @@ export function HeroBanner({ stories }: { stories: ArticleCard[] }) {
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
     >
-      {/* Photos, cross-fading. All stay mounted so the next one is already decoded. */}
-      {slides.map((a, i) => (
-        <div
-          key={a.short_id}
-          aria-hidden={i !== index}
-          className={cn(
-            'absolute inset-0 -z-10 transition-opacity duration-slow ease-standard',
-            i === index ? 'opacity-100' : 'opacity-0',
-          )}
-        >
-          <NewsImage
-            media={a.hero}
-            ratio="auto"
-            radius="none"
-            priority={i === 0}
-            className="h-full w-full"
-            sizes="(max-width: 1200px) 100vw, 1200px"
-          />
-        </div>
-      ))}
-      {/* Brand wash: deep blue from the left (and from the bottom on phones) so the copy always reads. */}
-      <div
-        aria-hidden
-        className="absolute inset-0 -z-10 bg-gradient-to-t from-brand-deep via-brand-deep/70 to-brand-deep/10 md:bg-gradient-to-r md:from-brand-deep md:via-brand-deep/75 md:to-transparent"
-      />
+      {/* No photos: the banner is the deep-blue WOW panel with an orange glow. */}
       <div aria-hidden className="absolute -left-20 -top-24 -z-10 h-72 w-72 rounded-full bg-wow/25 blur-3xl" />
 
-      <div className="flex min-h-[440px] flex-col justify-end gap-4 p-5 pt-16 sm:p-7 sm:pt-16 md:min-h-[480px] md:max-w-[62%] md:justify-center md:p-10 lg:min-h-[520px]">
+      <div className="flex min-h-[300px] flex-col justify-center gap-4 p-5 pt-16 sm:p-7 sm:pt-16 md:min-h-[340px] md:max-w-[80%] md:p-10">
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-pill bg-wow-deep px-3 py-1 font-sans text-meta font-bold uppercase tracking-wide text-on-wow">
             <Icon icon={Sparkles} size="xs" />

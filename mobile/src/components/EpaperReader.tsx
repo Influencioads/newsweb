@@ -25,7 +25,7 @@ import { AI_FEATURES } from '@/lib/features';
  * left here is what belongs to the edition as a whole — which page is open,
  * the share text, and the PDF download.
  */
-const SITE = 'https://toptelugunews.com';
+const SITE = 'https://wowindia.influencioweb.com';
 
 export function EpaperReader({
   edition,

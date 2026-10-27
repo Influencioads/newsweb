@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Award, GalleryVerticalEnd, LogIn, Newspaper, UserRound } from 'lucide-react';
+import { AudioLines, Award, GalleryVerticalEnd, LogIn, Newspaper, UserRound } from 'lucide-react';
 
 import { Sheet } from '@/components/ui/Dialog';
 import { Icon, type LucideIcon } from '@/components/ui/Icon';
@@ -46,14 +46,19 @@ export interface Shortcut {
 }
 
 /**
- * Reader destinations that are not categories, in nav order. Nominate Your
- * Local Hero leads as a green pill; the main categories that follow come from
- * the site config (the WOW categories, show_in_nav). WOW Radio lives on the
- * home page and in the bottom bar rather than the menu.
+ * Reader destinations that are not categories, in nav order; the main
+ * categories that follow come from the site config (the WOW categories,
+ * show_in_nav). WOW Radio and Nominate Your Local Hero are separate buttons in
+ * the header (Masthead) and the bottom bar, not menu items.
  */
 export const SHORTCUTS: readonly Shortcut[] = [
-  { to: '/nominate', key: 'ui.nominate', icon: Award, highlight: true },
   { to: '/story-shots', key: 'ui.storyShots', icon: GalleryVerticalEnd },
+];
+
+/** The two signature buttons, listed at the top of the phone menu. */
+export const DRAWER_SPECIALS: readonly Shortcut[] = [
+  { to: '/radio', key: 'ui.wowRadio', icon: AudioLines, highlight: true },
+  { to: '/nominate', key: 'ui.nominate', icon: Award, highlight: true },
 ];
 
 /** §12.5 — Grievance Officer, correction policy and AI disclosure, live at launch. */
@@ -131,12 +136,16 @@ export function NavDrawer({ open, onClose }: NavDrawerProps) {
             </NavLink>
           </li>
           )}
-          {SHORTCUTS.map((sc) => (
+          {[...DRAWER_SPECIALS, ...SHORTCUTS].map((sc) => (
             <li key={sc.to}>
               <NavLink
                 to={sc.to}
                 className={({ isActive }) =>
-                  cn(rowClass(isActive, s.body), sc.highlight && !isActive && 'bg-hero-tint text-hero-text hover:bg-hero-tint')
+                  cn(
+                    rowClass(isActive, s.body),
+                    sc.highlight && !isActive && sc.to === '/radio' && 'bg-wow-tint text-wow-deep hover:bg-wow-tint',
+                    sc.highlight && !isActive && sc.to === '/nominate' && 'bg-hero-tint text-hero-text hover:bg-hero-tint',
+                  )
                 }
               >
                 <Icon icon={sc.icon} size="md" className={sc.live ? 'text-breaking' : undefined} />

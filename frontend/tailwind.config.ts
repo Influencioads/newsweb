@@ -187,8 +187,8 @@ export default {
         dock: 'var(--player-dock-h, 0px)',
       },
       maxWidth: {
-        site: '1200px',
-        page: '960px',
+        site: '1360px',
+        page: '1040px',
         wrap: '880px',
         article: '680px', // mockup 1c article measure
         form: '560px',

@@ -6,6 +6,7 @@ import { AudioLines, Award, GalleryVerticalEnd, LogIn, Newspaper, TrendingUp, Us
 import { Sheet } from '@/components/ui/Dialog';
 import { Icon, type LucideIcon } from '@/components/ui/Icon';
 import * as publicApi from '@/features/public/api';
+import { MORE_FEATURES } from '@/features/wow/categories';
 import { useI18n, useScript, type StringKey } from '@/i18n';
 import { useAuth } from '@/stores/auth';
 import { cn } from '@/utils/cn';
@@ -154,6 +155,20 @@ export function NavDrawer({ open, onClose }: NavDrawerProps) {
             })}
           </Group>
         )}
+
+        <Group title={t('ui.moreCategories')}>
+          {MORE_FEATURES.map((f) => {
+            const label = s.forText(f.te, f.en);
+            return (
+              <li key={f.slug}>
+                <NavLink to={f.to} lang={label.lang} className={({ isActive }) => rowClass(isActive, label.cls)}>
+                  <Icon icon={f.icon} size="md" />
+                  {pick(f.te, f.en)}
+                </NavLink>
+              </li>
+            );
+          })}
+        </Group>
 
         <ul className="border-t border-rule pt-4">
           <li>

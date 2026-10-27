@@ -272,7 +272,7 @@ class TestSearch:
 # --------------------------------------------------------------------------- #
 class TestConfigurableHome:
     def _nav_category(self, db: Session) -> Category:
-        return db.execute(select(Category).where(Category.slug == "wow-news")).scalar_one()
+        return db.execute(select(Category).where(Category.slug == "wow-tech")).scalar_one()
 
     def test_home_renders_enabled_sections_in_config_order(
         self, client: TestClient, db: Session
@@ -290,13 +290,13 @@ class TestConfigurableHome:
         r = client.get("/api/v1/public/home")
         assert r.status_code == 200
         keys = [s["key"] for s in r.json()["sections"]]
-        assert "wow-news" in keys
+        assert "wow-tech" in keys
 
     def test_disabling_a_section_removes_it_without_deploy(
         self, client: TestClient, db: Session
     ) -> None:
         section = db.execute(
-            select(HomepageSection).where(HomepageSection.key == "wow-news")
+            select(HomepageSection).where(HomepageSection.key == "wow-tech")
         ).scalar_one()
         token = staff_token(db)
 
@@ -308,7 +308,7 @@ class TestConfigurableHome:
         assert r.status_code == 200, r.text
 
         home = client.get("/api/v1/public/home").json()
-        assert "wow-news" not in [s["key"] for s in home["sections"]]
+        assert "wow-tech" not in [s["key"] for s in home["sections"]]
 
         # Re-enable for later tests.
         client.patch(

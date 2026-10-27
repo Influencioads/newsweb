@@ -68,7 +68,7 @@ export const SEGMENTS: readonly Segment[] = [
     taglineEn: 'Surprising facts worth knowing',
     icon: Zap,
     tone: 'from-brand to-brand-dark',
-    categories: ['wow-news', 'wow-tech', 'wow-idea'],
+    categories: ['wow-tech', 'wow-idea', 'startup-stories'],
   },
   {
     id: 'mystery',

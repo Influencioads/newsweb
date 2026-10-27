@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Menu, Search } from 'lucide-react';
+import { LayoutGrid, Menu, Search } from 'lucide-react';
 
 import { IconButton, IconButtonLink } from '@/components/ui/Button';
 import { ChipRail } from '@/components/ui/Chip';
@@ -180,6 +180,12 @@ export function CategoryNav() {
                   </li>
                 );
               })}
+              <li className="contents">
+                <NavLink to="/explore" className={({ isActive }) => linkClass(isActive, s.body, s.te)}>
+                  <Icon icon={LayoutGrid} size="sm" />
+                  {t('ui.moreCategories')}
+                </NavLink>
+              </li>
             </ul>
             {/* The one active underline. Mounted only once measured, so it never slides in from zero. */}
             {bar && (

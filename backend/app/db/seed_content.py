@@ -47,24 +47,23 @@ DEMO_SOURCE_TYPE = "demo"
 # show_in_nav True are the main navigation. Home/Trending/Local are routes,
 # not categories.
 CATEGORIES: tuple[tuple[str, str, str, bool], ...] = (
-    # WOW Indian Telugu main categories (concept pitch §3, plus Business Guru).
-    # These are the site's top navigation, in this order. The slugs must match
+    # WOW Indian Telugu categories. The first six (show_in_nav True) are the
+    # main categories: the top navigation and the homepage sections, in this
+    # order. The rest stay live at /section/<slug> and are reached from
+    # "Explore more categories". The slugs must match
     # frontend/src/features/wow/categories.ts. WOW Radio and Story Shots are
     # routes, not categories.
     ("real-heroes", "రియల్ హీరోస్", "Real Heroes", True),
+    ("jai-telugoda", "జై తెలుగోడా!", "Jai Telugoda!", True),
     ("morning-mantra", "మార్నింగ్ మంత్ర", "Morning Mantra", True),
     ("startup-stories", "స్టార్టప్ స్టోరీస్", "Startup Stories", True),
-    ("business-guru", "బిజినెస్ గురు", "Business Guru", True),
-    ("jai-telugoda", "జై తెలుగోడా", "Jai Telugoda", True),
-    ("local-hero", "లోకల్ హీరో", "Local Hero", True),
-    ("zero-to-hero", "జీరో టు హీరో", "Zero to Hero", True),
-    ("my-village-story", "మై విలేజ్ స్టోరీ", "My Village Story", True),
-    ("wow-idea", "వావ్ ఐడియా", "WOW Idea", True),
-    ("wow-news", "వావ్ న్యూస్", "WOW News", True),
-    ("my-story", "మై స్టోరీ", "My Story", True),
     ("wow-tech", "వావ్ టెక్", "WOW Tech", True),
-    ("mystery", "మిస్టరీ", "Mystery", True),
-    ("wow-puranam", "వావ్ పురాణం", "WOW Puranam", True),
+    ("business-guru", "బిజినెస్ గురు", "Business Guru", True),
+    ("local-hero", "లోకల్ హీరో", "Local Hero", False),
+    ("zero-to-hero", "జీరో టు హీరో", "Zero to Hero", False),
+    ("wow-idea", "వావ్ ఐడియా", "WOW Idea", False),
+    ("mystery", "మిస్టరీ", "Mystery", False),
+    ("wow-puranam", "వావ్ పురాణం", "WOW Puranam", False),
     # The original news sections. Kept so existing stories keep their home and
     # URLs, but no longer in the main navigation (show_in_nav False); an admin
     # can bring any back from the Taxonomy page.
@@ -1287,13 +1286,13 @@ DEMO_WOW_HOME: dict[str, str] = {
     "inspiring": "real-heroes",
     "business": "business-guru",
     "devotional": "morning-mantra",
-    "world": "wow-news",
-    "national": "wow-news",
-    "lifestyle": "my-story",
-    "travel": "my-village-story",
+    "lifestyle": "morning-mantra",
+    "world": "wow-tech",
+    "national": "jai-telugoda",
     "sports": "jai-telugoda",
-    "jobs": "wow-news",
-    "cinema": "wow-news",
+    "cinema": "jai-telugoda",
+    "jobs": "startup-stories",
+    "travel": "local-hero",
 }
 
 

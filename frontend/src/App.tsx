@@ -32,6 +32,7 @@ const BulletinPage = lazy(() => import('./pages/public/BulletinPage'));
 const NominatePage = lazy(() => import('./features/wow/NominatePage'));
 const RadioPage = lazy(() => import('./features/wow/WowRadio'));
 const StoryShotsPage = lazy(() => import('./features/wow/StoryShots'));
+const ExplorePage = lazy(() => import('./features/wow/ExploreWow'));
 const ContributorApplyPage = lazy(() => import('./pages/public/ContributorApplyPage'));
 const LiveNewsPage = lazy(() => import('./pages/public/LiveNewsPage'));
 const ShortNewsPage = lazy(() => import('./pages/public/ShortNewsPage'));
@@ -179,6 +180,7 @@ export default function App() {
               <Route path="/short-news" element={<ShortNewsPage />} />
               <Route path="/story-shots" element={<StoryShotsPage />} />
               <Route path="/radio" element={<RadioPage />} />
+              <Route path="/explore" element={<ExplorePage />} />
               <Route path="/nominate" element={<NominatePage />} />
               <Route path="/web-stories" element={<WebStoriesPage />} />
               <Route path="/author/:slug" element={<AuthorPage />} />

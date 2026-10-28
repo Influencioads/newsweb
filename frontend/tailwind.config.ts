@@ -39,6 +39,8 @@ export default {
           tint: 'rgb(var(--tn-hero-tint) / <alpha-value>)',
           text: 'rgb(var(--tn-hero-text) / <alpha-value>)',
         },
+        /** The site footer's navy (constant in both themes; `on-ink` text on it). */
+        footer: 'rgb(var(--tn-footer) / <alpha-value>)',
         social: {
           whatsapp: 'rgb(var(--tn-social-whatsapp) / <alpha-value>)',
           facebook: 'rgb(var(--tn-social-facebook) / <alpha-value>)',

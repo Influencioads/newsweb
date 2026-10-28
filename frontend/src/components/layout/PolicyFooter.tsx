@@ -12,10 +12,11 @@ import { cn } from '@/utils/cn';
 import { ABOUT_LINK_COUNT, FOOTER_LINKS } from './NavDrawer';
 
 /**
- * PolicyFooter — constant-dark footer: categories / product / compliance link
- * (one `nav` landmark: the twelve WOW categories as a band of icon chips, then
- * product, company and policies columns), then the wordmark and the
- * copyright line. Nothing here goes below `text-meta`.
+ * PolicyFooter — the navy footer: categories / product / compliance links
+ * (one `nav` landmark: the twelve WOW categories as an even grid of icon
+ * chips, then product, company and policies columns on the same grid, so each
+ * column starts under a chip column), then the wordmark and the copyright
+ * line. Nothing here goes below `text-meta`.
  */
 
 const PRODUCT_LINKS: readonly (readonly [string, StringKey])[] = ([
@@ -57,16 +58,16 @@ export function PolicyFooter() {
   const s = useScript();
 
   return (
-    <footer className="mt-10 bg-ink text-on-ink">
+    <footer className="mt-10 bg-footer text-on-ink">
       <PageContainer width="site">
         {/* `ui.more`, not `ui.explore` — the header rail already owns that name. */}
         <nav aria-label={t('ui.more')} className="space-y-9 py-10">
-          {/* All twelve WOW categories as a band of icon chips across the top. */}
+          {/* All twelve WOW categories as an even grid of icon chips: 2, 3, then 6 across. */}
           <section aria-labelledby="footer-sections">
             <h2 id="footer-sections" className={cn(s.head, 'mb-3 text-headline-xs font-bold text-on-ink')}>
               {t('ui.categories')}
             </h2>
-            <ul className="flex flex-wrap gap-2">
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
               {WOW_FEATURES.map((f) => {
                 const label = s.forText(f.te, f.en);
                 return (
@@ -76,14 +77,14 @@ export function PolicyFooter() {
                       lang={label.lang}
                       className={cn(
                         label.cls,
-                        'inline-flex min-h-tap items-center gap-2 rounded-pill border border-on-ink/15 bg-on-ink/5 py-1.5 pl-2 pr-3.5 text-ui-sm font-semibold text-on-ink/90',
+                        'flex min-h-tap w-full min-w-0 items-center gap-2 rounded-pill border border-on-ink/20 bg-on-ink/10 py-1.5 pl-2 pr-3.5 text-ui-sm font-semibold text-on-ink',
                         'transition-colors duration-base ease-standard hover:border-hero hover:bg-hero hover:text-on-ink',
                       )}
                     >
                       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-on-ink/10">
                         <Icon icon={f.icon} size="xs" />
                       </span>
-                      {pick(f.te, f.en)}
+                      <span className="te-clamp-1 min-w-0">{pick(f.te, f.en)}</span>
                     </Link>
                   </li>
                 );
@@ -91,7 +92,8 @@ export function PolicyFooter() {
             </ul>
           </section>
 
-          <div className="grid grid-cols-2 gap-x-6 gap-y-8 md:grid-cols-3">
+          {/* Same gap as the chip grid: each column lines up with a chip column. */}
+          <div className="grid grid-cols-2 gap-x-3 gap-y-8 sm:grid-cols-3">
             <Column title={t('ui.product')}>
               {PRODUCT_LINKS.map(([to, key]) => (
                 <li key={to}>
@@ -122,7 +124,7 @@ export function PolicyFooter() {
           </div>
         </nav>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-on-ink/10 py-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-on-ink/15 py-6">
           <div className="flex flex-wrap items-center gap-3">
             <img
               src="/wow-indian-logo.webp"

@@ -17,6 +17,7 @@ import { formatFullDate } from '@/utils/time';
 
 import { LanguageToggle } from './LanguageToggle';
 import { ReaderSettings } from './ReaderSettings';
+import { Wordmark } from './Wordmark';
 
 /**
  * Masthead — row 1 of the reader shell; scrolls away.
@@ -106,7 +107,7 @@ export function Masthead() {
           From md it is the original three-column row. */}
       <PageContainer
         width="site"
-        className="grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1 py-2 md:grid-cols-3 md:py-3"
+        className="grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1 py-2 md:grid-cols-[1fr_auto_1fr] md:gap-x-6 md:py-4"
       >
         {/* Left column (md+): area, date, language — stacked like a paper's dateline. */}
         <div className="flex items-center gap-3 md:flex-col md:items-start md:gap-0.5">
@@ -120,9 +121,10 @@ export function Masthead() {
 
         <Link
           to="/"
-          className="order-first col-span-2 flex min-w-0 flex-col items-center rounded-xl md:order-none md:col-span-1"
+          aria-label="WowIndian · వావ్ ఇండియన్"
+          className="order-first col-span-2 flex min-w-0 flex-col items-center gap-1 rounded-xl py-1 md:order-none md:col-span-1"
         >
-          <img src="/wow-indian-logo.webp" alt="వావ్ ఇండియన్ · WowIndian" width={960} height={260} className="h-16 w-auto md:h-20 lg:h-24" />
+          <Wordmark />
           {/* Brand line: Ordinary People. Extraordinary Stories. */}
           <span lang="en" className="mt-0.5 whitespace-nowrap text-center font-sans text-ui-sm font-bold tracking-wide text-ink md:text-meta lg:text-ui-sm">
             Ordinary People. Extraordinary Stories.

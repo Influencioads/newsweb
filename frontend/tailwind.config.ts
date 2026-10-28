@@ -158,6 +158,9 @@ export default {
          * itself has to satisfy the floor.
          */
         display: ['34px', { lineHeight: '1.5' }],
+        /** The masthead wordmark (WOW · emblem · INDIAN): fluid, phone and md+. */
+        'wordmark-sm': ['clamp(1.75rem, 7.6vw, 2.5rem)', { lineHeight: '1', letterSpacing: '0.01em' }],
+        wordmark: ['clamp(2.25rem, 4.1vw, 3.75rem)', { lineHeight: '1', letterSpacing: '0.02em' }],
         'headline-xl': ['33px', { lineHeight: '1.5' }],
         'headline-lg': ['28px', { lineHeight: '1.5' }],
         'headline-md': ['20px', { lineHeight: '1.5' }],

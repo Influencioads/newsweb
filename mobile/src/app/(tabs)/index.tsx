@@ -9,6 +9,7 @@ import * as publicApi from '@/api/public';
 import type { ArticleCard, HomePayload } from '@/api/types';
 import { CompactCard } from '@/components/ArticleCard';
 import { EmptyState, ErrorState } from '@/components/Feedback';
+import { HomeControls } from '@/components/home/HomeControls';
 import { HomeListHeader } from '@/components/home/HomeListHeader';
 import { HomeSectionBand } from '@/components/home/HomeSectionBand';
 import { LocationSheet, usePlaceName } from '@/components/LocationSheet';
@@ -34,36 +35,54 @@ import { T } from '@/ui/Text';
 /**
  * Home — the WOW Indian layout, in the website's order (frontend
  * src/pages/public/Home.tsx): the top-story banner, WOW Radio and the Nominate
- * call straight under it, Explore WOW, the Story Shots shelf, Trending, then
- * Our Heroes. One `/public/home` request feeds the banner and Trending; the WOW
- * blocks fetch their own stories. Flattened into a single FlatList so the
+ * call straight under it, Explore WOW, the Story Shots shelf, then Our Heroes.
+ * One `/public/home` request feeds the banner; the WOW blocks fetch their own
+ * stories. Flattened into a single FlatList so the
  * masthead collapses against one scroll offset.
+ *
+ * At the top, `HomeControls` holds the language and light/dark switches and the
+ * category pick. With categories picked, Home shows only their stories (newest
+ * first, merged from each category's feed) instead of the WOW layout.
  */
 type Row =
   | { key: string; type: 'hero'; articles: ArticleCard[] }
-  | { key: string; type: 'radio' | 'nominate' | 'explore' | 'shots' | 'heroes' | 'empty' }
+  | { key: string; type: 'radio' | 'nominate' | 'explore' | 'shots' | 'heroes' | 'empty' | 'loading' | 'pickedEmpty' }
   | { key: string; type: 'section'; title: string }
   | { key: string; type: 'compact'; article: ArticleCard };
 
 const STAGGER_MAX = 6;
-const TRENDING_COUNT = 6;
 
-function flatten(home: HomePayload, trendingTitle: string): Row[] {
+function flatten(home: HomePayload): Row[] {
   const rows: Row[] = [];
   if (home.lead) rows.push({ key: 'hero', type: 'hero', articles: [home.lead, ...home.secondary] });
   rows.push({ key: 'radio', type: 'radio' }, { key: 'nominate', type: 'nominate' });
   rows.push({ key: 'explore', type: 'explore' }, { key: 'shots', type: 'shots' });
-
-  const trending = (home.sections.find((s) => s.key === 'trending')?.articles ?? home.latest)
-    .filter((a) => a.short_id !== home.lead?.short_id)
-    .slice(0, TRENDING_COUNT);
-  if (trending.length) {
-    rows.push({ key: 'trending-h', type: 'section', title: trendingTitle });
-    trending.forEach((a) => rows.push({ key: `trending-${a.short_id}`, type: 'compact', article: a }));
-  }
   rows.push({ key: 'heroes', type: 'heroes' });
-  if (!home.lead && !trending.length) rows.push({ key: 'empty', type: 'empty' });
+  if (!home.lead) rows.push({ key: 'empty', type: 'empty' });
   return rows;
+}
+
+/** Home for a category pick: those categories' stories only, newest first. */
+function pickedRows(articles: ArticleCard[] | undefined, title: string): Row[] {
+  if (!articles) return [{ key: 'loading', type: 'loading' }];
+  if (!articles.length) return [{ key: 'picked-empty', type: 'pickedEmpty' }];
+  const rows: Row[] = [];
+  const lead = articles.filter((a) => a.hero?.url).slice(0, 4);
+  if (lead.length) rows.push({ key: 'hero', type: 'hero', articles: lead });
+  const shown = new Set(lead.map((a) => a.short_id));
+  rows.push({ key: 'picked-h', type: 'section', title });
+  articles
+    .filter((a) => !shown.has(a.short_id))
+    .forEach((a) => rows.push({ key: `picked-${a.short_id}`, type: 'compact', article: a }));
+  return rows;
+}
+
+/** Each picked category's newest stories, merged: one copy each, newest first. */
+async function fetchPicked(slugs: string[]): Promise<ArticleCard[]> {
+  const feeds = await Promise.all(slugs.map((category) => publicApi.fetchFeed({ category, limit: 20 })));
+  const byId = new Map<string, ArticleCard>();
+  feeds.forEach((f) => f.articles.forEach((a) => byId.set(a.short_id, a)));
+  return [...byId.values()].sort((a, b) => (b.published_at ?? '').localeCompare(a.published_at ?? ''));
 }
 
 const keyOf = (row: Row) => row.key;
@@ -71,7 +90,7 @@ const keyOf = (row: Row) => row.key;
 export default function HomeScreen() {
   const styles = useStyles();
   const color = useColors();
-  const { t } = useI18n();
+  const { t, pick } = useI18n();
   const edition = usePrefs((s) => s.edition);
   const mandal = usePrefs((s) => s.mandal);
   const authed = useAuth((s) => s.status === 'authenticated');
@@ -79,6 +98,14 @@ export default function HomeScreen() {
   const home = useQuery({
     queryKey: ['home', edition, mandal],
     queryFn: () => publicApi.fetchHome(edition, mandal),
+  });
+
+  const picked = usePrefs((s) => s.homeCategories);
+  const filtering = picked.length > 0;
+  const pickedFeed = useQuery({
+    queryKey: ['home-picked', [...picked].sort()],
+    queryFn: () => fetchPicked(picked),
+    enabled: filtering,
   });
 
   const unread = useQuery({
@@ -123,17 +150,31 @@ export default function HomeScreen() {
       case 'shots':
         return <StoryShotsShelf />;
       case 'section':
-        return <HomeSectionBand title={item.title} sectionKey="trending" onSeeAll={() => router.push('/trending')} />;
+        return <HomeSectionBand title={item.title} sectionKey="trending" />;
       case 'compact':
         return <CompactCard article={item.article} index={stagger} />;
       case 'heroes':
         return <FeaturedHeroes />;
       case 'empty':
         return <EmptyState />;
+      case 'loading':
+        return <SkeletonFeed rows={4} />;
+      case 'pickedEmpty':
+        return (
+          <EmptyState
+            icon="filter"
+            title={pick('ఈ విభాగాల్లో ఇంకా కథలు లేవు', 'No stories in these categories yet')}
+            body={pick('ఇంకో విభాగం ఎంచుకోండి, లేదా "అన్నీ" నొక్కండి.', 'Pick another category, or tap "All".')}
+          />
+        );
     }
   };
 
-  const rows = home.data ? flatten(home.data, t('trending.title')) : [];
+  const rows = filtering
+    ? pickedRows(pickedFeed.data, pick('మీరు ఎంచుకున్న విభాగాలు', 'Your categories'))
+    : home.data
+      ? flatten(home.data)
+      : [];
 
   return (
     <Screen>
@@ -181,16 +222,17 @@ export default function HomeScreen() {
           onScrollBeginDrag={() => setFirstPaint(false)}
           scrollEventThrottle={16}
           ListHeaderComponent={
-            <HomeListHeader
-              breaking={home.data?.breaking ?? []}
-            />
+            <>
+              <HomeControls />
+              {filtering ? null : <HomeListHeader breaking={home.data?.breaking ?? []} />}
+            </>
           }
           contentContainerStyle={styles.content}
           refreshControl={
             <RefreshControl
-              refreshing={home.isRefetching}
+              refreshing={filtering ? pickedFeed.isRefetching : home.isRefetching}
               onRefresh={() => {
-                void home.refetch();
+                void (filtering ? pickedFeed.refetch() : home.refetch());
               }}
               tintColor={color.brand}
               colors={[color.brand]}

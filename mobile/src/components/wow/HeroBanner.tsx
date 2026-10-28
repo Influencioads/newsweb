@@ -23,7 +23,7 @@ export function HeroBanner({ stories, index }: { stories: ArticleCard[]; index?:
     <View>
       {/* Brand line under the masthead on the website; here it leads the page,
           where it has the full width (beside the logo it crowds the header). */}
-      <T variant="eyebrow" weight="bold" color="wowDeep" lang="en" numberOfLines={1} style={styles.caption}>
+      <T variant="eyebrow" weight="bold" color="ink" lang="en" numberOfLines={1} style={styles.caption}>
         {WOW_TAGLINE}
       </T>
       <View style={styles.tagRow}>

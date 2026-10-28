@@ -1,8 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useId } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useId, useRef, useState, type ComponentRef } from 'react';
+import {
+  ScrollView,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { absoluteMediaUrl } from '@/api/client';
@@ -12,6 +19,7 @@ import { useI18n } from '@/lib/i18n';
 import { useMotion } from '@/lib/motion';
 import { radius, space, TAP } from '@/lib/theme';
 import { makeStyles, useColors } from '@/lib/useTheme';
+import { IconButton } from '@/ui/Button';
 import { Icon } from '@/ui/Icon';
 import { PressableScale } from '@/ui/PressableScale';
 import { T } from '@/ui/Text';
@@ -20,10 +28,12 @@ import { T } from '@/ui/Text';
  * Story Shots — the home shelf (twin of the website's `StoryShotsStrip` in
  * frontend/src/features/wow/StoryShots.tsx).
  *
- * A sideways row of tall 9:16 cards, one per shot; a tap opens the
- * full-screen deck (`app/story-shots.tsx`) at that shot. The source is the
- * same as the website's: the newest stories that carry a hero photo. The
- * short-news feed is deliberately not used — its items are picture-only
+ * One shot at a time in a vertical window: swipe up for the next shot, down
+ * for the previous one (it snaps a whole shot per swipe, like the full-screen
+ * deck). The arrows beside it do the same for readers who can't swipe. A tap
+ * opens the full-screen deck (`app/story-shots.tsx`) at that shot. The source
+ * is the same as the website's: the newest stories that carry a hero photo.
+ * The short-news feed is deliberately not used — its items are picture-only
  * cards, with no headline or standfirst for a shot to show.
  */
 
@@ -69,10 +79,24 @@ export function StoryScrim({ from = 'bottom', strength = 0.85 }: { from?: 'top' 
   );
 }
 
-const CARD_WIDTH = 148;
+/** The window's height for a given width: a tall photo card, capped on tablets. */
+function windowHeight(width: number) {
+  return Math.min(Math.round(width * 1.25), 560);
+}
 
-function ShelfCard({ article, n }: { article: ArticleCard; n: number }) {
+function ShelfCard({
+  article,
+  n,
+  count,
+  height,
+}: {
+  article: ArticleCard;
+  n: number;
+  count: number;
+  height: number;
+}) {
   const styles = useStyles();
+  const color = useColors();
   const m = useMotion();
   const { pick } = useI18n();
   const uri = absoluteMediaUrl(article.hero?.url ?? null);
@@ -85,7 +109,7 @@ function ShelfCard({ article, n }: { article: ArticleCard; n: number }) {
       haptic="select"
       accessibilityRole="link"
       accessibilityLabel={[category, title].filter(Boolean).join(', ')}
-      style={styles.card}
+      style={[styles.card, { height }]}
     >
       {uri ? (
         <Image
@@ -102,7 +126,7 @@ function ShelfCard({ article, n }: { article: ArticleCard; n: number }) {
         <StoryScrim from="top" strength={0.6} />
         <View style={styles.number}>
           <T variant="meta" weight="bold" color="onWow" lang="en">
-            {String(n)}
+            {`${n} / ${count}`}
           </T>
         </View>
       </View>
@@ -113,22 +137,46 @@ function ShelfCard({ article, n }: { article: ArticleCard; n: number }) {
             {category}
           </T>
         ) : null}
-        <T variant="headlineSm" weight="bold" color="onOverlay" numberOfLines={4}>
+        <T variant="headlineMd" weight="bold" color="onOverlay" numberOfLines={4}>
           {title}
         </T>
+        {n < count ? (
+          <View style={styles.hint} importantForAccessibility="no-hide-descendants">
+            <Icon name="chevronUp" size={16} color={color.mutedLight} />
+            <T variant="meta" color="mutedLight" numberOfLines={1}>
+              {pick('తదుపరి కథ కోసం పైకి స్వైప్ చేయండి', 'Swipe up for the next story')}
+            </T>
+          </View>
+        ) : null}
       </View>
     </PressableScale>
   );
 }
 
-/** Home shelf: a header with a "see all" link and a sideways row of shots. */
+/** Home shelf: a header with a "see all" link and a vertical, one-at-a-time window of shots. */
 export function StoryShotsShelf() {
   const styles = useStyles();
   const color = useColors();
   const { pick, t } = useI18n();
   const shots = useStoryShots();
   const items = shots.data ?? [];
-  if (!items.length) return null;
+  const { width: screen } = useWindowDimensions();
+  const height = windowHeight(screen - space.lg * 2);
+  const scroller = useRef<ComponentRef<typeof ScrollView>>(null);
+  const [index, setIndex] = useState(0);
+  const count = items.length;
+
+  // Which shot is showing: the page nearest the scroll position.
+  const onScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const page = Math.round(e.nativeEvent.contentOffset.y / height);
+      setIndex(Math.min(count - 1, Math.max(0, page)));
+    },
+    [height, count],
+  );
+  const go = (to: number) => scroller.current?.scrollTo({ y: to * height, animated: true });
+
+  if (!count) return null;
 
   const title = pick('స్టోరీ షాట్స్', 'Story Shots');
 
@@ -155,18 +203,45 @@ export function StoryShotsShelf() {
           <Icon name="chevronRight" size={16} color={color.info} />
         </PressableScale>
       </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        decelerationRate="fast"
-        snapToInterval={CARD_WIDTH + space.md}
-        snapToAlignment="start"
-        contentContainerStyle={styles.row}
-      >
-        {items.map((article, i) => (
-          <ShelfCard key={article.short_id} article={article} n={i + 1} />
-        ))}
-      </ScrollView>
+      <View style={styles.frame}>
+        {/* Its own vertical scroller inside the home list: a swipe that starts on
+            a shot moves the shots; anywhere else still scrolls the page. */}
+        <ScrollView
+          ref={scroller}
+          style={{ height }}
+          nestedScrollEnabled
+          pagingEnabled
+          snapToInterval={height}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          disableIntervalMomentum
+          showsVerticalScrollIndicator={false}
+          onScroll={onScroll}
+          scrollEventThrottle={32}
+        >
+          {items.map((article, i) => (
+            <ShelfCard key={article.short_id} article={article} n={i + 1} count={count} height={height} />
+          ))}
+        </ScrollView>
+        <View pointerEvents="box-none" style={styles.arrows}>
+          <IconButton
+            name="chevronUp"
+            label={pick('మునుపటి కథ', 'Previous story')}
+            variant="inverse"
+            disabled={index === 0}
+            onPress={() => go(index - 1)}
+            style={index === 0 ? styles.arrowOff : undefined}
+          />
+          <IconButton
+            name="chevronDown"
+            label={pick('తదుపరి కథ', 'Next story')}
+            variant="inverse"
+            disabled={index === count - 1}
+            onPress={() => go(index + 1)}
+            style={index === count - 1 ? styles.arrowOff : undefined}
+          />
+        </View>
+      </View>
     </View>
   );
 }
@@ -184,26 +259,25 @@ const useStyles = makeStyles((color) => ({
   titleRow: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: space.sm },
   title: { flexShrink: 1 },
   seeAll: { flexDirection: 'row', alignItems: 'center', gap: space.xs, paddingLeft: space.sm },
-  row: { gap: space.md, paddingHorizontal: space.lg, paddingBottom: space.sm },
+  frame: { marginHorizontal: space.lg, marginBottom: space.sm, borderRadius: radius.lg, overflow: 'hidden' },
   card: {
-    width: CARD_WIDTH,
-    aspectRatio: 9 / 16,
+    width: '100%',
     justifyContent: 'space-between',
-    borderRadius: radius.lg,
     overflow: 'hidden',
     backgroundColor: color.inkDeep,
-    borderWidth: 1,
-    borderColor: color.rule,
   },
-  topBand: { padding: space.sm, paddingBottom: space.xl, alignItems: 'flex-start' },
+  arrows: { position: 'absolute', right: space.sm, top: 0, bottom: 0, justifyContent: 'center', gap: space.sm },
+  arrowOff: { opacity: 0.4 },
+  topBand: { padding: space.md, paddingBottom: space.xl, alignItems: 'flex-start' },
   number: {
     minWidth: 24,
     height: 24,
-    paddingHorizontal: space.xs,
+    paddingHorizontal: space.sm,
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: color.wowDeep,
   },
-  caption: { gap: space.xs, padding: space.md, paddingTop: space.xxl },
+  caption: { gap: space.xs, padding: space.lg, paddingTop: space.xxl, paddingRight: space.xxl + space.lg },
+  hint: { flexDirection: 'row', alignItems: 'center', gap: space.xs, paddingTop: space.xs },
 }));

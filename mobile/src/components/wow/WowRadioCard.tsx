@@ -29,7 +29,7 @@ import { T } from '@/ui/Text';
  * at a time (the global audio player pauses), chunked utterances, and silence
  * when the screen goes or the segment changes.
  *
- * `card` is the home-page block (artwork thumb, "Open radio" link, the first
+ * `card` is the home-page block (artwork thumb, "Click to listen" link, the first
  * few headlines); `page` is the `/radio` screen's body (the full running
  * order — the screen draws the artwork itself).
  */
@@ -349,13 +349,13 @@ export function WowRadioCard({ variant = 'card' }: { variant?: 'card' | 'page' }
         <PressableScale
           onPress={() => router.push('/radio')}
           accessibilityRole="link"
-          accessibilityLabel={pick('రేడియో తెరవండి', 'Open radio')}
+          accessibilityLabel={pick('వినడానికి క్లిక్ చేయండి', 'Click to listen')}
           style={styles.open}
         >
           <View style={styles.openInner}>
             <Icon name="headphones" size={20} color={color.wow} />
             <T variant="ui" weight="semibold" color="wow">
-              {pick('రేడియో తెరవండి', 'Open radio')}
+              {pick('వినడానికి క్లిక్ చేయండి', 'Click to listen')}
             </T>
             <Icon name="arrowRight" size={16} color={color.wow} />
           </View>

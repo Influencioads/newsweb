@@ -243,7 +243,7 @@ export function WowRadio({ variant = 'card' }: { variant?: 'card' | 'page' }) {
             to="/radio"
             className={cn(s.body, 'rounded-xl px-2 py-1 text-ui-sm font-semibold text-wow underline-offset-4 hover:underline')}
           >
-            {te ? 'రేడియో తెరవండి' : 'Open Radio'}
+            {te ? 'వినడానికి క్లిక్ చేయండి' : 'Click to listen'}
           </Link>
         ) : null}
       </div>

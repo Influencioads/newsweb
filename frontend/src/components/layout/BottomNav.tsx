@@ -76,14 +76,14 @@ export function BottomNav() {
                 cn(
                   s.body,
                   'flex min-h-[58px] w-full flex-col items-center justify-center gap-0.5 text-meta font-semibold',
-                  item.primary ? 'text-hero-text' : isActive ? 'text-brand' : 'text-muted',
+                  item.primary ? 'text-wow-deep' : isActive ? 'text-brand' : 'text-muted',
                 )
               }
             >
               {({ isActive }) => (
                 <>
                   {item.primary ? (
-                    <span className="flex h-7 w-12 items-center justify-center rounded-pill bg-hero text-on-ink">
+                    <span className="flex h-7 w-12 items-center justify-center rounded-pill bg-wow-deep text-on-wow">
                       <Icon icon={item.icon} size="md" />
                     </span>
                   ) : (

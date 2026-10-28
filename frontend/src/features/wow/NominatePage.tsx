@@ -369,7 +369,7 @@ export default function NominatePage() {
               </fieldset>
 
               <div className="flex flex-wrap items-center gap-3 pt-2">
-                <Button type="submit" variant="hero" size="lg" icon={Award} pending={submit.isPending}>
+                <Button type="submit" variant="wow" size="lg" icon={Award} pending={submit.isPending}>
                   {status === 'authenticated'
                     ? L('నామినేషన్ పంపండి', 'Send nomination')
                     : L('సైన్ ఇన్ చేసి పంపండి', 'Sign in and send')}

@@ -38,16 +38,16 @@ export function NominateCta({ compact = false }: { compact?: boolean }) {
   return (
     <section
       aria-labelledby="nominate-cta"
-      className="relative flex h-full flex-col justify-between gap-5 overflow-hidden rounded-2xl border-2 border-hero bg-hero-tint p-5 shadow-raised md:p-6"
+      className="relative flex h-full flex-col justify-between gap-5 overflow-hidden rounded-2xl border-2 border-wow-deep bg-wow-tint p-5 shadow-raised md:p-6"
     >
       <div
         aria-hidden
-        className="pointer-events-none absolute -bottom-10 -right-6 text-hero/15"
+        className="pointer-events-none absolute -bottom-10 -right-6 text-wow/20"
       >
         <Award size={compact ? 140 : 180} strokeWidth={1.25} />
       </div>
       <div className="relative space-y-2">
-        <span className={cn(s.body, 'inline-flex items-center gap-1.5 rounded-pill bg-hero px-3 py-1 text-meta font-bold text-on-ink')}>
+        <span className={cn(s.body, 'inline-flex items-center gap-1.5 rounded-pill bg-wow-deep px-3 py-1 text-meta font-bold text-on-wow')}>
           <Icon icon={HeartHandshake} size="xs" />
           {te ? 'మీ లోకల్ హీరోని నామినేట్ చేయండి' : 'Nominate Your Local Hero'}
         </span>
@@ -64,7 +64,7 @@ export function NominateCta({ compact = false }: { compact?: boolean }) {
         <ButtonLink
           to="/nominate"
           size="lg"
-          variant="hero"
+          variant="wow"
           icon={Award}
         >
           {te ? 'ఇప్పుడే నామినేట్ చేయండి' : 'Nominate now'}

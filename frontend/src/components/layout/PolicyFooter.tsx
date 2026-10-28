@@ -78,7 +78,7 @@ export function PolicyFooter() {
                       className={cn(
                         label.cls,
                         'flex min-h-tap w-full min-w-0 items-center gap-2 rounded-pill border border-on-ink/20 bg-on-ink/10 py-1.5 pl-2 pr-3.5 text-ui-sm font-semibold text-on-ink',
-                        'transition-colors duration-base ease-standard hover:border-hero hover:bg-hero hover:text-on-ink',
+                        'transition-colors duration-base ease-standard hover:border-wow-deep hover:bg-wow-deep hover:text-on-wow',
                       )}
                     >
                       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-on-ink/10">

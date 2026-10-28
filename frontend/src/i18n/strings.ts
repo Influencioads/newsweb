@@ -235,6 +235,7 @@ export const STRINGS = {
   'ui.tickerPause': { te: 'టిక్కర్ ఆపండి', en: 'Pause ticker' },
   'ui.tickerPlay': { te: 'టిక్కర్ నడపండి', en: 'Play ticker' },
   'ui.sections': { te: 'విభాగాలు', en: 'Sections' },
+  'ui.categories': { te: 'కేటగిరీలు', en: 'Categories' },
   'ui.product': { te: 'ప్రొడక్ట్', en: 'Product' },
   'ui.compliance': { te: 'నిబంధనలు & విధానాలు', en: 'Policies' },
   'ui.aboutUs': { te: 'సంస్థ', en: 'Company' },

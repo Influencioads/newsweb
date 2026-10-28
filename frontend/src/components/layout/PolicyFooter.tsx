@@ -12,8 +12,8 @@ import { cn } from '@/utils/cn';
 import { ABOUT_LINK_COUNT, FOOTER_LINKS } from './NavDrawer';
 
 /**
- * PolicyFooter — constant-dark footer: sections / product / compliance link
- * (one `nav` landmark: the twelve WOW sections as a band of icon chips, then
+ * PolicyFooter — constant-dark footer: categories / product / compliance link
+ * (one `nav` landmark: the twelve WOW categories as a band of icon chips, then
  * product, company and policies columns), then the wordmark and the
  * copyright line. Nothing here goes below `text-meta`.
  */
@@ -64,7 +64,7 @@ export function PolicyFooter() {
           {/* All twelve WOW categories as a band of icon chips across the top. */}
           <section aria-labelledby="footer-sections">
             <h2 id="footer-sections" className={cn(s.head, 'mb-3 text-headline-xs font-bold text-on-ink')}>
-              {t('ui.sections')}
+              {t('ui.categories')}
             </h2>
             <ul className="flex flex-wrap gap-2">
               {WOW_FEATURES.map((f) => {

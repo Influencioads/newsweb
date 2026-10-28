@@ -1,19 +1,18 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from "@tanstack/react-query";
 
-import { PageContainer } from '@/components/ui/Layout';
-import { EmptyState, QueryState } from '@/components/ui/State';
-import * as publicApi from '@/features/public/api';
-import { ExploreWow } from '@/features/wow/ExploreWow';
-import { TrendingArticles } from '@/features/wow/FeaturedStory';
-import { HeroBanner } from '@/features/wow/HeroBanner';
-import { FeaturedHeroes, NominateCta } from '@/features/wow/LocalHeroes';
-import { StoryShotsStrip } from '@/features/wow/StoryShots';
-import { WowRadio } from '@/features/wow/WowRadio';
-import { useI18n } from '@/i18n';
-import { useReaderPrefs } from '@/stores/readerPrefs';
-import { useDocumentTitle } from '@/utils/motion';
+import { PageContainer } from "@/components/ui/Layout";
+import { EmptyState, QueryState } from "@/components/ui/State";
+import * as publicApi from "@/features/public/api";
+import { ExploreWow } from "@/features/wow/ExploreWow";
+import { HeroBanner } from "@/features/wow/HeroBanner";
+import { FeaturedHeroes, NominateCta } from "@/features/wow/LocalHeroes";
+import { StoryShotsStrip } from "@/features/wow/StoryShots";
+import { WowRadio } from "@/features/wow/WowRadio";
+import { useI18n } from "@/i18n";
+import { useReaderPrefs } from "@/stores/readerPrefs";
+import { useDocumentTitle } from "@/utils/motion";
 
-import { HomeSkeleton } from './home/HomeSkeleton';
+import { HomeSkeleton } from "./home/HomeSkeleton";
 
 /**
  * Reader home page — the blocks the "WOW Indian Telugu" concept pitch names
@@ -23,7 +22,6 @@ import { HomeSkeleton } from './home/HomeSkeleton';
  *   WOW Radio + Nominate Your Local Hero — the highlighted signature features
  *   Explore WOW (the WOW content categories)
  *   Story Shots (infographic shelf)
- *   Trending Articles
  *   Featured Local Heroes
  *
  * Header, search and the category menu live in the shell (PublicLayout); the
@@ -37,45 +35,46 @@ export default function Home() {
   const edition = useReaderPrefs((state) => state.edition);
   const mandal = useReaderPrefs((state) => state.mandal);
   const { t } = useI18n();
-  useDocumentTitle(t('page.home'));
+  useDocumentTitle(t("page.home"));
 
   const home = useQuery({
-    queryKey: ['public', 'home', edition, mandal],
+    queryKey: ["public", "home", edition, mandal],
     queryFn: () => publicApi.fetchHome(edition, mandal),
   });
 
   return (
-    <PageContainer width="site" className="space-y-9 py-6 md:space-y-12 md:py-8">
+    <PageContainer
+      width="site"
+      className="space-y-9 py-6 md:space-y-12 md:py-8"
+    >
       <QueryState
         query={home}
         skeleton={<HomeSkeleton />}
         isEmpty={(data) => !data.lead}
-        empty={<EmptyState title={t('state.empty')} body={t('state.emptyEdition')} />}
-        errorTitle={t('state.newsFailed')}
+        empty={
+          <EmptyState title={t("state.empty")} body={t("state.emptyEdition")} />
+        }
+        errorTitle={t("state.newsFailed")}
       >
-        {(data) => {
-          const trending =
-            data.sections.find((section) => section.key === 'trending')?.articles ?? data.latest;
-          return (
-            <>
-              {data.lead ? <HeroBanner stories={[data.lead, ...data.secondary]} /> : null}
+        {(data) => (
+          <>
+            {data.lead ? (
+              <HeroBanner stories={[data.lead, ...data.secondary]} />
+            ) : null}
 
-              {/* The two signature features, highlighted straight under the banner. */}
-              <div className="grid gap-5 lg:grid-cols-[1.35fr_1fr]">
-                <WowRadio />
-                <NominateCta />
-              </div>
+            {/* The two signature features, highlighted straight under the banner. */}
+            <div className="grid gap-5 lg:grid-cols-[1.35fr_1fr]">
+              <WowRadio />
+              <NominateCta />
+            </div>
 
-              <ExploreWow />
+            <ExploreWow />
 
-              <StoryShotsStrip />
+            <StoryShotsStrip />
 
-              <TrendingArticles articles={trending.filter((a) => a.short_id !== data.lead?.short_id)} />
-
-              <FeaturedHeroes />
-            </>
-          );
-        }}
+            <FeaturedHeroes />
+          </>
+        )}
       </QueryState>
     </PageContainer>
   );

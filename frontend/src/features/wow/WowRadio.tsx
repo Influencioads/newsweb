@@ -1,6 +1,6 @@
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, Ghost, Lightbulb, Pause, Play, Square, Sunrise, Zap, type LucideIcon } from 'lucide-react';
+import { ChevronLeft, Ghost, Lightbulb, Newspaper, Pause, Play, Square, Sunrise, type LucideIcon } from 'lucide-react';
 
 import { Icon } from '@/components/ui/Icon';
 import { PageContainer } from '@/components/ui/Layout';
@@ -13,7 +13,7 @@ import { useDocumentTitle } from '@/utils/motion';
 
 /**
  * WOW Radio (pitch §2): a highlighted audio player with four segments —
- * Morning Mantra, Spoorthi, WOW Facts and Mystery.
+ * Morning Mantra, Spoorthi, WOW News and Mystery.
  *
  * The four segments sit as a 2 × 2 grid of tiles on the home card (a row of
  * four on /radio), each with its own icon, colour and line. Tapping one opens
@@ -61,14 +61,14 @@ export const SEGMENTS: readonly Segment[] = [
     categories: ['real-heroes', 'zero-to-hero', 'inspiring'],
   },
   {
-    id: 'wow-facts',
-    te: 'వావ్ ఫ్యాక్ట్స్',
-    en: 'WOW Facts',
-    taglineTe: 'ఆసక్తికరమైన నిజాలు, తెలుసుకోవాల్సిన విషయాలు',
-    taglineEn: 'Surprising facts worth knowing',
-    icon: Zap,
+    id: 'wow-news',
+    te: 'వావ్ న్యూస్',
+    en: 'WOW News',
+    taglineTe: 'వావ్ అనిపించే వార్తలు',
+    taglineEn: 'News that makes you say WOW',
+    icon: Newspaper,
     tone: 'from-brand to-brand-dark',
-    categories: ['wow-tech', 'wow-idea', 'startup-stories'],
+    categories: ['jai-telugoda', 'business-guru', 'wow-tech', 'startup-stories', 'wow-idea'],
   },
   {
     id: 'mystery',
@@ -129,7 +129,7 @@ function SegmentTiles({ large = false }: { large?: boolean }) {
   const s = useScript();
   const te = language === 'te';
   return (
-    <ul className={cn('relative grid gap-2.5', large ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-2')}>
+    <ul className={cn('relative grid gap-2.5', large ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-2')}>
       {SEGMENTS.map((sg) => (
         <li key={sg.id} className="min-w-0">
           <Link

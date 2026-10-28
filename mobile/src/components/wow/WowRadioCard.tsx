@@ -46,7 +46,7 @@ type Tone = 'wow' | 'success' | 'brand' | 'ai';
 const TONE: Record<string, Tone> = {
   'morning-mantra': 'wow',
   spoorthi: 'success',
-  'wow-facts': 'brand',
+  'wow-news': 'brand',
   mystery: 'ai',
 };
 

@@ -61,7 +61,7 @@ export interface RadioSegment {
 export const RADIO_SEGMENTS: readonly RadioSegment[] = [
   { id: 'morning-mantra', te: 'మార్నింగ్ మంత్ర', en: 'Morning Mantra', taglineTe: 'రోజుకు సానుకూల ఆరంభం', taglineEn: 'A positive start to the day', icon: 'sunrise', categories: ['morning-mantra', 'devotional'] },
   { id: 'spoorthi', te: 'స్ఫూర్తి', en: 'Spoorthi', taglineTe: 'హీరోల కథలు, విజయ గాథలు', taglineEn: 'Hero stories that inspire', icon: 'lightbulb', categories: ['real-heroes', 'zero-to-hero', 'inspiring'] },
-  { id: 'wow-facts', te: 'వావ్ ఫ్యాక్ట్స్', en: 'WOW Facts', taglineTe: 'ఆసక్తికరమైన నిజాలు, తెలుసుకోవాల్సిన విషయాలు', taglineEn: 'Surprising facts worth knowing', icon: 'zap', categories: ['wow-tech', 'wow-idea', 'startup-stories'] },
+  { id: 'wow-news', te: 'వావ్ న్యూస్', en: 'WOW News', taglineTe: 'వావ్ అనిపించే వార్తలు', taglineEn: 'News that makes you say WOW', icon: 'newspaper', categories: ['jai-telugoda', 'business-guru', 'wow-tech', 'startup-stories', 'wow-idea'] },
   { id: 'mystery', te: 'మిస్టరీ', en: 'Mystery', taglineTe: 'వివరించలేని సంఘటనలు, రహస్యాలు', taglineEn: 'Unexplained events and secrets', icon: 'ghost', categories: ['mystery', 'wow-puranam'] },
 ];
 

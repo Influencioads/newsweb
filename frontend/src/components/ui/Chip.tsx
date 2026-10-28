@@ -166,11 +166,13 @@ export interface ChipRailProps {
   className?: string;
   /** Tailwind gap utility between chips; default `gap-2`. */
   itemGap?: string;
+  /** Centre the chips while they fit; once they overflow they start at the left edge and scroll. */
+  center?: boolean;
 }
 
 const EDGE_SLOP = 2;
 
-export function ChipRail({ ariaLabel, snap = true, fadeEdges = true, children, className, itemGap }: ChipRailProps) {
+export function ChipRail({ ariaLabel, snap = true, fadeEdges = true, children, className, itemGap, center = false }: ChipRailProps) {
   const { t } = useI18n();
   const track = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
@@ -273,7 +275,7 @@ export function ChipRail({ ariaLabel, snap = true, fadeEdges = true, children, c
         )}
       >
         {/* w-max so the inner box is as wide as its chips; its resize = content change. */}
-        <div ref={inner} className={cn('flex w-max p-1', itemGap ?? 'gap-2')}>
+        <div ref={inner} className={cn('flex w-max p-1', itemGap ?? 'gap-2', center && 'mx-auto')}>
           {children}
         </div>
       </div>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { NavLink, useLocation } from 'react-router-dom';
 import { LayoutGrid, Menu, Search } from 'lucide-react';
 
-import { IconButton, IconButtonLink } from '@/components/ui/Button';
+import { ButtonLink, IconButton, IconButtonLink } from '@/components/ui/Button';
 import { ChipRail } from '@/components/ui/Chip';
 import { Icon } from '@/components/ui/Icon';
 import { PageContainer } from '@/components/ui/Layout';
@@ -15,24 +15,26 @@ import { NavDrawer, SHORTCUTS, useSiteConfig } from './NavDrawer';
 /**
  * CategoryNav — row 2 of the reader shell and its only sticky part.
  *
- * Menu (under md) · rail of NavLinks (Home, shortcuts, DB categories) with one
- * sliding brand underline · Search. The nav measures its own height and
+ * Menu + Search on the left (labelled from md) · rail of NavLinks (Home,
+ * shortcuts, DB categories) centred in the rest of the row while it fits, in
+ * bold serif like a newspaper's section bar, with one sliding brand underline.
+ * Under md the search is an icon at the right end. The nav measures its own height and
  * publishes it as `--header-h`, which every other sticky surface offsets by.
  * On route change the active link is scrolled into view inside the rail only —
  * the window never moves.
  */
 
 const LINK =
-  'relative flex min-h-tap shrink-0 snap-start items-center gap-1.5 whitespace-nowrap px-3 font-semibold ' +
+  'relative flex min-h-tap shrink-0 snap-start items-center gap-1.5 whitespace-nowrap px-3 font-bold ' +
   'transition-[colors,transform,box-shadow] duration-base ease-standard';
 
-/** Telugu labels get the 15.5px body size (the ticker's floor), Latin the 14px UI size. */
+/** Serif section names: Telugu at the 15.5px body size (the ticker's floor), Latin 14px, 15.5px from md. */
 function linkClass(active: boolean, font: string, telugu: boolean): string {
   return cn(
     LINK,
     font,
-    telugu ? 'text-te-body-xs' : 'text-ui',
-    active ? 'font-bold text-brand' : 'text-ink hover:text-brand',
+    telugu ? 'text-te-body-xs' : 'text-ui md:text-headline-xs',
+    active ? 'text-brand' : 'text-ink hover:text-brand',
   );
 }
 
@@ -121,27 +123,29 @@ export function CategoryNav() {
           aria-haspopup="dialog"
           aria-expanded={drawer}
           onClick={() => setDrawer(true)}
-          className="md:hidden"
         />
+        <ButtonLink to="/search" variant="ghost" size="sm" icon={Search} className={cn(s.body, 'hidden md:inline-flex')}>
+          {t('nav.search')}
+        </ButtonLink>
 
         {/* The enclosing <nav> already carries the "sections" name; the rail
             takes a distinct one so readers never hear it twice. */}
-        <ChipRail ariaLabel={t('ui.explore')} snap fadeEdges itemGap="gap-0" className="min-w-0 flex-1">
+        <ChipRail ariaLabel={t('ui.explore')} snap fadeEdges center itemGap="gap-0" className="min-w-0 flex-1">
           {/* A real list ("list, N items" for screen readers); `contents` keeps
               each link a direct flex item so offsetLeft is measured from the
               positioned wrapper, which also hosts the underline. */}
           <div ref={rail} className="relative">
             <ul className="flex">
               <li className="contents">
-                <NavLink to="/" end className={({ isActive }) => linkClass(isActive, s.body, s.te)}>
+                <NavLink to="/" end className={({ isActive }) => linkClass(isActive, s.head, s.te)}>
                   {t('nav.home')}
                 </NavLink>
               </li>
               {SHORTCUTS.map((sc) => (
                 <li key={sc.to} className="contents">
                   {sc.highlight ? (
-                    // WOW Radio and Nominate Your Local Hero: two separate green
-                    // buttons, apart from the category links.
+                    // WOW Radio and Nominate Your Local Hero: two separate
+                    // orange buttons, apart from the category links.
                     <NavLink
                       to={sc.to}
                       data-pill=""
@@ -162,7 +166,7 @@ export function CategoryNav() {
                       {t(sc.key)}
                     </NavLink>
                   ) : (
-                    <NavLink to={sc.to} className={({ isActive }) => linkClass(isActive, s.body, s.te)}>
+                    <NavLink to={sc.to} className={({ isActive }) => linkClass(isActive, s.head, s.te)}>
                       {sc.live && <Icon icon={sc.icon} size="sm" className="text-breaking" />}
                       {t(sc.key)}
                     </NavLink>
@@ -176,7 +180,7 @@ export function CategoryNav() {
                     <NavLink
                       to={`/section/${c.slug}`}
                       lang={f.lang}
-                      className={({ isActive }) => linkClass(isActive, f.cls, f.telugu)}
+                      className={({ isActive }) => linkClass(isActive, f.head, f.telugu)}
                     >
                       {pick(c.name_te, c.name_en)}
                     </NavLink>
@@ -184,7 +188,7 @@ export function CategoryNav() {
                 );
               })}
               <li className="contents">
-                <NavLink to="/explore" className={({ isActive }) => linkClass(isActive, s.body, s.te)}>
+                <NavLink to="/explore" className={({ isActive }) => linkClass(isActive, s.head, s.te)}>
                   <Icon icon={LayoutGrid} size="sm" />
                   {t('ui.allCategories')}
                 </NavLink>
@@ -201,7 +205,7 @@ export function CategoryNav() {
           </div>
         </ChipRail>
 
-        <IconButtonLink icon={Search} label={t('nav.search')} to="/search" />
+        <IconButtonLink icon={Search} label={t('nav.search')} to="/search" className="md:hidden" />
       </PageContainer>
 
       <NavDrawer open={drawer} onClose={() => setDrawer(false)} />

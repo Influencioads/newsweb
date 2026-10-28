@@ -21,11 +21,11 @@ import { ReaderSettings } from './ReaderSettings';
 /**
  * Masthead — row 1 of the reader shell; scrolls away.
  *
- * Language + date (xl+) · wordmark · e-paper (md+), location, reader settings,
- * notifications (signed in), account. Every control is 44px and present at
- * every width — only text labels collapse to icons under md (the e-paper label
- * under lg, the location name under 1200px) so the md row fits its third of the
- * grid. The language
+ * A newspaper masthead, the wordmark centred between two stacked columns.
+ * From md: left — the reader's area (bold), today's date, the language switch;
+ * right — sign in / account on top, then e-paper, reader settings and
+ * notifications. Under md: wordmark first, then the language chip and one row
+ * of icon actions. Every control is 44px and present at every width. The language
  * switch stays in the chrome at every width because a reader who cannot read
  * the interface must be able to leave it: md+ shows both labels, under md a
  * single chip carries the *other* language's label in its own script. It sits
@@ -53,7 +53,7 @@ function NotificationBell() {
  * to the village; every choice applies at once. Nothing is ever detected — the
  * reader picks.
  */
-function LocationButton() {
+function LocationButton({ named = false, className }: { named?: boolean; className?: string }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const place = useReaderPlace();
@@ -61,8 +61,18 @@ function LocationButton() {
   const label = name ? `${t('reader.location')}: ${name}` : t('reader.chooseLocation');
   return (
     <>
-      <Button variant="ghost" size="sm" icon={MapPin} aria-label={label} title={label} onClick={() => setOpen(true)}>
-        <span className="hidden max-w-[9rem] truncate min-[1200px]:block">{name ?? t('reader.chooseLocation')}</span>
+      <Button
+        variant="ghost"
+        size="sm"
+        icon={MapPin}
+        aria-label={label}
+        title={label}
+        onClick={() => setOpen(true)}
+        className={cn(named && '-ml-2 font-bold text-ink', className)}
+      >
+        <span className={cn('max-w-[11rem] truncate', named ? 'block' : 'hidden min-[1200px]:block')}>
+          {name ?? t('reader.chooseLocation')}
+        </span>
       </Button>
       <Dialog
         open={open}
@@ -98,26 +108,30 @@ export function Masthead() {
         width="site"
         className="grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1 py-2 md:grid-cols-3 md:py-3"
       >
-        <div className="flex items-center gap-3">
-          <LanguageToggle className="hidden md:inline-flex" />
+        {/* Left column (md+): area, date, language — stacked like a paper's dateline. */}
+        <div className="flex items-center gap-3 md:flex-col md:items-start md:gap-0.5">
+          <LocationButton named className="hidden md:inline-flex" />
+          <p className={cn(s.body, 'hidden text-meta text-ink-soft md:block')}>{formatFullDate(new Date(), language)}</p>
+          <LanguageToggle className="hidden md:mt-1 md:inline-flex" />
           <Chip as="button" lang={other} className="md:hidden" onClick={() => setLanguage(other)}>
             {LANGUAGE_LABELS[other]}
           </Chip>
-          <p className={cn(s.body, 'hidden text-meta text-muted xl:block')}>{formatFullDate(new Date(), language)}</p>
         </div>
 
         <Link
           to="/"
           className="order-first col-span-2 flex min-w-0 flex-col items-center rounded-xl md:order-none md:col-span-1"
         >
-          <img src="/wow-indian-logo.webp" alt="వావ్ ఇండియన్ · WowIndian" width={960} height={260} className="h-16 w-auto md:h-20" />
+          <img src="/wow-indian-logo.webp" alt="వావ్ ఇండియన్ · WowIndian" width={960} height={260} className="h-16 w-auto md:h-20 lg:h-24" />
           {/* Brand line: Ordinary People. Extraordinary Stories. */}
           <span lang="en" className="mt-0.5 whitespace-nowrap text-center font-sans text-ui-sm font-bold tracking-wide text-ink md:text-meta lg:text-ui-sm">
             Ordinary People. Extraordinary Stories.
           </span>
         </Link>
 
-        <div className="flex shrink-0 items-center justify-end gap-1">
+        {/* Right column: one row under md; from md account on top, the rest beneath. */}
+        <div className="flex shrink-0 items-center justify-end gap-1 md:flex-col md:items-end md:gap-1">
+          <div className="flex items-center gap-1">
           {EPAPER_PUBLIC && (
           <ButtonLink
             to="/epaper"
@@ -130,9 +144,11 @@ export function Masthead() {
             <span className="hidden lg:inline">{t('nav.epaper')}</span>
           </ButtonLink>
           )}
-          <LocationButton />
+          <LocationButton className="md:hidden" />
           <IconButton icon={SlidersHorizontal} label={t('ui.readerSettings')} onClick={() => setSettings(true)} />
           {authed && <NotificationBell />}
+          </div>
+          <div className="md:order-first">
           {authed && me ? (
             <IconButtonLink
               icon={UserRound}
@@ -141,9 +157,10 @@ export function Masthead() {
             />
           ) : (
             <ButtonLink to="/login" variant="ghost" size="sm" icon={UserRound} aria-label={t('nav.signIn')}>
-              <span className="hidden md:inline">{t('nav.signIn')}</span>
+              <span className="hidden font-bold md:inline">{t('nav.signIn')}</span>
             </ButtonLink>
           )}
+          </div>
         </div>
       </PageContainer>
 

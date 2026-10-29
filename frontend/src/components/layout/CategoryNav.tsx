@@ -145,7 +145,7 @@ export function CategoryNav() {
                 <li key={sc.to} className="contents">
                   {sc.highlight ? (
                     // WOW Radio, Nominate Your Local Hero and My Village Story:
-                    // three compact filled buttons, apart from the category links.
+                    // three compact orange buttons, apart from the category links.
                     <NavLink
                       to={sc.to}
                       data-pill=""

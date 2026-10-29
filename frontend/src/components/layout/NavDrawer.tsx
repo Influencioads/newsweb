@@ -54,7 +54,7 @@ export interface Shortcut {
 export const SHORTCUTS: readonly Shortcut[] = [
   { to: '/radio', key: 'ui.wowRadio', icon: AudioLines, highlight: 'wow' },
   { to: '/nominate', key: 'ui.nominate', icon: Award, highlight: 'wow' },
-  { to: '/section/my-village-story', key: 'ui.myVillageStory', icon: Trees, highlight: 'hero' },
+  { to: '/section/my-village-story', key: 'ui.myVillageStory', icon: Trees, highlight: 'wow' },
   { to: '/story-shots', key: 'ui.storyShots', icon: GalleryVerticalEnd },
 ];
 

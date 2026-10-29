@@ -39,7 +39,7 @@ export default {
           tint: 'rgb(var(--tn-hero-tint) / <alpha-value>)',
           text: 'rgb(var(--tn-hero-text) / <alpha-value>)',
         },
-        /** The site footer's solid WOW blue (constant in both themes; `on-ink` text on it). */
+        /** The site footer's dark blue (the hero banner's) (constant in both themes; `on-ink` text on it). */
         footer: 'rgb(var(--tn-footer) / <alpha-value>)',
         social: {
           whatsapp: 'rgb(var(--tn-social-whatsapp) / <alpha-value>)',

@@ -37,7 +37,7 @@ function heroStories(data: HomePayload): ArticleCard[] {
  *
  *   Hero banner (rotating top stories, Read / Share)
  *   WOW Radio + Nominate Your Local Hero — the highlighted signature features
- *   My Village Story (village stories + "share your village story")
+ *   My Village Story (four village stories)
  *   Explore WOW (the WOW content categories)
  *   Story Shots (infographic shelf)
  *   Featured Local Heroes

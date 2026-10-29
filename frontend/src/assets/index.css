@@ -31,8 +31,8 @@
      apart from the orange WOW accents. `hero` takes white text (AA). */
   --tn-hero: 21 128 61;           --tn-hero-tint: 225 243 231;
   --tn-hero-text: 21 110 54;
-  /* Footer: solid WOW blue (#0D47A1), the same in both themes; white text on it. */
-  --tn-footer: 13 71 161;
+  /* Footer: the hero banner's dark blue (#072659), the same in both themes; white text on it. */
+  --tn-footer: 7 38 89;
   --tn-breaking-border: 244 190 193;
   --tn-ink: 23 25 30;             --tn-ink-soft: 72 76 84;
   --tn-ink-panel: 34 37 43;       --tn-ink-deep: 16 18 22;

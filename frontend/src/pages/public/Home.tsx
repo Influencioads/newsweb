@@ -6,6 +6,7 @@ import * as publicApi from "@/features/public/api";
 import { ExploreWow } from "@/features/wow/ExploreWow";
 import { HeroBanner } from "@/features/wow/HeroBanner";
 import { FeaturedHeroes, NominateCta } from "@/features/wow/LocalHeroes";
+import { MyVillageStory } from "@/features/wow/MyVillageStory";
 import { StoryShotsStrip } from "@/features/wow/StoryShots";
 import { WowRadio } from "@/features/wow/WowRadio";
 import { useI18n } from "@/i18n";
@@ -20,6 +21,7 @@ import { HomeSkeleton } from "./home/HomeSkeleton";
  *
  *   Hero banner (rotating top stories, Read / Share)
  *   WOW Radio + Nominate Your Local Hero — the highlighted signature features
+ *   My Village Story (village stories + "share your village story")
  *   Explore WOW (the WOW content categories)
  *   Story Shots (infographic shelf)
  *   Featured Local Heroes
@@ -67,6 +69,9 @@ export default function Home() {
               <WowRadio />
               <NominateCta />
             </div>
+
+            {/* My Village Story: village stories and a call to send one in. */}
+            <MyVillageStory />
 
             <ExploreWow />
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Bell, MapPin, Newspaper, SlidersHorizontal, UserRound } from 'lucide-react';
+import { Award, Bell, MapPin, Newspaper, SlidersHorizontal, UserRound } from 'lucide-react';
 
 import { LocationPicker, useReaderPlace, useReaderPlaceName } from '@/components/location/LocationPicker';
 import { Button, ButtonLink, IconButton, IconButtonLink } from '@/components/ui/Button';
@@ -147,9 +147,14 @@ export function Masthead() {
           </ButtonLink>
           )}
           <LocationButton className="md:hidden" />
+          {/* Nominate Your Local Hero: the header's call to action, at the right end beside the logo. */}
+          <IconButtonLink icon={Award} label={t('ui.nominate')} to="/nominate" variant="wow" className="md:hidden" />
           <IconButton icon={SlidersHorizontal} label={t('ui.readerSettings')} onClick={() => setSettings(true)} />
           {authed && <NotificationBell />}
           </div>
+          <ButtonLink to="/nominate" variant="wow" size="sm" icon={Award} className="hidden md:inline-flex">
+            {t('ui.nominate')}
+          </ButtonLink>
           <div className="md:order-first">
           {authed && me ? (
             <IconButtonLink

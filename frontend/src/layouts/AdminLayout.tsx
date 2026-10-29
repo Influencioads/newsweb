@@ -12,6 +12,7 @@ import { Sheet } from '@/components/ui/Dialog';
 import { Input, TeluguTypingContext } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
 import { useToast } from '@/components/ui/Toast';
+import { useLogoUrl } from '@/features/wow/siteContent';
 import { useI18n, useScript } from '@/i18n';
 import { useAuth } from '@/stores/auth';
 import { cn } from '@/utils/cn';
@@ -138,6 +139,7 @@ function NavGroups({ groups, tone, collapsed = false }: NavGroupsProps) {
 
 function Wordmark({ collapsed }: { collapsed: boolean }) {
   const { t } = useI18n();
+  const logo = useLogoUrl();
   const s = useScript();
   return (
     <Link
@@ -150,7 +152,7 @@ function Wordmark({ collapsed }: { collapsed: boolean }) {
       {collapsed ? (
         <img src="/logo-mark.webp" alt="వావ్ ఇండియన్" width={336} height={80} className="h-6 w-auto" />
       ) : (
-        <img src="/wow-indian-logo.webp" alt="వావ్ ఇండియన్" width={960} height={260} className="h-9 w-auto self-start" />
+        <img src={logo} alt="వావ్ ఇండియన్" width={960} height={260} className="h-9 w-auto self-start" />
       )}
       <span
         className={cn(

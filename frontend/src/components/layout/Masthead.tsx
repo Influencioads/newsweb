@@ -10,6 +10,7 @@ import { Dialog } from '@/components/ui/Dialog';
 import { PageContainer } from '@/components/ui/Layout';
 import * as notificationsApi from '@/features/engagement/notificationsApi';
 import { EPAPER_PUBLIC } from '@/features/epaper/api';
+import { scriptOf, useSiteContent } from '@/features/wow/siteContent';
 import { LANGUAGE_LABELS, useI18n, useScript } from '@/i18n';
 import { useAuth } from '@/stores/auth';
 import { cn } from '@/utils/cn';
@@ -92,6 +93,9 @@ function LocationButton({ named = false, className }: { named?: boolean; classNa
 export function Masthead() {
   const { t, pick, language, setLanguage } = useI18n();
   const s = useScript();
+  const { brand } = useSiteContent();
+  const tagline = pick(brand.tagline_te, brand.tagline_en);
+  const taglineScript = scriptOf(tagline);
   const [settings, setSettings] = useState(false);
   const authStatus = useAuth((a) => a.status);
   const me = useAuth((a) => a.me);
@@ -125,9 +129,12 @@ export function Masthead() {
           className="order-first col-span-2 flex min-w-0 flex-col items-center gap-1 rounded-xl py-1 md:order-none md:col-span-1"
         >
           <Wordmark />
-          {/* Brand line: Ordinary People. Extraordinary Stories. */}
-          <span lang="en" className="mt-0.5 whitespace-nowrap text-center font-sans text-ui-sm font-bold tracking-wide text-ink md:text-meta lg:text-ui-sm">
-            Ordinary People. Extraordinary Stories.
+          {/* Brand line (CMS → Site content), e.g. "Ordinary People. Extraordinary Stories." */}
+          <span
+            lang={taglineScript.lang}
+            className={cn(taglineScript.cls, 'mt-0.5 whitespace-nowrap text-center text-ui-sm font-bold tracking-wide text-ink md:text-meta lg:text-ui-sm')}
+          >
+            {tagline}
           </span>
         </Link>
 

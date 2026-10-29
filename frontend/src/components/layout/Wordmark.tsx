@@ -1,12 +1,14 @@
+import { useLogoUrl } from '@/features/wow/siteContent';
 import { cn } from '@/utils/cn';
 
 /**
  * Wordmark — the newspaper-style masthead title: WOW · logo · INDIA on one
  * line, the way a broadsheet sets its name either side of a crest. The crest
- * is the WowIndian logo itself; the words are live type in Fraunces Black caps
+ * is the WowIndian logo itself (uploadable in CMS → Site content); the words are live type in Fraunces Black caps
  * (already loaded for headlines), so they stay crisp at every size.
  */
 export function Wordmark({ className }: { className?: string }) {
+  const logo = useLogoUrl();
   return (
     <span
       lang="en"
@@ -20,7 +22,7 @@ export function Wordmark({ className }: { className?: string }) {
     >
       <span>Wow</span>
       <img
-        src="/wow-indian-logo.webp"
+        src={logo}
         alt=""
         width={960}
         height={260}

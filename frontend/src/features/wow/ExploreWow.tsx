@@ -7,13 +7,15 @@ import { useI18n, useScript } from '@/i18n';
 import { cn } from '@/utils/cn';
 import { useDocumentTitle } from '@/utils/motion';
 
-import { MAIN_FEATURES, MORE_FEATURES, WOW_FEATURES, type WowFeature } from './categories';
+import type { WowFeature } from './categories';
+import { useWowFeatures } from './siteContent';
 
 /**
  * Explore WOW — category cards: each in its own accent colour, with a
  * gradient icon tile and the title on one line, the tagline, a "Read stories"
  * line, and a soft glow and large faint icon that come alive on hover.
- * The home page shows the six main categories and a link to /explore, which
+ * The cards come from the Taxonomy page ("WOW category", tagline, icon).
+ * The home page shows the main categories and a link to /explore, which
  * lists every category on its own page.
  */
 
@@ -153,6 +155,7 @@ export function ExploreWow() {
   const { language } = useI18n();
   const s = useScript();
   const te = language === 'te';
+  const { main, more } = useWowFeatures();
 
   return (
     <section aria-labelledby="explore-wow" className="space-y-4">
@@ -164,7 +167,7 @@ export function ExploreWow() {
           </span>
         }
       />
-      <FeatureGrid features={MAIN_FEATURES} />
+      <FeatureGrid features={main} />
       <div className="flex justify-center">
         <Link
           to="/explore"
@@ -176,7 +179,7 @@ export function ExploreWow() {
           )}
         >
           <Icon icon={LayoutGrid} size="sm" />
-          {te ? `మరిన్ని కేటగిరీలు చూడండి (${MORE_FEATURES.length})` : `Explore more categories (${MORE_FEATURES.length})`}
+          {te ? `మరిన్ని కేటగిరీలు చూడండి (${more.length})` : `Explore more categories (${more.length})`}
           <Icon icon={ArrowRight} size="sm" />
         </Link>
       </div>
@@ -188,6 +191,7 @@ export function ExploreWow() {
 export default function ExplorePage() {
   const { language } = useI18n();
   const te = language === 'te';
+  const { all } = useWowFeatures();
   useDocumentTitle(te ? 'అన్ని కేటగిరీలు' : 'All categories');
   return (
     <PageContainer width="site" className="space-y-6 py-7 md:py-10">
@@ -197,7 +201,7 @@ export default function ExplorePage() {
         subtitle={te ? 'ప్రతి కథలో ఒక WOW! మీకు నచ్చిన విభాగం ఎంచుకోండి.' : 'Every story has a WOW! Pick a section.'}
         spacing="none"
       />
-      <FeatureGrid features={WOW_FEATURES} />
+      <FeatureGrid features={all} />
     </PageContainer>
   );
 }

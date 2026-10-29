@@ -1,5 +1,8 @@
 import { api } from '@/api/client';
 import type { ArticleOrigin, AssistantConversation, AssistantConversationSummary, AssistantJob, AssistantStatus, AudioAssetRow, BulletinList, BulletinRow, ContentSource, KycProfileRow, KycStatus, Vertical, CrawlStatus, IngestQueueCounts, IngestedItem, IngestedRewrite, AiDraft, AiSuggestion, AudioState, CmsArticle, CmsArticleList, CmsAudioRef, CmsEditorOptions, CmsMediaRef, CmsOption, DashboardStats, SettingsPayload } from '@/types/cms';
+import type { SiteContent, SitePage } from '@/types/public';
+
+export interface SiteContentPayload { values: SiteContent; defaults: SiteContent; saved: (keyof SiteContent)[]; icons: string[]; radio_tones: string[] }
 export const fetchArticles=async(params?:{state?:string;search?:string;offset?:number;limit?:number})=>(await api.get<CmsArticleList>('/cms/articles',{params})).data;
 export const fetchArticle=async(id:number)=>(await api.get<CmsArticle>(`/cms/articles/${id}`)).data;
 export const createArticle=async(payload:Record<string,unknown>)=>(await api.post<CmsArticle>('/cms/articles',payload)).data;
@@ -11,6 +14,13 @@ export const fetchDashboardStats=async()=>(await api.get<DashboardStats>('/cms/d
 export const fetchEditorOptions=async()=>(await api.get<CmsEditorOptions>('/cms/dashboard/editor-options')).data;
 export const fetchManagement=async<T>(section:string)=>(await api.get<T>(`/cms/${section}`)).data;
 export const fetchModeration=async<T>(kind:'reports'|'comments',status?:string)=>(await api.get<T>(`/cms/moderation/${kind}`,{params:status?{status}:undefined})).data;
+/** CMS → Site content and Footer pages (backend app/api/v1/site_content.py). */
+export const fetchSiteContent=async()=>(await api.get<SiteContentPayload>('/cms/site-content')).data;
+export const saveSiteContent=async<K extends keyof SiteContent>(block:K,value:SiteContent[K])=>(await api.put<SiteContent[K]>(`/cms/site-content/${block}`,value)).data;
+export const resetSiteContent=async<K extends keyof SiteContent>(block:K)=>(await api.delete<SiteContent[K]>(`/cms/site-content/${block}`)).data;
+export const fetchSitePages=async()=>(await api.get<{slugs:string[];pages:Record<string,SitePage>}>('/cms/pages')).data;
+export const saveSitePage=async(slug:string,page:SitePage)=>(await api.put<SitePage>(`/cms/pages/${slug}`,page)).data;
+export const resetSitePage=async(slug:string)=>(await api.delete(`/cms/pages/${slug}`)).data;
 export const fetchHomeSections=async<T>()=>(await api.get<T>('/cms/homepage/sections')).data;
 export const patchHomeSection=async(id:number,payload:Record<string,unknown>)=>(await api.patch(`/cms/homepage/sections/${id}`,payload)).data;
 export const reorderHomeSections=async(orderedIds:number[])=>(await api.put('/cms/homepage/sections/order',{ordered_ids:orderedIds})).data;

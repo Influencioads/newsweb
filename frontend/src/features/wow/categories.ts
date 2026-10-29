@@ -15,14 +15,13 @@ import {
 } from 'lucide-react';
 
 /**
- * The WOW categories, in the order the desk asked for.
+ * The WOW category cards as the site shipped them.
  *
- * The first six (`main: true`) are the main categories: shown on the home page,
- * in the top navigation and first in the drawer. The rest sit behind
- * "Explore more categories". Each is a CMS category (slug) except Story Shots,
- * which is its own experience. The slugs must match the rows seeded in
- * backend/app/db/seed_content.py (CATEGORIES); an admin can rename them on the
- * Taxonomy page without breaking these links, because the slug is the key.
+ * The live list comes from the Taxonomy page (a category marked "WOW
+ * category", with its tagline and icon) through `/public/config` — see
+ * `useWowFeatures` in ./siteContent. This list is what shows before the
+ * config arrives, and from an API that does not send the card fields yet.
+ * Story Shots is a page, not a category; its card is always taken from here.
  */
 export interface WowFeature {
   slug: string;
@@ -163,20 +162,6 @@ export const WOW_FEATURES: readonly WowFeature[] = [
     to: section('wow-puranam'),
     main: false,
   },
-];
-
-export const MAIN_FEATURES = WOW_FEATURES.filter((f) => f.main);
-export const MORE_FEATURES = WOW_FEATURES.filter((f) => !f.main);
-
-/** Hero categories offered on the nomination form (pitch §4). */
-export const HERO_CATEGORIES: readonly { value: string; te: string; en: string }[] = [
-  { value: 'social-service', te: 'సామాజిక సేవ', en: 'Social Service' },
-  { value: 'education', te: 'విద్య', en: 'Education' },
-  { value: 'innovation', te: 'ఆవిష్కరణ', en: 'Innovation' },
-  { value: 'agriculture', te: 'వ్యవసాయం', en: 'Agriculture' },
-  { value: 'environment', te: 'పర్యావరణం', en: 'Environment' },
-  { value: 'youth', te: 'యువ విజయం', en: 'Youth Achievement' },
-  { value: 'other', te: 'ఇతరాలు', en: 'Other' },
 ];
 
 /** Slug the nomination is filed under, so the desk finds them together. */

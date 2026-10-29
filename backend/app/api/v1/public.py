@@ -31,7 +31,7 @@ from app.models.media import Media, ShortNewsCard
 from app.models.video import Video
 from app.models.enums import HomeSectionKind, PinPlacement, TrendingScope
 from app.repositories import article_repo, discovery_repo, site_repo
-from app.services import settings_service, trending_service
+from app.services import settings_service, site_content, trending_service
 from app.schemas.public import (
     ArticleCardOut,
     ArticleDetailOut,
@@ -211,6 +211,7 @@ def get_config(response: Response, db: Session = Depends(get_db)) -> SiteConfigO
             DistrictOut.model_validate(d) for d in article_repo.active_districts(db)
         ],
         brand=settings_service.brand_colors(db),
+        content=site_content.blocks(db),
     )
 
 

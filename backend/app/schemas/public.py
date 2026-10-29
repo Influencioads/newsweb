@@ -319,6 +319,11 @@ class ShortNewsOut(BaseModel):
 
 class NavCategoryOut(CategoryOut):
     show_in_nav: bool
+    #: The WOW category card: listed on Explore WOW, its tagline and icon.
+    in_explore: bool = False
+    tagline_te: str | None = None
+    tagline_en: str | None = None
+    icon: str | None = None
 
 
 class SiteConfigOut(BaseModel):
@@ -332,6 +337,10 @@ class SiteConfigOut(BaseModel):
     brand: dict[str, str] = Field(
         default_factory=dict,
         description="Brand colours changed from the default, as #rrggbb: primary, breaking, accent",
+    )
+    content: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Site content edited in the CMS: brand, home, radio, nominate, contact",
     )
 
 

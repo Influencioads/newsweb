@@ -28,6 +28,12 @@ export interface CategoryOut {
 
 export interface NavCategoryOut extends CategoryOut {
   show_in_nav: boolean;
+  /** A WOW category card (Explore WOW, drawer, footer); edited on the Taxonomy page. */
+  in_explore?: boolean;
+  tagline_te?: string | null;
+  tagline_en?: string | null;
+  /** One of the names in features/wow/icons.ts. */
+  icon?: string | null;
 }
 
 export interface DistrictOut {
@@ -307,6 +313,47 @@ export interface SiteConfig {
   districts: DistrictOut[];
   /** Admin-set #rrggbb colours; see utils/brand.ts. */
   brand?: { primary?: string; breaking?: string; accent?: string };
+  /** CMS → Site content. Absent from an older API; features/wow/siteContent.ts fills the defaults. */
+  content?: Partial<SiteContent>;
+}
+
+/** What CMS → Site content edits (backend app/services/site_content.py). */
+export interface SiteContent {
+  brand: { logo_url: string; tagline_te: string; tagline_en: string };
+  home: { banner_tag_te: string; banner_tag_en: string };
+  radio: { image_url: string; segments: RadioSegment[] };
+  nominate: { categories: { value: string; te: string; en: string }[] };
+  contact: { grievance_email: string };
+}
+
+export interface RadioSegment {
+  id: string;
+  te: string;
+  en: string;
+  tagline_te: string;
+  tagline_en: string;
+  icon: string;
+  tone: string;
+  /** Category slugs, tried in order; the first with stories is played. */
+  categories: string[];
+}
+
+/** A footer page (About, Privacy, ...) as CMS → Footer pages saves it. */
+export interface SitePageSection {
+  id: string;
+  heading: string;
+  body: string[];
+}
+
+export interface SitePageLanguage {
+  title: string;
+  sections: SitePageSection[];
+}
+
+export interface SitePage {
+  te: SitePageLanguage;
+  en: SitePageLanguage;
+  updated_at?: string | null;
 }
 
 /** What `GET /public/articles/{short_id}/formats` reports. */

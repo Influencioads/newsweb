@@ -17,13 +17,15 @@ import { scriptOf, useSiteContent } from './siteContent';
  * A wide, full-bleed photo banner in the WOW colours: the photo fills the
  * card, a deep-blue wash from the left carries the copy (category, Telugu
  * headline, standfirst, Read / Share), and an orange "Every Story Has a WOW!"
- * tag sits on top. Up to four top stories rotate every few seconds; the
+ * tag sits on top. Six top stories rotate every few seconds; the
  * reader can step with the arrows or the numbered tabs at the bottom right,
  * and hovering or focusing the banner pauses it. Reduced-motion readers get
  * no autoplay.
  */
 
 const ROTATE_MS = 7000;
+/** How many stories the banner rotates through. */
+export const HERO_SLIDES = 6;
 
 export function HeroBanner({ stories }: { stories: ArticleCard[] }) {
   const { language } = useI18n();
@@ -32,7 +34,7 @@ export function HeroBanner({ stories }: { stories: ArticleCard[] }) {
   const tag = s.pick(home.banner_tag_te, home.banner_tag_en);
   const tagScript = scriptOf(tag);
   const te = language === 'te';
-  const slides = stories.slice(0, 4);
+  const slides = stories.slice(0, HERO_SLIDES);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const reduced =
@@ -63,7 +65,7 @@ export function HeroBanner({ stories }: { stories: ArticleCard[] }) {
       {/* No photos: the banner is the deep-blue WOW panel with an orange glow. */}
       <div aria-hidden className="absolute -left-20 -top-24 -z-10 h-72 w-72 rounded-full bg-wow/25 blur-3xl" />
 
-      <div className="flex min-h-[300px] flex-col justify-center gap-4 p-5 pt-16 sm:p-7 sm:pt-16 md:min-h-[340px] md:max-w-[80%] md:p-10">
+      <div className="flex flex-col justify-center gap-4 p-5 pb-3 sm:p-7 sm:pb-3 md:min-h-[340px] md:max-w-[80%] md:p-10">
         <div className="flex flex-wrap items-center gap-2">
           <span
             lang={tagScript.lang}
@@ -108,10 +110,10 @@ export function HeroBanner({ stories }: { stories: ArticleCard[] }) {
         </div>
       </div>
 
-      {/* Controls: arrows + tabs. Top right on a phone, where they cannot sit on
-          the Read / Share buttons; bottom right from md up. */}
+      {/* Controls: arrows + tabs. Under the Read / Share buttons on a phone,
+          centred; bottom right from md up. */}
       {slides.length > 1 ? (
-        <div className="absolute right-3 top-3 flex items-center gap-1 md:bottom-6 md:right-6 md:top-auto md:gap-2">
+        <div className="flex items-center justify-center gap-1 px-5 pb-4 sm:px-7 md:absolute md:bottom-6 md:right-6 md:gap-2 md:p-0">
           <button
             type="button"
             onClick={() => go(index - 1)}

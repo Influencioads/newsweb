@@ -151,7 +151,7 @@ function ShelfCard({ article, n }: { article: ArticleCard; n: number }) {
   return (
     <Link
       to={`/story-shots?start=${article.short_id}`}
-      className="group flex aspect-[9/16] flex-col overflow-hidden rounded-2xl border border-rule bg-surface transition-[border-color,box-shadow,transform] duration-base hover:-translate-y-0.5 hover:border-wow hover:shadow-raised motion-reduce:transform-none"
+      className="group flex h-full flex-col overflow-hidden rounded-2xl border border-rule bg-surface transition-[border-color,box-shadow,transform] duration-base hover:-translate-y-0.5 hover:border-wow hover:shadow-raised motion-reduce:transform-none"
     >
       {/* Header band */}
       <div className="flex items-center justify-between gap-2 bg-brand-deep px-3 py-2 text-on-ink">
@@ -163,12 +163,12 @@ function ShelfCard({ article, n }: { article: ArticleCard; n: number }) {
         <NewsImage media={article.hero} ratio="16/10" radius="xl" sizes="200px" />
       </div>
       {/* Number + headline */}
-      <div className="flex min-h-0 flex-1 flex-col gap-1.5 p-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-1 px-3 pb-2 pt-2">
         <StatBlock stat={p.stat} size="sm" />
         <p lang={p.head.lang} className={cn(p.head.head, 'te-clamp-3 text-headline-xs font-bold text-ink')}>
           {p.head.text}
         </p>
-        <div className="mt-auto flex items-center gap-1 border-t border-dashed border-rule pt-2 text-muted">
+        <div className="mt-auto flex items-center gap-1 border-t border-dashed border-rule pt-1.5 text-muted">
           <Icon icon={MapPin} size="xs" className="shrink-0 text-wow-deep" />
           <span className={cn(s.body, 'te-clamp-1 text-meta')}>{p.place ?? p.when}</span>
         </div>
@@ -177,7 +177,7 @@ function ShelfCard({ article, n }: { article: ArticleCard; n: number }) {
   );
 }
 
-/** Home shelf: a row of infographic cards that scrolls sideways. */
+/** Home shelf: one row of four infographic cards (sideways scroll on phones). */
 export function StoryShotsStrip() {
   const { language } = useI18n();
   const shots = useShots();
@@ -196,9 +196,9 @@ export function StoryShotsStrip() {
         to="/story-shots"
         toLabel={language === 'te' ? 'అన్నీ చూడండి' : 'View all'}
       />
-      <ul className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] md:mx-0 md:px-0">
-        {items.map((article, i) => (
-          <li key={article.short_id} className="w-[58%] shrink-0 snap-start sm:w-[44%] md:w-[28%] lg:w-[19%]">
+      <ul className="-mx-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-2 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-4 md:overflow-visible md:px-0 md:pb-0">
+        {items.slice(0, 4).map((article, i) => (
+          <li key={article.short_id} className="w-[62%] shrink-0 snap-start sm:w-[44%] md:w-auto">
             <ShelfCard article={article} n={i + 1} />
           </li>
         ))}

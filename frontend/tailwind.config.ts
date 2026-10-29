@@ -39,7 +39,7 @@ export default {
           tint: 'rgb(var(--tn-hero-tint) / <alpha-value>)',
           text: 'rgb(var(--tn-hero-text) / <alpha-value>)',
         },
-        /** The site footer's navy (constant in both themes; `on-ink` text on it). */
+        /** The site footer's dark blue (the hero banner's) (constant in both themes; `on-ink` text on it). */
         footer: 'rgb(var(--tn-footer) / <alpha-value>)',
         social: {
           whatsapp: 'rgb(var(--tn-social-whatsapp) / <alpha-value>)',
@@ -159,7 +159,7 @@ export default {
          */
         display: ['34px', { lineHeight: '1.5' }],
         /** The masthead wordmark (WOW · emblem · INDIAN): fluid, phone and md+. */
-        'wordmark-sm': ['clamp(1.75rem, 7.6vw, 2.5rem)', { lineHeight: '1', letterSpacing: '0.01em' }],
+        'wordmark-sm': ['clamp(1.5rem, 6.9vw, 2.5rem)', { lineHeight: '1', letterSpacing: '0.01em' }],
         wordmark: ['clamp(2.25rem, 4.1vw, 3.75rem)', { lineHeight: '1', letterSpacing: '0.02em' }],
         'headline-xl': ['33px', { lineHeight: '1.5' }],
         'headline-lg': ['28px', { lineHeight: '1.5' }],

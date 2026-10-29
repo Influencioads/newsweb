@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { LayoutGrid, Menu, Search } from 'lucide-react';
 
@@ -11,6 +11,9 @@ import { cn } from '@/utils/cn';
 import { prefersReducedMotion, useScrolled } from '@/utils/motion';
 
 import { NavDrawer, SHORTCUTS, useSiteConfig } from './NavDrawer';
+
+/** The shortcuts shown in the section rails (Nominate lives in the masthead). */
+const RAIL_SHORTCUTS = SHORTCUTS.filter((sc) => !sc.drawerOnly);
 
 /**
  * CategoryNav — row 2 of the reader shell and its only sticky part.
@@ -109,7 +112,8 @@ export function CategoryNav() {
       ref={nav}
       aria-label={t('nav.sections')}
       className={cn(
-        'sticky top-0 z-header border-b transition-[colors,box-shadow] duration-base ease-standard',
+        // Phones get MobileSectionsBar above the wordmark instead of this row.
+        'sticky top-0 z-header hidden border-b transition-[colors,box-shadow] duration-base ease-standard md:block',
         // Opaque paper at rest; glass once content scrolls under it. The border
         // stays in the box (no 1px height jump) and goes transparent while
         // shadow-header draws its own rule line.
@@ -141,20 +145,19 @@ export function CategoryNav() {
                   {t('nav.home')}
                 </NavLink>
               </li>
-              {SHORTCUTS.map((sc) => (
+              {RAIL_SHORTCUTS.map((sc) => (
                 <li key={sc.to} className="contents">
                   {sc.highlight ? (
-                    // WOW Radio and Nominate Your Local Hero: two separate
-                    // orange buttons, apart from the category links.
+                    // WOW Radio and My Village Story: compact orange buttons, apart
+                    // from the category links (Nominate is in the masthead).
                     <NavLink
                       to={sc.to}
                       data-pill=""
                       className={({ isActive }) =>
                         cn(
-                          'mx-1 my-1.5 flex min-h-[36px] shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-pill px-3.5 font-bold shadow-card',
+                          'mx-0.5 my-2 flex min-h-[30px] shrink-0 snap-start items-center gap-1 whitespace-nowrap rounded-pill px-2.5 text-ui-sm font-bold leading-tight shadow-card',
                           'transition-[background-color,box-shadow] duration-base ease-standard',
                           s.body,
-                          s.te ? 'text-te-body-xs' : 'text-ui',
                           sc.highlight === 'wow'
                             ? 'bg-wow-deep text-on-wow hover:bg-wow-deep/90'
                             : 'bg-hero text-on-ink hover:bg-hero/90',
@@ -162,7 +165,7 @@ export function CategoryNav() {
                         )
                       }
                     >
-                      <Icon icon={sc.icon} size="sm" />
+                      <Icon icon={sc.icon} size="xs" />
                       {t(sc.key)}
                     </NavLink>
                   ) : (
@@ -205,9 +208,101 @@ export function CategoryNav() {
           </div>
         </ChipRail>
 
-        <IconButtonLink icon={Search} label={t('nav.search')} to="/search" className="md:hidden" />
       </PageContainer>
 
+      <NavDrawer open={drawer} onClose={() => setDrawer(false)} />
+    </nav>
+  );
+}
+
+/**
+ * Phones only (under md): a plain top strip above the WOW INDIAN wordmark —
+ * menu, every section scrolling past as a marquee, search. It replaces the
+ * sticky section row with its arrow buttons on small screens. Hover, touch
+ * focus and keyboard focus pause it; reduced motion turns it into a plain
+ * sideways-scrolling row (the shared `.animate-marquee` rules in index.css).
+ */
+export function MobileSectionsBar() {
+  const { t, pick } = useI18n();
+  const s = useScript();
+  const { data: config } = useSiteConfig();
+  const [drawer, setDrawer] = useState(false);
+  const categories = config?.categories.filter((c) => c.show_in_nav) ?? [];
+
+  const plain = (telugu: boolean, font: string) =>
+    cn(
+      font,
+      'flex min-h-tap shrink-0 items-center gap-1 whitespace-nowrap px-2.5 font-semibold text-ink hover:text-brand',
+      telugu ? 'text-te-body-xs' : 'text-ui-sm',
+    );
+  const pill = cn(
+    s.body,
+    'mx-1 flex min-h-tap shrink-0 items-center whitespace-nowrap',
+  );
+
+  const items = (copy: boolean) => (
+    <>
+      <NavLink to="/" end tabIndex={copy ? -1 : undefined} className={plain(s.te, s.head)}>
+        {t('nav.home')}
+      </NavLink>
+      {RAIL_SHORTCUTS.map((sc) =>
+        sc.highlight ? (
+          <NavLink key={sc.to} to={sc.to} tabIndex={copy ? -1 : undefined} className={pill}>
+            <span className="inline-flex h-7 items-center gap-1 rounded-pill bg-wow-deep px-2.5 text-ui-sm font-bold text-on-wow">
+              <Icon icon={sc.icon} size="xs" />
+              {t(sc.key)}
+            </span>
+          </NavLink>
+        ) : (
+          <NavLink key={sc.to} to={sc.to} tabIndex={copy ? -1 : undefined} className={plain(s.te, s.head)}>
+            {t(sc.key)}
+          </NavLink>
+        ),
+      )}
+      {categories.map((c) => {
+        const f = s.forText(c.name_te, c.name_en);
+        return (
+          <NavLink
+            key={c.slug}
+            to={`/section/${c.slug}`}
+            lang={f.lang}
+            tabIndex={copy ? -1 : undefined}
+            className={plain(f.telugu, f.head)}
+          >
+            {pick(c.name_te, c.name_en)}
+          </NavLink>
+        );
+      })}
+      <NavLink to="/explore" tabIndex={copy ? -1 : undefined} className={plain(s.te, s.head)}>
+        <Icon icon={LayoutGrid} size="xs" />
+        {t('ui.allCategories')}
+      </NavLink>
+    </>
+  );
+
+  // About three seconds a link, so the strip reads at the same pace however many sections there are.
+  const duration = Math.max(24, (categories.length + RAIL_SHORTCUTS.length + 2) * 3);
+
+  return (
+    <nav aria-label={t('ui.explore')} className="border-b border-rule md:hidden">
+      <div className="flex items-center gap-1 px-1">
+        <IconButton
+          icon={Menu}
+          label={t('ui.openMenu')}
+          aria-haspopup="dialog"
+          aria-expanded={drawer}
+          onClick={() => setDrawer(true)}
+        />
+        <div className="marquee-clip no-scrollbar scroll-touch min-w-0 flex-1">
+          <div className="animate-marquee items-center" style={{ '--marquee-duration': `${duration}s` } as CSSProperties}>
+            <div className="flex items-center">{items(false)}</div>
+            <div aria-hidden className="flex items-center">
+              {items(true)}
+            </div>
+          </div>
+        </div>
+        <IconButtonLink icon={Search} label={t('nav.search')} to="/search" />
+      </div>
       <NavDrawer open={drawer} onClose={() => setDrawer(false)} />
     </nav>
   );

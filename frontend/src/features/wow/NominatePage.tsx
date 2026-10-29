@@ -135,7 +135,7 @@ export default function NominatePage() {
         ? L(`కనీసం ${MIN_REASON} అక్షరాల్లో వివరించండి.`, `Explain in at least ${MIN_REASON} characters.`)
         : null,
     phone:
-      draft.phone.trim() && !PHONE.test(draft.phone.trim())
+      !PHONE.test(draft.phone.trim())
         ? L('10 అంకెల మొబైల్ నంబర్ ఇవ్వండి.', 'Enter a 10-digit mobile number.')
         : null,
     consent: !draft.consent ? L('అనుమతి ధృవీకరణ అవసరం.', 'Please confirm consent.') : null,
@@ -313,7 +313,7 @@ export default function NominatePage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <Field
                   label={L('మీ ఫోన్ నంబర్', 'Your contact number')}
-                  optionalLabel
+                  required
                   error={show(errors.phone)}
                   hint={L('సంపాదకులు ధృవీకరణ కోసం మాత్రమే వాడతారు.', 'Used only by editors to verify.')}
                 >
@@ -331,7 +331,6 @@ export default function NominatePage() {
 
                 <Field
                   label={L('హీరో ఫోటో', 'Hero photo')}
-                  optionalLabel
                   hint={
                     canAttachPhoto
                       ? L('JPG / PNG / WebP, హీరో అనుమతితో మాత్రమే.', 'JPG / PNG / WebP, only with the hero’s permission.')

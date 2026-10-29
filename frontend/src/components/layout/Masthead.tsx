@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Bell, MapPin, Newspaper, SlidersHorizontal, UserRound } from 'lucide-react';
+import { Award, Bell, MapPin, Newspaper, SlidersHorizontal, UserRound } from 'lucide-react';
 
 import { LocationPicker, useReaderPlace, useReaderPlaceName } from '@/components/location/LocationPicker';
 import { Button, ButtonLink, IconButton, IconButtonLink } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { Dialog } from '@/components/ui/Dialog';
+import { Icon } from '@/components/ui/Icon';
 import { PageContainer } from '@/components/ui/Layout';
 import * as notificationsApi from '@/features/engagement/notificationsApi';
 import { EPAPER_PUBLIC } from '@/features/epaper/api';
@@ -132,11 +133,35 @@ export function Masthead() {
           {/* Brand line (CMS → Site content), e.g. "Ordinary People. Extraordinary Stories." */}
           <span
             lang={taglineScript.lang}
-            className={cn(taglineScript.cls, 'mt-0.5 whitespace-nowrap text-center text-ui-sm font-bold tracking-wide text-ink md:text-meta lg:text-ui-sm')}
+            className={cn(taglineScript.cls, 'mt-0.5 hidden whitespace-nowrap text-center text-meta font-bold tracking-wide text-ink md:block lg:text-ui-sm')}
           >
             {tagline}
           </span>
         </Link>
+
+        {/* Phone: one line — the brand line small on the left, a small Nominate
+            Your Local Hero pill on the right (shorter label under 390px). */}
+        <div className="order-first col-span-2 flex items-center justify-between gap-1.5 md:hidden">
+          <p lang={taglineScript.lang} className={cn(taglineScript.cls, 'whitespace-nowrap text-eyebrow font-bold tracking-normal text-ink')}>
+            {tagline}
+          </p>
+          <Link
+            to="/nominate"
+            aria-label={t('ui.nominate')}
+            className="flex min-h-tap shrink-0 items-center rounded-pill"
+          >
+            <span
+              className={cn(
+                s.body,
+                'inline-flex h-7 items-center gap-0.5 whitespace-nowrap rounded-pill bg-wow-deep px-2 text-meta font-bold leading-none text-on-wow shadow-card',
+              )}
+            >
+              <Icon icon={Award} size="xs" />
+              <span className="sm:hidden">{language === 'te' ? 'నామినేట్ చేయండి' : 'Nominate'}</span>
+              <span className="hidden sm:inline">{language === 'te' ? 'లోకల్ హీరో నామినేషన్' : 'Nominate a Local Hero'}</span>
+            </span>
+          </Link>
+        </div>
 
         {/* Right column: one row under md; from md account on top, the rest beneath. */}
         <div className="flex shrink-0 items-center justify-end gap-1 md:flex-col md:items-end md:gap-1">
@@ -157,19 +182,19 @@ export function Masthead() {
           <IconButton icon={SlidersHorizontal} label={t('ui.readerSettings')} onClick={() => setSettings(true)} />
           {authed && <NotificationBell />}
           </div>
-          <div className="md:order-first">
+          <ButtonLink to="/nominate" variant="wow" size="sm" icon={Award} className="hidden md:inline-flex">
+            {t('ui.nominate')}
+          </ButtonLink>
+          {/* Signed-in readers keep their profile here; there is no sign-in button in the header. */}
           {authed && me ? (
-            <IconButtonLink
-              icon={UserRound}
-              label={`${t('page.profile')} · ${pick(me.user.name_te, me.user.name_en)}`}
-              to="/profile"
-            />
-          ) : (
-            <ButtonLink to="/login" variant="ghost" size="sm" icon={UserRound} aria-label={t('nav.signIn')}>
-              <span className="hidden font-bold md:inline">{t('nav.signIn')}</span>
-            </ButtonLink>
-          )}
-          </div>
+            <div className="md:order-first">
+              <IconButtonLink
+                icon={UserRound}
+                label={`${t('page.profile')} · ${pick(me.user.name_te, me.user.name_en)}`}
+                to="/profile"
+              />
+            </div>
+          ) : null}
         </div>
       </PageContainer>
 

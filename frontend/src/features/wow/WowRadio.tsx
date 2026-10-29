@@ -345,8 +345,13 @@ export function WowRadio({ variant = 'card' }: { variant?: 'card' | 'page' }) {
           ) : null}
           <div>
             <OnAirLabel />
-            <h2 id={`wow-radio-${variant}`} className="font-serif text-headline-md font-bold leading-tight">
-              WOW Radio <span lang="te" className="th text-headline-xs font-semibold text-on-ink/75">· వావ్ రేడియో</span>
+            {/* English and Telugu names on one line, the English a step smaller on phones. */}
+            <h2
+              id={`wow-radio-${variant}`}
+              className="flex items-baseline gap-1.5 whitespace-nowrap font-serif text-headline-sm font-bold leading-tight md:text-headline-md"
+            >
+              WOW Radio
+              <span lang="te" className="th text-headline-xs font-semibold text-on-ink/75">· వావ్ రేడియో</span>
             </h2>
           </div>
         </div>

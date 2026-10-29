@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, ExternalLink, FileText, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, FileText, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 
 import { AdminPage } from '@/components/admin/AdminPage';
 import { DataTable, type DataTableColumn } from '@/components/admin/DataTable';
 import { WorkflowPill } from '@/components/admin/StatusPill';
 import { Button, ButtonLink, IconButton, IconButtonLink } from '@/components/ui/Button';
 import { Chip, ChipRail } from '@/components/ui/Chip';
+import { Checkbox } from '@/components/ui/Choice';
 import { useConfirm } from '@/components/ui/Dialog';
 import { PromptDialog } from '@/components/ui/PromptDialog';
 import { Input, Select } from '@/components/ui/Field';
@@ -32,7 +33,8 @@ import { useL } from './useL';
  * gated by the same permissions the backend re-checks. `WorkflowActions` is
  * shared with the pending queue: reject / unpublish confirm first, request
  * changes collects a reason, and approve is withheld on the editor's own
- * story (§6 four-eyes, as in the review queue).
+ * story (§6 four-eyes, as in the review queue). Whoever may delete also gets
+ * a checkbox per row, "select all" for the page and "Delete selected".
  */
 
 /** action → [te, en, permission], keyed by the state the article is in. */
@@ -246,6 +248,34 @@ export default function Articles() {
   }, [search]);
   useEffect(() => setPage(0), [q, state]);
 
+  // Bulk delete: the selection is the rows ticked on this page.
+  const canDelete = can('article.delete');
+  const qc = useQueryClient();
+  const toast = useToast();
+  const { confirm, dialog } = useConfirm();
+  const [selected, setSelected] = useState<Set<number>>(() => new Set());
+  useEffect(() => setSelected(new Set()), [q, state, page]);
+  const toggle = (id: number, on: boolean) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  const bulkDelete = useMutation({
+    mutationFn: async (ids: number[]) => {
+      const results = await Promise.allSettled(ids.map((id) => cmsApi.deleteArticle(id)));
+      return { done: results.filter((r) => r.status === 'fulfilled').length, failed: results.filter((r) => r.status === 'rejected').length };
+    },
+    onSuccess: ({ done, failed }) => {
+      setSelected(new Set());
+      void qc.invalidateQueries({ queryKey: ['cms'] });
+      if (done) toast.success(L(`${done} కథనాలు తొలగించబడ్డాయి`, `${done} deleted`));
+      if (failed) toast.error(L(`${failed} కథనాలు తొలగించలేకపోయాం`, `${failed} could not be deleted`));
+    },
+    onError: (err) => toast.error(err),
+  });
+
   const query = useQuery({
     queryKey: ['cms', 'articles', { q, state, page }],
     queryFn: () => cmsApi.fetchArticles({ search: q || undefined, state: state || undefined, offset: page * PAGE, limit: PAGE }),
@@ -257,8 +287,40 @@ export default function Articles() {
   const rows = query.data?.articles ?? [];
   const total = query.data?.total ?? 0;
   const filtered = Boolean(q || state);
+  const allOnPage = rows.length > 0 && rows.every((a) => selected.has(a.id));
+  const selectAll = (on: boolean) => setSelected(on ? new Set(rows.map((a) => a.id)) : new Set());
+  const askBulkDelete = async () => {
+    const ids = [...selected];
+    const ok = await confirm({
+      title: L(`${ids.length} కథనాలను తొలగించాలా?`, ids.length === 1 ? 'Delete 1 article?' : `Delete ${ids.length} articles?`),
+      body: L(
+        'ఇవి సైట్ నుంచి, CMS జాబితాల నుంచి తొలగిపోతాయి. డేటాబేస్‌లో భద్రంగా ఉంటాయి, తిరిగి తీసుకురావచ్చు.',
+        'They disappear from the site and the CMS lists. They stay in the database and can be restored.',
+      ),
+      tone: 'danger',
+      confirmLabel: L('తొలగించండి', 'Delete'),
+    });
+    if (ok) bulkDelete.mutate(ids);
+  };
+
+  /** A tick box that never opens the row it sits in. */
+  const tick = (checked: boolean, onChange: (on: boolean) => void, label: string) => (
+    <span onClick={(e) => e.stopPropagation()} className="inline-flex">
+      <Checkbox checked={checked} onChange={onChange} label={<span className="sr-only">{label}</span>} className="py-0" />
+    </span>
+  );
 
   const columns: DataTableColumn<CmsArticle>[] = [
+    ...(canDelete
+      ? [
+          {
+            key: 'select',
+            header: tick(allOnPage, selectAll, L('ఈ పేజీలోని అన్నీ ఎంచుకోండి', 'Select all on this page')),
+            width: 'w-12',
+            render: (a: CmsArticle) => tick(selected.has(a.id), (on) => toggle(a.id, on), `${L('ఎంచుకోండి', 'Select')} #${a.id}`),
+          },
+        ]
+      : []),
     {
       key: 'title',
       header: L('శీర్షిక', 'Headline'),
@@ -344,6 +406,31 @@ export default function Articles() {
             </Chip>
           ))}
         </ChipRail>
+        {canDelete && rows.length ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-rule bg-paper px-3 py-2">
+            <Checkbox
+              checked={allOnPage}
+              onChange={selectAll}
+              label={L(`ఈ పేజీలోని అన్నీ (${rows.length})`, `Select all on this page (${rows.length})`)}
+              className="py-0"
+            />
+            {selected.size ? (
+              <>
+                <span className={cn(s.body, 'text-ui-sm font-semibold text-ink')}>
+                  · {L(`${selected.size} ఎంచుకున్నారు`, `${selected.size} selected`)}
+                </span>
+                <span className="ml-auto flex flex-wrap gap-2">
+                  <Button variant="ghost" size="sm" icon={X} onClick={() => setSelected(new Set())}>
+                    {L('ఎంపిక తీసేయండి', 'Clear')}
+                  </Button>
+                  <Button variant="danger" size="sm" icon={Trash2} pending={bulkDelete.isPending} onClick={() => void askBulkDelete()}>
+                    {L(`ఎంచుకున్నవి తొలగించండి (${selected.size})`, `Delete selected (${selected.size})`)}
+                  </Button>
+                </span>
+              </>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {query.isError ? (
@@ -391,6 +478,7 @@ export default function Articles() {
           </div>
         </nav>
       ) : null}
+      {dialog}
     </AdminPage>
   );
 }

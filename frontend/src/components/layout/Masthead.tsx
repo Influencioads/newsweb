@@ -7,6 +7,7 @@ import { LocationPicker, useReaderPlace, useReaderPlaceName } from '@/components
 import { Button, ButtonLink, IconButton, IconButtonLink } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { Dialog } from '@/components/ui/Dialog';
+import { Icon } from '@/components/ui/Icon';
 import { PageContainer } from '@/components/ui/Layout';
 import * as notificationsApi from '@/features/engagement/notificationsApi';
 import { EPAPER_PUBLIC } from '@/features/epaper/api';
@@ -131,16 +132,28 @@ export function Masthead() {
           </span>
         </Link>
 
-        {/* Phone: the brand line small on the left, Nominate Your Local Hero on the right. */}
-        <div className="order-first col-span-2 flex items-center justify-between gap-2 md:hidden">
-          <p lang="en" className="font-sans text-meta font-bold leading-tight text-ink">
-            Ordinary People.
-            <br />
-            Extraordinary Stories.
+        {/* Phone: one line — the brand line small on the left, a small Nominate
+            Your Local Hero pill on the right (shorter label under 390px). */}
+        <div className="order-first col-span-2 flex items-center justify-between gap-1.5 md:hidden">
+          <p lang="en" className="whitespace-nowrap font-sans text-eyebrow font-bold tracking-normal text-ink">
+            Ordinary People. Extraordinary Stories.
           </p>
-          <ButtonLink to="/nominate" variant="wow" size="sm" icon={Award} className="shrink-0">
-            {t('ui.nominate')}
-          </ButtonLink>
+          <Link
+            to="/nominate"
+            aria-label={t('ui.nominate')}
+            className="flex min-h-tap shrink-0 items-center rounded-pill"
+          >
+            <span
+              className={cn(
+                s.body,
+                'inline-flex h-7 items-center gap-0.5 whitespace-nowrap rounded-pill bg-wow-deep px-2 text-meta font-bold leading-none text-on-wow shadow-card',
+              )}
+            >
+              <Icon icon={Award} size="xs" />
+              <span className="sm:hidden">{language === 'te' ? 'నామినేట్ చేయండి' : 'Nominate'}</span>
+              <span className="hidden sm:inline">{language === 'te' ? 'లోకల్ హీరో నామినేషన్' : 'Nominate a Local Hero'}</span>
+            </span>
+          </Link>
         </div>
 
         {/* Right column: one row under md; from md account on top, the rest beneath. */}

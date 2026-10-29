@@ -60,7 +60,7 @@ export function HeroBanner({ stories }: { stories: ArticleCard[] }) {
       {/* No photos: the banner is the deep-blue WOW panel with an orange glow. */}
       <div aria-hidden className="absolute -left-20 -top-24 -z-10 h-72 w-72 rounded-full bg-wow/25 blur-3xl" />
 
-      <div className="flex min-h-[300px] flex-col justify-center gap-4 p-5 pt-16 sm:p-7 sm:pt-16 md:min-h-[340px] md:max-w-[80%] md:p-10">
+      <div className="flex flex-col justify-center gap-4 p-5 pb-3 sm:p-7 sm:pb-3 md:min-h-[340px] md:max-w-[80%] md:p-10">
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-pill bg-wow-deep px-3 py-1 font-sans text-meta font-bold uppercase tracking-wide text-on-wow">
             <Icon icon={Sparkles} size="xs" />
@@ -102,10 +102,10 @@ export function HeroBanner({ stories }: { stories: ArticleCard[] }) {
         </div>
       </div>
 
-      {/* Controls: arrows + tabs. Top right on a phone, where they cannot sit on
-          the Read / Share buttons; bottom right from md up. */}
+      {/* Controls: arrows + tabs. Under the Read / Share buttons on a phone,
+          centred; bottom right from md up. */}
       {slides.length > 1 ? (
-        <div className="absolute right-3 top-3 flex items-center gap-1 md:bottom-6 md:right-6 md:top-auto md:gap-2">
+        <div className="flex items-center justify-center gap-1 px-5 pb-4 sm:px-7 md:absolute md:bottom-6 md:right-6 md:gap-2 md:p-0">
           <button
             type="button"
             onClick={() => go(index - 1)}

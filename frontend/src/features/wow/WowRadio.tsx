@@ -154,7 +154,7 @@ function SegmentTiles({
         const playMark = cn(
           'flex shrink-0 items-center justify-center rounded-pill bg-wow-deep text-on-wow shadow-raised transition-transform duration-base hover:scale-110 motion-reduce:transform-none',
           // On the small home tiles the play button sits in the corner so it never covers the name.
-          large ? 'h-8 w-8' : 'absolute right-1.5 top-1.5 z-10 h-8 w-8',
+          large ? 'h-8 w-8' : 'absolute right-2 top-2 z-10 h-7 w-7 md:h-8 md:w-8',
           current && 'ring-2 ring-on-ink/70',
         );
         return (
@@ -167,18 +167,23 @@ function SegmentTiles({
           >
             <Link
               to={`/radio/${sg.id}`}
-              className={cn('flex h-full items-center gap-3 text-left', large ? 'p-4' : 'p-2.5 pr-11 sm:p-3 sm:pr-11')}
+              className={cn(
+                'flex h-full text-left',
+                // Phone: icon on top (play button beside it), name and English underneath,
+                // so a long Telugu name never runs into the play button.
+                large ? 'items-center gap-3 p-4' : 'flex-col items-start gap-1.5 p-2.5 md:flex-row md:items-center md:gap-3 md:p-3 md:pr-11',
+              )}
             >
               <span
                 className={cn(
                   'flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-on-ink shadow-raised',
-                  large ? 'h-14 w-14' : 'h-10 w-10 sm:h-11 sm:w-11',
+                  large ? 'h-14 w-14' : 'h-8 w-8 md:h-11 md:w-11',
                   sg.tone,
                 )}
               >
-                <Icon icon={sg.icon} size={large ? 'lg' : 'md'} />
+                <Icon icon={sg.icon} size={large ? 'lg' : 'sm'} />
               </span>
-              <span className="min-w-0 flex-1">
+              <span className="min-w-0 w-full flex-1 md:w-auto">
                 <span lang="te" className={cn('te block font-bold leading-snug', large ? 'text-te-body-sm' : 'text-te-body-xs')}>
                   {sg.te}
                 </span>

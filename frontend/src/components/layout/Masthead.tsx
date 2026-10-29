@@ -126,10 +126,22 @@ export function Masthead() {
         >
           <Wordmark />
           {/* Brand line: Ordinary People. Extraordinary Stories. */}
-          <span lang="en" className="mt-0.5 whitespace-nowrap text-center font-sans text-ui-sm font-bold tracking-wide text-ink md:text-meta lg:text-ui-sm">
+          <span lang="en" className="mt-0.5 hidden whitespace-nowrap text-center font-sans text-meta font-bold tracking-wide text-ink md:block lg:text-ui-sm">
             Ordinary People. Extraordinary Stories.
           </span>
         </Link>
+
+        {/* Phone: the brand line small on the left, Nominate Your Local Hero on the right. */}
+        <div className="order-first col-span-2 flex items-center justify-between gap-2 md:hidden">
+          <p lang="en" className="font-sans text-meta font-bold leading-tight text-ink">
+            Ordinary People.
+            <br />
+            Extraordinary Stories.
+          </p>
+          <ButtonLink to="/nominate" variant="wow" size="sm" icon={Award} className="shrink-0">
+            {t('ui.nominate')}
+          </ButtonLink>
+        </div>
 
         {/* Right column: one row under md; from md account on top, the rest beneath. */}
         <div className="flex shrink-0 items-center justify-end gap-1 md:flex-col md:items-end md:gap-1">
@@ -147,8 +159,6 @@ export function Masthead() {
           </ButtonLink>
           )}
           <LocationButton className="md:hidden" />
-          {/* Nominate Your Local Hero: the header's call to action, at the right end beside the logo. */}
-          <IconButtonLink icon={Award} label={t('ui.nominate')} to="/nominate" variant="wow" className="md:hidden" />
           <IconButton icon={SlidersHorizontal} label={t('ui.readerSettings')} onClick={() => setSettings(true)} />
           {authed && <NotificationBell />}
           </div>

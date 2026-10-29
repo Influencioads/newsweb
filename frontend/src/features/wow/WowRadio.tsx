@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, Ghost, Lightbulb, Newspaper, Pause, Play, Square, Sunrise, type LucideIcon } from 'lucide-react';
@@ -123,55 +124,160 @@ function Equalizer({ live }: { live: boolean }) {
   );
 }
 
-/** The four segment tiles. Each opens that segment's own page. */
-function SegmentTiles({ large = false }: { large?: boolean }) {
+type PlayState = 'idle' | 'loading' | 'speaking' | 'paused';
+
+/**
+ * The four segment tiles. Each name opens that segment's own page; with
+ * `onPlay` (the home card) the round play button plays the segment right
+ * there instead.
+ */
+function SegmentTiles({
+  large = false,
+  active,
+  playState = 'idle',
+  onPlay,
+}: {
+  large?: boolean;
+  active?: string | null;
+  playState?: PlayState;
+  onPlay?: (id: string) => void;
+}) {
   const { language } = useI18n();
   const s = useScript();
   const te = language === 'te';
   return (
     <ul className={cn('relative grid gap-2.5', large ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-2')}>
-      {SEGMENTS.map((sg) => (
-        <li key={sg.id} className="min-w-0">
-          <Link
-            to={`/radio/${sg.id}`}
+      {SEGMENTS.map((sg) => {
+        const current = active === sg.id;
+        const live = current && playState === 'speaking';
+        const name = te ? sg.te : sg.en;
+        const playMark = cn(
+          'flex shrink-0 items-center justify-center rounded-pill bg-wow-deep text-on-wow shadow-raised transition-transform duration-base hover:scale-110 motion-reduce:transform-none',
+          // On the small home tiles the play button sits in the corner so it never covers the name.
+          large ? 'h-8 w-8' : 'absolute right-1.5 top-1.5 z-10 h-8 w-8',
+          current && 'ring-2 ring-on-ink/70',
+        );
+        return (
+          <li
+            key={sg.id}
             className={cn(
-              'group relative flex h-full items-center gap-3 overflow-hidden rounded-xl border border-on-ink/15 bg-on-ink/5 text-left',
-              'transition-[border-color,background-color,transform] duration-base hover:-translate-y-0.5 hover:border-wow hover:bg-on-ink/10 motion-reduce:transform-none',
-              large ? 'p-4' : 'p-2.5 sm:p-3',
+              'group relative min-w-0 overflow-hidden rounded-xl border bg-on-ink/5 transition-[border-color,background-color,transform] duration-base hover:-translate-y-0.5 hover:bg-on-ink/10 motion-reduce:transform-none',
+              current ? 'border-wow bg-on-ink/10' : 'border-on-ink/15 hover:border-wow',
             )}
           >
-            <span
-              className={cn(
-                'flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-on-ink shadow-raised',
-                large ? 'h-14 w-14' : 'h-10 w-10 sm:h-11 sm:w-11',
-                sg.tone,
-              )}
+            <Link
+              to={`/radio/${sg.id}`}
+              className={cn('flex h-full items-center gap-3 text-left', large ? 'p-4' : 'p-2.5 pr-11 sm:p-3 sm:pr-11')}
             >
-              <Icon icon={sg.icon} size={large ? 'lg' : 'md'} />
-            </span>
-            <span className={cn('min-w-0 flex-1', !large && 'pr-5')}>
-              <span lang="te" className={cn('te block font-bold leading-snug', large ? 'text-te-body-sm' : 'text-te-body-xs')}>
-                {sg.te}
+              <span
+                className={cn(
+                  'flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-on-ink shadow-raised',
+                  large ? 'h-14 w-14' : 'h-10 w-10 sm:h-11 sm:w-11',
+                  sg.tone,
+                )}
+              >
+                <Icon icon={sg.icon} size={large ? 'lg' : 'md'} />
               </span>
-              <span className={cn(s.body, 'block text-meta text-on-ink/70', large && 'te-clamp-2')}>
-                {large ? (te ? sg.taglineTe : sg.taglineEn) : sg.en}
+              <span className="min-w-0 flex-1">
+                <span lang="te" className={cn('te block font-bold leading-snug', large ? 'text-te-body-sm' : 'text-te-body-xs')}>
+                  {sg.te}
+                </span>
+                <span className={cn(s.body, 'block text-meta text-on-ink/70', large && 'te-clamp-2')}>
+                  {current && playState !== 'idle' ? (
+                    <span className="inline-flex items-center gap-1.5 font-semibold text-wow">
+                      {playState === 'loading'
+                        ? te ? 'ట్యూన్ అవుతోంది…' : 'Tuning…'
+                        : playState === 'speaking'
+                          ? te ? 'ప్రసారంలో' : 'On air'
+                          : te ? 'ఆపబడింది' : 'Paused'}
+                    </span>
+                  ) : large ? (
+                    te ? sg.taglineTe : sg.taglineEn
+                  ) : (
+                    sg.en
+                  )}
+                </span>
               </span>
-            </span>
-            <span
-              aria-hidden
-              className={cn(
-                'flex shrink-0 items-center justify-center rounded-pill bg-wow-deep text-on-wow transition-transform duration-base group-hover:scale-110',
-                // On the small home tiles the play mark sits in the corner so it never covers the name.
-                large ? 'h-8 w-8' : 'absolute right-1.5 top-1.5 h-6 w-6',
-              )}
-            >
-              <Icon icon={Play} size="xs" />
-            </span>
-          </Link>
-        </li>
-      ))}
+              {!onPlay ? (
+                <span aria-hidden className={playMark}>
+                  <Icon icon={Play} size="xs" />
+                </span>
+              ) : null}
+            </Link>
+            {onPlay ? (
+              <button
+                type="button"
+                onClick={() => onPlay(sg.id)}
+                aria-label={live ? `${te ? 'ఆపు' : 'Pause'} · ${name}` : `${te ? 'ప్లే' : 'Play'} · ${name}`}
+                aria-pressed={live}
+                className={playMark}
+              >
+                <Icon icon={live ? Pause : Play} size="xs" />
+              </button>
+            ) : null}
+          </li>
+        );
+      })}
     </ul>
   );
+}
+
+/**
+ * The home card's inline player: the play button on a tile reads that
+ * segment's stories aloud right on the home page (same voice and running
+ * order as its /radio page); pressing it again pauses, another tile switches.
+ */
+function useInlineRadio() {
+  const [active, setActive] = useState<string | null>(null);
+  const [startWhenReady, setStartWhenReady] = useState(false);
+  const segment = SEGMENTS.find((sg) => sg.id === active) ?? null;
+  const programme = useQuery({
+    queryKey: ['wow-radio', active],
+    queryFn: () => fetchSegment(segment ?? DEFAULT_SEGMENT),
+    enabled: Boolean(segment),
+    staleTime: 120_000,
+  });
+  const items = programme.data ?? [];
+  const text = segment ? script(segment, items) : '';
+  const { state, toggle, stop } = useTts(text);
+
+  // A new segment's stories have arrived: start reading as soon as the text is in.
+  useEffect(() => {
+    if (!startWhenReady || programme.isFetching || !(programme.isSuccess || programme.isError)) return;
+    setStartWhenReady(false);
+    if (text && state === 'idle') toggle();
+  }, [startWhenReady, text, programme.isFetching, programme.isSuccess, programme.isError, state, toggle]);
+
+  const play = useCallback(
+    (id: string) => {
+      if (id === active && (state === 'speaking' || state === 'paused')) {
+        toggle();
+        return;
+      }
+      stop();
+      setActive(id);
+      setStartWhenReady(true);
+    },
+    [active, state, toggle, stop],
+  );
+
+  const playState: PlayState =
+    state === 'speaking'
+      ? 'speaking'
+      : state === 'paused'
+        ? 'paused'
+        : active && (startWhenReady || programme.isFetching)
+          ? 'loading'
+          : 'idle';
+
+  const note =
+    active && state === 'unavailable'
+      ? 'unavailable'
+      : active && programme.isSuccess && !items.length && !startWhenReady
+        ? 'empty'
+        : null;
+
+  return { active, play, playState, note };
 }
 
 function OnAirLabel() {
@@ -195,6 +301,7 @@ export function WowRadio({ variant = 'card' }: { variant?: 'card' | 'page' }) {
   const s = useScript();
   const te = language === 'te';
   const page = variant === 'page';
+  const radio = useInlineRadio();
 
   return (
     <section
@@ -248,11 +355,29 @@ export function WowRadio({ variant = 'card' }: { variant?: 'card' | 'page' }) {
         ) : null}
       </div>
 
-      <p className={cn(s.body, 'relative mt-3 text-ui-sm text-on-ink/75')}>
-        {te ? 'ఒక సెగ్మెంట్ ఎంచుకోండి — దాని పేజీలో వినండి.' : 'Pick a segment to listen on its own page.'}
+      <p role="status" className={cn(s.body, 'relative mt-3 text-ui-sm text-on-ink/75')}>
+        {radio.note === 'unavailable'
+          ? te
+            ? 'ఈ బ్రౌజర్‌లో తెలుగు వాయిస్ లేదు. Android లేదా Chrome లో ప్రయత్నించండి.'
+            : 'This browser has no Telugu voice. Try Chrome or an Android phone.'
+          : radio.note === 'empty'
+            ? te
+              ? 'ఈ సెగ్మెంట్ ఎపిసోడ్‌లు త్వరలో.'
+              : 'Episodes for this segment are coming soon.'
+            : page
+              ? te
+                ? 'ఒక సెగ్మెంట్ ఎంచుకోండి — దాని పేజీలో వినండి.'
+                : 'Pick a segment to listen on its own page.'
+              : te
+                ? '▶ నొక్కి ఇక్కడే వినండి — పేరు నొక్కితే ఆ సెగ్మెంట్ పేజీ.'
+                : 'Press ▶ to listen right here, or tap a name for its page.'}
       </p>
       <div className="relative mt-3">
-        <SegmentTiles large={page} />
+        {page ? (
+          <SegmentTiles large />
+        ) : (
+          <SegmentTiles active={radio.active} playState={radio.playState} onPlay={radio.play} />
+        )}
       </div>
     </section>
   );

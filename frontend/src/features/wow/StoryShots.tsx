@@ -196,7 +196,7 @@ export function StoryShotsStrip() {
         to="/story-shots"
         toLabel={language === 'te' ? 'అన్నీ చూడండి' : 'View all'}
       />
-      <ul className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] md:mx-0 md:px-0">
+      <ul className="-mx-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-2 [scrollbar-width:none] md:mx-0 md:px-0">
         {items.map((article, i) => (
           <li key={article.short_id} className="w-[58%] shrink-0 snap-start sm:w-[44%] md:w-[28%] lg:w-[19%]">
             <ShelfCard article={article} n={i + 1} />

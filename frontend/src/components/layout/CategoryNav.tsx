@@ -144,17 +144,16 @@ export function CategoryNav() {
               {SHORTCUTS.map((sc) => (
                 <li key={sc.to} className="contents">
                   {sc.highlight ? (
-                    // WOW Radio and Nominate Your Local Hero: two separate
-                    // orange buttons, apart from the category links.
+                    // WOW Radio, Nominate Your Local Hero and My Village Story:
+                    // three compact filled buttons, apart from the category links.
                     <NavLink
                       to={sc.to}
                       data-pill=""
                       className={({ isActive }) =>
                         cn(
-                          'mx-1 my-1.5 flex min-h-[36px] shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-pill px-3.5 font-bold shadow-card',
+                          'mx-0.5 my-2 flex min-h-[30px] shrink-0 snap-start items-center gap-1 whitespace-nowrap rounded-pill px-2.5 text-ui-sm font-bold leading-tight shadow-card',
                           'transition-[background-color,box-shadow] duration-base ease-standard',
                           s.body,
-                          s.te ? 'text-te-body-xs' : 'text-ui',
                           sc.highlight === 'wow'
                             ? 'bg-wow-deep text-on-wow hover:bg-wow-deep/90'
                             : 'bg-hero text-on-ink hover:bg-hero/90',
@@ -162,7 +161,7 @@ export function CategoryNav() {
                         )
                       }
                     >
-                      <Icon icon={sc.icon} size="sm" />
+                      <Icon icon={sc.icon} size="xs" />
                       {t(sc.key)}
                     </NavLink>
                   ) : (

@@ -4,7 +4,7 @@ import { PageContainer } from "@/components/ui/Layout";
 import { EmptyState, QueryState } from "@/components/ui/State";
 import * as publicApi from "@/features/public/api";
 import { ExploreWow } from "@/features/wow/ExploreWow";
-import { HeroBanner } from "@/features/wow/HeroBanner";
+import { HERO_SLIDES, HeroBanner } from "@/features/wow/HeroBanner";
 import { FeaturedHeroes, NominateCta } from "@/features/wow/LocalHeroes";
 import { MyVillageStory } from "@/features/wow/MyVillageStory";
 import { StoryShotsStrip } from "@/features/wow/StoryShots";
@@ -13,7 +13,23 @@ import { useI18n } from "@/i18n";
 import { useReaderPrefs } from "@/stores/readerPrefs";
 import { useDocumentTitle } from "@/utils/motion";
 
+import type { ArticleCard, HomePayload } from "@/types/public";
+
 import { HomeSkeleton } from "./home/HomeSkeleton";
+
+/** The banner's six stories: the lead, the secondaries, then the top of the
+ *  mid column and latest list, each story once. */
+function heroStories(data: HomePayload): ArticleCard[] {
+  const seen = new Set<string>();
+  const out: ArticleCard[] = [];
+  for (const a of [data.lead, ...data.secondary, ...data.mid_column, ...data.latest]) {
+    if (!a || seen.has(a.short_id)) continue;
+    seen.add(a.short_id);
+    out.push(a);
+    if (out.length === HERO_SLIDES) break;
+  }
+  return out;
+}
 
 /**
  * Reader home page — the blocks the "WOW Indian Telugu" concept pitch names
@@ -61,7 +77,7 @@ export default function Home() {
         {(data) => (
           <>
             {data.lead ? (
-              <HeroBanner stories={[data.lead, ...data.secondary]} />
+              <HeroBanner stories={heroStories(data)} />
             ) : null}
 
             {/* The two signature features, highlighted straight under the banner. */}

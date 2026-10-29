@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { AudioLines, Award, GalleryVerticalEnd, LogIn, Newspaper, UserRound } from 'lucide-react';
+import { AudioLines, Award, GalleryVerticalEnd, LogIn, Newspaper, Trees, UserRound } from 'lucide-react';
 
 import { Sheet } from '@/components/ui/Dialog';
 import { Icon, type LucideIcon } from '@/components/ui/Icon';
@@ -54,6 +54,7 @@ export interface Shortcut {
 export const SHORTCUTS: readonly Shortcut[] = [
   { to: '/radio', key: 'ui.wowRadio', icon: AudioLines, highlight: 'wow' },
   { to: '/nominate', key: 'ui.nominate', icon: Award, highlight: 'wow' },
+  { to: '/section/my-village-story', key: 'ui.myVillageStory', icon: Trees, highlight: 'hero' },
   { to: '/story-shots', key: 'ui.storyShots', icon: GalleryVerticalEnd },
 ];
 

@@ -155,19 +155,16 @@ export function Masthead() {
           <ButtonLink to="/nominate" variant="wow" size="sm" icon={Award} className="hidden md:inline-flex">
             {t('ui.nominate')}
           </ButtonLink>
-          <div className="md:order-first">
+          {/* Signed-in readers keep their profile here; there is no sign-in button in the header. */}
           {authed && me ? (
-            <IconButtonLink
-              icon={UserRound}
-              label={`${t('page.profile')} · ${pick(me.user.name_te, me.user.name_en)}`}
-              to="/profile"
-            />
-          ) : (
-            <ButtonLink to="/login" variant="ghost" size="sm" icon={UserRound} aria-label={t('nav.signIn')}>
-              <span className="hidden font-bold md:inline">{t('nav.signIn')}</span>
-            </ButtonLink>
-          )}
-          </div>
+            <div className="md:order-first">
+              <IconButtonLink
+                icon={UserRound}
+                label={`${t('page.profile')} · ${pick(me.user.name_te, me.user.name_en)}`}
+                to="/profile"
+              />
+            </div>
+          ) : null}
         </div>
       </PageContainer>
 

@@ -15,19 +15,21 @@ import { cn } from '@/utils/cn';
  * A wide, full-bleed photo banner in the WOW colours: the photo fills the
  * card, a deep-blue wash from the left carries the copy (category, Telugu
  * headline, standfirst, Read / Share), and an orange "Every Story Has a WOW!"
- * tag sits on top. Up to four top stories rotate every few seconds; the
+ * tag sits on top. Six top stories rotate every few seconds; the
  * reader can step with the arrows or the numbered tabs at the bottom right,
  * and hovering or focusing the banner pauses it. Reduced-motion readers get
  * no autoplay.
  */
 
 const ROTATE_MS = 7000;
+/** How many stories the banner rotates through. */
+export const HERO_SLIDES = 6;
 
 export function HeroBanner({ stories }: { stories: ArticleCard[] }) {
   const { language } = useI18n();
   const s = useScript();
   const te = language === 'te';
-  const slides = stories.slice(0, 4);
+  const slides = stories.slice(0, HERO_SLIDES);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const reduced =

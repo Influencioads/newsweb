@@ -86,6 +86,17 @@ describe('Home (WOW layout)', () => {
     expect(follows(nominate, explore)).toBe(true);
   });
 
+  it('rotates up to six banner stories, each once, and puts My Village Story after WOW Radio', () => {
+    renderHome(homePayload());
+    // lead + exclusive-one + exclusive-two (latest repeats them).
+    expect(screen.getAllByRole('tab', { name: /\/ 3$/ })).toHaveLength(3);
+    const radio = screen.getByRole('heading', { name: /WOW Radio/ });
+    const village = document.getElementById('my-village-story')!;
+    const explore = document.getElementById('explore-wow')!;
+    expect(follows(radio, village)).toBe(true);
+    expect(follows(village, explore)).toBe(true);
+  });
+
   it('shows the lead once and no Trending shelf', () => {
     renderHome(homePayload());
     expect(screen.getAllByRole('heading', { name: 'ముఖ్య కథనం' })).toHaveLength(1);

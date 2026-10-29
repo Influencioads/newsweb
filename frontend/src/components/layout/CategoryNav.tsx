@@ -213,7 +213,7 @@ export function CategoryNav() {
 }
 
 /**
- * Phones only (under md): a dark top strip above the WOW INDIAN wordmark —
+ * Phones only (under md): a plain top strip above the WOW INDIAN wordmark —
  * menu, every section scrolling past as a marquee, search. It replaces the
  * sticky section row with its arrow buttons on small screens. Hover, touch
  * focus and keyboard focus pause it; reduced motion turns it into a plain
@@ -229,7 +229,7 @@ export function MobileSectionsBar() {
   const plain = (telugu: boolean, font: string) =>
     cn(
       font,
-      'flex min-h-tap shrink-0 items-center gap-1 whitespace-nowrap px-2.5 font-semibold text-on-ink hover:underline',
+      'flex min-h-tap shrink-0 items-center gap-1 whitespace-nowrap px-2.5 font-semibold text-ink hover:text-brand',
       telugu ? 'text-te-body-xs' : 'text-ui-sm',
     );
   const pill = cn(
@@ -281,12 +281,11 @@ export function MobileSectionsBar() {
   const duration = Math.max(24, (categories.length + SHORTCUTS.length + 2) * 3);
 
   return (
-    <nav aria-label={t('ui.explore')} className="bg-brand-deep text-on-ink md:hidden">
+    <nav aria-label={t('ui.explore')} className="border-b border-rule md:hidden">
       <div className="flex items-center gap-1 px-1">
         <IconButton
           icon={Menu}
           label={t('ui.openMenu')}
-          variant="inverse"
           aria-haspopup="dialog"
           aria-expanded={drawer}
           onClick={() => setDrawer(true)}
@@ -299,7 +298,7 @@ export function MobileSectionsBar() {
             </div>
           </div>
         </div>
-        <IconButtonLink icon={Search} label={t('nav.search')} to="/search" variant="inverse" />
+        <IconButtonLink icon={Search} label={t('nav.search')} to="/search" />
       </div>
       <NavDrawer open={drawer} onClose={() => setDrawer(false)} />
     </nav>

@@ -86,10 +86,10 @@ describe('Home (WOW layout)', () => {
     expect(follows(nominate, explore)).toBe(true);
   });
 
-  it('keeps the lead out of the trending list', () => {
+  it('shows the lead once and no Trending shelf', () => {
     renderHome(homePayload());
     expect(screen.getAllByRole('heading', { name: 'ముఖ్య కథనం' })).toHaveLength(1);
-    expect(document.querySelectorAll('a[href="/national/exclusive-one"]').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('heading', { name: /ట్రెండింగ్/ })).toBeNull();
   });
 
   it('no longer renders the newspaper exclusive shelf', () => {

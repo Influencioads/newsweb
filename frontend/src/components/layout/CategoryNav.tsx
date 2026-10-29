@@ -12,6 +12,9 @@ import { prefersReducedMotion, useScrolled } from '@/utils/motion';
 
 import { NavDrawer, SHORTCUTS, useSiteConfig } from './NavDrawer';
 
+/** The shortcuts shown in the section rails (Nominate lives in the masthead). */
+const RAIL_SHORTCUTS = SHORTCUTS.filter((sc) => !sc.drawerOnly);
+
 /**
  * CategoryNav — row 2 of the reader shell and its only sticky part.
  *
@@ -142,11 +145,11 @@ export function CategoryNav() {
                   {t('nav.home')}
                 </NavLink>
               </li>
-              {SHORTCUTS.map((sc) => (
+              {RAIL_SHORTCUTS.map((sc) => (
                 <li key={sc.to} className="contents">
                   {sc.highlight ? (
-                    // WOW Radio, Nominate Your Local Hero and My Village Story:
-                    // three compact orange buttons, apart from the category links.
+                    // WOW Radio and My Village Story: compact orange buttons, apart
+                    // from the category links (Nominate is in the masthead).
                     <NavLink
                       to={sc.to}
                       data-pill=""
@@ -242,7 +245,7 @@ export function MobileSectionsBar() {
       <NavLink to="/" end tabIndex={copy ? -1 : undefined} className={plain(s.te, s.head)}>
         {t('nav.home')}
       </NavLink>
-      {SHORTCUTS.map((sc) =>
+      {RAIL_SHORTCUTS.map((sc) =>
         sc.highlight ? (
           <NavLink key={sc.to} to={sc.to} tabIndex={copy ? -1 : undefined} className={pill}>
             <span className="inline-flex h-7 items-center gap-1 rounded-pill bg-wow-deep px-2.5 text-ui-sm font-bold text-on-wow">
@@ -278,7 +281,7 @@ export function MobileSectionsBar() {
   );
 
   // About three seconds a link, so the strip reads at the same pace however many sections there are.
-  const duration = Math.max(24, (categories.length + SHORTCUTS.length + 2) * 3);
+  const duration = Math.max(24, (categories.length + RAIL_SHORTCUTS.length + 2) * 3);
 
   return (
     <nav aria-label={t('ui.explore')} className="border-b border-rule md:hidden">

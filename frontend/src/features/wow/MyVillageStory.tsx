@@ -9,22 +9,24 @@ import { cn } from '@/utils/cn';
 
 /**
  * My Village Story (మై విలేజ్ స్టోరీ): the home page's village shelf, straight
- * under WOW Radio. Four stories from the my-village-story section, falling back
+ * under WOW Radio. Two stories from the my-village-story section, falling back
  * to the local sections while that one fills up.
  */
 
 const VILLAGE_SOURCES = ['my-village-story', 'local-hero', 'districts', 'andhra-pradesh', 'telangana'];
 
-/** Four stories: my-village-story first, topped up from the local sections. */
+/** Two stories: my-village-story first, topped up from the local sections. */
+const SHOWN = 2;
+
 async function fetchVillageStories(): Promise<{ slug: string; articles: ArticleCard[] }> {
   const articles: ArticleCard[] = [];
   let slug: string | null = null;
   for (const source of VILLAGE_SOURCES) {
-    if (articles.length >= 4) break;
+    if (articles.length >= SHOWN) break;
     try {
-      const feed = await publicApi.fetchFeed({ category: source, limit: 4 });
+      const feed = await publicApi.fetchFeed({ category: source, limit: SHOWN });
       for (const a of feed.articles) {
-        if (articles.length < 4 && !articles.some((x) => x.short_id === a.short_id)) articles.push(a);
+        if (articles.length < SHOWN && !articles.some((x) => x.short_id === a.short_id)) articles.push(a);
       }
       if (feed.articles.length && !slug) slug = source;
     } catch {
@@ -56,7 +58,7 @@ export function MyVillageStory() {
 
       {data?.articles.length ? (
         <div
-          // One per row on phones, two in a row from tablets up.
+          // Two stories: one per row on phones, side by side from tablets up.
           className="grid grid-cols-1 gap-4 md:grid-cols-2"
         >
           {data.articles.map((article) => (

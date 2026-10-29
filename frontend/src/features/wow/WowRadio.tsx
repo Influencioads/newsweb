@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Ghost, Lightbulb, Newspaper, Pause, Play, Square, Sunrise, type LucideIcon } from 'lucide-react';
 
 import { Icon } from '@/components/ui/Icon';
 import { PageContainer } from '@/components/ui/Layout';
 import * as publicApi from '@/features/public/api';
+import { audioQuery } from '@/components/article/AudioPlayer';
 import { useTts } from '@/features/reader/tts';
+import { usePlayer, type Track } from '@/stores/player';
 import { useI18n, useScript } from '@/i18n';
 import type { ArticleCard } from '@/types/public';
 import { cn } from '@/utils/cn';
@@ -152,10 +154,10 @@ function SegmentTiles({
         const live = current && playState === 'speaking';
         const name = te ? sg.te : sg.en;
         const playMark = cn(
-          'flex shrink-0 items-center justify-center rounded-pill bg-wow-deep text-on-wow shadow-raised transition-transform duration-base hover:scale-110 motion-reduce:transform-none',
+          'flex shrink-0 items-center justify-center rounded-pill bg-on-ink text-wow-deep shadow-raised transition-transform duration-base hover:scale-110 motion-reduce:transform-none',
           // On the small home tiles the play button sits in the corner so it never covers the name.
           large ? 'h-8 w-8' : 'absolute right-2 top-2 z-10 h-7 w-7 md:h-8 md:w-8',
-          current && 'ring-2 ring-on-ink/70',
+          current && 'ring-2 ring-wow',
         );
         return (
           <li
@@ -227,14 +229,24 @@ function SegmentTiles({
   );
 }
 
+/** The audio route of a story — also its track id in the global player. */
+const audioRoute = (a: ArticleCard) => `/public/articles/${a.short_id}/audio`;
+
 /**
- * The home card's inline player: the play button on a tile reads that
- * segment's stories aloud right on the home page (same voice and running
- * order as its /radio page); pressing it again pauses, another tile switches.
+ * WOW Radio playback, shared by the home card and the segment pages.
+ *
+ * Server audio first: each story's narration (`/public/articles/{id}/audio`,
+ * the same Telugu voice the article player uses) is queued in the one global
+ * player, so it plays in every browser and keeps playing across pages. Only
+ * when no story has a server file does it fall back to the device's Telugu
+ * voice (Web Speech). Pressing play again pauses; another segment switches.
  */
-function useInlineRadio() {
-  const [active, setActive] = useState<string | null>(null);
+function useRadioPlayer(initial: string | null = null) {
+  const queryClient = useQueryClient();
+  const [active, setActive] = useState<string | null>(initial);
   const [startWhenReady, setStartWhenReady] = useState(false);
+  const [mode, setMode] = useState<'server' | 'voice' | null>(null);
+  const [trackIds, setTrackIds] = useState<string[]>([]);
   const segment = SEGMENTS.find((sg) => sg.id === active) ?? null;
   const programme = useQuery({
     queryKey: ['wow-radio', active],
@@ -242,47 +254,104 @@ function useInlineRadio() {
     enabled: Boolean(segment),
     staleTime: 120_000,
   });
-  const items = programme.data ?? [];
+  const items = useMemo(() => programme.data ?? [], [programme.data]);
   const text = segment ? script(segment, items) : '';
-  const { state, toggle, stop } = useTts(text);
-
-  // A new segment's stories have arrived: start reading as soon as the text is in.
+  const tts = useTts(text);
+  // Read inside the async start below without re-running it on every render.
+  const ttsRef = useRef(tts);
   useEffect(() => {
-    if (!startWhenReady || programme.isFetching || !(programme.isSuccess || programme.isError)) return;
+    ttsRef.current = tts;
+  });
+  // Each start gets a number; a slower, older start that resolves late is ignored.
+  const request = useRef(0);
+
+  const currentId = usePlayer((p) => (p.index >= 0 ? p.queue[p.index]?.id : undefined));
+  const playerPlaying = usePlayer((p) => p.playing);
+  const ours = mode === 'server' && currentId !== undefined && trackIds.includes(currentId);
+
+  // A segment's stories have arrived: queue their narration, or read them aloud.
+  useEffect(() => {
+    if (!startWhenReady || !segment || programme.isFetching || !(programme.isSuccess || programme.isError)) return;
     setStartWhenReady(false);
-    if (text && state === 'idle') toggle();
-  }, [startWhenReady, text, programme.isFetching, programme.isSuccess, programme.isError, state, toggle]);
+    if (!items.length) return;
+    const mine = ++request.current;
+    void Promise.all(
+      items.map((a) =>
+        queryClient
+          .fetchQuery(audioQuery(audioRoute(a)))
+          .then((audio) => (audio.available && audio.url ? { a, audio } : null))
+          .catch(() => null),
+      ),
+    ).then((found) => {
+      if (request.current !== mine) return;
+      const tracks: Track[] = found
+        .filter((x): x is NonNullable<typeof x> => x !== null)
+        .map(({ a, audio }) => ({
+          id: audioRoute(a),
+          kind: 'article',
+          title: a.title_te,
+          subtitle: `${'వావ్ రేడియో'} · ${segment.te}`,
+          url: audio.url as string,
+          durationSec: audio.duration_sec,
+          href: a.url,
+        }));
+      if (tracks.length) {
+        setMode('server');
+        setTrackIds(tracks.map((tr) => tr.id));
+        usePlayer.getState().playQueue(tracks, 0);
+      } else {
+        setMode('voice');
+        if (ttsRef.current.state === 'idle') ttsRef.current.toggle();
+      }
+    });
+  }, [startWhenReady, segment, items, programme.isFetching, programme.isSuccess, programme.isError, queryClient]);
+
+  const stop = useCallback(() => {
+    tts.stop();
+    if (ours) usePlayer.getState().pause();
+  }, [tts, ours]);
 
   const play = useCallback(
     (id: string) => {
-      if (id === active && (state === 'speaking' || state === 'paused')) {
-        toggle();
+      if (id === active && ours) {
+        usePlayer.getState().toggle();
+        return;
+      }
+      if (id === active && mode === 'voice' && (tts.state === 'speaking' || tts.state === 'paused')) {
+        tts.toggle();
         return;
       }
       stop();
+      request.current += 1;
+      setMode(null);
       setActive(id);
       setStartWhenReady(true);
     },
-    [active, state, toggle, stop],
+    [active, ours, mode, tts, stop],
   );
 
-  const playState: PlayState =
-    state === 'speaking'
+  const playState: PlayState = ours
+    ? playerPlaying
       ? 'speaking'
-      : state === 'paused'
+      : 'paused'
+    : mode === 'voice' && tts.state === 'speaking'
+      ? 'speaking'
+      : mode === 'voice' && tts.state === 'paused'
         ? 'paused'
         : active && (startWhenReady || programme.isFetching)
           ? 'loading'
           : 'idle';
 
   const note =
-    active && state === 'unavailable'
-      ? 'unavailable'
-      : active && programme.isSuccess && !items.length && !startWhenReady
+    !active || startWhenReady || programme.isFetching
+      ? null
+      : programme.isSuccess && !items.length
         ? 'empty'
-        : null;
+        : mode === 'voice' && tts.state === 'unavailable'
+          ? 'unavailable'
+          : null;
 
-  return { active, play, playState, note };
+  return { active, items, loading: programme.isLoading, play, stop, playState, note };
 }
 
 function OnAirLabel() {
@@ -306,7 +375,7 @@ export function WowRadio({ variant = 'card' }: { variant?: 'card' | 'page' }) {
   const s = useScript();
   const te = language === 'te';
   const page = variant === 'page';
-  const radio = useInlineRadio();
+  const radio = useRadioPlayer();
 
   return (
     <section
@@ -409,26 +478,25 @@ export default function RadioPage() {
  * the running order, with the other three segments one tap away.
  */
 export function RadioSegmentPage() {
+  const { segment: segmentId } = useParams();
+  const segment = SEGMENTS.find((sg) => sg.id === segmentId);
+  if (!segment) return <Navigate to="/radio" replace />;
+  // Keyed, so moving to another segment starts that one's player fresh.
+  return <SegmentView key={segment.id} segment={segment} />;
+}
+
+function SegmentView({ segment }: { segment: Segment }) {
   const { language } = useI18n();
   const s = useScript();
   const te = language === 'te';
-  const { segment: segmentId } = useParams();
-  const segment = SEGMENTS.find((sg) => sg.id === segmentId);
-  useDocumentTitle(segment ? `${te ? segment.te : segment.en} · ${te ? 'వావ్ రేడియో' : 'WOW Radio'}` : te ? 'వావ్ రేడియో' : 'WOW Radio');
+  useDocumentTitle(`${te ? segment.te : segment.en} · ${te ? 'వావ్ రేడియో' : 'WOW Radio'}`);
 
-  const programme = useQuery({
-    queryKey: ['wow-radio', segment?.id],
-    queryFn: () => fetchSegment(segment ?? DEFAULT_SEGMENT),
-    enabled: Boolean(segment),
-    staleTime: 120_000,
-  });
-  const items = programme.data ?? [];
-  const { state, toggle, stop } = useTts(segment ? script(segment, items) : '');
-  const live = state === 'speaking';
+  const radio = useRadioPlayer(segment.id);
+  const items = radio.items;
+  const live = radio.playState === 'speaking';
+  const stop = radio.stop;
 
-  if (!segment) return <Navigate to="/radio" replace />;
-
-  const status = programme.isLoading
+  const status = radio.loading
     ? te
       ? 'ట్యూన్ అవుతోంది…'
       : 'Tuning…'
@@ -436,21 +504,25 @@ export function RadioSegmentPage() {
       ? te
         ? 'ఈ సెగ్మెంట్ ఎపిసోడ్‌లు త్వరలో'
         : 'Episodes for this segment are coming soon'
-      : state === 'unavailable'
+      : radio.note === 'unavailable'
         ? te
           ? 'ఈ బ్రౌజర్‌లో తెలుగు వాయిస్ లేదు. Android లేదా Chrome లో ప్రయత్నించండి.'
           : 'This browser has no Telugu voice. Try Chrome or an Android phone.'
-        : live
+        : radio.playState === 'loading'
           ? te
-            ? 'ప్రసారంలో'
-            : 'On air'
-          : state === 'paused'
+            ? 'ట్యూన్ అవుతోంది…'
+            : 'Tuning…'
+          : live
             ? te
-              ? 'ఆపబడింది'
-              : 'Paused'
-            : te
-              ? 'వినడానికి ప్లే నొక్కండి'
-              : 'Press play to listen';
+              ? 'ప్రసారంలో'
+              : 'On air'
+            : radio.playState === 'paused'
+              ? te
+                ? 'ఆపబడింది'
+                : 'Paused'
+              : te
+                ? 'వినడానికి ప్లే నొక్కండి'
+                : 'Press play to listen';
 
   return (
     <PageContainer width="page" className="space-y-5 py-6 md:py-10">
@@ -498,10 +570,10 @@ export function RadioSegmentPage() {
         <div className="relative mt-6 flex items-center gap-4 rounded-xl bg-on-ink/10 p-4">
           <button
             type="button"
-            onClick={toggle}
-            disabled={state === 'unavailable' || !items.length}
+            onClick={() => radio.play(segment.id)}
+            disabled={radio.note === 'unavailable' || !items.length}
             aria-label={live ? (te ? 'ఆపు' : 'Pause') : te ? 'ప్లే' : 'Play'}
-            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-pill bg-wow-deep text-on-wow shadow-raised transition-transform duration-base hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transform-none"
+            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-pill bg-on-ink text-wow-deep shadow-raised transition-transform duration-base hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transform-none"
           >
             <Icon icon={live ? Pause : Play} size="lg" />
           </button>
@@ -516,7 +588,7 @@ export function RadioSegmentPage() {
               </span>
             </div>
           </div>
-          {state === 'speaking' || state === 'paused' ? (
+          {radio.playState === 'speaking' || radio.playState === 'paused' ? (
             <button
               type="button"
               onClick={stop}

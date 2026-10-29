@@ -4,7 +4,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { RouteFallback, SkipLink } from '@/components/app';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { BreakingTicker } from '@/components/layout/BreakingTicker';
-import { CategoryNav } from '@/components/layout/CategoryNav';
+import { CategoryNav, MobileSectionsBar } from '@/components/layout/CategoryNav';
 import { Masthead } from '@/components/layout/Masthead';
 import { PolicyFooter } from '@/components/layout/PolicyFooter';
 import { useI18n } from '@/i18n';
@@ -45,6 +45,8 @@ export default function PublicLayout() {
       {/* Only the masthead is the banner. The sticky nav sits directly in the
           root column so its containing block is the full page, not a boxed
           header that would scroll away with the masthead. */}
+      {/* Phones: every section in a marquee strip above the wordmark. */}
+      <MobileSectionsBar />
       <header>
         <Masthead />
       </header>

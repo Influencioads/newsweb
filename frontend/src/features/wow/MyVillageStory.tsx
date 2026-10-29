@@ -15,16 +15,23 @@ import { cn } from '@/utils/cn';
 
 const VILLAGE_SOURCES = ['my-village-story', 'local-hero', 'districts', 'andhra-pradesh', 'telangana'];
 
+/** Four stories: my-village-story first, topped up from the local sections. */
 async function fetchVillageStories(): Promise<{ slug: string; articles: ArticleCard[] }> {
-  for (const slug of VILLAGE_SOURCES) {
+  const articles: ArticleCard[] = [];
+  let slug: string | null = null;
+  for (const source of VILLAGE_SOURCES) {
+    if (articles.length >= 4) break;
     try {
-      const feed = await publicApi.fetchFeed({ category: slug, limit: 4 });
-      if (feed.articles.length) return { slug, articles: feed.articles.slice(0, 4) };
+      const feed = await publicApi.fetchFeed({ category: source, limit: 4 });
+      for (const a of feed.articles) {
+        if (articles.length < 4 && !articles.some((x) => x.short_id === a.short_id)) articles.push(a);
+      }
+      if (feed.articles.length && !slug) slug = source;
     } catch {
       // Section not created yet — try the next one.
     }
   }
-  return { slug: 'my-village-story', articles: [] };
+  return { slug: slug ?? 'my-village-story', articles };
 }
 
 export function MyVillageStory() {
@@ -49,10 +56,8 @@ export function MyVillageStory() {
 
       {data?.articles.length ? (
         <div
-          className={cn(
-            'grid grid-cols-1 gap-4 md:grid-cols-2',
-            data.articles.length === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-4',
-          )}
+          // Two in a row on phones and tablets, four across on a desktop.
+          className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4"
         >
           {data.articles.map((article) => (
             <GridCard key={article.short_id} article={article} />

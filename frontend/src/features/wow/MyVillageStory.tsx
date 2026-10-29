@@ -56,8 +56,8 @@ export function MyVillageStory() {
 
       {data?.articles.length ? (
         <div
-          // Two in a row on phones and tablets, four across on a desktop.
-          className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4"
+          // One per row on phones, two in a row from tablets up.
+          className="grid grid-cols-1 gap-4 md:grid-cols-2"
         >
           {data.articles.map((article) => (
             <GridCard key={article.short_id} article={article} />

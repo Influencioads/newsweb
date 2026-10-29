@@ -142,7 +142,9 @@ function SegmentTiles({
   const { segments } = useRadio();
   return (
     // auto-rows-fr: every tile as tall as the tallest, so a line that wraps doesn't make one tile stick out.
-    <ul className={cn('relative grid auto-rows-fr gap-2.5', large ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-2')}>
+    // The large tiles (icon, name, line, play in a row) need a tablet's width for two across: this
+    // site's `sm` is 390px, an ordinary phone, where two columns crushed the text to a letter a line.
+    <ul className={cn('relative grid auto-rows-fr gap-2.5', large ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-2')}>
       {segments.map((sg) => {
         const current = active === sg.id;
         const live = current && playState === 'speaking';
@@ -629,7 +631,7 @@ function SegmentView({ segment }: { segment: Segment }) {
       {/* The other three segments */}
       <nav aria-label={te ? 'ఇతర సెగ్మెంట్లు' : 'Other segments'} className="space-y-2">
         <p className={cn(s.body, 'text-ui-sm font-semibold text-ink-soft')}>{te ? 'ఇతర సెగ్మెంట్లు' : 'Other segments'}</p>
-        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-2 md:grid-cols-3">
           {segments.filter((sg) => sg.id !== segment.id).map((sg) => (
             <li key={sg.id}>
               <Link

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Pause, Play, Square, type LucideIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pause, Play, Square, type LucideIcon } from 'lucide-react';
 
 import { Icon } from '@/components/ui/Icon';
 import { PageContainer } from '@/components/ui/Layout';
@@ -141,15 +141,14 @@ function SegmentTiles({
   const te = language === 'te';
   const { segments } = useRadio();
   return (
-    <ul className={cn('relative grid gap-2.5', large ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-2')}>
+    // auto-rows-fr: every tile as tall as the tallest, so a line that wraps doesn't make one tile stick out.
+    <ul className={cn('relative grid auto-rows-fr gap-2.5', large ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-2')}>
       {segments.map((sg) => {
         const current = active === sg.id;
         const live = current && playState === 'speaking';
         const name = te ? sg.te : sg.en;
         const playMark = cn(
-          'flex shrink-0 items-center justify-center rounded-pill bg-on-ink text-wow-deep shadow-raised transition-transform duration-base hover:scale-110 motion-reduce:transform-none',
-          // On the small home tiles the play button sits in the corner so it never covers the name.
-          large ? 'h-8 w-8' : 'absolute right-2 top-2 z-10 h-7 w-7 md:h-8 md:w-8',
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-pill bg-on-ink text-wow-deep shadow-raised transition-transform duration-base group-hover/play:scale-110 motion-reduce:transform-none',
           current && 'ring-2 ring-wow',
         );
         return (
@@ -166,17 +165,17 @@ function SegmentTiles({
                 'flex h-full text-left',
                 // Phone: icon on top (play button beside it), name and English underneath,
                 // so a long Telugu name never runs into the play button.
-                large ? 'items-center gap-3 p-4' : 'flex-col items-start gap-1.5 p-2.5 md:flex-row md:items-center md:gap-3 md:p-3 md:pr-11',
+                large ? 'items-center gap-3 p-4' : 'flex-col items-start gap-2 p-3 md:flex-row md:items-center md:gap-3 md:pr-12',
               )}
             >
               <span
                 className={cn(
                   'flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-on-ink shadow-raised',
-                  large ? 'h-14 w-14' : 'h-8 w-8 md:h-11 md:w-11',
+                  large ? 'h-14 w-14' : 'h-10 w-10 md:h-11 md:w-11',
                   sg.tone,
                 )}
               >
-                <Icon icon={sg.icon} size={large ? 'lg' : 'sm'} />
+                <Icon icon={sg.icon} size={large ? 'lg' : 'md'} />
               </span>
               <span className="min-w-0 w-full flex-1 md:w-auto">
                 <span lang="te" className={cn('te block font-bold leading-snug', large ? 'text-te-body-sm' : 'text-te-body-xs')}>
@@ -199,20 +198,24 @@ function SegmentTiles({
                 </span>
               </span>
               {!onPlay ? (
-                <span aria-hidden className={playMark}>
+                <span aria-hidden className={cn(playMark, 'group-hover:scale-110')}>
                   <Icon icon={Play} size="xs" />
                 </span>
               ) : null}
             </Link>
             {onPlay ? (
+              // A full 44px tap area in the tile's corner, so it never covers the
+              // name; the white circle inside stays small.
               <button
                 type="button"
                 onClick={() => onPlay(sg.id)}
                 aria-label={live ? `${te ? 'ఆపు' : 'Pause'} · ${name}` : `${te ? 'ప్లే' : 'Play'} · ${name}`}
                 aria-pressed={live}
-                className={playMark}
+                className="group/play absolute right-1 top-1 z-10 flex h-11 w-11 items-center justify-center rounded-pill md:top-1/2 md:-translate-y-1/2"
               >
-                <Icon icon={live ? Pause : Play} size="xs" />
+                <span className={playMark}>
+                  <Icon icon={live ? Pause : Play} size="xs" />
+                </span>
               </button>
             ) : null}
           </li>
@@ -423,9 +426,14 @@ export function WowRadio({ variant = 'card' }: { variant?: 'card' | 'page' }) {
         {!page ? (
           <Link
             to="/radio"
-            className={cn(s.body, 'rounded-xl px-2 py-1 text-ui-sm font-semibold text-wow underline-offset-4 hover:underline')}
+            className={cn(
+              s.body,
+              'inline-flex min-h-tap items-center gap-1 rounded-pill border border-wow/70 px-4 text-ui-sm font-semibold text-wow',
+              'transition-colors duration-base hover:bg-wow hover:text-on-wow',
+            )}
           >
             {te ? 'వినడానికి క్లిక్ చేయండి' : 'Click to listen'}
+            <Icon icon={ChevronRight} size="sm" />
           </Link>
         ) : null}
       </div>

@@ -69,7 +69,7 @@ function ShelfCard({ article }: { article: ArticleCard }) {
       aria-label={p.head.text}
       className="group block overflow-hidden rounded-2xl shadow-card transition-[box-shadow,transform] duration-base hover:-translate-y-0.5 hover:shadow-raised motion-reduce:transform-none"
     >
-      <NewsImage media={article.hero} ratio="4/5" radius="2xl" sizes="(min-width: 768px) 25vw, 60vw" />
+      <NewsImage media={article.hero} ratio="9/16" radius="2xl" sizes="(min-width: 768px) 25vw, 46vw" />
     </Link>
   );
 }
@@ -93,9 +93,9 @@ export function StoryShotsStrip() {
         to="/story-shots"
         toLabel={language === 'te' ? 'అన్నీ చూడండి' : 'View all'}
       />
-      <ul className="-mx-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-2 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-4 md:overflow-visible md:px-0 md:pb-0">
+      <ul className="-mx-3 flex snap-x snap-mandatory scroll-px-3 gap-3 overflow-x-auto px-3 pb-2 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-4 md:overflow-visible md:px-0 md:pb-0">
         {items.slice(0, 4).map((article) => (
-          <li key={article.short_id} className="w-[62%] shrink-0 snap-start sm:w-[44%] md:w-auto">
+          <li key={article.short_id} className="w-[46%] shrink-0 snap-start sm:w-[42%] md:w-auto">
             <ShelfCard article={article} />
           </li>
         ))}

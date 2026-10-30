@@ -136,6 +136,29 @@ class TestBlocks:
             r = client.put("/api/v1/cms/site-content/radio", json=bad, headers=admin)
             assert r.status_code == 422, bad
 
+    def test_story_shots_are_their_own_uploads(self, client: TestClient, admin: dict) -> None:
+        assert client.get("/api/v1/public/config").json()["content"]["story_shots"] == {"shots": []}
+        shot = {"id": "s1", "image_url": "/media/shot-1.webp", "title_en": "Village fair", "link": "/section/mystery"}
+        r = client.put(
+            "/api/v1/cms/site-content/story_shots",
+            json={"shots": [shot, {"id": "s2", "image_url": "/media/shot-2.webp"}]},
+            headers=admin,
+        )
+        assert r.status_code == 200, r.text
+        shots = client.get("/api/v1/public/config").json()["content"]["story_shots"]["shots"]
+        assert [s["id"] for s in shots] == ["s1", "s2"]
+        assert shots[0]["link"] == "/section/mystery" and shots[1]["title_te"] == ""
+
+        for bad in (
+            {"shots": [shot, shot]},
+            {"shots": [{**shot, "image_url": ""}]},
+            {"shots": [{**shot, "image_url": "javascript:alert(1)"}]},
+            {"shots": [{**shot, "link": "javascript:alert(1)"}]},
+        ):
+            r = client.put("/api/v1/cms/site-content/story_shots", json=bad, headers=admin)
+            assert r.status_code == 422, bad
+        assert client.delete("/api/v1/cms/site-content/story_shots", headers=admin).status_code == 200
+
     def test_unknown_block_and_permissions(self, client: TestClient, db: Session, admin: dict) -> None:
         assert client.put("/api/v1/cms/site-content/nope", json={}, headers=admin).status_code == 404
         assert client.get("/api/v1/cms/site-content").status_code == 401

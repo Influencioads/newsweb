@@ -385,6 +385,7 @@ export const STRINGS = {
   'admin.page.ads': { te: 'ప్రకటనలు', en: 'Ads' },
   'admin.page.homepage': { te: 'హోమ్ విభాగాలు', en: 'Homepage' },
   'admin.page.siteContent': { te: 'సైట్ కంటెంట్', en: 'Site content' },
+  'admin.page.storyShots': { te: 'స్టోరీ షాట్స్', en: 'Story Shots' },
   'admin.page.sitePages': { te: 'ఫుటర్ పేజీలు', en: 'Footer pages' },
   'admin.page.analytics': { te: 'విశ్లేషణలు', en: 'Analytics' },
   'admin.page.taxonomy': { te: 'వర్గీకరణ', en: 'Taxonomy' },

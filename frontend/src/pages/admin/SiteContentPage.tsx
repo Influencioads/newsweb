@@ -1,6 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, Plus, RotateCcw, Save, X } from 'lucide-react';
+import { ExternalLink, ImageUp, Plus, RotateCcw, Save, X } from 'lucide-react';
 
 import { AdminPage } from '@/components/admin/AdminPage';
 import { Section } from '@/components/admin/FormControls';
@@ -17,7 +17,7 @@ import { wowIcon } from '@/features/wow/icons';
 import { DEFAULT_LOGO, DEFAULT_RADIO_IMAGE, useSiteConfig } from '@/features/wow/siteContent';
 import { useI18n } from '@/i18n';
 import { useAuth } from '@/stores/auth';
-import type { RadioSegment, SiteContent } from '@/types/public';
+import type { RadioSegment, SiteContent, StoryShotItem } from '@/types/public';
 
 import { ImageField, moveItem, RowActions, slugify, uniqueSlug } from './siteContentShared';
 import { useL } from './useL';
@@ -380,6 +380,148 @@ function withChoiceValues(nominate: SiteContent['nominate']): SiteContent['nomin
   };
 }
 
+/** As many as the API keeps (site_content.MAX_STORY_SHOTS). */
+const MAX_STORY_SHOTS = 40;
+
+/**
+ * Story Shots: pictures uploaded here, not taken from stories. Each may carry
+ * a headline (read out by screen readers and used when shared) and a link
+ * for the "Read story" button; both are optional.
+ */
+function StoryShotsCard({ payload, canManage }: { payload: cmsApi.SiteContentPayload; canManage: boolean }) {
+  const L = useL();
+  const toast = useToast();
+  const state = useBlock('story_shots', payload);
+  const { draft, setDraft } = state;
+  const shots = draft.shots;
+  const setShots = (next: StoryShotItem[]) => setDraft({ ...draft, shots: next });
+  const patch = (i: number, change: Partial<StoryShotItem>) =>
+    setShots(shots.map((sh, j) => (j === i ? { ...sh, ...change } : sh)));
+  const input = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(0);
+  const room = MAX_STORY_SHOTS - shots.length;
+
+  const addFiles = async (files: File[]) => {
+    const take = files.slice(0, room);
+    if (files.length > take.length) {
+      toast.error(L(`గరిష్ఠంగా ${MAX_STORY_SHOTS} చిత్రాలు`, `At most ${MAX_STORY_SHOTS} pictures`));
+    }
+    setUploading(take.length);
+    const added: StoryShotItem[] = [];
+    for (const [i, file] of take.entries()) {
+      try {
+        const media = await cmsApi.uploadMedia(file);
+        if (media.url) {
+          // Keep our own uploads as /media/... paths: the site serves them on its own address.
+          const path = new URL(media.url, window.location.origin).pathname;
+          const image_url = path.startsWith('/media/') ? path : media.url;
+          added.push({ id: `shot-${Date.now().toString(36)}-${i}`, image_url, title_te: '', title_en: '', link: '' });
+        }
+      } catch (err) {
+        toast.error(err);
+      }
+      setUploading((n) => n - 1);
+    }
+    // New pictures go first: the newest are the ones on the home shelf.
+    if (added.length) setDraft((d) => ({ ...d, shots: [...added, ...d.shots] }));
+  };
+
+  return (
+    <Section
+      title={L('స్టోరీ షాట్స్', 'Story Shots')}
+      subtitle={L(
+        'హోమ్ పేజీ "స్టోరీ షాట్స్" వరుస, పూర్తి స్క్రీన్ వ్యూయర్ కోసం చిత్రాలు. ఇవి కథనాల నుంచి కాదు, ఇక్కడ అప్‌లోడ్ చేసినవే. మొదటి నాలుగు హోమ్ పేజీలో కనిపిస్తాయి.',
+        'Pictures for the Story Shots row on the home page and the full-screen viewer. They are uploaded here, not taken from articles. The first four show on the home page.',
+      )}
+    >
+      {canManage ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            ref={input}
+            type="file"
+            multiple
+            accept="image/png,image/jpeg,image/webp"
+            className="sr-only"
+            tabIndex={-1}
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? []);
+              e.target.value = '';
+              if (files.length) void addFiles(files);
+            }}
+          />
+          <Button icon={ImageUp} pending={uploading > 0} disabled={room <= 0} onClick={() => input.current?.click()}>
+            {L('చిత్రాలు అప్‌లోడ్ చేయండి', 'Upload pictures')}
+          </Button>
+          <span className="font-sans text-meta text-muted">
+            {L(
+              'పొడవాటి చిత్రాలు (9:16 లేదా 4:5) బాగుంటాయి. ఒకేసారి చాలా ఎంచుకోవచ్చు. తర్వాత సేవ్ నొక్కండి.',
+              'Tall pictures (9:16 or 4:5) look best. You can pick several at once. Press Save afterwards.',
+            )}{' '}
+            ({shots.length}/{MAX_STORY_SHOTS})
+          </span>
+        </div>
+      ) : null}
+      {shots.length ? (
+        <ol className="space-y-3">
+          {shots.map((sh, i) => (
+            <li key={sh.id}>
+              <Card tone="paper" padding="md" className="flex flex-wrap gap-4 sm:flex-nowrap">
+                <img src={sh.image_url} alt="" className="aspect-[4/5] w-24 shrink-0 rounded-lg border border-rule object-cover" />
+                <div className="min-w-0 flex-1 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <p className="min-w-0 flex-1 font-sans text-ui font-bold text-ink">
+                      {i + 1}. {sh.title_en || sh.title_te || L('శీర్షిక లేదు', 'No headline')}
+                      {i < 4 ? (
+                        <Badge tone="muted" size="xs" className="ml-2">
+                          {L('హోమ్ పేజీలో', 'On the home page')}
+                        </Badge>
+                      ) : null}
+                    </p>
+                    {canManage ? (
+                      <RowActions
+                        index={i}
+                        count={shots.length}
+                        minCount={0}
+                        onMove={(d) => setShots(moveItem(shots, i, d))}
+                        onRemove={() => setShots(shots.filter((_, j) => j !== i))}
+                      />
+                    ) : null}
+                  </div>
+                  <PairFields
+                    label={L('శీర్షిక (ఐచ్ఛికం)', 'Headline (optional)')}
+                    te={sh.title_te}
+                    en={sh.title_en}
+                    onTe={(title_te) => patch(i, { title_te })}
+                    onEn={(title_en) => patch(i, { title_en })}
+                    disabled={!canManage}
+                  />
+                  <Field
+                    label={L('"కథ చదవండి" లింక్ (ఐచ్ఛికం)', '"Read story" link (optional)')}
+                    hint={L(
+                      'ఈ సైట్‌లోని పేజీ (/...) లేదా https:// చిరునామా. ఖాళీగా ఉంటే బటన్ కనిపించదు.',
+                      'A page on this site (/...) or an https:// address. Leave blank for no button.',
+                    )}
+                  >
+                    <Input script="en" value={sh.link} disabled={!canManage} onChange={(e) => patch(i, { link: e.target.value.trim() })} />
+                  </Field>
+                </div>
+              </Card>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="font-sans text-ui-sm text-muted">
+          {L(
+            'ఇంకా చిత్రాలు లేవు. అప్‌లోడ్ చేసే వరకు తాజా కథనాల ఫోటోలు చూపిస్తాం.',
+            'No pictures yet. Until you upload some, the newest stories’ photos are shown.',
+          )}
+        </p>
+      )}
+      <BlockActions state={state} canManage={canManage} />
+    </Section>
+  );
+}
+
 function NominateCard({ payload, canManage }: { payload: cmsApi.SiteContentPayload; canManage: boolean }) {
   const L = useL();
   const state = useBlock('nominate', payload, withChoiceValues);
@@ -480,11 +622,32 @@ export function SiteContentPage() {
             <BrandCard payload={payload} canManage={canManage} />
             <HomeCard payload={payload} canManage={canManage} />
             <RadioCard payload={payload} canManage={canManage} />
+            <StoryShotsCard payload={payload} canManage={canManage} />
             <NominateCard payload={payload} canManage={canManage} />
             <ContactCard payload={payload} canManage={canManage} />
           </div>
         )}
       </QueryState>
+    </AdminPage>
+  );
+}
+
+/** CMS → Story Shots: the same card as on Site content, on a page of its own. */
+export function StoryShotsAdminPage() {
+  const L = useL();
+  const canManage = useAuth((st) => st.can)('settings.manage');
+  const q = useQuery({ queryKey: ['cms', 'site-content'], queryFn: cmsApi.fetchSiteContent });
+  return (
+    <AdminPage
+      title={L('స్టోరీ షాట్స్', 'Story Shots')}
+      subtitle={L('స్టోరీ షాట్స్ కోసం ప్రత్యేక చిత్రాలు', 'The pictures shown in Story Shots, uploaded separately from articles')}
+      actions={
+        <ButtonLink to="/story-shots" external variant="secondary" size="sm" iconRight={ExternalLink}>
+          {L('సైట్‌లో చూడండి', 'View on the site')}
+        </ButtonLink>
+      }
+    >
+      <QueryState query={q}>{(payload) => <StoryShotsCard payload={payload} canManage={canManage} />}</QueryState>
     </AdminPage>
   );
 }

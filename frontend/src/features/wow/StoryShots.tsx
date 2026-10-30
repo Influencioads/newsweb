@@ -3,13 +3,9 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowRight,
-  BarChart3,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Clock,
   GalleryVerticalEnd,
-  MapPin,
   Pause,
   Play,
   X,
@@ -26,17 +22,14 @@ import { useI18n, useScript } from '@/i18n';
 import type { ArticleCard } from '@/types/public';
 import { cn } from '@/utils/cn';
 import { useDocumentTitle } from '@/utils/motion';
-import { relativeTime } from '@/utils/time';
 
 /**
- * Story Shots (pitch §2) as infographics.
+ * Story Shots (pitch §2): pictures only.
  *
- * Every shot is laid out like a news infographic rather than a photo with a
- * caption: a coloured header band with the section, the photo as a framed
- * panel, the story's key number drawn large in WOW orange (pulled from the
- * headline — "905 పోస్టులు", "₹1,250 కోట్లు", "18 గంటలు"), the headline, and the
- * key points as ticked bullets with place and time. The home page shows them
- * as a sideways shelf; tapping one opens the full-screen deck at that shot.
+ * A shot is its picture — the home shelf shows four of them, and the
+ * full-screen deck shows one at a time, filling the card, with only the
+ * progress bar and controls on top and Read story / Share at the bottom.
+ * Tapping a shelf picture opens the deck at that shot.
  *
  * The source is the short-news feed: the newsroom already writes a headline
  * and a short text for those. Until there are short items, the newest
@@ -49,9 +42,7 @@ function useShots() {
   return useQuery({
     queryKey: ['public', 'story-shots'],
     queryFn: async () => {
-      // Short news are image-only cards now, so the shots are built from the
-      // newest illustrated stories, which carry the headline and standfirst
-      // an infographic needs.
+      // The newest stories that have a picture.
       const latest = (await publicApi.fetchFeed({ limit: SHOTS_LIMIT * 2 })).articles;
       return latest.filter((a) => a.hero?.url).slice(0, SHOTS_LIMIT);
     },
@@ -59,86 +50,10 @@ function useShots() {
   });
 }
 
-/* ------------------------------------------------------------------------ */
-/* What an infographic is made of                                           */
-/* ------------------------------------------------------------------------ */
-
-export interface Stat {
-  value: string;
-  unit: string | null;
-}
-
-/**
- * The headline's key number: the one with the most digits ("905" beats the
- * "2" in "గ్రూప్-2"), with the word after it as its unit. Numbers glued to a
- * word or hyphen (Group-2, IPL 2026's year is fine) are skipped as labels.
- */
-export function extractStat(title: string): Stat | null {
-  const re = /(?<![\p{L}\p{M}\d-])(₹\s?)?(\d[\d,]*(?:\.\d+)?)(?:\s+([^\s;,.:—–-]+))?/gu;
-  let best: { digits: number; stat: Stat } | null = null;
-  for (const m of title.matchAll(re)) {
-    const num = (m[1] ? '₹' : '') + (m[2] ?? '');
-    const digits = num.replace(/\D/g, '').length;
-    if (!best || digits > best.digits) best = { digits, stat: { value: num, unit: m[3] ?? null } };
-  }
-  return best?.stat ?? null;
-}
-
-/** Up to three key points from the summary, one sentence each. */
-export function keyPoints(summary: string | null): string[] {
-  if (!summary) return [];
-  return summary
-    .split(/(?<=[.!?।])\s+/u)
-    .map((p) => p.trim().replace(/[.।]$/u, ''))
-    .filter((p) => p.length > 3)
-    .slice(0, 3);
-}
-
+/** The headline, for each shot's accessible name and share text. */
 function useShotParts(article: ArticleCard) {
-  const { language } = useI18n();
   const s = useScript();
-  return {
-    head: s.text(article.title_te, article.title_en),
-    stat: extractStat(article.title_te),
-    points: keyPoints(article.summary_te),
-    category: article.category ? s.pick(article.category.name_te, article.category.name_en) : null,
-    place: article.district ? s.pick(article.district.name_te, article.district.name_en) : null,
-    when: relativeTime(article.published_at, language),
-    minutes: Math.max(1, Math.round(article.reading_time_sec / 60)),
-  };
-}
-
-/** The orange number block; falls back to a chart glyph when the headline has no number. */
-function StatBlock({ stat, size }: { stat: Stat | null; size: 'sm' | 'lg' }) {
-  if (!stat) {
-    return (
-      <span
-        className={cn(
-          'flex items-center justify-center rounded-xl bg-wow-tint text-wow-deep',
-          size === 'lg' ? 'h-16 w-16' : 'h-10 w-10',
-        )}
-      >
-        <Icon icon={BarChart3} size={size === 'lg' ? 'lg' : 'md'} />
-      </span>
-    );
-  }
-  return (
-    <span className="flex items-baseline gap-2">
-      <span
-        className={cn(
-          'font-sans font-extrabold leading-none tabular-nums text-wow-deep',
-          size === 'lg' ? 'text-display' : 'text-headline-lg',
-        )}
-      >
-        {stat.value}
-      </span>
-      {stat.unit ? (
-        <span lang="te" className={cn('te font-bold text-ink', size === 'lg' ? 'text-headline-sm' : 'text-te-body-xs')}>
-          {stat.unit}
-        </span>
-      ) : null}
-    </span>
-  );
+  return { head: s.text(article.title_te, article.title_en) };
 }
 
 /* ------------------------------------------------------------------------ */
@@ -196,78 +111,44 @@ export function StoryShotsStrip() {
 /** Seconds each shot stays up before the deck moves on by itself. */
 const SHOT_SECONDS = 9;
 
-/** One infographic poster inside the deck card. */
+/**
+ * One shot inside the deck card: just the picture, filling the card. The
+ * headline stays as its accessible name; a slim bar at the bottom keeps the
+ * way to the full story and sharing.
+ */
 function Poster({ article }: { article: ArticleCard }) {
   const { language } = useI18n();
-  const s = useScript();
   const te = language === 'te';
   const p = useShotParts(article);
   const hasStory = article.reading_time_sec > 0;
-  const facts = [
-    p.place ? { icon: MapPin, text: p.place } : null,
-    { icon: Clock, text: te ? `${p.when} · ${p.minutes} ని. చదువు` : `${p.when} · ${p.minutes} min read` },
-  ].filter(Boolean) as { icon: typeof MapPin; text: string }[];
 
   return (
-    <div className="flex h-full flex-col bg-paper text-ink">
-      {/* Photo with the section on it — leaves room for the progress bar above. */}
-      <div className="relative h-[34%] shrink-0">
-        <NewsImage media={article.hero} ratio="auto" radius="none" priority className="h-full w-full" sizes="480px" />
-        <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-overlay/80 via-overlay/10 to-transparent" />
-        {p.category ? (
-          <span className={cn(s.body, 'absolute bottom-3 left-4 rounded-pill bg-gradient-to-br from-wow to-wow-deep px-3 py-1 text-meta font-bold text-on-wow')}>
-            {p.category}
-          </span>
+    <div className="relative h-full bg-ink">
+      <NewsImage
+        media={article.hero}
+        ratio="auto"
+        radius="none"
+        priority
+        className="h-full w-full"
+        sizes="(min-width: 768px) 500px, 100vw"
+      />
+      <h1 className="sr-only">{p.head.text}</h1>
+      {/* Shades under the controls at the top and the buttons at the bottom. */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-overlay/70 to-transparent" />
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-overlay/70 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-end gap-2 p-3 md:p-4">
+        {hasStory ? (
+          <ButtonLink to={article.url} variant="wow" size="sm" iconRight={ArrowRight}>
+            {te ? 'కథ చదవండి' : 'Read story'}
+          </ButtonLink>
         ) : null}
-      </div>
-
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 pb-5 pt-4">
-        {/* Key number */}
-        <div className="flex items-center gap-3 rounded-xl border-l-4 border-wow bg-wow-tint/60 px-4 py-3">
-          <StatBlock stat={p.stat} size="lg" />
-        </div>
-
-        <h1 lang={p.head.lang} className={cn(p.head.head, 'text-headline-md font-bold text-ink')}>
-          {p.head.text}
-        </h1>
-
-        {/* Key points */}
-        {p.points.length ? (
-          <div>
-            <p className={cn(s.body, 'mb-1.5 text-meta font-bold uppercase tracking-wide text-brand')}>
-              {te ? 'కీలక అంశాలు' : 'Key points'}
-            </p>
-            <ul className="space-y-1.5">
-              {p.points.map((pt) => (
-                <li key={pt} className="flex items-start gap-2">
-                  <Icon icon={CheckCircle2} size="sm" className="mt-1 shrink-0 text-success" />
-                  <span lang="te" className="te text-te-body-xs text-ink-soft">
-                    {pt}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
-        {/* Facts row */}
-        <ul className="flex flex-wrap gap-2">
-          {facts.map((f) => (
-            <li key={f.text} className="inline-flex items-center gap-1.5 rounded-pill bg-brand-tint px-3 py-1 text-brand">
-              <Icon icon={f.icon} size="xs" />
-              <span className={cn(s.body, 'text-meta font-semibold')}>{f.text}</span>
-            </li>
-          ))}
-        </ul>
-
-        <div className="mt-auto flex items-center gap-2 pt-2">
-          {hasStory ? (
-            <ButtonLink to={article.url} variant="wow" iconRight={ArrowRight} className="flex-1">
-              {te ? 'పూర్తి కథ చదవండి' : 'Read full story'}
-            </ButtonLink>
-          ) : null}
-          <ShareButton shortId={article.short_id} url={article.url} title={p.head.text} cardAvailable={false} />
-        </div>
+        <ShareButton
+          shortId={article.short_id}
+          url={article.url}
+          title={p.head.text}
+          cardAvailable={false}
+          className="bg-on-ink/15 text-on-ink hover:bg-on-ink/25"
+        />
       </div>
     </div>
   );

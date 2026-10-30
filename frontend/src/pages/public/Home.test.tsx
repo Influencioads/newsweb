@@ -86,7 +86,7 @@ describe('Home (WOW layout)', () => {
     expect(follows(nominate, explore)).toBe(true);
   });
 
-  it('rotates up to six banner stories, each once, and puts My Village Story after WOW Radio', () => {
+  it('rotates up to ten banner stories, each once, and puts My Village after WOW Radio', () => {
     renderHome(homePayload());
     // lead + exclusive-one + exclusive-two (latest repeats them).
     expect(screen.getAllByRole('tab', { name: /\/ 3$/ })).toHaveLength(3);

@@ -95,7 +95,7 @@ CATEGORIES: tuple[tuple[str, str, str, bool], ...] = (
     ("startup-stories", "స్టార్టప్ స్టోరీస్", "Startup Stories", False),
     ("jai-telugoda", "జై తెలుగోడా", "Jai Telugoda", False),
     ("local-hero", "లోకల్ హీరో", "Local Hero", False),
-    ("my-village-story", "మై విలేజ్ స్టోరీ", "My Village Story", False),
+    ("my-village-story", "మై విలేజ్", "My Village", False),
     ("wow-idea", "వావ్ ఐడియా", "WOW Idea", False),
     ("wow-news", "వావ్ న్యూస్", "WOW News", False),
     ("my-story", "మై స్టోరీ", "My Story", False),

@@ -58,7 +58,10 @@ export function PolicyFooter() {
   const s = useScript();
 
   return (
-    <footer className="mt-10 bg-footer text-on-ink">
+    <footer className="relative isolate mt-10 overflow-hidden bg-footer text-on-ink">
+      {/* The WOW Radio panel's look: deep blue with soft orange glows. */}
+      <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 -z-10 h-80 w-80 rounded-full bg-wow/25 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-32 -left-24 -z-10 h-80 w-80 rounded-full bg-wow/15 blur-3xl" />
       <PageContainer width="site">
         {/* `ui.more`, not `ui.explore` — the header rail already owns that name. */}
         <nav aria-label={t('ui.more')} className="space-y-9 py-10">

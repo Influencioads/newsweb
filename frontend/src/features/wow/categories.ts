@@ -107,8 +107,8 @@ export const WOW_FEATURES: readonly WowFeature[] = [
   // ── Explore more ──
   {
     slug: 'my-village-story',
-    te: 'మై విలేజ్ స్టోరీ',
-    en: 'My Village Story',
+    te: 'మై విలేజ్',
+    en: 'My Village',
     focusTe: 'మన ఊళ్ల కథలు.. మనుషులు..',
     focusEn: 'Stories of our villages.. and their people..',
     icon: Trees,

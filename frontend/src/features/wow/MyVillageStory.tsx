@@ -11,7 +11,7 @@ import type { ArticleCard } from '@/types/public';
 import { cn } from '@/utils/cn';
 
 /**
- * My Village Story (మై విలేజ్ స్టోరీ): the home page's village shelf, straight
+ * My Village (మై విలేజ్): the home page's village shelf, straight
  * under WOW Radio. Two stories from the my-village-story section, falling back
  * to the local sections while that one fills up.
  */
@@ -86,7 +86,7 @@ export function MyVillageStory() {
   return (
     <section aria-labelledby="my-village-story">
       <SectionHeader
-        title={<span id="my-village-story">{te ? 'మై విలేజ్ స్టోరీ' : 'My Village Story'}</span>}
+        title={<span id="my-village-story">{te ? 'మై విలేజ్' : 'My Village'}</span>}
         to={data?.articles.length ? `/section/${data.slug}` : undefined}
       />
 

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Award, HeartHandshake } from 'lucide-react';
 
 import { GridCard } from '@/components/article/ArticleCard';
+import { NewsImage } from '@/components/media/NewsImage';
 import { ButtonLink } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { SectionHeader } from '@/components/ui/Layout';
@@ -35,38 +36,40 @@ export function NominateCta({ compact = false }: { compact?: boolean }) {
   const { language } = useI18n();
   const s = useScript();
   const te = language === 'te';
+  // The backdrop is a real local hero's photo — the same stories Featured Heroes shows.
+  const heroes = useQuery({ queryKey: ['wow', 'featured-heroes'], queryFn: fetchHeroes, staleTime: 120_000 });
+  const photo = heroes.data?.articles.find((a) => a.hero)?.hero ?? null;
   return (
     <section
       aria-labelledby="nominate-cta"
-      className="relative flex h-full flex-col justify-between gap-5 overflow-hidden rounded-2xl border-2 border-wow-deep bg-wow-tint p-5 shadow-raised md:p-6"
+      className="relative isolate flex h-full min-h-[320px] flex-col justify-end gap-5 overflow-hidden rounded-2xl bg-brand-deep p-5 text-on-ink shadow-raised ring-2 ring-wow/60 md:p-6"
     >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -bottom-10 -right-6 text-wow/20"
-      >
+      {photo ? (
+        <div aria-hidden className="absolute inset-0 -z-20">
+          <NewsImage media={photo} ratio="auto" radius="none" className="h-full w-full" sizes="(min-width: 1024px) 40vw, 100vw" />
+        </div>
+      ) : null}
+      {/* Orange at the top fading into the deep WOW blue, so the copy reads on any photo. */}
+      <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-b from-wow/55 via-brand-deep/75 to-brand-deep" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-10 -right-6 -z-10 text-on-ink/10">
         <Award size={compact ? 140 : 180} strokeWidth={1.25} />
       </div>
-      <div className="relative space-y-2">
+      <div className="space-y-2">
         <span className={cn(s.body, 'inline-flex items-center gap-1.5 rounded-pill bg-gradient-to-br from-wow to-wow-deep px-3 py-1 text-meta font-bold text-on-wow')}>
           <Icon icon={HeartHandshake} size="xs" />
           {te ? 'మీ లోకల్ హీరోని నామినేట్ చేయండి' : 'Nominate Your Local Hero'}
         </span>
-        <h2 id="nominate-cta" lang="te" className="th text-headline-md font-bold text-ink md:text-headline-lg">
+        <h2 id="nominate-cta" lang="te" className="th text-headline-md font-bold text-on-ink md:text-headline-lg">
           మీ లోకల్ హీరోను ప్రపంచానికి పరిచయం చేయండి!
         </h2>
-        <p className={cn(s.body, s.te ? 'text-te-body-xs' : 'text-ui', 'max-w-prose text-ink-soft')}>
+        <p className={cn(s.body, s.te ? 'text-te-body-xs' : 'text-ui', 'max-w-prose text-on-ink/85')}>
           {te
             ? 'ఉపాధ్యాయులు, రైతులు, ఆవిష్కర్తలు, సామాజిక సేవకులు, విద్యార్థులు, గ్రామ వాలంటీర్లు — మార్పు తెస్తున్న వారి గురించి మాకు చెప్పండి.'
             : 'Teachers, farmers, innovators, social workers, students, village volunteers — tell us about the people making a difference.'}
         </p>
       </div>
-      <div className="relative">
-        <ButtonLink
-          to="/nominate"
-          size="lg"
-          variant="wow"
-          icon={Award}
-        >
+      <div>
+        <ButtonLink to="/nominate" size="lg" variant="wow" icon={Award}>
           {te ? 'ఇప్పుడే నామినేట్ చేయండి' : 'Nominate now'}
         </ButtonLink>
       </div>

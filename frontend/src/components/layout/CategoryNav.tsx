@@ -148,7 +148,7 @@ export function CategoryNav() {
               {RAIL_SHORTCUTS.map((sc) => (
                 <li key={sc.to} className="contents">
                   {sc.highlight ? (
-                    // WOW Radio and My Village Story: compact orange buttons, apart
+                    // WOW Radio and My Village: compact orange buttons, apart
                     // from the category links (Nominate is in the masthead).
                     <NavLink
                       to={sc.to}

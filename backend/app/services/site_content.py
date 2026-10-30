@@ -221,6 +221,7 @@ def _default_hero_categories() -> list[HeroCategory]:
         ("innovation", "ఆవిష్కరణ", "Innovation"),
         ("agriculture", "వ్యవసాయం", "Agriculture"),
         ("environment", "పర్యావరణం", "Environment"),
+        ("sports", "క్రీడలు", "Sports"),
         ("youth", "యువ విజయం", "Youth Achievement"),
         ("other", "ఇతరాలు", "Other"),
     )

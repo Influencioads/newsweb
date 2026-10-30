@@ -68,7 +68,7 @@ export default function MyVillagePage() {
             <Icon icon={HomeIcon} size="xs" />
             {L('మై విలేజ్', 'My Village')}
           </span>
-          <h1 id="my-village-title" lang={s.language} className={cn(s.head, 'text-headline-lg font-bold md:text-headline-xl')}>
+          <h1 id="my-village-title" lang={s.language} className={cn(s.head, 'text-headline-md font-bold md:text-headline-lg')}>
             {te ? MY_VILLAGE_TITLE.te : MY_VILLAGE_TITLE.en}
           </h1>
           <div className="space-y-1">

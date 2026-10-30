@@ -477,7 +477,7 @@ export default function ArticlePage() {
                 {data.category?.slug === MY_VILLAGE_SLUG ? (
                   <div className="mt-6 flex flex-wrap items-center gap-2 rounded-xl border border-wow/40 bg-wow-tint p-4">
                     <p className={cn(s.body, 'mr-auto text-ui font-semibold text-ink')}>
-                      {pick('మై విలేజ్ – మన ఊరు.. మన గొప్పతనం!', 'My Village – our village, our pride!')}
+                      {pick('మై విలేజ్ – మన ఊరు.. మన వైభవం.!', 'My Village – our village, our glory!')}
                     </p>
                     <ButtonLink to={MY_VILLAGE_PATH} variant="secondary" size="sm">
                       {pick('మరిన్ని గ్రామాలు చూడండి', 'Explore more villages')}

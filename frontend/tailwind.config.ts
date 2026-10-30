@@ -163,6 +163,8 @@ export default {
         wordmark: ['clamp(2.25rem, 4.1vw, 3.75rem)', { lineHeight: '1', letterSpacing: '0.02em' }],
         'headline-xl': ['33px', { lineHeight: '1.5' }],
         'headline-lg': ['28px', { lineHeight: '1.5' }],
+        /** Between md and lg: a section title that should sit a step under lg. */
+        'headline-ml': ['24px', { lineHeight: '1.5' }],
         'headline-md': ['20px', { lineHeight: '1.5' }],
         'headline-sm': ['17px', { lineHeight: '1.5' }],
         'headline-xs': ['15.5px', { lineHeight: '1.5' }],

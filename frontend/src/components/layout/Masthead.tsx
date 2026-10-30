@@ -140,9 +140,9 @@ export function Masthead() {
         </Link>
 
         {/* Phone: one line — the brand line small on the left, a small Nominate
-            Your Local Hero pill on the right (shorter label under 390px). */}
+            Your Local Hero pill on the right. */}
         <div className="order-first col-span-2 flex items-center justify-between gap-1.5 md:hidden">
-          <p lang={taglineScript.lang} className={cn(taglineScript.cls, 'whitespace-nowrap text-eyebrow font-bold tracking-normal text-ink')}>
+          <p lang={taglineScript.lang} className={cn(taglineScript.cls, 'min-w-0 text-eyebrow font-bold leading-snug tracking-normal text-ink')}>
             {tagline}
           </p>
           <Link
@@ -157,8 +157,7 @@ export function Masthead() {
               )}
             >
               <Icon icon={Award} size="xs" />
-              <span className="sm:hidden">{language === 'te' ? 'నామినేట్ చేయండి' : 'Nominate'}</span>
-              <span className="hidden sm:inline">{language === 'te' ? 'లోకల్ హీరో నామినేషన్' : 'Nominate a Local Hero'}</span>
+              {language === 'te' ? 'లోకల్ హీరో ని నామినేట్ చేయండి' : 'Nominate a Local Hero'}
             </span>
           </Link>
         </div>

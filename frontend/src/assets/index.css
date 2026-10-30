@@ -326,17 +326,30 @@
     font-size: calc(17px * var(--reader-scale));
     line-height: 1.7;
   }
+  /* Story headings match the home hero headline (headline-md on phones,
+     headline-lg from md up) rather than the larger display size. */
   .reader-h1 {
-    font-size: calc(33px * var(--reader-scale));
+    font-size: calc(22px * var(--reader-scale));
     line-height: 1.5;
   }
   .reader-h2 {
-    font-size: calc(24px * var(--reader-scale));
+    font-size: calc(19px * var(--reader-scale));
     line-height: 1.5;
   }
   .reader-h3 {
-    font-size: calc(20px * var(--reader-scale));
+    font-size: calc(17px * var(--reader-scale));
     line-height: 1.5;
+  }
+  @media (min-width: 768px) {
+    .reader-h1 {
+      font-size: calc(28px * var(--reader-scale));
+    }
+    .reader-h2 {
+      font-size: calc(22px * var(--reader-scale));
+    }
+    .reader-h3 {
+      font-size: calc(19px * var(--reader-scale));
+    }
   }
   .reader-caption {
     font-size: calc(13px * var(--reader-scale));

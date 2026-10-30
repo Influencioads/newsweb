@@ -13,7 +13,7 @@ import { MY_VILLAGE_IMAGE, MY_VILLAGE_INTRO, MY_VILLAGE_PATH, MY_VILLAGE_TITLE }
 
 /**
  * My Village (మై విలేజ్): the home page's village shelf, straight under WOW
- * Radio — a banner with the "మన ఊరు.. మన గొప్పతనం!" introduction and a Click
+ * Radio — a banner with the "మన ఊరు.. మన వైభవం.!" introduction and a Click
  * to know more button to /my-village on the left and the village picture
  * (public/my-village.webp) on the right, then two stories from the my-village-story section
  * (topped up from the local sections while that one fills up).
@@ -99,7 +99,7 @@ export function MyVillageStory() {
       <div className="relative isolate mb-5 grid overflow-hidden rounded-2xl bg-brand-deep text-on-ink shadow-raised md:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         <div aria-hidden className="pointer-events-none absolute -left-16 -top-16 -z-10 h-64 w-64 rounded-full bg-wow/25 blur-3xl" />
         <div className="order-2 flex flex-col justify-center gap-3 p-5 md:order-1 md:p-10">
-          <h2 id="my-village-story" lang={s.language} className={cn(s.head, 'text-headline-md font-bold md:text-headline-lg')}>
+          <h2 id="my-village-story" lang={s.language} className={cn(s.head, 'text-headline-sm font-bold md:text-headline-ml')}>
             {te ? MY_VILLAGE_TITLE.te : MY_VILLAGE_TITLE.en}
           </h2>
           {(te ? MY_VILLAGE_INTRO.te : MY_VILLAGE_INTRO.en).map((para) => (

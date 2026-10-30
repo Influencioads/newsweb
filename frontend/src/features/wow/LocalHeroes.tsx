@@ -11,6 +11,8 @@ import { useI18n, useScript } from '@/i18n';
 import type { ArticleCard } from '@/types/public';
 import { cn } from '@/utils/cn';
 
+import { useSiteContent } from './siteContent';
+
 /**
  * The homepage's two hero surfaces (pitch §2, §5):
  *   - NominateCta: the always-visible "Nominate Your Local Hero" call.
@@ -36,7 +38,9 @@ export function NominateCta({ compact = false }: { compact?: boolean }) {
   const { language } = useI18n();
   const s = useScript();
   const te = language === 'te';
-  // The backdrop is a real local hero's photo — the same stories Featured Heroes shows.
+  // The backdrop is the picture uploaded in CMS → Site content → Nominate form,
+  // else a real local hero's photo — the same stories Featured Heroes shows.
+  const uploaded = useSiteContent().nominate.image_url;
   const heroes = useQuery({ queryKey: ['wow', 'featured-heroes'], queryFn: fetchHeroes, staleTime: 120_000 });
   const photo = heroes.data?.articles.find((a) => a.hero)?.hero ?? null;
   return (
@@ -44,7 +48,9 @@ export function NominateCta({ compact = false }: { compact?: boolean }) {
       aria-labelledby="nominate-cta"
       className="relative isolate flex h-full min-h-[320px] flex-col justify-end gap-5 overflow-hidden rounded-2xl bg-brand-deep p-5 text-on-ink shadow-raised ring-2 ring-wow/60 md:p-6"
     >
-      {photo ? (
+      {uploaded ? (
+        <img aria-hidden src={uploaded} alt="" className="absolute inset-0 -z-20 h-full w-full object-cover" />
+      ) : photo ? (
         <div aria-hidden className="absolute inset-0 -z-20">
           <NewsImage media={photo} ratio="auto" radius="none" className="h-full w-full" sizes="(min-width: 1024px) 40vw, 100vw" />
         </div>

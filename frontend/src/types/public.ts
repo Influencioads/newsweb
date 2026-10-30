@@ -323,7 +323,7 @@ export interface SiteContent {
   home: { banner_tag_te: string; banner_tag_en: string };
   radio: { image_url: string; segments: RadioSegment[] };
   story_shots: { shots: StoryShotItem[] };
-  nominate: { categories: { value: string; te: string; en: string }[] };
+  nominate: { image_url: string; categories: { value: string; te: string; en: string }[] };
   contact: { grievance_email: string };
 }
 

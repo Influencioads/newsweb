@@ -159,6 +159,24 @@ class TestBlocks:
             assert r.status_code == 422, bad
         assert client.delete("/api/v1/cms/site-content/story_shots", headers=admin).status_code == 200
 
+    def test_nominate_banner_picture(self, client: TestClient, admin: dict) -> None:
+        assert client.get("/api/v1/public/config").json()["content"]["nominate"]["image_url"] == ""
+        cats = client.get("/api/v1/public/config").json()["content"]["nominate"]["categories"]
+        r = client.put(
+            "/api/v1/cms/site-content/nominate",
+            json={"image_url": "/media/banner.webp", "categories": cats},
+            headers=admin,
+        )
+        assert r.status_code == 200, r.text
+        assert client.get("/api/v1/public/config").json()["content"]["nominate"]["image_url"] == "/media/banner.webp"
+        bad = client.put(
+            "/api/v1/cms/site-content/nominate",
+            json={"image_url": "javascript:alert(1)", "categories": cats},
+            headers=admin,
+        )
+        assert bad.status_code == 422
+        assert client.delete("/api/v1/cms/site-content/nominate", headers=admin).status_code == 200
+
     def test_link_preview_for_other_pages_has_a_full_image_address(self, client: TestClient) -> None:
         html = client.get("/_og/home").text
         assert '<meta property="og:image" content="http' in html

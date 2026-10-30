@@ -19,7 +19,7 @@ import { useI18n } from '@/i18n';
 import { useAuth } from '@/stores/auth';
 import type { RadioSegment, SiteContent, StoryShotItem } from '@/types/public';
 
-import { ImageField, moveItem, RowActions, slugify, uniqueSlug } from './siteContentShared';
+import { ImageField, moveItem, ownMediaPath, RowActions, slugify, uniqueSlug } from './siteContentShared';
 import { useL } from './useL';
 
 /**
@@ -412,10 +412,7 @@ function StoryShotsCard({ payload, canManage }: { payload: cmsApi.SiteContentPay
       try {
         const media = await cmsApi.uploadMedia(file);
         if (media.url) {
-          // Keep our own uploads as /media/... paths: the site serves them on its own address.
-          const path = new URL(media.url, window.location.origin).pathname;
-          const image_url = path.startsWith('/media/') ? path : media.url;
-          added.push({ id: `shot-${Date.now().toString(36)}-${i}`, image_url, title_te: '', title_en: '', link: '' });
+          added.push({ id: `shot-${Date.now().toString(36)}-${i}`, image_url: ownMediaPath(media.url), title_te: '', title_en: '', link: '' });
         }
       } catch (err) {
         toast.error(err);
@@ -531,8 +528,25 @@ function NominateCard({ payload, canManage }: { payload: cmsApi.SiteContentPaylo
   return (
     <Section
       title={L('నామినేట్ ఫారం', 'Nominate form')}
-      subtitle={L('"హీరో విభాగం" జాబితాలో కనిపించే ఎంపికలు', 'The choices in the form’s "Hero category" list')}
+      subtitle={L(
+        'హోమ్ పేజీ "మీ లోకల్ హీరోను నామినేట్ చేయండి" బ్యానర్ చిత్రం, ఫారంలోని "హీరో విభాగం" ఎంపికలు',
+        'The picture behind the home page’s "Nominate Your Local Hero" banner, and the choices in the form’s "Hero category" list',
+      )}
     >
+      <Field
+        label={L('బ్యానర్ నేపథ్య చిత్రం', 'Banner background picture')}
+        hint={L('వెడల్పాటి ఫోటో (16:9) బాగుంటుంది', 'A wide photo (16:9) works best')}
+      >
+        <ImageField
+          wide
+          value={draft.image_url}
+          fallback=""
+          alt={L('నామినేట్ బ్యానర్', 'Nominate banner')}
+          disabled={!canManage}
+          originalLabel={L('తాజా లోకల్ హీరో కథనం ఫోటో చూపిస్తోంది', 'Showing the newest Local Hero story’s photo')}
+          onChange={(image_url) => setDraft({ ...draft, image_url })}
+        />
+      </Field>
       <ol className="space-y-2">
         {rows.map((c, i) => (
           <li key={c.value || `new-${i}`} className="flex flex-wrap items-end gap-3 sm:flex-nowrap">

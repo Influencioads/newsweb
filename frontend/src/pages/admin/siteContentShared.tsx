@@ -67,8 +67,18 @@ export function RowActions({
 }
 
 /**
+ * Our own upload as a /media/... path: the site serves it on its own address
+ * (and the API accepts only that or an https address).
+ */
+export function ownMediaPath(url: string): string {
+  const path = new URL(url, window.location.origin).pathname;
+  return path.startsWith('/media/') ? path : url;
+}
+
+/**
  * A picture the desk uploads (to the media library) or leaves blank for the
- * built-in one. `value` is what is stored; `fallback` is what blank shows.
+ * built-in one. `value` is what is stored; `fallback` is what blank shows
+ * (none: `originalLabel` says what the site uses instead).
  */
 export function ImageField({
   value,
@@ -77,10 +87,13 @@ export function ImageField({
   onChange,
   disabled,
   wide = false,
+  originalLabel,
 }: {
   value: string;
   fallback: string;
   alt: string;
+  /** What blank means, when it is not a built-in picture. */
+  originalLabel?: string;
   onChange: (url: string) => void;
   disabled?: boolean;
   /** A 16:9 picture rather than a wide logo strip. */
@@ -91,13 +104,17 @@ export function ImageField({
   const input = useRef<HTMLInputElement>(null);
   const upload = useMutation({
     mutationFn: (file: File) => cmsApi.uploadMedia(file),
-    onSuccess: (media) => onChange(media.url),
+    onSuccess: (media) => media.url && onChange(ownMediaPath(media.url)),
     onError: (err) => toast.error(err),
   });
   return (
     <div className="flex flex-wrap items-center gap-4">
       <div className={cn('flex items-center justify-center rounded-xl border border-rule bg-paper p-3', wide ? 'h-28 w-48' : 'h-20 min-w-48')}>
-        <img src={value || fallback} alt={alt} className={cn('max-h-full w-auto', wide && 'rounded-lg object-cover')} />
+        {value || fallback ? (
+          <img src={value || fallback} alt={alt} className={cn('max-h-full w-auto', wide && 'rounded-lg object-cover')} />
+        ) : (
+          <span className="px-2 text-center font-sans text-meta text-muted">{L('చిత్రం లేదు', 'No picture uploaded')}</span>
+        )}
       </div>
       <div className="flex flex-col items-start gap-2">
         <input
@@ -120,7 +137,7 @@ export function ImageField({
             {L('అసలు చిత్రాన్ని వాడండి', 'Use the original picture')}
           </Button>
         ) : (
-          <span className="font-sans text-meta text-muted">{L('అసలు చిత్రం చూపిస్తోంది', 'Showing the original picture')}</span>
+          <span className="font-sans text-meta text-muted">{originalLabel ?? L('అసలు చిత్రం చూపిస్తోంది', 'Showing the original picture')}</span>
         )}
       </div>
     </div>

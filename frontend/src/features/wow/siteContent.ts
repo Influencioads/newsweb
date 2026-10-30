@@ -66,6 +66,7 @@ export const DEFAULT_CONTENT: SiteContent = {
   },
   story_shots: { shots: [] },
   nominate: {
+    image_url: '',
     categories: [
       { value: 'social-service', te: 'సామాజిక సేవ', en: 'Social Service' },
       { value: 'education', te: 'విద్య', en: 'Education' },

@@ -228,11 +228,18 @@ def _default_hero_categories() -> list[HeroCategory]:
 
 
 class Nominate(_Block):
-    """The hero categories offered on the Nominate form."""
+    """The home page's Nominate banner picture (blank: the newest Local Hero
+    story's photo) and the hero categories offered on the Nominate form."""
 
+    image_url: str = Field(default="", max_length=500)
     categories: list[HeroCategory] = Field(
         default_factory=_default_hero_categories, min_length=1, max_length=20
     )
+
+    @field_validator("image_url")
+    @classmethod
+    def _img(cls, v: str) -> str:
+        return _image(v)
 
     @field_validator("categories")
     @classmethod

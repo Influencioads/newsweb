@@ -14,6 +14,7 @@ from app.core.permissions import LEVEL_PIN_PLACEMENT, LEVEL_SELF_APPROVE
 from app.db.base import utcnow
 from app.models.content import (
     Article,
+    ArticleCategory,
     ArticleTag,
     ArticleVersion,
     Category,
@@ -192,6 +193,34 @@ def _apply_gallery(db: Session, article: Article, media_ids: list[int]) -> None:
     db.flush()
 
 
+#: Besides the main section, a story may be listed in up to this many more.
+MAX_EXTRA_CATEGORIES = 3
+
+
+def _apply_extra_categories(db: Session, article: Article, category_ids: list[int]) -> None:
+    """Replace the extra sections. The main one (`category_id`) is never
+    repeated here, so picking it again is simply ignored."""
+    wanted = [
+        cid for cid in dict.fromkeys(category_ids) if cid != article.category_id
+    ][:MAX_EXTRA_CATEGORIES]
+    known = (
+        set(db.scalars(select(Category.id).where(Category.id.in_(wanted))).all())
+        if wanted
+        else set()
+    )
+    missing = [cid for cid in wanted if cid not in known]
+    if missing:
+        raise ValidationError(
+            details={"extra_category_ids": f"unknown categories: {missing}"}
+        )
+    db.execute(delete(ArticleCategory).where(ArticleCategory.article_id == article.id))
+    for position, category_id in enumerate(wanted):
+        db.add(ArticleCategory(article_id=article.id, category_id=category_id, sort=position))
+    # Autoflush is off; the response reads these rows straight back.
+    db.flush()
+    db.expire(article, ["extra_categories"])
+
+
 def apply_copy(
     article: Article, values: dict[str, Any], db: Session | None = None
 ) -> None:
@@ -352,6 +381,7 @@ def create(db: Session, principal: Principal, values: dict[str, Any]) -> Article
     # Placement has to land before the scope check, and the gallery needs an id,
     # so the write is split around the flush.
     gallery = values.pop("gallery_media_ids", None)
+    extra_categories = values.pop("extra_category_ids", None)
     apply_copy(article, values, db)
     if values.get("article_type") is None:
         article.article_type = _default_type(principal, article)
@@ -361,6 +391,8 @@ def create(db: Session, principal: Principal, values: dict[str, Any]) -> Article
     db.flush()
     if gallery is not None:
         _apply_gallery(db, article, gallery)
+    if extra_categories is not None:
+        _apply_extra_categories(db, article, extra_categories)
     db.add(
         WorkflowTransition(
             article_id=article.id,
@@ -398,9 +430,12 @@ def update(
         principal.require_level(LEVEL_PIN_PLACEMENT, reason="edit after approval")
     _guard_flags(db, principal, article, values)
     gallery = values.pop("gallery_media_ids", None)
+    extra_categories = values.pop("extra_category_ids", None)
     apply_copy(article, values, db)
     if gallery is not None:
         _apply_gallery(db, article, gallery)
+    if extra_categories is not None:
+        _apply_extra_categories(db, article, extra_categories)
     article.updated_by = principal.id
     article.version += 1
     if article.status == ArticleStatus.PUBLISHED:

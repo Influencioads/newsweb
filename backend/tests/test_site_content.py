@@ -159,6 +159,11 @@ class TestBlocks:
             assert r.status_code == 422, bad
         assert client.delete("/api/v1/cms/site-content/story_shots", headers=admin).status_code == 200
 
+    def test_link_preview_for_other_pages_has_a_full_image_address(self, client: TestClient) -> None:
+        html = client.get("/_og/home").text
+        assert '<meta property="og:image" content="http' in html
+        assert "/og-default.png" in html
+
     def test_unknown_block_and_permissions(self, client: TestClient, db: Session, admin: dict) -> None:
         assert client.put("/api/v1/cms/site-content/nope", json={}, headers=admin).status_code == 404
         assert client.get("/api/v1/cms/site-content").status_code == 401

@@ -247,7 +247,10 @@ def og_home() -> HTMLResponse:
             title=settings.APP_NAME,
             description="తెలుగు వార్తలు — ఆంధ్రప్రదేశ్, తెలంగాణ, జాతీయం.",
             url=_site(),
-            image=None,
+            # The site's own preview picture (frontend/public), as a full
+            # address: WhatsApp ignores a relative og:image.
+            image=_abs("/og-default.png"),
+            image_size=CARD_SIZE,
         ),
         f"<h1>{escape(settings.APP_NAME)}</h1>",
     )

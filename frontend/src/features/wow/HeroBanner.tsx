@@ -74,7 +74,7 @@ export function HeroBanner({ stories }: { stories: ArticleCard[] }) {
       />
       <div aria-hidden className="absolute -left-20 -top-24 -z-10 h-72 w-72 rounded-full bg-wow/25 blur-3xl" />
 
-      <div className="flex flex-col justify-center gap-4 p-5 pb-3 sm:p-7 sm:pb-3 md:min-h-[340px] md:max-w-[80%] md:p-10">
+      <div className="flex min-h-[340px] flex-col justify-center gap-4 p-5 pb-3 sm:p-7 sm:pb-3 md:min-h-[460px] md:max-w-[80%] md:p-12 lg:min-h-[520px]">
         <div className="flex flex-wrap items-center gap-2">
           <span
             lang={tagScript.lang}

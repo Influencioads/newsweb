@@ -13,9 +13,9 @@ import { MY_VILLAGE_IMAGE, MY_VILLAGE_INTRO, MY_VILLAGE_PATH, MY_VILLAGE_TITLE }
 
 /**
  * My Village (మై విలేజ్): the home page's village shelf, straight under WOW
- * Radio — a banner (the village picture, public/my-village.webp) with the
- * "మన ఊరు.. మన గొప్పతనం!" introduction and a Click to know more button to
- * /my-village, then two stories from the my-village-story section
+ * Radio — a banner with the "మన ఊరు.. మన గొప్పతనం!" introduction and a Click
+ * to know more button to /my-village on the left and the village picture
+ * (public/my-village.webp) on the right, then two stories from the my-village-story section
  * (topped up from the local sections while that one fills up).
  */
 
@@ -93,22 +93,12 @@ export function MyVillageStory() {
 
   return (
     <section aria-labelledby="my-village-story">
-      {/* The section's own banner: the village-at-sunset picture under a deep-blue
-          wash, with the introduction and Click to know more over it. */}
-      <div className="relative isolate mb-5 overflow-hidden rounded-2xl text-on-ink shadow-raised">
-        <img
-          src={MY_VILLAGE_IMAGE}
-          alt=""
-          width={1024}
-          height={1536}
-          loading="lazy"
-          className="absolute inset-0 -z-20 h-full w-full object-cover object-[center_40%]"
-        />
-        <div
-          aria-hidden
-          className="absolute inset-0 -z-10 bg-gradient-to-t from-brand-deep via-brand-deep/80 to-brand-deep/20 md:bg-gradient-to-r md:from-brand-deep md:via-brand-deep/80 md:to-transparent"
-        />
-        <div className="flex min-h-[420px] flex-col justify-end gap-3 p-5 md:min-h-[380px] md:max-w-[62%] md:justify-center md:p-10">
+      {/* The section's own banner: the introduction on the left (deep WOW blue
+          with the orange glow), the village-at-sunset picture on the right.
+          On a phone the picture comes first and the text under it. */}
+      <div className="relative isolate mb-5 grid overflow-hidden rounded-2xl bg-brand-deep text-on-ink shadow-raised md:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+        <div aria-hidden className="pointer-events-none absolute -left-16 -top-16 -z-10 h-64 w-64 rounded-full bg-wow/25 blur-3xl" />
+        <div className="order-2 flex flex-col justify-center gap-3 p-5 md:order-1 md:p-10">
           <h2 id="my-village-story" lang={s.language} className={cn(s.head, 'text-headline-md font-bold md:text-headline-lg')}>
             {te ? MY_VILLAGE_TITLE.te : MY_VILLAGE_TITLE.en}
           </h2>
@@ -127,6 +117,16 @@ export function MyVillageStory() {
               </ButtonLink>
             ) : null}
           </div>
+        </div>
+        <div className="relative order-1 aspect-[16/10] md:order-2 md:aspect-auto md:min-h-[380px]">
+          <img
+            src={MY_VILLAGE_IMAGE}
+            alt={te ? 'సూర్యాస్తమయంలో ఓ గ్రామం, ఆలయం' : 'A village and its temple at sunset'}
+            width={1024}
+            height={1536}
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover object-[center_45%]"
+          />
         </div>
       </div>
 

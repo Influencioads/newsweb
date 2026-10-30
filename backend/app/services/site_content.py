@@ -4,8 +4,8 @@ Two kinds, both kept in `app_settings` beside the other admin-edited rows
 (outside settings_service.SPECS, so the Settings screen does not list them):
 
 * **Blocks** — `content.<block>`: the logo and masthead line, the home banner
-  tag, WOW Radio (its picture and segments), the nomination form's hero
-  categories, and the grievance contact. Every block has a default here equal
+  tag, WOW Radio (its picture and segments), the Story Shots pictures, the
+  nomination form's hero categories, and the grievance contact. Every block has a default here equal
   to what the website shipped with, so the site reads the same before anyone
   saves, and "Reset" simply deletes the row.
 * **Footer pages** — `page.<slug>`: About, Contact, the policies. The website
@@ -165,6 +165,49 @@ class Radio(_Block):
         return v
 
 
+#: Story Shots kept at once; the deck shows them all, the home shelf the first four.
+MAX_STORY_SHOTS = 40
+
+
+class StoryShot(_Block):
+    """One picture the desk uploads for Story Shots, with an optional headline
+    (its accessible name and share text) and an optional "Read more" link."""
+
+    id: str = Field(min_length=1, max_length=40, pattern=_SLUG)
+    image_url: str = Field(min_length=1, max_length=500)
+    title_te: str = Field(default="", max_length=160)
+    title_en: str = Field(default="", max_length=160)
+    link: str = Field(default="", max_length=500)
+
+    @field_validator("image_url")
+    @classmethod
+    def _img(cls, v: str) -> str:
+        return _image(v)
+
+    @field_validator("link")
+    @classmethod
+    def _link(cls, v: str) -> str:
+        # A page on this site (/...) or an https address, same rule as pictures.
+        if v and not _IMAGE_URL.fullmatch(v):
+            raise ValueError("must be a page on this site (/...) or an https:// address")
+        return v
+
+
+class StoryShots(_Block):
+    """Story Shots pictures, in the order shown. Only these appear in Story
+    Shots, never article photos; empty hides the home shelf."""
+
+    shots: list[StoryShot] = Field(default_factory=list, max_length=MAX_STORY_SHOTS)
+
+    @field_validator("shots")
+    @classmethod
+    def _unique(cls, v: list[StoryShot]) -> list[StoryShot]:
+        ids = [s.id for s in v]
+        if len(set(ids)) != len(ids):
+            raise ValueError("each shot needs its own id")
+        return v
+
+
 class HeroCategory(_Block):
     value: str = Field(min_length=2, max_length=40, pattern=_SLUG)
     te: str = Field(min_length=1, max_length=60)
@@ -185,11 +228,18 @@ def _default_hero_categories() -> list[HeroCategory]:
 
 
 class Nominate(_Block):
-    """The hero categories offered on the Nominate form."""
+    """The home page's Nominate banner picture (blank: the newest Local Hero
+    story's photo) and the hero categories offered on the Nominate form."""
 
+    image_url: str = Field(default="", max_length=500)
     categories: list[HeroCategory] = Field(
         default_factory=_default_hero_categories, min_length=1, max_length=20
     )
+
+    @field_validator("image_url")
+    @classmethod
+    def _img(cls, v: str) -> str:
+        return _image(v)
 
     @field_validator("categories")
     @classmethod
@@ -217,6 +267,7 @@ BLOCKS: dict[str, type[_Block]] = {
     "brand": Brand,
     "home": Home,
     "radio": Radio,
+    "story_shots": StoryShots,
     "nominate": Nominate,
     "contact": Contact,
 }

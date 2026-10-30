@@ -322,8 +322,18 @@ export interface SiteContent {
   brand: { logo_url: string; tagline_te: string; tagline_en: string };
   home: { banner_tag_te: string; banner_tag_en: string };
   radio: { image_url: string; segments: RadioSegment[] };
-  nominate: { categories: { value: string; te: string; en: string }[] };
+  story_shots: { shots: StoryShotItem[] };
+  nominate: { image_url: string; categories: { value: string; te: string; en: string }[] };
   contact: { grievance_email: string };
+}
+
+/** A Story Shots picture uploaded in the CMS; the title and link are optional. */
+export interface StoryShotItem {
+  id: string;
+  image_url: string;
+  title_te: string;
+  title_en: string;
+  link: string;
 }
 
 export interface RadioSegment {

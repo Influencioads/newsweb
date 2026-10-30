@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import {
   ArrowRight,
   ChevronLeft,
@@ -17,11 +16,12 @@ import { ButtonLink } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { SectionHeader } from '@/components/ui/Layout';
 import { EmptyState } from '@/components/ui/State';
-import * as publicApi from '@/features/public/api';
 import { useI18n, useScript } from '@/i18n';
-import type { ArticleCard } from '@/types/public';
+import type { MediaOut, StoryShotItem } from '@/types/public';
 import { cn } from '@/utils/cn';
 import { useDocumentTitle } from '@/utils/motion';
+
+import { useSiteConfig } from './siteContent';
 
 /**
  * Story Shots (pitch §2): pictures only.
@@ -31,29 +31,69 @@ import { useDocumentTitle } from '@/utils/motion';
  * progress bar and controls on top and Read story / Share at the bottom.
  * Tapping a shelf picture opens the deck at that shot.
  *
- * The source is the short-news feed: the newsroom already writes a headline
- * and a short text for those. Until there are short items, the newest
- * stories with a photograph stand in.
+ * The pictures are only the ones uploaded in CMS → Story Shots, in the order
+ * the desk set there — never article photos. With none uploaded, the home
+ * shelf is hidden and the page says Story Shots are on the way.
  */
 
-const SHOTS_LIMIT = 12;
+/** One uploaded picture, ready for the shelf and the deck. */
+interface Shot {
+  key: string;
+  media: MediaOut;
+  title_te: string;
+  title_en: string;
+  /** "Read story" target: a page on the site or an https address; '' for none. */
+  link: string;
+  external: boolean;
+  /** Share target: the deck opened at this shot. */
+  shareUrl: string;
+}
 
-function useShots() {
-  return useQuery({
-    queryKey: ['public', 'story-shots'],
-    queryFn: async () => {
-      // The newest stories that have a picture.
-      const latest = (await publicApi.fetchFeed({ limit: SHOTS_LIMIT * 2 })).articles;
-      return latest.filter((a) => a.hero?.url).slice(0, SHOTS_LIMIT);
-    },
-    staleTime: 60_000,
-  });
+/** An uploaded picture as the media shape NewsImage draws. */
+function pictureMedia(url: string): MediaOut {
+  return {
+    id: 0,
+    url,
+    srcset: null,
+    alt_te: null,
+    caption_te: null,
+    credit: null,
+    license_label: null,
+    representative: false,
+    source_url: null,
+    width: null,
+    height: null,
+    blurhash: null,
+    ai_generated: false,
+  };
+}
+
+function fromUpload(shot: StoryShotItem): Shot {
+  return {
+    key: shot.id,
+    media: pictureMedia(shot.image_url),
+    title_te: shot.title_te,
+    title_en: shot.title_en,
+    link: shot.link,
+    external: shot.link.startsWith('https:'),
+    shareUrl: `/story-shots?start=${encodeURIComponent(shot.id)}`,
+  };
+}
+
+function useShots(): { data: Shot[]; isLoading: boolean } {
+  const config = useSiteConfig();
+  const uploaded = config.data?.content?.story_shots?.shots;
+  const data = useMemo(() => (uploaded ?? []).map(fromUpload), [uploaded]);
+  return { data, isLoading: config.isLoading };
 }
 
 /** The headline, for each shot's accessible name and share text. */
-function useShotParts(article: ArticleCard) {
+function useShotParts(shot: Shot) {
   const s = useScript();
-  return { head: s.text(article.title_te, article.title_en) };
+  const { language } = useI18n();
+  const head = s.text(shot.title_te, shot.title_en);
+  if (head.text) return { head };
+  return { head: { ...head, text: language === 'te' ? 'స్టోరీ షాట్స్' : 'Story Shots' } };
 }
 
 /* ------------------------------------------------------------------------ */
@@ -61,15 +101,15 @@ function useShotParts(article: ArticleCard) {
 /* ------------------------------------------------------------------------ */
 
 /** A home shelf tile: just the picture; the headline is its accessible name. */
-function ShelfCard({ article }: { article: ArticleCard }) {
-  const p = useShotParts(article);
+function ShelfCard({ shot }: { shot: Shot }) {
+  const p = useShotParts(shot);
   return (
     <Link
-      to={`/story-shots?start=${article.short_id}`}
+      to={`/story-shots?start=${encodeURIComponent(shot.key)}`}
       aria-label={p.head.text}
       className="group block overflow-hidden rounded-2xl shadow-card transition-[box-shadow,transform] duration-base hover:-translate-y-0.5 hover:shadow-raised motion-reduce:transform-none"
     >
-      <NewsImage media={article.hero} ratio="9/16" radius="2xl" sizes="(min-width: 768px) 25vw, 46vw" />
+      <NewsImage media={shot.media} ratio="9/16" radius="2xl" sizes="(min-width: 768px) 25vw, 46vw" />
     </Link>
   );
 }
@@ -78,7 +118,7 @@ function ShelfCard({ article }: { article: ArticleCard }) {
 export function StoryShotsStrip() {
   const { language } = useI18n();
   const shots = useShots();
-  const items = shots.data ?? [];
+  const items = shots.data;
   if (!items.length) return null;
 
   return (
@@ -94,9 +134,9 @@ export function StoryShotsStrip() {
         toLabel={language === 'te' ? 'అన్నీ చూడండి' : 'View all'}
       />
       <ul className="-mx-3 flex snap-x snap-mandatory scroll-px-3 gap-3 overflow-x-auto px-3 pb-2 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-4 md:overflow-visible md:px-0 md:pb-0">
-        {items.slice(0, 4).map((article) => (
-          <li key={article.short_id} className="w-[46%] shrink-0 snap-start sm:w-[42%] md:w-auto">
-            <ShelfCard article={article} />
+        {items.slice(0, 4).map((shot) => (
+          <li key={shot.key} className="w-[46%] shrink-0 snap-start sm:w-[42%] md:w-auto">
+            <ShelfCard shot={shot} />
           </li>
         ))}
       </ul>
@@ -116,16 +156,15 @@ const SHOT_SECONDS = 9;
  * headline stays as its accessible name; a slim bar at the bottom keeps the
  * way to the full story and sharing.
  */
-function Poster({ article }: { article: ArticleCard }) {
+function Poster({ shot }: { shot: Shot }) {
   const { language } = useI18n();
   const te = language === 'te';
-  const p = useShotParts(article);
-  const hasStory = article.reading_time_sec > 0;
+  const p = useShotParts(shot);
 
   return (
     <div className="relative h-full bg-ink">
       <NewsImage
-        media={article.hero}
+        media={shot.media}
         ratio="auto"
         radius="none"
         priority
@@ -137,15 +176,16 @@ function Poster({ article }: { article: ArticleCard }) {
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-overlay/70 to-transparent" />
       <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-overlay/70 to-transparent" />
       <div className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-end gap-2 p-3 md:p-4">
-        {hasStory ? (
-          <ButtonLink to={article.url} variant="wow" size="sm" iconRight={ArrowRight}>
+        {shot.link ? (
+          <ButtonLink to={shot.link} external={shot.external} variant="wow" size="sm" iconRight={ArrowRight}>
             {te ? 'కథ చదవండి' : 'Read story'}
           </ButtonLink>
         ) : null}
         <ShareButton
-          shortId={article.short_id}
-          url={article.url}
+          shortId={shot.key}
+          url={shot.shareUrl}
           title={p.head.text}
+          track={false}
           cardAvailable={false}
           className="bg-on-ink/15 text-on-ink hover:bg-on-ink/25"
         />
@@ -177,7 +217,7 @@ export default function StoryShotsPage() {
   useDocumentTitle(te ? 'స్టోరీ షాట్స్' : 'Story Shots');
   const navigate = useNavigate();
   const shots = useShots();
-  const items = useMemo(() => shots.data ?? [], [shots.data]);
+  const items = shots.data;
   const [params] = useSearchParams();
   const start = params.get('start');
 
@@ -191,7 +231,7 @@ export default function StoryShotsPage() {
   // Open at the shot the reader tapped on the home shelf.
   useEffect(() => {
     if (!start || !items.length) return;
-    const at = items.findIndex((a) => a.short_id === start);
+    const at = items.findIndex((a) => a.key === start);
     if (at >= 0) setIndex(at);
   }, [start, items]);
 
@@ -235,7 +275,7 @@ export default function StoryShotsPage() {
     };
   }, []);
 
-  const article = items[index];
+  const shot = items[index];
   const upcoming = items[index + 1];
   const running = !paused && !held;
 
@@ -250,7 +290,7 @@ export default function StoryShotsPage() {
     );
   }
 
-  if (!article) {
+  if (!shot) {
     return (
       <div className={cn(shell, 'items-center justify-center p-6')}>
         <EmptyState
@@ -267,11 +307,11 @@ export default function StoryShotsPage() {
   return (
     <div className={shell} role="dialog" aria-modal="true" aria-label={te ? 'స్టోరీ షాట్స్' : 'Story Shots'}>
       {/* Blurred backdrop from the current photo (desktop only — on a phone the poster fills the screen). */}
-      {article.hero?.url ? (
+      {shot.media?.url ? (
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 hidden scale-110 bg-cover bg-center opacity-40 blur-3xl md:block"
-          style={{ backgroundImage: `url(${article.hero.url})` }}
+          style={{ backgroundImage: `url(${shot.media.url})` }}
         />
       ) : null}
 
@@ -289,7 +329,7 @@ export default function StoryShotsPage() {
 
         {/* The poster */}
         <article
-          key={article.short_id}
+          key={shot.key}
           className="relative h-full w-full animate-fade-in overflow-hidden bg-paper md:aspect-[9/16] md:h-full md:max-h-[880px] md:w-auto md:rounded-2xl md:shadow-raised"
           onPointerDown={() => setHeld(true)}
           onPointerUp={() => setHeld(false)}
@@ -310,18 +350,18 @@ export default function StoryShotsPage() {
             else (dy < 0 ? next : prev)();
           }}
         >
-          <Poster article={article} />
+          <Poster shot={shot} />
 
           {/* Top: progress + controls, over the photo. */}
           <div className="absolute inset-x-0 top-0 z-10 space-y-2.5 p-3 text-on-ink md:p-4">
             <div className="flex gap-1" aria-hidden>
               {items.map((a, i) => (
-                <span key={a.short_id} className="h-[3px] flex-1 overflow-hidden rounded-full bg-on-ink/35">
+                <span key={a.key} className="h-[3px] flex-1 overflow-hidden rounded-full bg-on-ink/35">
                   {i < index ? (
                     <span className="block h-full w-full bg-on-ink" />
                   ) : i === index ? (
                     <span
-                      key={`${a.short_id}-${index}`}
+                      key={`${a.key}-${index}`}
                       className="block h-full w-full origin-left bg-on-ink"
                       style={{
                         animation: reducedMotion ? 'none' : `wow-progress ${SHOT_SECONDS}s linear forwards`,
@@ -427,7 +467,7 @@ export default function StoryShotsPage() {
       </div>
 
       {/* Warm the next photo so the swipe never waits on the network. */}
-      {upcoming?.hero?.url ? <link rel="preload" as="image" href={upcoming.hero.url} /> : null}
+      {upcoming?.media?.url ? <link rel="preload" as="image" href={upcoming.media.url} /> : null}
     </div>
   );
 }

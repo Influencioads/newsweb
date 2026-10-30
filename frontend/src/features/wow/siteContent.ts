@@ -64,7 +64,9 @@ export const DEFAULT_CONTENT: SiteContent = {
       },
     ],
   },
+  story_shots: { shots: [] },
   nominate: {
+    image_url: '',
     categories: [
       { value: 'social-service', te: 'సామాజిక సేవ', en: 'Social Service' },
       { value: 'education', te: 'విద్య', en: 'Education' },
@@ -104,6 +106,7 @@ export function useSiteContent(): SiteContent {
     brand: { ...DEFAULT_CONTENT.brand, ...content?.brand },
     home: { ...DEFAULT_CONTENT.home, ...content?.home },
     radio: { ...DEFAULT_CONTENT.radio, ...content?.radio },
+    story_shots: { ...DEFAULT_CONTENT.story_shots, ...content?.story_shots },
     nominate: { ...DEFAULT_CONTENT.nominate, ...content?.nominate },
     contact: { ...DEFAULT_CONTENT.contact, ...content?.contact },
   };

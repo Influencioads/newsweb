@@ -376,3 +376,70 @@ def ensure_card(db, article: Article, *, force: bool = False) -> str | None:
             "share_card_failed", short_id=article.short_id, error=str(exc)[:200]
         )
         return None
+
+
+# --------------------------------------------------------------------------- #
+# link-preview photo
+# --------------------------------------------------------------------------- #
+#: Bump to re-crop every preview photo.
+PREVIEW_VERSION = 1
+
+#: WhatsApp drops to a small thumbnail, or no picture, for heavier images.
+_PREVIEW_MAX_BYTES = 280_000
+
+
+def render_preview(hero_url: str) -> bytes | None:
+    """The hero photograph alone, cover-cropped to 1200x630 around its centre.
+
+    WhatsApp often shows a link's picture as a small square cut from the
+    middle of og:image. The headline card puts text there, so that square
+    came out as half a photo and half a cut-off headline. The headline is
+    already the preview's title, so the picture is just the photo.
+    """
+    from PIL import Image
+
+    hero = _fetch_hero(hero_url)
+    if hero is None:
+        return None
+    ratio = max(CARD_W / hero.width, CARD_H / hero.height)
+    resized = hero.resize(
+        (max(1, round(hero.width * ratio)), max(1, round(hero.height * ratio))),
+        Image.Resampling.LANCZOS,
+    )
+    left = max(0, (resized.width - CARD_W) // 2)
+    top = max(0, (resized.height - CARD_H) // 2)
+    photo = resized.crop((left, top, left + CARD_W, top + CARD_H))
+    data = b""
+    for quality in (82, 74, 66, 58):
+        out = io.BytesIO()
+        photo.save(out, format="JPEG", quality=quality, optimize=True)
+        data = out.getvalue()
+        if len(data) <= _PREVIEW_MAX_BYTES:
+            break
+    return data
+
+
+def ensure_preview(db, article: Article) -> str | None:
+    """og:image for a story: its photo at 1200x630, or None without a usable
+    hero (the caller then uses the headline card). Never raises."""
+    hero = hero_media_url(db, article)
+    if not hero:
+        return None
+    try:
+        digest = hashlib.sha256(f"{PREVIEW_VERSION}\x1f{hero}".encode()).hexdigest()
+        key = f"share-cards/{article.short_id}/photo-{digest[:16]}.jpg"
+        storage = get_storage()
+        try:
+            if storage.exists(key):
+                return storage.url_for(key)
+        except Exception:  # noqa: BLE001 — a storage hiccup means re-render
+            pass
+        data = render_preview(hero)
+        if data is None:
+            return None
+        stored = storage.put(key, data, content_type="image/jpeg", cache_control=CACHE_CONTROL)
+        logger.info("share_preview_rendered", short_id=article.short_id, key=key)
+        return stored.url
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("share_preview_failed", short_id=article.short_id, error=str(exc)[:200])
+        return None

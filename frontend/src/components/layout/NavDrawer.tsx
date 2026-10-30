@@ -59,7 +59,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { to: '/radio', key: 'ui.wowRadio', icon: AudioLines, highlight: 'wow' },
   // The masthead already carries Nominate beside the wordmark, so the rails skip it.
   { to: '/nominate', key: 'ui.nominate', icon: Award, highlight: 'wow', drawerOnly: true },
-  { to: '/section/my-village-story', key: 'ui.myVillageStory', icon: Trees, highlight: 'wow' },
+  { to: '/my-village', key: 'ui.myVillageStory', icon: Trees, highlight: 'wow' },
   { to: '/story-shots', key: 'ui.storyShots', icon: GalleryVerticalEnd },
   { to: '/section/wow-news', key: 'ui.wowNews', icon: Newspaper, railOnly: true },
 ];

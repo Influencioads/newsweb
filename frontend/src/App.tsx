@@ -34,6 +34,8 @@ const MyEpaperPage = lazy(() => import('./pages/public/MyEpaperPage'));
 const epaperGate = (page: ReactElement) => (EPAPER_PUBLIC ? page : <Navigate to="/" replace />);
 const BulletinPage = lazy(() => import('./pages/public/BulletinPage'));
 const NominatePage = lazy(() => import('./features/wow/NominatePage'));
+const MyVillagePage = lazy(() => import('./features/wow/MyVillagePage'));
+const ShareVillagePage = lazy(() => import('./features/wow/ShareVillagePage'));
 const RadioPage = lazy(() => import('./features/wow/WowRadio'));
 const RadioSegmentPage = named(() => import('./features/wow/WowRadio'), 'RadioSegmentPage');
 const StoryShotsPage = lazy(() => import('./features/wow/StoryShots'));
@@ -193,6 +195,8 @@ export default function App() {
               <Route path="/radio/:segment" element={<RadioSegmentPage />} />
               <Route path="/explore" element={<ExplorePage />} />
               <Route path="/nominate" element={<NominatePage />} />
+              <Route path="/my-village" element={<MyVillagePage />} />
+              <Route path="/my-village/share" element={<ShareVillagePage />} />
               <Route path="/web-stories" element={<WebStoriesPage />} />
               <Route path="/author/:slug" element={<AuthorPage />} />
               <Route path="/tag/:slug" element={<TagPage />} />

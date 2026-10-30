@@ -40,7 +40,7 @@ BODY_MAX = 20_000
 
 #: Photographs per submission. A citizen journalist sends the scene, not an
 #: album, and four is what fits a hero plus a gallery strip.
-MAX_MEDIA = 4
+MAX_MEDIA = 5
 
 
 def plain_text_to_tiptap(text: str) -> dict[str, Any]:

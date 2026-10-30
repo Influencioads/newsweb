@@ -10,26 +10,30 @@ import { useI18n, useScript } from '@/i18n';
 import type { ArticleCard } from '@/types/public';
 import { cn } from '@/utils/cn';
 
+import { MY_VILLAGE_INTRO, MY_VILLAGE_PATH, MY_VILLAGE_TITLE } from './myVillage';
+
 /**
- * My Village (మై విలేజ్): the home page's village shelf, straight
- * under WOW Radio. Two stories from the my-village-story section, falling back
- * to the local sections while that one fills up.
+ * My Village (మై విలేజ్): the home page's village shelf, straight under WOW
+ * Radio — the "మన ఊరు.. మన గొప్పతనం!" introduction with a Click to know more
+ * button to /my-village, then two stories from the my-village-story section
+ * (topped up from the local sections while that one fills up).
  */
 
 const VILLAGE_SOURCES = ['my-village-story', 'local-hero', 'districts', 'andhra-pradesh', 'telangana'];
 
-/** Two stories: my-village-story first, topped up from the local sections. */
+/** Stories on the home shelf; the /my-village page asks for more. */
 const SHOWN = 2;
 
-async function fetchVillageStories(): Promise<{ slug: string; articles: ArticleCard[] }> {
+/** `count` stories: my-village-story first, topped up from the local sections. */
+export async function fetchVillageStories(count = SHOWN): Promise<{ slug: string; articles: ArticleCard[] }> {
   const articles: ArticleCard[] = [];
   let slug: string | null = null;
   for (const source of VILLAGE_SOURCES) {
-    if (articles.length >= SHOWN) break;
+    if (articles.length >= count) break;
     try {
-      const feed = await publicApi.fetchFeed({ category: source, limit: SHOWN });
+      const feed = await publicApi.fetchFeed({ category: source, limit: count });
       for (const a of feed.articles) {
-        if (articles.length < SHOWN && !articles.some((x) => x.short_id === a.short_id)) articles.push(a);
+        if (articles.length < count && !articles.some((x) => x.short_id === a.short_id)) articles.push(a);
       }
       if (feed.articles.length && !slug) slug = source;
     } catch {
@@ -40,13 +44,13 @@ async function fetchVillageStories(): Promise<{ slug: string; articles: ArticleC
 }
 
 /** Each card's wash: a colour at the top fading into the deep WOW blue. */
-const TINTS = [
+export const TINTS = [
   'from-wow/45 via-brand-deep/55 to-brand-deep',
   'from-hero/45 via-brand-deep/55 to-brand-deep',
 ] as const;
 
 /** A full-bleed photo card: tinted overlay, big headline, standfirst, button. */
-function VillageCard({ article, tint }: { article: ArticleCard; tint: string }) {
+export function VillageCard({ article, tint }: { article: ArticleCard; tint: string }) {
   const { language } = useI18n();
   const s = useScript();
   const head = s.text(article.title_te, article.title_en);
@@ -80,15 +84,31 @@ export function MyVillageStory() {
   const { language } = useI18n();
   const s = useScript();
   const te = language === 'te';
-  const stories = useQuery({ queryKey: ['wow', 'my-village-story'], queryFn: fetchVillageStories, staleTime: 120_000 });
+  const stories = useQuery({
+    queryKey: ['wow', 'my-village-story'],
+    queryFn: () => fetchVillageStories(),
+    staleTime: 120_000,
+  });
   const data = stories.data;
 
   return (
     <section aria-labelledby="my-village-story">
       <SectionHeader
-        title={<span id="my-village-story">{te ? 'మై విలేజ్' : 'My Village'}</span>}
+        title={<span id="my-village-story">{te ? MY_VILLAGE_TITLE.te : MY_VILLAGE_TITLE.en}</span>}
         to={data?.articles.length ? `/section/${data.slug}` : undefined}
       />
+      <div className="mb-5 space-y-2">
+        {(te ? MY_VILLAGE_INTRO.te : MY_VILLAGE_INTRO.en).map((para) => (
+          <p key={para} className={cn(s.body, s.te ? 'text-te-body-xs' : 'text-ui', 'max-w-4xl text-ink-soft')}>
+            {para}
+          </p>
+        ))}
+        <div className="pt-2">
+          <ButtonLink to={MY_VILLAGE_PATH} variant="wow" size="md" iconRight={ArrowRight}>
+            {te ? 'మరింత తెలుసుకోండి' : 'Click to know more'}
+          </ButtonLink>
+        </div>
+      </div>
 
       {data?.articles.length ? (
         // Two photo cards: one per row on phones, side by side from tablets up.

@@ -83,7 +83,7 @@ export function BottomNav() {
               {({ isActive }) => (
                 <>
                   {item.primary ? (
-                    <span className="flex h-7 w-12 items-center justify-center rounded-pill bg-wow-deep text-on-wow">
+                    <span className="flex h-7 w-12 items-center justify-center rounded-pill bg-gradient-to-br from-wow to-wow-deep text-on-wow">
                       <Icon icon={item.icon} size="md" />
                     </span>
                   ) : (

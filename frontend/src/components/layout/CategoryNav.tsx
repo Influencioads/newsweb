@@ -159,7 +159,7 @@ export function CategoryNav() {
                           'transition-[background-color,box-shadow] duration-base ease-standard',
                           s.body,
                           sc.highlight === 'wow'
-                            ? 'bg-wow-deep text-on-wow hover:bg-wow-deep/90'
+                            ? 'bg-gradient-to-br from-wow to-wow-deep text-on-wow hover:from-wow-deep'
                             : 'bg-hero text-on-ink hover:bg-hero/90',
                           isActive && 'ring-2 ring-ink/20 ring-offset-1',
                         )
@@ -248,7 +248,7 @@ export function MobileSectionsBar() {
       {RAIL_SHORTCUTS.map((sc) =>
         sc.highlight ? (
           <NavLink key={sc.to} to={sc.to} tabIndex={copy ? -1 : undefined} className={pill}>
-            <span className="inline-flex h-7 items-center gap-1 rounded-pill bg-wow-deep px-2.5 text-ui-sm font-bold text-on-wow">
+            <span className="inline-flex h-7 items-center gap-1 rounded-pill bg-gradient-to-br from-wow to-wow-deep px-2.5 text-ui-sm font-bold text-on-wow">
               <Icon icon={sc.icon} size="xs" />
               {t(sc.key)}
             </span>

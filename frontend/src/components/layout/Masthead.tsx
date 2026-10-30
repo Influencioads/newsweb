@@ -146,7 +146,7 @@ export function Masthead() {
             <span
               className={cn(
                 s.body,
-                'inline-flex h-7 items-center gap-0.5 whitespace-nowrap rounded-pill bg-wow-deep px-2 text-meta font-bold leading-none text-on-wow shadow-card',
+                'inline-flex h-7 items-center gap-0.5 whitespace-nowrap rounded-pill bg-gradient-to-br from-wow to-wow-deep px-2 text-meta font-bold leading-none text-on-wow shadow-card',
               )}
             >
               <Icon icon={Award} size="xs" />

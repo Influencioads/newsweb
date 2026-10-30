@@ -62,7 +62,7 @@ export function HeroBanner({ stories }: { stories: ArticleCard[] }) {
 
       <div className="flex flex-col justify-center gap-4 p-5 pb-3 sm:p-7 sm:pb-3 md:min-h-[340px] md:max-w-[80%] md:p-10">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-pill bg-wow-deep px-3 py-1 font-sans text-meta font-bold uppercase tracking-wide text-on-wow">
+          <span className="inline-flex items-center gap-1.5 rounded-pill bg-gradient-to-br from-wow to-wow-deep px-3 py-1 font-sans text-meta font-bold uppercase tracking-wide text-on-wow">
             <Icon icon={Sparkles} size="xs" />
             Every Story Has a WOW!
           </span>
@@ -76,14 +76,14 @@ export function HeroBanner({ stories }: { stories: ArticleCard[] }) {
         <h1
           key={article.short_id}
           lang={head.lang}
-          className={cn(head.head, 'animate-fade-up text-headline-lg font-bold text-on-ink sm:text-headline-xl md:text-display')}
+          className={cn(head.head, 'animate-fade-up text-headline-md font-bold text-on-ink md:text-headline-lg')}
         >
           <Link to={article.url} className="hover:underline hover:decoration-wow hover:decoration-2 hover:underline-offset-8">
             {head.text}
           </Link>
         </h1>
         {article.summary_te ? (
-          <p lang="te" className="te te-clamp-3 max-w-2xl text-te-body-sm text-on-ink/85">
+          <p lang="te" className="te te-clamp-3 max-w-2xl text-te-body-xs text-on-ink/85">
             {article.summary_te}
           </p>
         ) : null}

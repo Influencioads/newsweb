@@ -63,7 +63,7 @@ const VARIANT: Record<ButtonVariant, string> = {
   // is white on the deep light-mode fills and ink on the lighter dark-mode ones.
   'on-fill': 'text-on-brand hover:bg-on-brand/10 focus-visible:outline-on-brand',
   // WOW orange call to action (Nominate, Radio, Story Shots).
-  wow: 'bg-wow-deep text-on-wow hover:bg-wow-deep/90',
+  wow: 'bg-gradient-to-br from-wow to-wow-deep text-on-wow hover:from-wow-deep',
   hero: 'bg-hero text-on-ink hover:bg-hero/90',
 };
 

@@ -145,39 +145,21 @@ function StatBlock({ stat, size }: { stat: Stat | null; size: 'sm' | 'lg' }) {
 /* Home shelf                                                               */
 /* ------------------------------------------------------------------------ */
 
-function ShelfCard({ article, n }: { article: ArticleCard; n: number }) {
-  const s = useScript();
+/** A home shelf tile: just the picture; the headline is its accessible name. */
+function ShelfCard({ article }: { article: ArticleCard }) {
   const p = useShotParts(article);
   return (
     <Link
       to={`/story-shots?start=${article.short_id}`}
-      className="group flex h-full flex-col overflow-hidden rounded-2xl border border-rule bg-surface transition-[border-color,box-shadow,transform] duration-base hover:-translate-y-0.5 hover:border-wow hover:shadow-raised motion-reduce:transform-none"
+      aria-label={p.head.text}
+      className="group block overflow-hidden rounded-2xl shadow-card transition-[box-shadow,transform] duration-base hover:-translate-y-0.5 hover:shadow-raised motion-reduce:transform-none"
     >
-      {/* Header band */}
-      <div className="flex items-center justify-between gap-2 bg-brand-deep px-3 py-2 text-on-ink">
-        <span className={cn(s.body, 'te-clamp-1 text-meta font-bold')}>{p.category ?? 'WOW'}</span>
-        <span className="shrink-0 font-sans text-eyebrow font-bold uppercase text-wow">#{n}</span>
-      </div>
-      {/* Photo panel */}
-      <div className="px-2.5 pt-2.5">
-        <NewsImage media={article.hero} ratio="16/10" radius="xl" sizes="200px" />
-      </div>
-      {/* Number + headline */}
-      <div className="flex min-h-0 flex-1 flex-col gap-1 px-3 pb-2 pt-2">
-        <StatBlock stat={p.stat} size="sm" />
-        <p lang={p.head.lang} className={cn(p.head.head, 'te-clamp-3 text-headline-xs font-bold text-ink')}>
-          {p.head.text}
-        </p>
-        <div className="mt-auto flex items-center gap-1 border-t border-dashed border-rule pt-1.5 text-muted">
-          <Icon icon={MapPin} size="xs" className="shrink-0 text-wow-deep" />
-          <span className={cn(s.body, 'te-clamp-1 text-meta')}>{p.place ?? p.when}</span>
-        </div>
-      </div>
+      <NewsImage media={article.hero} ratio="4/5" radius="2xl" sizes="(min-width: 768px) 25vw, 60vw" />
     </Link>
   );
 }
 
-/** Home shelf: one row of four infographic cards (sideways scroll on phones). */
+/** Home shelf: one row of four pictures (sideways scroll on phones). */
 export function StoryShotsStrip() {
   const { language } = useI18n();
   const shots = useShots();
@@ -197,9 +179,9 @@ export function StoryShotsStrip() {
         toLabel={language === 'te' ? 'అన్నీ చూడండి' : 'View all'}
       />
       <ul className="-mx-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-2 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-4 md:overflow-visible md:px-0 md:pb-0">
-        {items.slice(0, 4).map((article, i) => (
+        {items.slice(0, 4).map((article) => (
           <li key={article.short_id} className="w-[62%] shrink-0 snap-start sm:w-[44%] md:w-auto">
-            <ShelfCard article={article} n={i + 1} />
+            <ShelfCard article={article} />
           </li>
         ))}
       </ul>
@@ -233,7 +215,7 @@ function Poster({ article }: { article: ArticleCard }) {
         <NewsImage media={article.hero} ratio="auto" radius="none" priority className="h-full w-full" sizes="480px" />
         <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-overlay/80 via-overlay/10 to-transparent" />
         {p.category ? (
-          <span className={cn(s.body, 'absolute bottom-3 left-4 rounded-pill bg-wow-deep px-3 py-1 text-meta font-bold text-on-wow')}>
+          <span className={cn(s.body, 'absolute bottom-3 left-4 rounded-pill bg-gradient-to-br from-wow to-wow-deep px-3 py-1 text-meta font-bold text-on-wow')}>
             {p.category}
           </span>
         ) : null}
@@ -472,7 +454,7 @@ export default function StoryShotsPage() {
               ))}
             </div>
             <div className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-pill bg-wow-deep text-on-wow">
+              <span className="flex h-8 w-8 items-center justify-center rounded-pill bg-gradient-to-br from-wow to-wow-deep text-on-wow">
                 <Icon icon={GalleryVerticalEnd} size="sm" />
               </span>
               <div className="min-w-0 flex-1 leading-tight">
@@ -555,7 +537,7 @@ export default function StoryShotsPage() {
           aria-label={te ? 'తదుపరి' : 'Next'}
           className={cn(
             s.body,
-            'flex min-h-tap items-center gap-1.5 rounded-pill bg-wow-deep pl-4 pr-2 text-ui-sm font-bold text-on-wow transition active:scale-[.97] disabled:invisible',
+            'flex min-h-tap items-center gap-1.5 rounded-pill bg-gradient-to-br from-wow to-wow-deep pl-4 pr-2 text-ui-sm font-bold text-on-wow transition active:scale-[.97] disabled:invisible',
           )}
         >
           {te ? 'తదుపరి' : 'Next'}

@@ -368,11 +368,17 @@ export default function Articles() {
       render: (a) => {
         const cat = categoryOf(a.category_id);
         const sub = categoryOf(a.subcategory_id);
+        const more = (a.extra_category_ids ?? []).map(categoryOf).filter((c) => c !== undefined);
         if (!cat) return <span className="text-muted">—</span>;
         return (
           <span className={cn(s.body, 'text-ui-sm text-ink')}>
-            {te ? cat.name_te : cat.name_en}
+            <span className="font-semibold">{te ? cat.name_te : cat.name_en}</span>
             {sub ? <span className="block text-meta text-muted">{te ? sub.name_te : sub.name_en}</span> : null}
+            {more.map((c) => (
+              <span key={c.id} className="block text-meta text-muted">
+                + {te ? c.name_te : c.name_en}
+              </span>
+            ))}
           </span>
         );
       },

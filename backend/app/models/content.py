@@ -460,6 +460,13 @@ class Article(PKMixin, TimestampMixin, SoftDeleteMixin, ActorMixin, Base):
     tags: Mapped[list["ArticleTag"]] = relationship(
         back_populates="article", cascade="all, delete-orphan"
     )
+    #: Up to three more sections the story also appears in, besides
+    #: `category_id` (which still gives the URL and the label).
+    extra_categories: Mapped[list["ArticleCategory"]] = relationship(
+        back_populates="article",
+        cascade="all, delete-orphan",
+        order_by="ArticleCategory.sort",
+    )
     aliases: Mapped[list["ArticleSearchAlias"]] = relationship(
         back_populates="article", cascade="all, delete-orphan"
     )
@@ -499,6 +506,24 @@ class ArticleTag(Base):
 
     article: Mapped["Article"] = relationship(back_populates="tags")
     tag: Mapped["Tag"] = relationship(back_populates="articles", lazy="joined")
+
+
+class ArticleCategory(Base):
+    """A further section a story is listed in. The main one stays on
+    `articles.category_id`; these only add the story to more section pages."""
+
+    __tablename__ = "article_categories"
+    __table_args__ = (MYSQL_TABLE_ARGS,)
+
+    article_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("articles.id", ondelete="CASCADE"), primary_key=True
+    )
+    category_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("categories.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    sort: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    article: Mapped["Article"] = relationship(back_populates="extra_categories")
 
 
 class ArticleSearchAlias(PKMixin, Base):

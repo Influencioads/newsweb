@@ -336,7 +336,7 @@ class TestShortNews:
 
         r = publish()
         assert r.status_code == 422, r.text
-        assert "hero photo" in r.json()["error"]["message_en"]
+        assert "Main image" in r.json()["error"]["message_en"]
 
         hero = Media(type=MediaType.IMAGE, filename="hero.webp", mime="image/webp",
                      storage_provider="test", storage_key="images/test/e-hero.webp",
@@ -347,7 +347,7 @@ class TestShortNews:
         db.commit()
         r = publish()
         assert r.status_code == 422, r.text
-        assert "hero photo" in r.json()["error"]["message_en"]
+        assert "Main image" in r.json()["error"]["message_en"]
         db.refresh(article)
         assert article.workflow_state == WorkflowState.APPROVED
 

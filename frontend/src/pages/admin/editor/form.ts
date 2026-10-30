@@ -19,6 +19,8 @@ export interface ArticleForm {
   bodyImages: Record<string, BodyImage>;
   categoryId: number | null;
   subcategoryId: number | null;
+  /** More sections the story is also listed in (up to three). */
+  extraCategoryIds: number[];
   location: LocationValue;
   hero: CmsMediaRef | null;
   gallery: CmsMediaRef[];
@@ -51,6 +53,7 @@ export const EMPTY_FORM: ArticleForm = {
   bodyImages: {},
   categoryId: null,
   subcategoryId: null,
+  extraCategoryIds: [],
   location: { state: '', districtId: null, mandalId: null, localityId: null },
   hero: null,
   gallery: [],
@@ -196,6 +199,7 @@ export function fromArticle(a: CmsArticle): ArticleForm {
     bodyImages: extractImages(a.body),
     categoryId: a.category_id,
     subcategoryId: a.subcategory_id,
+    extraCategoryIds: a.extra_category_ids ?? [],
     location: { state: '', districtId: a.district_id, mandalId: a.mandal_id, localityId: a.locality_id },
     hero: a.hero_media,
     gallery: a.gallery ?? [],
@@ -229,6 +233,7 @@ export function toPayload(f: ArticleForm, canPin: boolean): Record<string, unkno
     body: bodyDoc(f.body, f.bodyImages),
     category_id: f.categoryId,
     subcategory_id: f.subcategoryId,
+    extra_category_ids: f.extraCategoryIds.filter((id) => id !== f.categoryId),
     district_id: f.location.districtId,
     mandal_id: f.location.mandalId,
     locality_id: f.location.localityId,

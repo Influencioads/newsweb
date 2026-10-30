@@ -12,7 +12,7 @@ from app.core.ratelimit import rate_limit
 from app.db.base import utcnow
 from app.db.session import get_db
 from app.models.audio import AudioAsset
-from app.models.content import Article, ArticleTag, Category
+from app.models.content import Article, ArticleCategory, ArticleTag, Category
 from app.models.discovery import Pin
 from app.models.enums import ArticleStatus, ArticleType, AuditAction, WorkflowState
 from app.models.geo import District, Mandal
@@ -89,7 +89,10 @@ _COLUMN_FIELDS = tuple(
 
 #: Eager-load for the list endpoints: one extra query for the whole page
 #: instead of two per row, and it is what makes `_list_row` free of DB access.
-_LIST_LOADS = (selectinload(Article.tags).selectinload(ArticleTag.tag),)
+_LIST_LOADS = (
+    selectinload(Article.tags).selectinload(ArticleTag.tag),
+    selectinload(Article.extra_categories),
+)
 
 
 def _tag_refs(article: Article) -> list[CmsTagRef]:
@@ -116,6 +119,7 @@ def _list_row(article: Article) -> CmsArticleOut:
     """
     payload = CmsArticleOut(**{name: getattr(article, name) for name in _COLUMN_FIELDS})
     payload.tags = _tag_refs(article)
+    payload.extra_category_ids = [link.category_id for link in article.extra_categories]
     return payload
 
 
@@ -145,6 +149,13 @@ def _out(db: Session, article: Article) -> CmsArticleOut:
         .all()
     )
     payload.gallery = [_media_ref(m) for m in gallery]
+    payload.extra_category_ids = list(
+        db.scalars(
+            select(ArticleCategory.category_id)
+            .where(ArticleCategory.article_id == article.id)
+            .order_by(ArticleCategory.sort)
+        )
+    )
     if article.video_id:
         video = db.get(Video, article.video_id)
         if video is not None:
@@ -206,10 +217,10 @@ def list_articles(
     if state:
         stmt = stmt.where(Article.workflow_state == state)
     if category_id:
-        # A story filed under a sub-section still belongs to its section.
-        stmt = stmt.where(
-            or_(Article.category_id == category_id, Article.subcategory_id == category_id)
-        )
+        # Its main section, its sub-section or one of its extra sections.
+        from app.repositories.article_repo import in_category
+
+        stmt = stmt.where(in_category(category_id))
     if search:
         term = f"%{search.strip()}%"
         stmt = stmt.where(

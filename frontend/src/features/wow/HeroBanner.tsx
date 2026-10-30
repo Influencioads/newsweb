@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 
 import { ShareButton } from '@/components/article/ShareSheet';
+import { NewsImage } from '@/components/media/NewsImage';
 import { ButtonLink } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { useI18n, useScript } from '@/i18n';
@@ -57,7 +58,15 @@ export function HeroBanner({ stories }: { stories: ArticleCard[] }) {
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
     >
-      {/* No photos: the banner is the deep-blue WOW panel with an orange glow. */}
+      {/* The story's photo fills the banner under a deep-blue wash (solid on
+          the left where the copy sits, clearing to the right) and an orange glow. */}
+      <div aria-hidden key={`bg-${article.short_id}`} className="absolute inset-0 -z-10 animate-fade-in">
+        <NewsImage media={article.hero} ratio="auto" radius="none" priority className="h-full w-full" sizes="100vw" />
+      </div>
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-10 bg-gradient-to-t from-brand-deep via-brand-deep/85 to-brand-deep/40 md:bg-gradient-to-r md:from-brand-deep md:via-brand-deep/80 md:to-brand-deep/10"
+      />
       <div aria-hidden className="absolute -left-20 -top-24 -z-10 h-72 w-72 rounded-full bg-wow/25 blur-3xl" />
 
       <div className="flex flex-col justify-center gap-4 p-5 pb-3 sm:p-7 sm:pb-3 md:min-h-[340px] md:max-w-[80%] md:p-10">

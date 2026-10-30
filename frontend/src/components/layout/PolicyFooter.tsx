@@ -62,12 +62,12 @@ export function PolicyFooter() {
       <PageContainer width="site">
         {/* `ui.more`, not `ui.explore` — the header rail already owns that name. */}
         <nav aria-label={t('ui.more')} className="space-y-9 py-10">
-          {/* All twelve WOW categories as an even grid of icon chips: 2, 3, then 6 across. */}
+          {/* All fourteen WOW categories as an even grid of icon chips: 2, 3, then 7 across. */}
           <section aria-labelledby="footer-sections">
             <h2 id="footer-sections" className={cn(s.head, 'mb-3 text-headline-xs font-bold text-on-ink')}>
               {t('ui.categories')}
             </h2>
-            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
               {WOW_FEATURES.map((f) => {
                 const label = s.forText(f.te, f.en);
                 return (

@@ -250,6 +250,7 @@ export const STRINGS = {
   'ui.shorts': { te: 'షార్ట్స్', en: 'Shorts' },
   'ui.storyShots': { te: 'స్టోరీ షాట్స్', en: 'Story Shots' },
   'ui.myVillageStory': { te: 'మై విలేజ్ స్టోరీ', en: 'My Village Story' },
+  'ui.wowNews': { te: 'వావ్ న్యూస్', en: 'WOW News' },
   'ui.wowRadio': { te: 'వావ్ రేడియో', en: 'WOW Radio' },
   'ui.nominate': { te: 'మీ లోకల్ హీరోని నామినేట్ చేయండి', en: 'Nominate Your Local Hero' },
   'ui.explore': { te: 'ఇంకా చూడండి', en: 'Explore' },

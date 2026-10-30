@@ -45,6 +45,8 @@ export interface Shortcut {
   highlight?: 'wow' | 'hero';
   /** Kept out of the section rails (the drawer still lists it). */
   drawerOnly?: boolean;
+  /** Only in the section rails (the drawer lists it with the categories). */
+  railOnly?: boolean;
 }
 
 /**
@@ -59,7 +61,11 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { to: '/nominate', key: 'ui.nominate', icon: Award, highlight: 'wow', drawerOnly: true },
   { to: '/section/my-village-story', key: 'ui.myVillageStory', icon: Trees, highlight: 'wow' },
   { to: '/story-shots', key: 'ui.storyShots', icon: GalleryVerticalEnd },
+  { to: '/section/wow-news', key: 'ui.wowNews', icon: Newspaper, railOnly: true },
 ];
+
+/** The drawer's shortcut rows; categories it already lists further down are left out. */
+const DRAWER_SHORTCUTS = SHORTCUTS.filter((sc) => !sc.railOnly);
 
 /** §12.5 — Grievance Officer, correction policy and AI disclosure, live at launch. */
 /** Footer "Company" column: the first five of FOOTER_LINKS. The rest are policies. */
@@ -136,7 +142,7 @@ export function NavDrawer({ open, onClose }: NavDrawerProps) {
             </NavLink>
           </li>
           )}
-          {SHORTCUTS.map((sc) => (
+          {DRAWER_SHORTCUTS.map((sc) => (
             <li key={sc.to}>
               <NavLink
                 to={sc.to}
@@ -171,7 +177,7 @@ export function NavDrawer({ open, onClose }: NavDrawerProps) {
         )}
 
         <Group title={t('ui.moreCategories')}>
-          {MORE_FEATURES.map((f) => {
+          {MORE_FEATURES.filter((f) => !DRAWER_SHORTCUTS.some((sc) => sc.to === f.to)).map((f) => {
             const label = s.forText(f.te, f.en);
             return (
               <li key={f.slug}>

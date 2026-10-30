@@ -450,6 +450,34 @@ def approver_may_self_approve(db: Session, user_id: int) -> bool:
     return user is not None and build_principal(user, "").level >= LEVEL_SELF_APPROVE
 
 
+def _usable_photo(media: Media | None) -> bool:
+    return media is not None and media.deleted_at is None and media.mime.startswith("image/")
+
+
+def _first_story_photo(db: Session, article: Article) -> Media | None:
+    """The first usable photo the story already carries: its gallery in order,
+    then the pictures placed between paragraphs."""
+    gallery = db.scalars(
+        select(Media)
+        .join(ArticleMedia, ArticleMedia.media_id == Media.id)
+        .where(ArticleMedia.article_id == article.id, ArticleMedia.role == "gallery")
+        .order_by(ArticleMedia.sort)
+    ).all()
+    for media in gallery:
+        if _usable_photo(media):
+            return media
+    for node in (article.body or {}).get("content") or []:
+        if node.get("type") != "image":
+            continue
+        try:
+            media = db.get(Media, int((node.get("attrs") or {}).get("media_id")))
+        except (TypeError, ValueError):
+            continue
+        if _usable_photo(media):
+            return media
+    return None
+
+
 def transition(
     db: Session,
     principal: Principal,
@@ -523,10 +551,23 @@ def transition(
         # photo. Asked before the trusted branch below writes anything, and of
         # the picture itself — a hero deleted from the library is no photo.
         hero = db.get(Media, article.hero_media_id) if article.hero_media_id else None
-        if hero is None or hero.deleted_at is not None or not hero.mime.startswith("image/"):
+        if not _usable_photo(hero):
+            # A story that has photos but no main image chosen leads with its
+            # first one (gallery first, then a picture inside the body), so
+            # "one main image, the rest optional" never blocks a publish.
+            hero = _first_story_photo(db, article)
+            if hero is not None:
+                article.hero_media_id = hero.id
+        if not _usable_photo(hero):
             raise ValidationError(
-                message_en="Add a hero photo before publishing: a story without a photo is never published.",
-                message_te="ప్రచురించే ముందు ప్రధాన ఫోటో జత చేయండి — ఫోటో లేని వార్త ప్రచురించబడదు.",
+                message_en=(
+                    "This story has no photo. Open it, choose a Main image under "
+                    "Pictures & video, press Save, then publish."
+                ),
+                message_te=(
+                    "ఈ కథనానికి ఫోటో లేదు. కథనాన్ని తెరిచి, చిత్రాలు & వీడియోలో ప్రధాన "
+                    "చిత్రం ఎంచుకుని, సేవ్ చేసి, తర్వాత ప్రచురించండి."
+                ),
                 details={"hero_media_id": "a usable photo is required"},
             )
         if trusted:

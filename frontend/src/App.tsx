@@ -99,6 +99,8 @@ const adminDiscovery = () => import('./pages/admin/DiscoveryPages');
 const AdsPage = named(adminDiscovery, 'AdsPage');
 const AnalyticsPage = named(adminDiscovery, 'AnalyticsPage');
 const HomepageSectionsPage = named(adminDiscovery, 'HomepageSectionsPage');
+const SiteContentPage = named(() => import('./pages/admin/SiteContentPage'), 'SiteContentPage');
+const SitePagesPage = named(() => import('./pages/admin/SitePagesPage'), 'SitePagesPage');
 const NotificationsAdminPage = named(adminDiscovery, 'NotificationsAdminPage');
 const PinsPage = named(adminDiscovery, 'PinsPage');
 const TrendingAdminPage = named(adminDiscovery, 'TrendingAdminPage');
@@ -237,6 +239,8 @@ export default function App() {
                 <Route path="/admin/videos" element={<VideosAdminPage />} />
                 <Route path="/admin/ads" element={<AdsPage />} />
                 <Route path="/admin/homepage" element={<HomepageSectionsPage />} />
+                <Route path="/admin/site-content" element={<SiteContentPage />} />
+                <Route path="/admin/pages" element={<SitePagesPage />} />
                 <Route path="/admin/notifications" element={<NotificationsAdminPage />} />
                 <Route path="/admin/taxonomy" element={<TaxonomyPage />} />
                 <Route path="/admin/media" element={<MediaPage />} />

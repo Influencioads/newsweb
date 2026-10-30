@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Ghost, Lightbulb, Newspaper, Pause, Play, Square, Sunrise, type LucideIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pause, Play, Square, type LucideIcon } from 'lucide-react';
 
 import { Icon } from '@/components/ui/Icon';
 import { PageContainer } from '@/components/ui/Layout';
@@ -10,13 +10,18 @@ import { audioQuery } from '@/components/article/AudioPlayer';
 import { useTts } from '@/features/reader/tts';
 import { usePlayer, type Track } from '@/stores/player';
 import { useI18n, useScript } from '@/i18n';
-import type { ArticleCard } from '@/types/public';
+import type { ArticleCard, RadioSegment } from '@/types/public';
 import { cn } from '@/utils/cn';
 import { useDocumentTitle } from '@/utils/motion';
 
+import { wowIcon } from './icons';
+import { DEFAULT_CONTENT, DEFAULT_RADIO_IMAGE, useSiteContent } from './siteContent';
+
 /**
  * WOW Radio (pitch §2): a highlighted audio player with four segments —
- * Morning Mantra, Spoorthi, WOW News and Mystery.
+ * Morning Mantra, Spoorthi, WOW News and Mystery. The segments (names, lines,
+ * icons, colours, categories) and the card picture are edited in CMS → Site
+ * content → WOW Radio; the defaults are in ./siteContent.
  *
  * The four segments sit as a 2 × 2 grid of tiles on the home card (a row of
  * four on /radio), each with its own icon, colour and line. Tapping one opens
@@ -42,51 +47,38 @@ interface Segment {
   categories: string[];
 }
 
-export const SEGMENTS: readonly Segment[] = [
-  {
-    id: 'morning-mantra',
-    te: 'మార్నింగ్ మంత్ర',
-    en: 'Morning Mantra',
-    taglineTe: 'రోజుకు సానుకూల ఆరంభం',
-    taglineEn: 'A positive start to the day',
-    icon: Sunrise,
-    tone: 'from-wow to-wow-deep',
-    categories: ['morning-mantra', 'devotional'],
-  },
-  {
-    id: 'spoorthi',
-    te: 'స్ఫూర్తి',
-    en: 'Spoorthi',
-    taglineTe: 'హీరోల కథలు, విజయ గాథలు',
-    taglineEn: 'Hero stories that inspire',
-    icon: Lightbulb,
-    tone: 'from-success/80 to-success',
-    categories: ['real-heroes', 'zero-to-hero', 'inspiring'],
-  },
-  {
-    id: 'wow-news',
-    te: 'వావ్ న్యూస్',
-    en: 'WOW News',
-    taglineTe: 'వావ్ అనిపించే వార్తలు',
-    taglineEn: 'News that makes you say WOW',
-    icon: Newspaper,
-    tone: 'from-brand to-brand-dark',
-    categories: ['jai-telugoda', 'business-guru', 'wow-tech', 'startup-stories', 'wow-idea'],
-  },
-  {
-    id: 'mystery',
-    te: 'మిస్టరీ',
-    en: 'Mystery',
-    taglineTe: 'వివరించలేని సంఘటనలు, రహస్యాలు',
-    taglineEn: 'Unexplained events and secrets',
-    icon: Ghost,
-    tone: 'from-ai to-ai-text',
-    categories: ['mystery', 'wow-puranam'],
-  },
-];
+/** The CMS's tone names (backend site_content.RADIO_TONES) as theme gradients. */
+const TONES: Record<string, string> = {
+  orange: 'from-wow to-wow-deep',
+  green: 'from-success/80 to-success',
+  blue: 'from-brand to-brand-dark',
+  purple: 'from-ai to-ai-text',
+};
+
+const toSegment = (sg: RadioSegment): Segment => ({
+  id: sg.id,
+  te: sg.te,
+  en: sg.en,
+  taglineTe: sg.tagline_te,
+  taglineEn: sg.tagline_en || sg.tagline_te,
+  icon: wowIcon(sg.icon),
+  tone: TONES[sg.tone] ?? TONES.orange!,
+  categories: sg.categories,
+});
+
+/** The segments and the card picture, as set in CMS → Site content → WOW Radio. */
+function useRadio(): { segments: Segment[]; image: string } {
+  const { radio } = useSiteContent();
+  // Memoised on the stored list: the player's effects key on the segment, so a
+  // fresh array every render would restart them forever.
+  const segments = useMemo(
+    () => (radio.segments.length ? radio.segments : DEFAULT_CONTENT.radio.segments).map(toSegment),
+    [radio.segments],
+  );
+  return { segments, image: radio.image_url || DEFAULT_RADIO_IMAGE };
+}
 
 const PER_SEGMENT = 5;
-const DEFAULT_SEGMENT: Segment = SEGMENTS[0] as Segment;
 
 async function fetchSegment(segment: Segment): Promise<ArticleCard[]> {
   for (const category of segment.categories) {
@@ -147,16 +139,18 @@ function SegmentTiles({
   const { language } = useI18n();
   const s = useScript();
   const te = language === 'te';
+  const { segments } = useRadio();
   return (
-    <ul className={cn('relative grid gap-2.5', large ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-2')}>
-      {SEGMENTS.map((sg) => {
+    // auto-rows-fr: every tile as tall as the tallest, so a line that wraps doesn't make one tile stick out.
+    // The large tiles (icon, name, line, play in a row) need a tablet's width for two across: this
+    // site's `sm` is 390px, an ordinary phone, where two columns crushed the text to a letter a line.
+    <ul className={cn('relative grid auto-rows-fr gap-2.5', large ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-2')}>
+      {segments.map((sg) => {
         const current = active === sg.id;
         const live = current && playState === 'speaking';
         const name = te ? sg.te : sg.en;
         const playMark = cn(
-          'flex shrink-0 items-center justify-center rounded-pill bg-on-ink text-wow-deep shadow-raised transition-transform duration-base hover:scale-110 motion-reduce:transform-none',
-          // On the small home tiles the play button sits in the corner so it never covers the name.
-          large ? 'h-8 w-8' : 'absolute right-2 top-2 z-10 h-7 w-7 md:h-8 md:w-8',
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-pill bg-on-ink text-wow-deep shadow-raised transition-transform duration-base group-hover/play:scale-110 motion-reduce:transform-none',
           current && 'ring-2 ring-wow',
         );
         return (
@@ -173,17 +167,17 @@ function SegmentTiles({
                 'flex h-full text-left',
                 // Phone: icon on top (play button beside it), name and English underneath,
                 // so a long Telugu name never runs into the play button.
-                large ? 'items-center gap-3 p-4' : 'flex-col items-start gap-1.5 p-2.5 md:flex-row md:items-center md:gap-3 md:p-3 md:pr-11',
+                large ? 'items-center gap-3 p-4' : 'flex-col items-start gap-2 p-3 md:flex-row md:items-center md:gap-3 md:pr-12',
               )}
             >
               <span
                 className={cn(
                   'flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-on-ink shadow-raised',
-                  large ? 'h-14 w-14' : 'h-8 w-8 md:h-11 md:w-11',
+                  large ? 'h-14 w-14' : 'h-10 w-10 md:h-11 md:w-11',
                   sg.tone,
                 )}
               >
-                <Icon icon={sg.icon} size={large ? 'lg' : 'sm'} />
+                <Icon icon={sg.icon} size={large ? 'lg' : 'md'} />
               </span>
               <span className="min-w-0 w-full flex-1 md:w-auto">
                 <span lang="te" className={cn('te block font-bold leading-snug', large ? 'text-te-body-sm' : 'text-te-body-xs')}>
@@ -206,20 +200,24 @@ function SegmentTiles({
                 </span>
               </span>
               {!onPlay ? (
-                <span aria-hidden className={playMark}>
+                <span aria-hidden className={cn(playMark, 'group-hover:scale-110')}>
                   <Icon icon={Play} size="xs" />
                 </span>
               ) : null}
             </Link>
             {onPlay ? (
+              // A full 44px tap area in the tile's corner, so it never covers the
+              // name; the white circle inside stays small.
               <button
                 type="button"
                 onClick={() => onPlay(sg.id)}
                 aria-label={live ? `${te ? 'ఆపు' : 'Pause'} · ${name}` : `${te ? 'ప్లే' : 'Play'} · ${name}`}
                 aria-pressed={live}
-                className={playMark}
+                className="group/play absolute right-1 top-1 z-10 flex h-11 w-11 items-center justify-center rounded-pill md:top-1/2 md:-translate-y-1/2"
               >
-                <Icon icon={live ? Pause : Play} size="xs" />
+                <span className={playMark}>
+                  <Icon icon={live ? Pause : Play} size="xs" />
+                </span>
               </button>
             ) : null}
           </li>
@@ -247,10 +245,12 @@ function useRadioPlayer(initial: string | null = null) {
   const [startWhenReady, setStartWhenReady] = useState(false);
   const [mode, setMode] = useState<'server' | 'voice' | null>(null);
   const [trackIds, setTrackIds] = useState<string[]>([]);
-  const segment = SEGMENTS.find((sg) => sg.id === active) ?? null;
+  const { segments } = useRadio();
+  const segment = segments.find((sg) => sg.id === active) ?? null;
   const programme = useQuery({
-    queryKey: ['wow-radio', active],
-    queryFn: () => fetchSegment(segment ?? DEFAULT_SEGMENT),
+    // Segments are edited in the CMS; the key carries its categories so an edit refetches.
+    queryKey: ['wow-radio', active, segment?.categories.join(',')],
+    queryFn: () => (segment ? fetchSegment(segment) : Promise.resolve([])),
     enabled: Boolean(segment),
     staleTime: 120_000,
   });
@@ -376,6 +376,7 @@ export function WowRadio({ variant = 'card' }: { variant?: 'card' | 'page' }) {
   const te = language === 'te';
   const page = variant === 'page';
   const radio = useRadioPlayer();
+  const { image } = useRadio();
 
   return (
     <section
@@ -393,7 +394,7 @@ export function WowRadio({ variant = 'card' }: { variant?: 'card' | 'page' }) {
 
       {page ? (
         <img
-          src="/wow-radio.webp"
+          src={image}
           alt={te ? 'వావ్ రేడియో' : 'WOW Radio'}
           width={960}
           height={540}
@@ -405,7 +406,7 @@ export function WowRadio({ variant = 'card' }: { variant?: 'card' | 'page' }) {
         <div className="flex items-center gap-3">
           {!page ? (
             <img
-              src="/wow-radio.webp"
+              src={image}
               alt=""
               width={960}
               height={540}
@@ -427,9 +428,14 @@ export function WowRadio({ variant = 'card' }: { variant?: 'card' | 'page' }) {
         {!page ? (
           <Link
             to="/radio"
-            className={cn(s.body, 'rounded-xl px-2 py-1 text-ui-sm font-semibold text-wow underline-offset-4 hover:underline')}
+            className={cn(
+              s.body,
+              'inline-flex min-h-tap items-center gap-1 rounded-pill border border-wow/70 px-4 text-ui-sm font-semibold text-wow',
+              'transition-colors duration-base hover:bg-wow hover:text-on-wow',
+            )}
           >
             {te ? 'వినడానికి క్లిక్ చేయండి' : 'Click to listen'}
+            <Icon icon={ChevronRight} size="sm" />
           </Link>
         ) : null}
       </div>
@@ -479,7 +485,8 @@ export default function RadioPage() {
  */
 export function RadioSegmentPage() {
   const { segment: segmentId } = useParams();
-  const segment = SEGMENTS.find((sg) => sg.id === segmentId);
+  const { segments } = useRadio();
+  const segment = segments.find((sg) => sg.id === segmentId);
   if (!segment) return <Navigate to="/radio" replace />;
   // Keyed, so moving to another segment starts that one's player fresh.
   return <SegmentView key={segment.id} segment={segment} />;
@@ -490,6 +497,7 @@ function SegmentView({ segment }: { segment: Segment }) {
   const s = useScript();
   const te = language === 'te';
   useDocumentTitle(`${te ? segment.te : segment.en} · ${te ? 'వావ్ రేడియో' : 'WOW Radio'}`);
+  const { segments, image } = useRadio();
 
   const radio = useRadioPlayer(segment.id);
   const items = radio.items;
@@ -558,7 +566,7 @@ function SegmentView({ segment }: { segment: Segment }) {
             <p className={cn(s.body, 'text-ui-sm text-on-ink/80')}>{te ? segment.taglineTe : segment.taglineEn}</p>
           </div>
           <img
-            src="/wow-radio.webp"
+            src={image}
             alt=""
             width={960}
             height={540}
@@ -623,8 +631,8 @@ function SegmentView({ segment }: { segment: Segment }) {
       {/* The other three segments */}
       <nav aria-label={te ? 'ఇతర సెగ్మెంట్లు' : 'Other segments'} className="space-y-2">
         <p className={cn(s.body, 'text-ui-sm font-semibold text-ink-soft')}>{te ? 'ఇతర సెగ్మెంట్లు' : 'Other segments'}</p>
-        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          {SEGMENTS.filter((sg) => sg.id !== segment.id).map((sg) => (
+        <ul className="grid grid-cols-1 gap-2 md:grid-cols-3">
+          {segments.filter((sg) => sg.id !== segment.id).map((sg) => (
             <li key={sg.id}>
               <Link
                 to={`/radio/${sg.id}`}

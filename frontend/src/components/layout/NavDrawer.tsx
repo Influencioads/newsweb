@@ -7,7 +7,7 @@ import { Sheet } from '@/components/ui/Dialog';
 import { Icon, type LucideIcon } from '@/components/ui/Icon';
 import { EPAPER_PUBLIC } from '@/features/epaper/api';
 import * as publicApi from '@/features/public/api';
-import { MORE_FEATURES } from '@/features/wow/categories';
+import { featuresFrom } from '@/features/wow/siteContent';
 import { useI18n, useScript, type StringKey } from '@/i18n';
 import { useAuth } from '@/stores/auth';
 import { cn } from '@/utils/cn';
@@ -111,6 +111,7 @@ export function NavDrawer({ open, onClose }: NavDrawerProps) {
   const s = useScript();
   const { pathname } = useLocation();
   const { data: config } = useSiteConfig();
+  const moreFeatures = featuresFrom(config?.categories).filter((f) => !f.main);
   const authStatus = useAuth((a) => a.status);
   const me = useAuth((a) => a.me);
 
@@ -177,7 +178,7 @@ export function NavDrawer({ open, onClose }: NavDrawerProps) {
         )}
 
         <Group title={t('ui.moreCategories')}>
-          {MORE_FEATURES.filter((f) => !DRAWER_SHORTCUTS.some((sc) => sc.to === f.to)).map((f) => {
+          {moreFeatures.filter((f) => !DRAWER_SHORTCUTS.some((sc) => sc.to === f.to)).map((f) => {
             const label = s.forText(f.te, f.en);
             return (
               <li key={f.slug}>

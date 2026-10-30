@@ -6,7 +6,7 @@ import { PageContainer } from '@/components/ui/Layout';
 import { EPAPER_PUBLIC } from '@/features/epaper/api';
 import { VIDEOS_PUBLIC } from '@/features/public/api';
 import { useI18n, useScript, type StringKey } from '@/i18n';
-import { WOW_FEATURES } from '@/features/wow/categories';
+import { scriptOf, useLogoUrl, useSiteContent, useWowFeatures } from '@/features/wow/siteContent';
 import { cn } from '@/utils/cn';
 
 import { ABOUT_LINK_COUNT, FOOTER_LINKS } from './NavDrawer';
@@ -56,6 +56,11 @@ function Column({
 export function PolicyFooter() {
   const { t, pick } = useI18n();
   const s = useScript();
+  const features = useWowFeatures().all;
+  const logo = useLogoUrl();
+  const { brand } = useSiteContent();
+  const tagline = pick(brand.tagline_te, brand.tagline_en);
+  const taglineScript = scriptOf(tagline);
 
   return (
     <footer className="relative isolate mt-10 overflow-hidden bg-footer text-on-ink">
@@ -65,13 +70,13 @@ export function PolicyFooter() {
       <PageContainer width="site">
         {/* `ui.more`, not `ui.explore` — the header rail already owns that name. */}
         <nav aria-label={t('ui.more')} className="space-y-9 py-10">
-          {/* All fourteen WOW categories as an even grid of icon chips: 2, 3, then 7 across. */}
+          {/* The WOW categories (Taxonomy → "WOW category") as an even grid of icon chips: 2, 3, then 7 across. */}
           <section aria-labelledby="footer-sections">
             <h2 id="footer-sections" className={cn(s.head, 'mb-3 text-headline-xs font-bold text-on-ink')}>
               {t('ui.categories')}
             </h2>
             <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
-              {WOW_FEATURES.map((f) => {
+              {features.map((f) => {
                 const label = s.forText(f.te, f.en);
                 return (
                   <li key={f.slug}>
@@ -130,15 +135,15 @@ export function PolicyFooter() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-on-ink/15 py-6">
           <div className="flex flex-wrap items-center gap-3">
             <img
-              src="/wow-indian-logo.webp"
+              src={logo}
               alt="వావ్ ఇండియన్"
               width={960}
               height={260}
               loading="lazy"
               className="h-10 w-auto"
             />
-            <p lang="en" className="font-sans text-ui font-bold tracking-wide text-on-ink">
-              Ordinary People. Extraordinary Stories.
+            <p lang={taglineScript.lang} className={cn(taglineScript.cls, 'text-ui font-bold tracking-wide text-on-ink')}>
+              {tagline}
             </p>
           </div>
           <p lang="en" className="font-sans text-meta text-muted-inverse">

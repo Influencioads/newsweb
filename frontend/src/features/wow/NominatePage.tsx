@@ -18,7 +18,8 @@ import { useAuth } from '@/stores/auth';
 import { cn } from '@/utils/cn';
 import { useDocumentTitle } from '@/utils/motion';
 
-import { HERO_CATEGORIES, LOCAL_HERO_SLUG } from './categories';
+import { LOCAL_HERO_SLUG } from './categories';
+import { DEFAULT_CONTENT } from './siteContent';
 
 /**
  * Nominate Your Local Hero (pitch §4) — "మీ లోకల్ హీరోను ప్రపంచానికి పరిచయం చేయండి!"
@@ -120,7 +121,9 @@ export default function NominatePage() {
     const d = config.data?.districts.find((x) => x.slug === draft.district);
     return d ? d.name_te : draft.district;
   })();
-  const heroCategory = HERO_CATEGORIES.find((c) => c.value === draft.category);
+  // CMS → Site content → Nominate form.
+  const heroCategories = config.data?.content?.nominate?.categories ?? DEFAULT_CONTENT.nominate.categories;
+  const heroCategory = heroCategories.find((c) => c.value === draft.category);
 
   const errors = {
     name: draft.name.trim().length < 3 ? L('హీరో పూర్తి పేరు రాయండి.', "Enter the hero's full name.") : null,
@@ -279,7 +282,7 @@ export default function NominatePage() {
               <Field label={L('హీరో విభాగం', 'Hero category')} required error={show(errors.category)}>
                 <Select id="nominee-category" value={draft.category} onChange={(e) => set('category', e.target.value)}>
                   <option value="">{L('— ఎంచుకోండి —', '— choose —')}</option>
-                  {HERO_CATEGORIES.map((c) => (
+                  {heroCategories.map((c) => (
                     <option key={c.value} value={c.value}>
                       {pick(c.te, c.en)}
                     </option>

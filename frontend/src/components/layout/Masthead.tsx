@@ -11,6 +11,7 @@ import { Icon } from '@/components/ui/Icon';
 import { PageContainer } from '@/components/ui/Layout';
 import * as notificationsApi from '@/features/engagement/notificationsApi';
 import { EPAPER_PUBLIC } from '@/features/epaper/api';
+import { scriptOf, useSiteContent } from '@/features/wow/siteContent';
 import { LANGUAGE_LABELS, useI18n, useScript } from '@/i18n';
 import { useAuth } from '@/stores/auth';
 import { cn } from '@/utils/cn';
@@ -93,6 +94,9 @@ function LocationButton({ named = false, className }: { named?: boolean; classNa
 export function Masthead() {
   const { t, pick, language, setLanguage } = useI18n();
   const s = useScript();
+  const { brand } = useSiteContent();
+  const tagline = pick(brand.tagline_te, brand.tagline_en);
+  const taglineScript = scriptOf(tagline);
   const [settings, setSettings] = useState(false);
   const authStatus = useAuth((a) => a.status);
   const me = useAuth((a) => a.me);
@@ -126,17 +130,20 @@ export function Masthead() {
           className="order-first col-span-2 flex min-w-0 flex-col items-center gap-1 rounded-xl py-1 md:order-none md:col-span-1"
         >
           <Wordmark />
-          {/* Brand line: Ordinary People. Extraordinary Stories. */}
-          <span lang="en" className="mt-0.5 hidden whitespace-nowrap text-center font-sans text-meta font-bold tracking-wide text-ink md:block lg:text-ui-sm">
-            Ordinary People. Extraordinary Stories.
+          {/* Brand line (CMS → Site content), e.g. "Ordinary People. Extraordinary Stories." */}
+          <span
+            lang={taglineScript.lang}
+            className={cn(taglineScript.cls, 'mt-0.5 hidden whitespace-nowrap text-center text-meta font-bold tracking-wide text-ink md:block lg:text-ui-sm')}
+          >
+            {tagline}
           </span>
         </Link>
 
         {/* Phone: one line — the brand line small on the left, a small Nominate
             Your Local Hero pill on the right (shorter label under 390px). */}
         <div className="order-first col-span-2 flex items-center justify-between gap-1.5 md:hidden">
-          <p lang="en" className="whitespace-nowrap font-sans text-eyebrow font-bold tracking-normal text-ink">
-            Ordinary People. Extraordinary Stories.
+          <p lang={taglineScript.lang} className={cn(taglineScript.cls, 'whitespace-nowrap text-eyebrow font-bold tracking-normal text-ink')}>
+            {tagline}
           </p>
           <Link
             to="/nominate"

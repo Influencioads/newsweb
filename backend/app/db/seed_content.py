@@ -104,6 +104,25 @@ CATEGORIES: tuple[tuple[str, str, str, bool], ...] = (
     ("wow-puranam", "వావ్ పురాణం", "WOW Puranam", False),
 )
 
+#: The WOW category cards: slug -> (tagline_te, tagline_en, icon). A category
+#: listed here is `in_explore` (Explore WOW, the drawer, the footer chips);
+#: with show_in_nav it is one of the main six. Editable on the Taxonomy page.
+WOW_CARDS: dict[str, tuple[str, str, str]] = {
+    "real-heroes": ("అసాధారణ వ్యక్తుల విజయ గాధలు", "Success stories of extraordinary people", "medal"),
+    "jai-telugoda": ("మన తెలుగోళ్ల విజయగాథలు!", "Success stories of our Telugu people!", "flag"),
+    "morning-mantra": ("రోజువారీ ప్రేరణ, స్ఫూర్తి, జ్ఞానం", "Daily motivation, inspiration and wisdom", "sunrise"),
+    "startup-stories": ("కొత్త ఆలోచనలు.. సరికొత్త విజయాలు!", "New ideas.. brand-new successes!", "rocket"),
+    "wow-tech": ("ఫ్యూచర్ గాడ్జెట్స్.. లేటెస్ట్ టెక్నాలజీ!", "Future gadgets.. latest technology!", "cpu"),
+    "business-guru": ("వ్యాపారాలు.. సలహాలు", "Businesses.. and advice", "briefcase"),
+    "my-village-story": ("మన ఊళ్ల కథలు.. మనుషులు..", "Stories of our villages.. and their people..", "sprout"),
+    "wow-news": ("వావ్ అనిపించే వార్తలు", "News that makes you say WOW", "newspaper"),
+    "local-hero": ("పల్లెలు, పట్టణాల్లోని అసాధారణ వ్యక్తులు", "Extraordinary people from villages and towns", "map-pin"),
+    "zero-to-hero": ("జీరో నుండి హీరోగా", "From zero to hero", "trending-up"),
+    "wow-idea": ("ఐడియాతో మొదలైన ఆవిష్కరణలు", "Innovations that began with an idea", "lightbulb"),
+    "mystery": ("అద్భుతాలు.. రహస్యాలు..", "Wonders.. and secrets..", "telescope"),
+    "wow-puranam": ("పురాణాలు.. ఇతిహాసాలు..", "Puranas.. and epics..", "scroll"),
+}
+
 TAGS: tuple[tuple[str, str, str, TagType], ...] = (
     ("amaravati", "అమరావతి", "Amaravati", TagType.PLACE),
     ("crda", "CRDA", "CRDA", TagType.ORG),
@@ -140,6 +159,7 @@ def seed_categories(db: Session) -> dict[str, Category]:
     for sort, (slug, name_te, name_en, in_nav) in enumerate(CATEGORIES):
         if slug in existing or slug in retired:
             continue
+        tagline_te, tagline_en, icon = WOW_CARDS.get(slug, (None, None, None))
         cat = Category(
             slug=slug,
             name_te=name_te,
@@ -147,6 +167,10 @@ def seed_categories(db: Session) -> dict[str, Category]:
             sort=sort,
             is_active=True,
             show_in_nav=in_nav,
+            tagline_te=tagline_te,
+            tagline_en=tagline_en,
+            icon=icon,
+            in_explore=slug in WOW_CARDS,
         )
         db.add(cat)
         existing[slug] = cat

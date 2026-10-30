@@ -132,7 +132,7 @@ export function BodyImages({ body, images, textareaRef, onChange }: Props) {
         <span className={label}>
           {L('కథనం మధ్యలో చిత్రాలు', 'Pictures inside the story')}{' '}
           <span className="font-normal text-muted">
-            ({placed.length}/{MAX_BODY_IMAGES})
+            · {L('ఐచ్ఛికం', 'optional')} ({placed.length}/{MAX_BODY_IMAGES})
           </span>
         </span>
         <Button variant="secondary" size="sm" icon={ImagePlus} disabled={full} onClick={openPicker}>

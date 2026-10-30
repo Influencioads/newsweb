@@ -88,8 +88,8 @@ describe('Home (WOW layout)', () => {
 
   it('rotates up to ten banner stories, each once, and puts My Village after WOW Radio', () => {
     renderHome(homePayload());
-    // lead + exclusive-one + exclusive-two (latest repeats them).
-    expect(screen.getAllByRole('tab', { name: /\/ 3$/ })).toHaveLength(3);
+    // lead, exclusive-one, exclusive-two and the national section story (repeats skipped).
+    expect(screen.getAllByRole('tab', { name: /\/ 4$/ })).toHaveLength(4);
     const radio = screen.getByRole('heading', { name: /WOW Radio/ });
     const village = document.getElementById('my-village-story')!;
     const explore = document.getElementById('explore-wow')!;

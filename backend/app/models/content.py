@@ -70,6 +70,19 @@ class Category(PKMixin, TimestampMixin, Base):
     )
     seo_title: Mapped[str | None] = mapped_column(String(180), nullable=True)
     seo_description: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    # The WOW category card (Explore WOW, the drawer, the footer chips): its
+    # one-line tagline, its icon, and whether it is listed there at all.
+    tagline_te: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    tagline_en: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    icon: Mapped[str | None] = mapped_column(
+        String(40), nullable=True, doc="One of app.services.site_content.ICONS"
+    )
+    in_explore: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        doc="Listed as a WOW category; with show_in_nav it is one of the main six",
+    )
 
     parent: Mapped["Category | None"] = relationship(
         remote_side="Category.id", back_populates="children"

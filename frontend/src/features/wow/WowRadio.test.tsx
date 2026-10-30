@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ArticleCard } from '@/types/public';
 
 vi.mock('@/features/public/api', () => ({
+  // No CMS content: the radio uses its built-in segments (features/wow/siteContent).
+  fetchSiteConfig: vi.fn(async () => ({ site_name_te: '', site_name_en: '', categories: [], states: [], districts: [] })),
   fetchFeed: vi.fn(async () => ({
     category: null,
     district: null,

@@ -7,6 +7,7 @@ import { Icon } from '@/components/ui/Icon';
 import { EmptyState } from '@/components/ui/State';
 import { useI18n } from '@/i18n';
 import type { EpaperArticle, EpaperEdition, EpaperPage, EpaperSlot, EpaperSlotSize } from '@/types/epaper';
+import { DEFAULT_LOGO } from '@/features/wow/siteContent';
 import { cn } from '@/utils/cn';
 import { formatDate } from '@/utils/time';
 
@@ -40,6 +41,8 @@ export interface EpaperSheetProps {
   editable?: boolean;
   /** Chrome around one slot; `story` is the drawn story, `null` for an empty slot. */
   renderSlot?: (slot: EpaperSlot, article: EpaperArticle | null, story: ReactNode) => ReactNode;
+  /** The masthead logo (CMS → Site content); the built-in file when omitted. */
+  logoUrl?: string;
 }
 
 /** `grid-area` for a slot: row-start / col-start / row-span / col-span. */
@@ -148,6 +151,7 @@ export function EpaperSheet({
   showClips = true,
   editable = false,
   renderSlot,
+  logoUrl = DEFAULT_LOGO,
 }: EpaperSheetProps) {
   const { language } = useI18n();
   // Page-specific copy with no strings.ts key yet (see neededStrings).
@@ -226,7 +230,7 @@ export function EpaperSheet({
           style={{ left: MARGIN, top: MARGIN + FOLIO_H, width: CONTENT_W, height: MASTHEAD_H }}
         >
           <div className="mt-2 flex-1 border-t-2 border-ink pt-1">
-            <img src="/wow-indian-logo.webp" alt={WORDMARK} width={960} height={260} className="ep-wordmark mx-auto" />
+            <img src={logoUrl} alt={WORDMARK} width={960} height={260} className="ep-wordmark mx-auto" />
             <p lang="en" className="font-sans text-eyebrow font-semibold uppercase tracking-wordmark text-exclusive-text">
               WowIndian
             </p>

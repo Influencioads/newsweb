@@ -10,6 +10,8 @@ import { useI18n, useScript } from '@/i18n';
 import type { ArticleCard } from '@/types/public';
 import { cn } from '@/utils/cn';
 
+import { scriptOf, useSiteContent } from './siteContent';
+
 /**
  * Hero banner (pitch §2 "Featured Story", redesigned as a banner).
  *
@@ -29,6 +31,9 @@ export const HERO_SLIDES = 10;
 export function HeroBanner({ stories }: { stories: ArticleCard[] }) {
   const { language } = useI18n();
   const s = useScript();
+  const { home } = useSiteContent();
+  const tag = s.pick(home.banner_tag_te, home.banner_tag_en);
+  const tagScript = scriptOf(tag);
   const te = language === 'te';
   const slides = stories.slice(0, HERO_SLIDES);
   const [index, setIndex] = useState(0);
@@ -71,9 +76,12 @@ export function HeroBanner({ stories }: { stories: ArticleCard[] }) {
 
       <div className="flex flex-col justify-center gap-4 p-5 pb-3 sm:p-7 sm:pb-3 md:min-h-[340px] md:max-w-[80%] md:p-10">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-pill bg-gradient-to-br from-wow to-wow-deep px-3 py-1 font-sans text-meta font-bold uppercase tracking-wide text-on-wow">
+          <span
+            lang={tagScript.lang}
+            className={cn(tagScript.cls, 'inline-flex items-center gap-1.5 rounded-pill bg-gradient-to-br from-wow to-wow-deep px-3 py-1 text-meta font-bold uppercase tracking-wide text-on-wow')}
+          >
             <Icon icon={Sparkles} size="xs" />
-            Every Story Has a WOW!
+            {tag}
           </span>
           {article.category ? (
             <span className={cn(s.body, 'rounded-pill bg-on-ink/15 px-3 py-1 text-meta font-semibold backdrop-blur')}>

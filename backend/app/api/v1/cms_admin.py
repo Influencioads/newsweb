@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import delete, func, or_, select, union_all, update
 from sqlalchemy.orm import Session
 
@@ -34,7 +34,7 @@ from app.models.setting import AppSetting
 from app.models.site import HomepageSection
 from app.models.user import Role, User, UserRole
 from app.models.video import Video
-from app.services import audit_service, panchayat_service
+from app.services import audit_service, panchayat_service, site_content
 
 router = APIRouter(prefix="/cms", tags=["cms-management"])
 
@@ -86,6 +86,10 @@ def taxonomy(
                 "sort": x.sort,
                 "parent_id": x.parent_id,
                 "description_te": x.description_te,
+                "in_explore": x.in_explore,
+                "tagline_te": x.tagline_te,
+                "tagline_en": x.tagline_en,
+                "icon": x.icon,
                 "article_count": int(article_counts.get(x.id, 0)),
             }
             for x in categories
@@ -306,6 +310,12 @@ def audit(
 _CATEGORY_SLUG = r"^[a-z0-9-]+$"
 
 
+def _known_icon(value: str | None) -> str | None:
+    if value is not None and value not in site_content.ICONS:
+        raise ValueError(f"must be one of {', '.join(site_content.ICONS)}")
+    return value
+
+
 class CategoryWrite(BaseModel):
     slug: str = Field(min_length=2, max_length=80, pattern=_CATEGORY_SLUG)
     name_te: str = Field(min_length=1, max_length=120)
@@ -316,6 +326,16 @@ class CategoryWrite(BaseModel):
     is_active: bool = True
     #: Omitted -> appended after the last category.
     sort: int | None = None
+    # The WOW category card (see app/services/site_content).
+    in_explore: bool = False
+    tagline_te: str | None = Field(default=None, max_length=200)
+    tagline_en: str | None = Field(default=None, max_length=200)
+    icon: str | None = Field(default=None, max_length=40)
+
+    @field_validator("icon")
+    @classmethod
+    def _icon(cls, v: str | None) -> str | None:
+        return _known_icon(v)
 
 
 class CategoryPatch(BaseModel):
@@ -329,6 +349,15 @@ class CategoryPatch(BaseModel):
     show_in_nav: bool | None = None
     is_active: bool | None = None
     sort: int | None = None
+    in_explore: bool | None = None
+    tagline_te: str | None = Field(default=None, max_length=200)
+    tagline_en: str | None = Field(default=None, max_length=200)
+    icon: str | None = Field(default=None, max_length=40)
+
+    @field_validator("icon")
+    @classmethod
+    def _icon(cls, v: str | None) -> str | None:
+        return _known_icon(v)
 
 
 class CategoryOrder(BaseModel):
@@ -336,7 +365,9 @@ class CategoryOrder(BaseModel):
 
 
 #: Columns NOT NULL in `categories` — a PATCH may omit them, never null them.
-_CATEGORY_REQUIRED = ("slug", "name_te", "name_en", "show_in_nav", "is_active", "sort")
+_CATEGORY_REQUIRED = (
+    "slug", "name_te", "name_en", "show_in_nav", "is_active", "sort", "in_explore"
+)
 
 #: Rows that file content under a category. Deleting a category any of these
 #: point at needs a destination (`move_to`), so nothing silently loses its

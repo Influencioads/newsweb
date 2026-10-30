@@ -13,6 +13,7 @@ import type {
   ReactionKind,
   ReactionSummary,
   SiteConfig,
+  SitePage,
   VideoDetail,
   VideoList,
   VideoRails,
@@ -23,6 +24,17 @@ import type {
 export async function fetchSiteConfig(): Promise<SiteConfig> {
   const { data } = await api.get<SiteConfig>('/public/config');
   return data;
+}
+
+/** A footer page saved from the CMS; null while it still uses the built-in copy. */
+export async function fetchSitePage(slug: string): Promise<SitePage | null> {
+  try {
+    const { data } = await api.get<SitePage>(`/public/pages/${slug}`);
+    return data;
+  } catch (err) {
+    if ((err as { response?: { status?: number } }).response?.status === 404) return null;
+    throw err;
+  }
 }
 
 export async function fetchHome(

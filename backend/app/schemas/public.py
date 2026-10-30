@@ -270,6 +270,9 @@ class HomeOut(BaseModel):
     edition: DistrictOut | None
     #: §3 — present only when the reader has chosen a mandal.
     mandal_block: HomeSectionOut | None = None
+    #: The hero banner's slides the desk chose (CMS → Home hero slides), in
+    #: their order; the website tops them up with the stories below.
+    hero: list[ArticleCardOut] = Field(default_factory=list)
     lead: ArticleCardOut | None
     secondary: list[ArticleCardOut] = Field(
         default_factory=list, description="Thumb + headline rows under the lead"

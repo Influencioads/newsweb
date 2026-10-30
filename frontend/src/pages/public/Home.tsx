@@ -19,10 +19,12 @@ import { HomeSkeleton } from "./home/HomeSkeleton";
 
 /** The banner's ten stories: the lead, the secondaries, then the mid column,
  *  the latest list and the section blocks, each story once. */
+/** The desk's slides (CMS → Home hero slides) in their order, topped up to
+ *  HERO_SLIDES with the newest top stories. */
 function heroStories(data: HomePayload): ArticleCard[] {
   const seen = new Set<string>();
   const out: ArticleCard[] = [];
-  for (const a of [data.lead, ...data.secondary, ...data.mid_column, ...data.latest, ...data.sections.flatMap((sec) => sec.articles)]) {
+  for (const a of [...(data.hero ?? []), data.lead, ...data.secondary, ...data.mid_column, ...data.latest, ...data.sections.flatMap((sec) => sec.articles)]) {
     if (!a || seen.has(a.short_id)) continue;
     seen.add(a.short_id);
     out.push(a);

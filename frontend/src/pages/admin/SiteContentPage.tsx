@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ExternalLink, ImageUp, Plus, RotateCcw, Save, X } from 'lucide-react';
 
 import { AdminPage } from '@/components/admin/AdminPage';
@@ -380,6 +380,111 @@ function withChoiceValues(nominate: SiteContent['nominate']): SiteContent['nomin
   };
 }
 
+/** As many as the API keeps (site_content.MAX_HERO_SLIDES). */
+const MAX_HERO_SLIDES = 10;
+
+/**
+ * Home hero slides: the stories in the home page's top banner, in the order
+ * picked here. Fewer than ten: the newest top stories fill the rest; none:
+ * the banner works as before.
+ */
+function HeroSlidesCard({ payload, canManage }: { payload: cmsApi.SiteContentPayload; canManage: boolean }) {
+  const L = useL();
+  const state = useBlock('hero', payload);
+  const { draft, setDraft } = state;
+  const ids = draft.article_ids;
+  const setIds = (article_ids: number[]) => setDraft({ ...draft, article_ids });
+  const [search, setSearch] = useState('');
+  const chosen = useQueries({
+    queries: ids.map((id) => ({ queryKey: ['cms', 'article', id], queryFn: () => cmsApi.fetchArticle(id), staleTime: 60_000 })),
+  });
+  const found = useQuery({
+    queryKey: ['cms', 'hero-search', search.trim()],
+    queryFn: () => cmsApi.fetchArticles({ state: 'PUBLISHED', search: search.trim() || undefined, limit: 20 }),
+    enabled: canManage,
+  });
+  const full = ids.length >= MAX_HERO_SLIDES;
+  const results = (found.data?.articles ?? []).filter((a) => !ids.includes(a.id));
+
+  return (
+    <Section
+      title={L('హోమ్ హీరో స్లైడ్‌లు', 'Home hero slides')}
+      subtitle={L(
+        `హోమ్ పేజీ పై బ్యానర్‌లో వచ్చే కథనాలు, ఈ క్రమంలోనే. ${MAX_HERO_SLIDES} వరకు. తక్కువ ఉంటే మిగతా స్లైడ్‌లు తాజా కథనాలతో నిండుతాయి.`,
+        `The stories in the banner at the top of the home page, in this order, up to ${MAX_HERO_SLIDES}. If you pick fewer, the newest top stories fill the rest.`,
+      )}
+    >
+      {ids.length ? (
+        <ol className="space-y-2">
+          {ids.map((id, i) => {
+            const a = chosen[i]?.data;
+            const live = a?.status === 'published';
+            return (
+              <li key={id} className="flex items-center gap-3 rounded-xl border border-rule bg-paper p-2">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-pill bg-wow-tint font-sans text-ui-sm font-bold text-wow-deep">{i + 1}</span>
+                {a?.hero_media?.url ? (
+                  <img src={a.hero_media.url} alt="" className="h-12 w-20 shrink-0 rounded-md object-cover" />
+                ) : (
+                  <span className="h-12 w-20 shrink-0 rounded-md bg-rule" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p lang="te" className="te te-clamp-2 text-ui-sm font-semibold text-ink">
+                    {a ? a.title_te : chosen[i]?.isError ? L('కథనం దొరకలేదు', 'Story not found') : '…'}
+                  </p>
+                  {a && !live ? (
+                    <Badge tone="muted" size="xs">
+                      {L('ప్రచురించలేదు — బ్యానర్‌లో రాదు', 'Not published — not shown')}
+                    </Badge>
+                  ) : null}
+                </div>
+                {canManage ? (
+                  <RowActions
+                    index={i}
+                    count={ids.length}
+                    minCount={0}
+                    onMove={(d) => setIds(moveItem(ids, i, d))}
+                    onRemove={() => setIds(ids.filter((x) => x !== id))}
+                  />
+                ) : null}
+              </li>
+            );
+          })}
+        </ol>
+      ) : (
+        <p className="font-sans text-ui-sm text-muted">
+          {L('ఇంకా ఎంచుకోలేదు — బ్యానర్ తాజా కథనాలను చూపిస్తోంది.', 'None chosen yet — the banner shows the newest top stories.')}
+        </p>
+      )}
+      {canManage ? (
+        <div className="space-y-2 rounded-xl border border-dashed border-rule p-3">
+          <Field
+            label={L(`కథనం జోడించండి (${ids.length}/${MAX_HERO_SLIDES})`, `Add a story (${ids.length}/${MAX_HERO_SLIDES})`)}
+            hint={L('ప్రచురించిన కథనాలు మాత్రమే. శీర్షికలో వెతకండి.', 'Published stories only. Search by headline.')}
+          >
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={L('శీర్షిక…', 'Headline…')} />
+          </Field>
+          <ul className="max-h-72 space-y-1 overflow-y-auto">
+            {results.map((a) => (
+              <li key={a.id} className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-rule/40">
+                <p lang="te" className="te te-clamp-1 min-w-0 flex-1 text-ui-sm text-ink">
+                  {a.title_te}
+                </p>
+                <Button size="sm" variant="secondary" icon={Plus} disabled={full} onClick={() => setIds([...ids, a.id])}>
+                  {L('జోడించు', 'Add')}
+                </Button>
+              </li>
+            ))}
+            {found.isSuccess && !results.length ? (
+              <li className="px-2 font-sans text-meta text-muted">{L('కథనాలు దొరకలేదు', 'No stories found')}</li>
+            ) : null}
+          </ul>
+        </div>
+      ) : null}
+      <BlockActions state={state} canManage={canManage} />
+    </Section>
+  );
+}
+
 /** As many as the API keeps (site_content.MAX_STORY_SHOTS). */
 const MAX_STORY_SHOTS = 40;
 
@@ -635,6 +740,7 @@ export function SiteContentPage() {
           <div className="space-y-6">
             <BrandCard payload={payload} canManage={canManage} />
             <HomeCard payload={payload} canManage={canManage} />
+            <HeroSlidesCard payload={payload} canManage={canManage} />
             <RadioCard payload={payload} canManage={canManage} />
             <StoryShotsCard payload={payload} canManage={canManage} />
             <NominateCard payload={payload} canManage={canManage} />
@@ -662,6 +768,26 @@ export function StoryShotsAdminPage() {
       }
     >
       <QueryState query={q}>{(payload) => <StoryShotsCard payload={payload} canManage={canManage} />}</QueryState>
+    </AdminPage>
+  );
+}
+
+/** CMS → Home hero slides: the same card as on Site content, on a page of its own. */
+export function HeroSlidesAdminPage() {
+  const L = useL();
+  const canManage = useAuth((st) => st.can)('settings.manage');
+  const q = useQuery({ queryKey: ['cms', 'site-content'], queryFn: cmsApi.fetchSiteContent });
+  return (
+    <AdminPage
+      title={L('హోమ్ హీరో స్లైడ్‌లు', 'Home hero slides')}
+      subtitle={L('హోమ్ పేజీ పై బ్యానర్ కథనాలు, మీరు ఇచ్చే క్రమంలో', 'The stories in the home page’s top banner, in the order you set')}
+      actions={
+        <ButtonLink to="/" external variant="secondary" size="sm" iconRight={ExternalLink}>
+          {L('సైట్‌లో చూడండి', 'View on the site')}
+        </ButtonLink>
+      }
+    >
+      <QueryState query={q}>{(payload) => <HeroSlidesCard payload={payload} canManage={canManage} />}</QueryState>
     </AdminPage>
   );
 }

@@ -19,6 +19,7 @@ export const DEFAULT_CONTENT: SiteContent = {
     tagline_en: 'Ordinary People. Extraordinary Stories.',
   },
   home: { banner_tag_te: 'Every Story Has a WOW!', banner_tag_en: 'Every Story Has a WOW!' },
+  hero: { article_ids: [] },
   radio: {
     image_url: '',
     segments: [
@@ -105,6 +106,7 @@ export function useSiteContent(): SiteContent {
   return {
     brand: { ...DEFAULT_CONTENT.brand, ...content?.brand },
     home: { ...DEFAULT_CONTENT.home, ...content?.home },
+    hero: { ...DEFAULT_CONTENT.hero, ...content?.hero },
     radio: { ...DEFAULT_CONTENT.radio, ...content?.radio },
     story_shots: { ...DEFAULT_CONTENT.story_shots, ...content?.story_shots },
     nominate: { ...DEFAULT_CONTENT.nominate, ...content?.nominate },

@@ -194,8 +194,8 @@ class StoryShot(_Block):
 
 
 class StoryShots(_Block):
-    """Story Shots pictures, in the order shown. Empty: the site falls back to
-    the newest stories' photos so the shelf is never blank."""
+    """Story Shots pictures, in the order shown. Only these appear in Story
+    Shots, never article photos; empty hides the home shelf."""
 
     shots: list[StoryShot] = Field(default_factory=list, max_length=MAX_STORY_SHOTS)
 

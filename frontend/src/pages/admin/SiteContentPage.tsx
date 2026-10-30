@@ -512,8 +512,8 @@ function StoryShotsCard({ payload, canManage }: { payload: cmsApi.SiteContentPay
       ) : (
         <p className="font-sans text-ui-sm text-muted">
           {L(
-            'ఇంకా చిత్రాలు లేవు. అప్‌లోడ్ చేసే వరకు తాజా కథనాల ఫోటోలు చూపిస్తాం.',
-            'No pictures yet. Until you upload some, the newest stories’ photos are shown.',
+            'ఇంకా చిత్రాలు లేవు. ఇక్కడ అప్‌లోడ్ చేసినవే స్టోరీ షాట్స్‌లో కనిపిస్తాయి; కథనాల ఫోటోలు రావు.',
+            'No pictures yet. Only pictures uploaded here appear in Story Shots, never article photos.',
           )}
         </p>
       )}

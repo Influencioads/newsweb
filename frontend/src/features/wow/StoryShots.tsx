@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import {
   ArrowRight,
   ChevronLeft,
@@ -17,9 +16,8 @@ import { ButtonLink } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { SectionHeader } from '@/components/ui/Layout';
 import { EmptyState } from '@/components/ui/State';
-import * as publicApi from '@/features/public/api';
 import { useI18n, useScript } from '@/i18n';
-import type { ArticleCard, MediaOut, StoryShotItem } from '@/types/public';
+import type { MediaOut, StoryShotItem } from '@/types/public';
 import { cn } from '@/utils/cn';
 import { useDocumentTitle } from '@/utils/motion';
 
@@ -33,27 +31,22 @@ import { useSiteConfig } from './siteContent';
  * progress bar and controls on top and Read story / Share at the bottom.
  * Tapping a shelf picture opens the deck at that shot.
  *
- * The pictures are their own uploads, from CMS → Story Shots, in the order
- * the desk set there. Until any are uploaded, the newest stories with a
- * photograph stand in so the shelf is never blank.
+ * The pictures are only the ones uploaded in CMS → Story Shots, in the order
+ * the desk set there — never article photos. With none uploaded, the home
+ * shelf is hidden and the page says Story Shots are on the way.
  */
 
-const SHOTS_LIMIT = 12;
-
-/** One shot, whichever source it came from. */
+/** One uploaded picture, ready for the shelf and the deck. */
 interface Shot {
   key: string;
-  media: MediaOut | null;
+  media: MediaOut;
   title_te: string;
   title_en: string;
-  /** "Read more" target: a story, a page on the site or an https address; '' for none. */
+  /** "Read story" target: a page on the site or an https address; '' for none. */
   link: string;
   external: boolean;
-  /** Share target: the story itself, or the deck opened at this shot. */
+  /** Share target: the deck opened at this shot. */
   shareUrl: string;
-  shortId: string;
-  /** Share counts are kept for stories only. */
-  track: boolean;
 }
 
 /** An uploaded picture as the media shape NewsImage draws. */
@@ -84,44 +77,14 @@ function fromUpload(shot: StoryShotItem): Shot {
     link: shot.link,
     external: shot.link.startsWith('https:'),
     shareUrl: `/story-shots?start=${encodeURIComponent(shot.id)}`,
-    shortId: shot.id,
-    track: false,
-  };
-}
-
-function fromArticle(article: ArticleCard): Shot {
-  return {
-    key: article.short_id,
-    media: article.hero,
-    title_te: article.title_te,
-    title_en: article.title_en ?? '',
-    link: article.reading_time_sec > 0 ? article.url : '',
-    external: false,
-    shareUrl: article.url,
-    shortId: article.short_id,
-    track: true,
   };
 }
 
 function useShots(): { data: Shot[]; isLoading: boolean } {
   const config = useSiteConfig();
   const uploaded = config.data?.content?.story_shots?.shots;
-  const hasUploads = Boolean(uploaded?.length);
-  const latest = useQuery({
-    queryKey: ['public', 'story-shots'],
-    queryFn: async () => {
-      // The newest stories that have a picture.
-      const feed = (await publicApi.fetchFeed({ limit: SHOTS_LIMIT * 2 })).articles;
-      return feed.filter((a) => a.hero?.url).slice(0, SHOTS_LIMIT);
-    },
-    staleTime: 60_000,
-    enabled: !config.isLoading && !hasUploads,
-  });
-  const data = useMemo(
-    () => (hasUploads ? (uploaded ?? []).map(fromUpload) : (latest.data ?? []).map(fromArticle)),
-    [hasUploads, uploaded, latest.data],
-  );
-  return { data, isLoading: config.isLoading || (!hasUploads && latest.isLoading) };
+  const data = useMemo(() => (uploaded ?? []).map(fromUpload), [uploaded]);
+  return { data, isLoading: config.isLoading };
 }
 
 /** The headline, for each shot's accessible name and share text. */
@@ -219,10 +182,10 @@ function Poster({ shot }: { shot: Shot }) {
           </ButtonLink>
         ) : null}
         <ShareButton
-          shortId={shot.shortId}
+          shortId={shot.key}
           url={shot.shareUrl}
           title={p.head.text}
-          track={shot.track}
+          track={false}
           cardAvailable={false}
           className="bg-on-ink/15 text-on-ink hover:bg-on-ink/25"
         />

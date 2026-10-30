@@ -6,7 +6,8 @@ import { useI18n } from '@/lib/i18n';
 import { useMotion } from '@/lib/motion';
 import { radius, space, TAP } from '@/lib/theme';
 import { makeStyles, useColors } from '@/lib/useTheme';
-import { MAIN_FEATURES, MORE_FEATURES, WOW_FEATURES, type WowFeature } from '@/lib/wow';
+import { useWowFeatures } from '@/lib/siteContent';
+import type { WowFeature } from '@/lib/wow';
 import { Icon } from '@/ui/Icon';
 import { PressableScale } from '@/ui/PressableScale';
 import { T } from '@/ui/Text';
@@ -69,10 +70,12 @@ export function ExploreWowGrid({ show = 'main' }: ExploreWowGridProps) {
   const styles = useStyles();
   const color = useColors();
   const { pick } = useI18n();
-  const features = show === 'main' ? MAIN_FEATURES : WOW_FEATURES;
+  // The cards as the desk set them on the CMS Taxonomy page.
+  const wow = useWowFeatures();
+  const features = show === 'main' ? wow.main : wow.all;
   const moreLabel = pick(
-    `మరిన్ని కేటగిరీలు చూడండి (${MORE_FEATURES.length})`,
-    `Explore more categories (${MORE_FEATURES.length})`,
+    `మరిన్ని కేటగిరీలు చూడండి (${wow.more.length})`,
+    `Explore more categories (${wow.more.length})`,
   );
 
   return (

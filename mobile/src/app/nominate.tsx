@@ -11,7 +11,8 @@ import { WowButton } from '@/components/wow/NominateCta';
 import { useI18n } from '@/lib/i18n';
 import { radius, space, TAP } from '@/lib/theme';
 import { makeStyles, useColors } from '@/lib/useTheme';
-import { HERO_CATEGORIES, LOCAL_HERO_SLUG } from '@/lib/wow';
+import { useSiteContent } from '@/lib/siteContent';
+import { LOCAL_HERO_SLUG } from '@/lib/wow';
 import { useAuth } from '@/stores/auth';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
@@ -105,7 +106,9 @@ export default function NominateScreen() {
   const stateCode = draft.state ?? chosenDistrict?.state ?? (states.length === 1 ? states[0].code : null);
   const districts = allDistricts.filter((d) => d.state === stateCode);
   const districtName = chosenDistrict ? chosenDistrict.name_te : draft.district;
-  const heroCategory = HERO_CATEGORIES.find((c) => c.value === draft.category);
+  // The choices the desk set in CMS → Site content → Nominate form.
+  const heroCategories = useSiteContent().nominate.categories;
+  const heroCategory = heroCategories.find((c) => c.value === draft.category);
 
   const errors = {
     name: draft.name.trim().length < 3 ? pick('హీరో పూర్తి పేరు రాయండి.', "Enter the hero's full name.") : null,
@@ -333,7 +336,7 @@ export default function NominateScreen() {
               </T>
             </T>
             <View style={styles.chips}>
-              {HERO_CATEGORIES.map((c) => (
+              {heroCategories.map((c) => (
                 <Chip
                   key={c.value}
                   role="radio"

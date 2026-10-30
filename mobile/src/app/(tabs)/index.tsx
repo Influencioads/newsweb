@@ -15,7 +15,7 @@ import { HomeSectionBand } from '@/components/home/HomeSectionBand';
 import { LocationSheet, usePlaceName } from '@/components/LocationSheet';
 import { ExploreWowGrid } from '@/components/wow/ExploreWowGrid';
 import { FeaturedHeroes } from '@/components/wow/FeaturedHeroes';
-import { HeroBanner } from '@/components/wow/HeroBanner';
+import { HERO_SLIDES, HeroBanner } from '@/components/wow/HeroBanner';
 import { NominateCta } from '@/components/wow/NominateCta';
 import { StoryShotsShelf } from '@/components/wow/StoryShotsShelf';
 import { WowRadioCard } from '@/components/wow/WowRadioCard';
@@ -52,9 +52,25 @@ type Row =
 
 const STAGGER_MAX = 6;
 
+/** The desk's slides (CMS → Home hero slides) in their order, topped up to
+ *  HERO_SLIDES with the newest top stories — as the website's Home does. */
+function heroStories(home: HomePayload): ArticleCard[] {
+  const seen = new Set<string>();
+  const out: ArticleCard[] = [];
+  const all = [...(home.hero ?? []), home.lead, ...home.secondary, ...home.mid_column, ...home.latest, ...home.sections.flatMap((sec) => sec.articles)];
+  for (const a of all) {
+    if (!a || seen.has(a.short_id)) continue;
+    seen.add(a.short_id);
+    out.push(a);
+    if (out.length === HERO_SLIDES) break;
+  }
+  return out;
+}
+
 function flatten(home: HomePayload): Row[] {
   const rows: Row[] = [];
-  if (home.lead) rows.push({ key: 'hero', type: 'hero', articles: [home.lead, ...home.secondary] });
+  const hero = heroStories(home);
+  if (hero.length) rows.push({ key: 'hero', type: 'hero', articles: hero });
   rows.push({ key: 'radio', type: 'radio' }, { key: 'nominate', type: 'nominate' });
   rows.push({ key: 'explore', type: 'explore' }, { key: 'shots', type: 'shots' });
   rows.push({ key: 'heroes', type: 'heroes' });

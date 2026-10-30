@@ -56,6 +56,8 @@ export interface RadioSegment {
   icon: IconName;
   /** Tried in order; the first category with stories is played. */
   categories: readonly string[];
+  /** The CMS colour: orange, green, blue or purple. */
+  tone?: string;
 }
 
 export const RADIO_SEGMENTS: readonly RadioSegment[] = [

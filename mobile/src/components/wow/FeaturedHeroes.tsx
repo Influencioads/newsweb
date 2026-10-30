@@ -17,7 +17,7 @@ import { useI18n } from '@/lib/i18n';
 const HERO_SOURCES = ['local-hero', 'real-heroes', 'zero-to-hero', 'inspiring'] as const;
 const HERO_COUNT = 4;
 
-async function fetchHeroes(): Promise<{ slug: string; articles: ArticleCard[] }> {
+export async function fetchHeroes(): Promise<{ slug: string; articles: ArticleCard[] }> {
   for (const slug of HERO_SOURCES) {
     try {
       const feed = await publicApi.fetchFeed({ category: slug, limit: HERO_COUNT });

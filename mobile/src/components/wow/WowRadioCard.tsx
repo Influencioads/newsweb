@@ -12,7 +12,8 @@ import { useI18n } from '@/lib/i18n';
 import { useMotion } from '@/lib/motion';
 import { alpha, radius, shadow, space, TAP_LG } from '@/lib/theme';
 import { makeStyles, useColors } from '@/lib/useTheme';
-import { RADIO_PER_SEGMENT, RADIO_SEGMENTS, radioScript, type RadioSegment } from '@/lib/wow';
+import { useRadioArt, useRadioSegments } from '@/lib/siteContent';
+import { RADIO_PER_SEGMENT, radioScript, type RadioSegment } from '@/lib/wow';
 import { usePlayer } from '@/stores/player';
 import { Icon } from '@/ui/Icon';
 import { PressableScale } from '@/ui/PressableScale';
@@ -34,8 +35,6 @@ import { T } from '@/ui/Text';
  * order — the screen draws the artwork itself).
  */
 
-const ART = require('../../../assets/images/wow-radio.webp');
-const DEFAULT_SEGMENT = RADIO_SEGMENTS[0] as RadioSegment;
 /** Headlines listed on the home card; the radio page lists the whole programme. */
 const CARD_ITEMS = 3;
 /** expo-speech caps an utterance; speak sentence-grouped chunks (as lib/tts.ts). */
@@ -43,6 +42,8 @@ const CHUNK_RX = /[\s\S]{1,3500}(?:\.|$)/g;
 const TELUGU_VOICE = /^te(?:[-_]|$)/i;
 
 type Tone = 'wow' | 'success' | 'brand' | 'ai';
+/** The CMS colour names, as the app's tones. */
+const CMS_TONE: Record<string, Tone> = { orange: 'wow', green: 'success', blue: 'brand', purple: 'ai' };
 const TONE: Record<string, Tone> = {
   'morning-mantra': 'wow',
   spoorthi: 'success',
@@ -170,8 +171,11 @@ export function WowRadioCard({ variant = 'card' }: { variant?: 'card' | 'page' }
   const { pick } = useI18n();
   const page = variant === 'page';
 
-  const [segmentId, setSegmentId] = useState(DEFAULT_SEGMENT.id);
-  const segment = RADIO_SEGMENTS.find((sg) => sg.id === segmentId) ?? DEFAULT_SEGMENT;
+  // Programmes and picture as the desk set them in CMS → Site content.
+  const segments = useRadioSegments();
+  const art = useRadioArt();
+  const [segmentId, setSegmentId] = useState<string | null>(null);
+  const segment = (segments.find((sg) => sg.id === segmentId) ?? segments[0]) as RadioSegment;
 
   const programme = useQuery({
     queryKey: ['wow-radio', segment.id],
@@ -214,7 +218,7 @@ export function WowRadioCard({ variant = 'card' }: { variant?: 'card' | 'page' }
       {/* Header */}
       <View style={styles.header}>
         {!page ? (
-          <Image source={ART} style={styles.thumb} contentFit="cover" transition={m.imageTransition} accessible={false} />
+          <Image source={art} style={styles.thumb} contentFit="cover" transition={m.imageTransition} accessible={false} />
         ) : null}
         <View style={styles.titles}>
           <View style={styles.onAir}>
@@ -239,9 +243,9 @@ export function WowRadioCard({ variant = 'card' }: { variant?: 'card' | 'page' }
 
       {/* The four segments */}
       <View style={styles.grid} accessibilityRole="radiogroup" accessibilityLabel={pick('సెగ్మెంట్లు', 'Segments')}>
-        {RADIO_SEGMENTS.map((sg) => {
+        {segments.map((sg) => {
           const active = sg.id === segment.id;
-          const tone = TONE[sg.id] ?? 'wow';
+          const tone = CMS_TONE[sg.tone ?? ''] ?? TONE[sg.id] ?? 'wow';
           return (
             <PressableScale
               key={sg.id}

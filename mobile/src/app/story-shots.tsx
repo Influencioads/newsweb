@@ -1,7 +1,8 @@
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   FlatList,
   StyleSheet,
@@ -13,12 +14,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { absoluteMediaUrl } from '@/api/client';
-import type { ArticleCard } from '@/api/types';
 import { EmptyState, ErrorState, LoadingState } from '@/components/Feedback';
 import { ShareOptionsSheet } from '@/components/ShareSheet';
-import { StoryScrim, useStoryShots } from '@/components/wow/StoryShotsShelf';
-import { timeAgo, useI18n } from '@/lib/i18n';
+import { StoryScrim, useStoryShots, type StoryShot } from '@/components/wow/StoryShotsShelf';
+import { useI18n } from '@/lib/i18n';
 import { useMotion } from '@/lib/motion';
 import { radius, space, TAP_LG } from '@/lib/theme';
 import { makeStyles, useColors } from '@/lib/useTheme';
@@ -32,26 +31,31 @@ import { T } from '@/ui/Text';
 /**
  * `/story-shots` — the full-screen Story Shots viewer, Reels style: one story
  * per screen, stacked vertically. Swipe up for the next story, down for the
- * previous one; the list snaps a whole screen at a time. Each story shows the
- * photo full-bleed, the section, the headline and a short summary, with "Read
- * full story" and share. The top bar (title, "n / N", close) stays put while
- * the stories move under it. `?start=<short_id>` opens at the story tapped on
- * the home shelf.
+ * previous one; the list snaps a whole screen at a time. Each shot is a
+ * picture uploaded in CMS → Story Shots, full-bleed, with its headline and
+ * "Read story" when the desk gave them, and share. The top bar (title,
+ * "n / N", close) stays put while the shots move under it. `?start=<id>`
+ * opens at the shot tapped on the home shelf.
  */
+
+const SITE = 'https://wowindia.influencioweb.com';
 
 function close() {
   if (router.canGoBack()) router.back();
   else router.replace('/');
 }
 
-function openArticle(shortId: string) {
-  router.push({ pathname: '/article/[shortId]', params: { shortId } });
+/** "Read story": a story link opens in the app, anything else in the browser. */
+function openLink(link: string) {
+  const story = link.match(/^\/[a-z0-9-]+\/[A-Za-z0-9_-]+-([A-Za-z0-9_-]{6})$/);
+  if (story?.[1]) router.push({ pathname: '/article/[shortId]', params: { shortId: story[1] } });
+  else void Linking.openURL(link.startsWith('/') ? `${SITE}${link}` : link);
 }
 
 export default function StoryShotsScreen() {
   const { pick } = useI18n();
   const shots = useStoryShots();
-  const items = useMemo(() => shots.data ?? [], [shots.data]);
+  const items = shots.data;
   const title = pick('స్టోరీ షాట్స్', 'Story Shots');
 
   if (items.length) return <Deck items={items} />;
@@ -78,7 +82,7 @@ export default function StoryShotsScreen() {
   );
 }
 
-function Deck({ items }: { items: ArticleCard[] }) {
+function Deck({ items }: { items: StoryShot[] }) {
   const styles = useStyles();
   const color = useColors();
   const insets = useSafeAreaInsets();
@@ -87,9 +91,9 @@ function Deck({ items }: { items: ArticleCard[] }) {
   const { start } = useLocalSearchParams<{ start?: string }>();
   const count = items.length;
 
-  const startIndex = Math.max(0, start ? items.findIndex((a) => a.short_id === start) : 0);
+  const startIndex = Math.max(0, start ? items.findIndex((a) => a.key === start) : 0);
   const [index, setIndex] = useState(startIndex);
-  const [shareFor, setShareFor] = useState<ArticleCard | null>(null);
+  const [shareFor, setShareFor] = useState<StoryShot | null>(null);
 
   // Which story is on screen: the page nearest the scroll position.
   const onSettle = useCallback(
@@ -101,14 +105,14 @@ function Deck({ items }: { items: ArticleCard[] }) {
   );
 
   // Warm the next photo so swiping up never waits on the network.
-  const upcoming = absoluteMediaUrl(items[index + 1]?.hero?.url ?? null);
+  const upcoming = items[index + 1]?.uri ?? null;
   useEffect(() => {
     if (upcoming) void Image.prefetch(upcoming);
   }, [upcoming]);
 
   const deckTitle = pick('స్టోరీ షాట్స్', 'Story Shots');
-  const renderItem: ListRenderItem<ArticleCard> = ({ item, index: i }) => (
-    <Shot article={item} height={height} last={i === count - 1} onShare={setShareFor} />
+  const renderItem: ListRenderItem<StoryShot> = ({ item, index: i }) => (
+    <Shot shot={item} height={height} last={i === count - 1} onShare={setShareFor} />
   );
 
   return (
@@ -118,7 +122,7 @@ function Deck({ items }: { items: ArticleCard[] }) {
 
       <FlatList
         data={items}
-        keyExtractor={(a) => a.short_id}
+        keyExtractor={(a) => a.key}
         renderItem={renderItem}
         pagingEnabled
         snapToInterval={height}
@@ -158,9 +162,9 @@ function Deck({ items }: { items: ArticleCard[] }) {
         <ShareOptionsSheet
           open
           onClose={() => setShareFor(null)}
-          shortId={shareFor.short_id}
-          url={shareFor.url}
-          title={pick(shareFor.title_te, shareFor.title_en)}
+          shortId={shareFor.key}
+          url={`/story-shots?start=${encodeURIComponent(shareFor.key)}`}
+          title={pick(shareFor.title_te, shareFor.title_en) || deckTitle}
         />
       ) : null}
     </View>
@@ -169,89 +173,69 @@ function Deck({ items }: { items: ArticleCard[] }) {
 
 /** One full-screen story in the vertical list. */
 function Shot({
-  article,
+  shot,
   height,
   last,
   onShare,
 }: {
-  article: ArticleCard;
+  shot: StoryShot;
   height: number;
   last: boolean;
-  onShare: (a: ArticleCard) => void;
+  onShare: (s: StoryShot) => void;
 }) {
   const styles = useStyles();
   const color = useColors();
   const m = useMotion();
   const insets = useSafeAreaInsets();
-  const { pick, language } = useI18n();
+  const { pick } = useI18n();
 
-  const uri = absoluteMediaUrl(article.hero?.url ?? null);
-  const head = pick(article.title_te, article.title_en);
-  const category = article.category ? pick(article.category.name_te, article.category.name_en) : null;
-  const meta = [
-    article.district ? pick(article.district.name_te, article.district.name_en) : null,
-    timeAgo(article.published_at, language),
-  ]
-    .filter(Boolean)
-    .join(' · ');
-  const read = pick('పూర్తి కథ చదవండి', 'Read full story');
+  const head = pick(shot.title_te, shot.title_en);
+  const read = pick('కథ చదవండి', 'Read story');
 
   return (
     <View style={[styles.shot, { height }]}>
-      {uri ? (
+      {shot.uri ? (
         <Image
-          source={{ uri }}
+          source={{ uri: shot.uri }}
           style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          placeholder={article.hero?.blurhash ? { blurhash: article.hero.blurhash } : undefined}
+          contentFit="contain"
           transition={m.imageTransition}
-          accessibilityLabel={article.hero?.alt_te ?? ''}
+          accessibilityLabel={head}
         />
       ) : null}
 
       <View pointerEvents="box-none" style={[styles.bottom, { paddingBottom: insets.bottom + space.lg }]}>
-        <StoryScrim strength={0.92} />
-        <View pointerEvents="box-none" style={styles.copy}>
-          {category ? (
-            <View style={styles.category}>
-              <T variant="meta" weight="bold" color="onWow" numberOfLines={1}>
-                {category}
-              </T>
-            </View>
-          ) : null}
-          <T variant="headlineLg" weight="bold" color="onOverlay" numberOfLines={5} accessibilityRole="header">
-            {head}
-          </T>
-          {article.summary_te ? (
-            <T variant="body" color="onOverlay" lang="te" numberOfLines={4}>
-              {article.summary_te}
+        <StoryScrim strength={head ? 0.92 : 0.6} />
+        {head ? (
+          <View pointerEvents="box-none" style={styles.copy}>
+            <T variant="headlineLg" weight="bold" color="onOverlay" numberOfLines={5} accessibilityRole="header">
+              {head}
             </T>
-          ) : null}
-          {meta ? (
-            <T variant="meta" color="mutedLight" numberOfLines={1}>
-              {meta}
-            </T>
-          ) : null}
-        </View>
+          </View>
+        ) : null}
         <View pointerEvents="box-none" style={styles.actions}>
-          <PressableScale
-            onPress={() => openArticle(article.short_id)}
-            minHeight={TAP_LG}
-            accessibilityRole="link"
-            accessibilityLabel={`${read}: ${head}`}
-            style={styles.read}
-          >
-            <T variant="ui" weight="bold" color="onWow" numberOfLines={1}>
-              {read}
-            </T>
-            <Icon name="arrowRight" size={20} color={color.onWow} />
-          </PressableScale>
+          {shot.link ? (
+            <PressableScale
+              onPress={() => openLink(shot.link)}
+              minHeight={TAP_LG}
+              accessibilityRole="link"
+              accessibilityLabel={head ? `${read}: ${head}` : read}
+              style={styles.read}
+            >
+              <T variant="ui" weight="bold" color="onWow" numberOfLines={1}>
+                {read}
+              </T>
+              <Icon name="arrowRight" size={20} color={color.onWow} />
+            </PressableScale>
+          ) : (
+            <View style={styles.spacer} />
+          )}
           <IconButton
             name="share"
             label={pick('షేర్ చేయండి', 'Share')}
             size={TAP_LG}
             variant="inverse"
-            onPress={() => onShare(article)}
+            onPress={() => onShare(shot)}
           />
         </View>
         {!last ? (
@@ -292,6 +276,7 @@ const useStyles = makeStyles((color) => ({
     gap: space.lg,
   },
   copy: { gap: space.sm },
+  spacer: { flex: 1 },
   hint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.xs },
   category: {
     alignSelf: 'flex-start',

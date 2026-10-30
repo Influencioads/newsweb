@@ -29,7 +29,7 @@ import { useL } from './useL';
  * Articles — the editorial list from draft to publication.
  *
  * Search (`?q=`, so the topbar search lands here prefilled), a workflow-state
- * filter (`?state=`), offset paging and the per-row workflow transitions,
+ * filter (`?state=`), a category filter (`?category=`) and column, offset paging and the per-row workflow transitions,
  * gated by the same permissions the backend re-checks. `WorkflowActions` is
  * shared with the pending queue: reject / unpublish confirm first, request
  * changes collects a reason, and approve is withheld on the editor's own
@@ -228,6 +228,7 @@ export default function Articles() {
   const [params, setParams] = useSearchParams();
   const q = params.get('q') ?? '';
   const state = params.get('state') ?? '';
+  const category = params.get('category') ?? '';
   const [search, setSearch] = useState(q);
   const [page, setPage] = useState(0);
 
@@ -246,7 +247,7 @@ export default function Articles() {
     return () => window.clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
-  useEffect(() => setPage(0), [q, state]);
+  useEffect(() => setPage(0), [q, state, category]);
 
   // Bulk delete: the selection is the rows ticked on this page.
   const canDelete = can('article.delete');
@@ -254,7 +255,7 @@ export default function Articles() {
   const toast = useToast();
   const { confirm, dialog } = useConfirm();
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
-  useEffect(() => setSelected(new Set()), [q, state, page]);
+  useEffect(() => setSelected(new Set()), [q, state, category, page]);
   const toggle = (id: number, on: boolean) =>
     setSelected((prev) => {
       const next = new Set(prev);
@@ -277,16 +278,29 @@ export default function Articles() {
   });
 
   const query = useQuery({
-    queryKey: ['cms', 'articles', { q, state, page }],
-    queryFn: () => cmsApi.fetchArticles({ search: q || undefined, state: state || undefined, offset: page * PAGE, limit: PAGE }),
+    queryKey: ['cms', 'articles', { q, state, category, page }],
+    queryFn: () =>
+      cmsApi.fetchArticles({
+        search: q || undefined,
+        state: state || undefined,
+        category_id: category ? Number(category) : undefined,
+        offset: page * PAGE,
+        limit: PAGE,
+      }),
     placeholderData: keepPreviousData,
   });
   const options = useQuery({ queryKey: ['cms', 'editor-options'], queryFn: cmsApi.fetchEditorOptions });
-  const categorySlug = (id: number | null) => options.data?.categories.find((c) => c.id === id)?.slug ?? 'news';
+  const categories = options.data?.categories ?? [];
+  const categoryOf = (id: number | null) => categories.find((c) => c.id === id);
+  // The filter lists each section with its sub-sections straight after it.
+  const categoryChoices = categories
+    .filter((c) => !c.parent_id)
+    .flatMap((c) => [c, ...categories.filter((sub) => sub.parent_id === c.id)]);
+  const categorySlug = (id: number | null) => categoryOf(id)?.slug ?? 'news';
 
   const rows = query.data?.articles ?? [];
   const total = query.data?.total ?? 0;
-  const filtered = Boolean(q || state);
+  const filtered = Boolean(q || state || category);
   const allOnPage = rows.length > 0 && rows.every((a) => selected.has(a.id));
   const selectAll = (on: boolean) => setSelected(on ? new Set(rows.map((a) => a.id)) : new Set());
   const askBulkDelete = async () => {
@@ -347,6 +361,22 @@ export default function Articles() {
         );
       },
     },
+    {
+      key: 'category',
+      header: L('విభాగం', 'Category'),
+      nowrap: true,
+      render: (a) => {
+        const cat = categoryOf(a.category_id);
+        const sub = categoryOf(a.subcategory_id);
+        if (!cat) return <span className="text-muted">—</span>;
+        return (
+          <span className={cn(s.body, 'text-ui-sm text-ink')}>
+            {te ? cat.name_te : cat.name_en}
+            {sub ? <span className="block text-meta text-muted">{te ? sub.name_te : sub.name_en}</span> : null}
+          </span>
+        );
+      },
+    },
     { key: 'state', header: L('స్థితి', 'State'), nowrap: true, render: (a) => <WorkflowPill status={a.workflow_state} /> },
     {
       key: 'updated',
@@ -384,6 +414,17 @@ export default function Articles() {
               placeholder={t('admin.searchPlaceholder')}
               aria-label={t('ui.search')}
             />
+          </div>
+          <div className="md:w-56">
+            <Select value={category} onChange={(e) => setParam('category', e.target.value)} aria-label={L('విభాగం', 'Category')}>
+              <option value="">{L('అన్ని విభాగాలు', 'All categories')}</option>
+              {categoryChoices.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.parent_id ? '— ' : ''}
+                  {te ? c.name_te : c.name_en}
+                </option>
+              ))}
+            </Select>
           </div>
           <div className="md:w-56">
             <Select value={state} onChange={(e) => setParam('state', e.target.value)} aria-label={L('స్థితి', 'State')}>

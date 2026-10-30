@@ -3,7 +3,7 @@ import type { ArticleOrigin, AssistantConversation, AssistantConversationSummary
 import type { SiteContent, SitePage } from '@/types/public';
 
 export interface SiteContentPayload { values: SiteContent; defaults: SiteContent; saved: (keyof SiteContent)[]; icons: string[]; radio_tones: string[] }
-export const fetchArticles=async(params?:{state?:string;search?:string;offset?:number;limit?:number})=>(await api.get<CmsArticleList>('/cms/articles',{params})).data;
+export const fetchArticles=async(params?:{state?:string;search?:string;category_id?:number;offset?:number;limit?:number})=>(await api.get<CmsArticleList>('/cms/articles',{params})).data;
 export const fetchArticle=async(id:number)=>(await api.get<CmsArticle>(`/cms/articles/${id}`)).data;
 export const createArticle=async(payload:Record<string,unknown>)=>(await api.post<CmsArticle>('/cms/articles',payload)).data;
 export const updateArticle=async(id:number,payload:Record<string,unknown>)=>(await api.patch<CmsArticle>(`/cms/articles/${id}`,payload)).data;

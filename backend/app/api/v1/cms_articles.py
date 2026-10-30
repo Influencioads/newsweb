@@ -192,6 +192,7 @@ def list_articles(
     # and came back as a 500 instead of a 422 naming the bad parameter.
     state: WorkflowState | None = None,
     search: str | None = Query(None, max_length=200),
+    category_id: int | None = None,
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -204,6 +205,11 @@ def list_articles(
         stmt = stmt.where(Article.district_id.in_(principal.district_ids))
     if state:
         stmt = stmt.where(Article.workflow_state == state)
+    if category_id:
+        # A story filed under a sub-section still belongs to its section.
+        stmt = stmt.where(
+            or_(Article.category_id == category_id, Article.subcategory_id == category_id)
+        )
     if search:
         term = f"%{search.strip()}%"
         stmt = stmt.where(

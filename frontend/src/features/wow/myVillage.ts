@@ -28,6 +28,8 @@ import {
 export const MY_VILLAGE_SLUG = 'my-village-story';
 export const MY_VILLAGE_PATH = '/my-village';
 export const SHARE_VILLAGE_PATH = '/my-village/share';
+/** The village-at-sunset picture (public/my-village.webp; .jpeg is the original). */
+export const MY_VILLAGE_IMAGE = '/my-village.webp';
 
 export const MY_VILLAGE_TITLE = { te: 'మై విలేజ్ – మన ఊరు.. మన గొప్పతనం!', en: 'My Village – our village, our pride!' };
 

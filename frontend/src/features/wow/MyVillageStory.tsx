@@ -4,18 +4,18 @@ import { ArrowRight } from 'lucide-react';
 
 import { NewsImage } from '@/components/media/NewsImage';
 import { ButtonLink } from '@/components/ui/Button';
-import { SectionHeader } from '@/components/ui/Layout';
 import * as publicApi from '@/features/public/api';
 import { useI18n, useScript } from '@/i18n';
 import type { ArticleCard } from '@/types/public';
 import { cn } from '@/utils/cn';
 
-import { MY_VILLAGE_INTRO, MY_VILLAGE_PATH, MY_VILLAGE_TITLE } from './myVillage';
+import { MY_VILLAGE_IMAGE, MY_VILLAGE_INTRO, MY_VILLAGE_PATH, MY_VILLAGE_TITLE } from './myVillage';
 
 /**
  * My Village (మై విలేజ్): the home page's village shelf, straight under WOW
- * Radio — the "మన ఊరు.. మన గొప్పతనం!" introduction with a Click to know more
- * button to /my-village, then two stories from the my-village-story section
+ * Radio — a banner (the village picture, public/my-village.webp) with the
+ * "మన ఊరు.. మన గొప్పతనం!" introduction and a Click to know more button to
+ * /my-village, then two stories from the my-village-story section
  * (topped up from the local sections while that one fills up).
  */
 
@@ -93,20 +93,40 @@ export function MyVillageStory() {
 
   return (
     <section aria-labelledby="my-village-story">
-      <SectionHeader
-        title={<span id="my-village-story">{te ? MY_VILLAGE_TITLE.te : MY_VILLAGE_TITLE.en}</span>}
-        to={data?.articles.length ? `/section/${data.slug}` : undefined}
-      />
-      <div className="mb-5 space-y-2">
-        {(te ? MY_VILLAGE_INTRO.te : MY_VILLAGE_INTRO.en).map((para) => (
-          <p key={para} className={cn(s.body, s.te ? 'text-te-body-xs' : 'text-ui', 'max-w-4xl text-ink-soft')}>
-            {para}
-          </p>
-        ))}
-        <div className="pt-2">
-          <ButtonLink to={MY_VILLAGE_PATH} variant="wow" size="md" iconRight={ArrowRight}>
-            {te ? 'మరింత తెలుసుకోండి' : 'Click to know more'}
-          </ButtonLink>
+      {/* The section's own banner: the village-at-sunset picture under a deep-blue
+          wash, with the introduction and Click to know more over it. */}
+      <div className="relative isolate mb-5 overflow-hidden rounded-2xl text-on-ink shadow-raised">
+        <img
+          src={MY_VILLAGE_IMAGE}
+          alt=""
+          width={1024}
+          height={1536}
+          loading="lazy"
+          className="absolute inset-0 -z-20 h-full w-full object-cover object-[center_40%]"
+        />
+        <div
+          aria-hidden
+          className="absolute inset-0 -z-10 bg-gradient-to-t from-brand-deep via-brand-deep/80 to-brand-deep/20 md:bg-gradient-to-r md:from-brand-deep md:via-brand-deep/80 md:to-transparent"
+        />
+        <div className="flex min-h-[420px] flex-col justify-end gap-3 p-5 md:min-h-[380px] md:max-w-[62%] md:justify-center md:p-10">
+          <h2 id="my-village-story" lang={s.language} className={cn(s.head, 'text-headline-md font-bold md:text-headline-lg')}>
+            {te ? MY_VILLAGE_TITLE.te : MY_VILLAGE_TITLE.en}
+          </h2>
+          {(te ? MY_VILLAGE_INTRO.te : MY_VILLAGE_INTRO.en).map((para) => (
+            <p key={para} className={cn(s.body, s.te ? 'text-te-body-xs' : 'text-ui', 'text-on-ink/85')}>
+              {para}
+            </p>
+          ))}
+          <div className="flex flex-wrap gap-2 pt-1">
+            <ButtonLink to={MY_VILLAGE_PATH} variant="wow" size="md" iconRight={ArrowRight}>
+              {te ? 'మరింత తెలుసుకోండి' : 'Click to know more'}
+            </ButtonLink>
+            {data?.articles.length ? (
+              <ButtonLink to={`/section/${data.slug}`} variant="inverse" size="md">
+                {te ? 'అన్నీ చూడండి' : 'See all'}
+              </ButtonLink>
+            ) : null}
+          </div>
         </div>
       </div>
 

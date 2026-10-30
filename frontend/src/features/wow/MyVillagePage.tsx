@@ -1,5 +1,6 @@
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Compass, Home as HomeIcon, PenLine, Sprout } from 'lucide-react';
+import { ArrowRight, Compass, Home as HomeIcon, PenLine } from 'lucide-react';
 
 import { ButtonLink } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
@@ -9,6 +10,7 @@ import { cn } from '@/utils/cn';
 import { useDocumentTitle } from '@/utils/motion';
 
 import {
+  MY_VILLAGE_IMAGE,
   MY_VILLAGE_INTRO,
   MY_VILLAGE_SLUG,
   MY_VILLAGE_TITLE,
@@ -48,10 +50,19 @@ export default function MyVillagePage() {
         aria-labelledby="my-village-title"
         className="relative isolate overflow-hidden rounded-2xl bg-brand-deep p-6 text-on-ink shadow-raised ring-2 ring-wow/60 md:p-10"
       >
+        {/* The village-at-sunset picture under a deep-blue wash, with the orange glow. */}
+        <img
+          src={MY_VILLAGE_IMAGE}
+          alt=""
+          width={1024}
+          height={1536}
+          className="absolute inset-0 -z-20 h-full w-full object-cover object-[center_40%]"
+        />
+        <div
+          aria-hidden
+          className="absolute inset-0 -z-10 bg-gradient-to-t from-brand-deep via-brand-deep/85 to-brand-deep/40 md:bg-gradient-to-r md:from-brand-deep md:via-brand-deep/80 md:to-brand-deep/10"
+        />
         <div aria-hidden className="pointer-events-none absolute -right-16 -top-16 -z-10 h-64 w-64 rounded-full bg-wow/25 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute -bottom-10 -right-4 -z-10 text-on-ink/10">
-          <Sprout size={200} strokeWidth={1.25} />
-        </div>
         <div className="max-w-3xl space-y-4">
           <span className={cn(s.body, 'inline-flex items-center gap-1.5 rounded-pill bg-gradient-to-br from-wow to-wow-deep px-3 py-1 text-meta font-bold text-on-wow')}>
             <Icon icon={HomeIcon} size="xs" />
@@ -71,7 +82,7 @@ export default function MyVillagePage() {
         </div>
 
         {/* The two ways in */}
-        <div className="mt-7 grid gap-3 sm:grid-cols-2 md:max-w-3xl">
+        <div className="mt-7 grid gap-3 md:max-w-3xl md:grid-cols-2">
           <button
             type="button"
             onClick={() => document.getElementById('explore-villages')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
@@ -94,9 +105,9 @@ export default function MyVillagePage() {
       {/* What a village story can be about */}
       <section aria-labelledby="village-specialities">
         <SectionHeader title={<span id="village-specialities">{L('మీ ఊరి ప్రత్యేకత ఏమిటి?', 'What makes your village special?')}</span>} />
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <ul className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {SPECIALITIES.map((sp) => (
-            <li key={sp.value} className="flex items-center gap-2.5 rounded-xl border border-rule bg-surface p-3">
+            <li key={sp.value} className="flex min-w-0 items-center gap-2.5 rounded-xl border border-rule bg-surface p-3">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-wow-tint text-wow-deep">
                 <Icon icon={sp.icon} size="sm" />
               </span>
@@ -151,26 +162,25 @@ export default function MyVillagePage() {
   );
 }
 
-/** The "Share Your Village" way in, as a router link styled like its sibling card. */
+/** The "Share Your Village" way in: the same card as Explore Villages, in WOW orange. */
 function ShareCard() {
   const { language } = useI18n();
   const s = useScript();
   const te = language === 'te';
   return (
-    <ButtonLink
+    <Link
       to={SHARE_VILLAGE_PATH}
-      variant="wow"
-      className="h-full justify-start gap-3 whitespace-normal rounded-xl p-4 text-left"
+      className="group flex items-start gap-3 rounded-xl bg-gradient-to-br from-wow to-wow-deep p-4 text-left text-on-wow shadow-raised transition-transform duration-base hover:-translate-y-0.5 motion-reduce:transform-none"
     >
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-on-ink/20 text-on-wow">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-on-ink/20">
         <Icon icon={PenLine} size="md" />
       </span>
       <span className="min-w-0">
         <span className={cn(s.head, 'block text-headline-xs font-bold')}>{te ? 'మీ ఊరి కథ పంపండి' : 'Share Your Village'}</span>
-        <span className={cn(s.body, 'block text-ui-sm font-normal text-on-wow/85')}>
+        <span className={cn(s.body, 'block text-ui-sm text-on-wow/85')}>
           {te ? 'మీ గ్రామం గురించి వివరాలు పంపండి.' : 'Send us the details of your village.'}
         </span>
       </span>
-    </ButtonLink>
+    </Link>
   );
 }

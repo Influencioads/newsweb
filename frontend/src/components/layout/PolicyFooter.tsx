@@ -100,8 +100,8 @@ export function PolicyFooter() {
             </ul>
           </section>
 
-          {/* Same gap as the chip grid: each column lines up with a chip column. */}
-          <div className="grid grid-cols-2 gap-x-3 gap-y-8 sm:grid-cols-3">
+          {/* Phones: one column, all on the left. From md: three columns, same gap as the chip grid. */}
+          <div className="grid grid-cols-1 gap-x-3 gap-y-8 md:grid-cols-3">
             <Column title={t('ui.product')}>
               {PRODUCT_LINKS.map(([to, key]) => (
                 <li key={to}>

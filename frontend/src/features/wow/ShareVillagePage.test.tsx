@@ -48,4 +48,38 @@ describe('Share Your Village', () => {
     fireEvent.click(screen.getByRole('button', { name: /తర్వాత/ }));
     expect(screen.getByText(/దశ 3 \/ 6/)).toBeInTheDocument();
   });
+
+  it('asks who is writing: name and photo are needed before the preview', () => {
+    sessionStorage.setItem(
+      'wow.village-draft',
+      JSON.stringify({
+        village: 'పెదపూడి',
+        state: 'AP',
+        district: 'east-godavari',
+        mandal: 'pedapudi',
+        specialities: ['history'],
+        story: 'మా ఊరి కథ '.repeat(20),
+        phone: '9876543210',
+        consent: true,
+      }),
+    );
+    URL.createObjectURL = vi.fn(() => 'blob:writer');
+    URL.revokeObjectURL = vi.fn();
+    renderPage();
+    for (let i = 0; i < 4; i += 1) fireEvent.click(screen.getByRole('button', { name: /తర్వాత/ }));
+    expect(screen.getByText(/దశ 5 \/ 6/)).toBeInTheDocument();
+    expect(screen.getByText('ఈ కథ రాస్తున్నది ఎవరు?')).toBeInTheDocument();
+
+    fireEvent.change(document.getElementById('sender-name')!, { target: { value: 'రాముడు కొండా' } });
+    fireEvent.click(screen.getByRole('button', { name: /ప్రివ్యూ/ }));
+    expect(screen.getByText('మీ ఫొటో జోడించండి.')).toBeInTheDocument();
+    expect(screen.getByText(/దశ 5 \/ 6/)).toBeInTheDocument();
+
+    const photo = new File(['x'], 'me.jpg', { type: 'image/jpeg' });
+    fireEvent.change(document.getElementById('writer-photo')!, { target: { files: [photo] } });
+    expect(screen.getAllByAltText('మీ ఫొటో')[0]).toHaveAttribute('src', 'blob:writer');
+    fireEvent.click(screen.getByRole('button', { name: /ప్రివ్యూ/ }));
+    expect(screen.getByText(/దశ 6 \/ 6/)).toBeInTheDocument();
+    expect(screen.getByText('రాముడు కొండా')).toBeInTheDocument();
+  });
 });

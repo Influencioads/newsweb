@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, ImagePlus, Pencil, Send, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Camera, Check, CheckCircle2, ImagePlus, Mail, Pencil, Phone, Send, ShieldCheck, UserRound, X } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { LocationPicker } from '@/components/location/LocationPicker';
@@ -11,6 +11,7 @@ import { Checkbox, Field, Input, inputClass, Select, Textarea } from '@/componen
 import { Icon } from '@/components/ui/Icon';
 import { PageContainer } from '@/components/ui/Layout';
 import { useToast } from '@/components/ui/Toast';
+import * as authApi from '@/features/auth/api';
 import * as creatorApi from '@/features/creator/api';
 import * as publicApi from '@/features/public/api';
 import { useI18n, useScript } from '@/i18n';
@@ -44,6 +45,8 @@ import {
 
 const DRAFT_KEY = 'wow.village-draft';
 const MIN_STORY = 100;
+/** The profile-picture route takes up to 4 MB (users.py upload_avatar). */
+const MAX_WRITER_PHOTO_BYTES = 4 * 1024 * 1024;
 const MAX_STORY = 5000;
 const PHONE = /^[6-9]\d{9}$/;
 const PIN = /^[1-9]\d{5}$/;
@@ -127,17 +130,31 @@ export default function ShareVillagePage() {
   const location = useLocation();
   const toast = useToast();
   const status = useAuth((auth) => auth.status);
+  const me = useAuth((auth) => auth.me);
+  const bootstrap = useAuth((auth) => auth.bootstrap);
 
   const [draft, setDraft] = useState<Draft>(loadDraft);
   const [step, setStep] = useState(0);
   const [tried, setTried] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>([]);
+  // The writer's own photo: becomes their profile picture on submit, shown
+  // with the story's byline. An existing profile picture counts.
+  const [writerPhoto, setWriterPhoto] = useState<{ file: File; preview: string } | null>(null);
+  const [writerPhotoError, setWriterPhotoError] = useState<string | null>(null);
+  const savedAvatar = me?.user.avatar_url ?? null;
+  const writerPicture = writerPhoto?.preview ?? savedAvatar;
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((d) => ({ ...d, [key]: value }));
 
   // Keep the draft while the reader types, so a sign-in round trip loses nothing.
   useEffect(() => saveDraft(draft), [draft]);
   // Free the photo previews when they go.
   useEffect(() => () => photos.forEach((p) => URL.revokeObjectURL(p.preview)), [photos]);
+  useEffect(() => () => (writerPhoto ? URL.revokeObjectURL(writerPhoto.preview) : undefined), [writerPhoto]);
+  // A signed-in reader starts with the name on their account.
+  const accountName = me?.user.name_te || me?.user.name_en || '';
+  useEffect(() => {
+    if (accountName) setDraft((d) => (d.name.trim() ? d : { ...d, name: accountName }));
+  }, [accountName]);
 
   const config = useQuery({ queryKey: ['public', 'config'], queryFn: publicApi.fetchSiteConfig, staleTime: 300_000 });
   const mandals = useQuery({
@@ -190,6 +207,7 @@ export default function ShareVillagePage() {
     {},
     {
       name: draft.name.trim().length < 3 ? L('మీ పూర్తి పేరు రాయండి.', 'Enter your full name.') : null,
+      writerPhoto: !writerPicture ? L('మీ ఫొటో జోడించండి.', 'Add your photo.') : null,
       phone: !PHONE.test(draft.phone.trim()) ? L('10 అంకెల మొబైల్ నంబర్ ఇవ్వండి.', 'Enter a 10-digit mobile number.') : null,
       email: draft.email.trim() && !EMAIL.test(draft.email.trim()) ? L('సరైన ఇమెయిల్ ఇవ్వండి.', 'Enter a valid email.') : null,
       consent: !draft.consent ? L('అనుమతి ధృవీకరణ అవసరం.', 'Please confirm.') : null,
@@ -231,6 +249,7 @@ export default function ShareVillagePage() {
           : `ఫొటోలు: జోడించలేదు`,
         '',
         `పంపినవారు: ${draft.name.trim()}`,
+        `రచయిత ఫొటో: ${writerPhoto ? 'కొత్తగా జోడించారు (ప్రొఫైల్ ఫొటో)' : savedAvatar ? 'ప్రొఫైల్ ఫొటో' : 'లేదు'}`,
         `మొబైల్: ${draft.phone.trim()}`,
         `ఇమెయిల్: ${draft.email.trim() || 'ఇవ్వలేదు'}`,
         `పేరు ప్రచురించవచ్చు: ${draft.showName ? 'అవును' : 'వద్దు'}`,
@@ -242,6 +261,14 @@ export default function ShareVillagePage() {
         district_slug: draft.district || null,
         accept_guidelines: true,
       });
+      if (writerPhoto) {
+        try {
+          await authApi.uploadAvatar(writerPhoto.file);
+          void bootstrap();
+        } catch {
+          toast.error(L('మీ ఫొటో అప్‌లోడ్ కాలేదు — కథనం మాత్రం అందింది.', 'Your photo did not upload — the story itself was received.'));
+        }
+      }
       if (canAttachPhotos) {
         let failed = 0;
         for (const p of photos) {
@@ -263,6 +290,7 @@ export default function ShareVillagePage() {
       saveDraft(null);
       setDraft(EMPTY);
       setPhotos([]);
+      setWriterPhoto(null);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
     onError: (e) => toast.error(e),
@@ -285,6 +313,21 @@ export default function ShareVillagePage() {
       .slice(0, room)
       .map((file) => ({ file, kind: PHOTO_KINDS[0]!.value, preview: URL.createObjectURL(file) }));
     setPhotos((list) => [...list, ...added]);
+  };
+
+  const pickWriterPhoto = (files: FileList | null) => {
+    const file = files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setWriterPhotoError(L('ఫొటో (JPG/PNG) మాత్రమే ఎంచుకోండి.', 'Choose a photo (JPG/PNG).'));
+      return;
+    }
+    if (file.size > MAX_WRITER_PHOTO_BYTES) {
+      setWriterPhotoError(L('ఫొటో 4 MB లోపు ఉండాలి.', 'The photo must be under 4 MB.'));
+      return;
+    }
+    setWriterPhotoError(null);
+    setWriterPhoto({ file, preview: URL.createObjectURL(file) });
   };
 
   // Step 8 — thank you.
@@ -592,34 +635,137 @@ export default function ShareVillagePage() {
 
         {step === 4 ? (
           <>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label={L('పూర్తి పేరు', 'Full name')} required error={show('name')}>
-                <Input id="sender-name" script="te" value={draft.name} maxLength={120} onChange={(e) => set('name', e.target.value)} />
-              </Field>
-              <Field label={L('మొబైల్ నంబర్', 'Mobile number')} required error={show('phone')}>
-                <Input
-                  id="sender-phone"
-                  type="tel"
-                  inputMode="numeric"
-                  autoComplete="tel-national"
-                  maxLength={10}
-                  value={draft.phone}
-                  onChange={(e) => set('phone', e.target.value.replace(/\D/g, ''))}
-                  placeholder="98xxxxxxxx"
+            {/* About you: the writer's photo and name, as they appear with the story. */}
+            <section
+              aria-labelledby="writer-heading"
+              className="relative isolate overflow-hidden rounded-2xl bg-gradient-to-br from-brand-deep to-brand-dark p-5 text-on-ink shadow-raised md:p-6"
+            >
+              <div aria-hidden className="pointer-events-none absolute -right-12 -top-12 -z-10 h-48 w-48 rounded-full bg-wow/30 blur-3xl" />
+              <h2 id="writer-heading" className={cn(s.head, 'text-headline-xs font-bold')}>
+                {L('ఈ కథ రాస్తున్నది ఎవరు?', 'Who is writing this story?')}
+              </h2>
+              <p className={cn(bodyCls, 'mt-1 text-on-ink/80')}>
+                {L('మీ పేరు, ఫొటో కథనంతో పాటు కనిపిస్తాయి.', 'Your name and photo appear with the story.')}
+              </p>
+
+              <div className="mt-5 flex flex-col items-center gap-5 md:flex-row md:items-center">
+                <label
+                  htmlFor="writer-photo"
+                  className="group relative block h-28 w-28 shrink-0 cursor-pointer rounded-pill ring-4 ring-wow/70 ring-offset-4 ring-offset-brand-deep transition-transform duration-base hover:scale-[1.02] motion-reduce:transform-none"
+                >
+                  {writerPicture ? (
+                    <img src={writerPicture} alt={L('మీ ఫొటో', 'Your photo')} className="h-full w-full rounded-pill object-cover" />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center rounded-pill bg-on-ink/10 text-on-ink/70">
+                      <Icon icon={UserRound} size="lg" />
+                    </span>
+                  )}
+                  <span className="absolute -bottom-1 -right-1 flex h-10 w-10 items-center justify-center rounded-pill bg-gradient-to-br from-wow to-wow-deep text-on-wow shadow-card">
+                    <Icon icon={Camera} size="sm" />
+                  </span>
+                  <span className="sr-only">{writerPicture ? L('ఫొటో మార్చండి', 'Change photo') : L('ఫొటో జోడించండి', 'Add photo')}</span>
+                </label>
+                <input
+                  id="writer-photo"
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(e) => {
+                    pickWriterPhoto(e.target.files);
+                    e.target.value = '';
+                  }}
                 />
-              </Field>
-              <Field label={L('ఇమెయిల్', 'Email')} error={show('email')} hint={L('ఐచ్ఛికం', 'Optional')}>
-                <Input id="sender-email" type="email" autoComplete="email" value={draft.email} onChange={(e) => set('email', e.target.value)} />
-              </Field>
-              <Field label={L('గ్రామం పేరు', 'Village name')}>
-                <Input id="sender-village" value={draft.village} readOnly className="bg-paper-sub" />
-              </Field>
+
+                <div className="w-full min-w-0 flex-1 space-y-3">
+                  <Field label={L('మీ పూర్తి పేరు', 'Your full name')} required error={show('name')} className="[&_label]:text-on-ink">
+                    <Input
+                      id="sender-name"
+                      script="te"
+                      value={draft.name}
+                      maxLength={120}
+                      onChange={(e) => set('name', e.target.value)}
+                      placeholder={L('ఉదా: రాముడు కొండా', 'e.g. Ramudu Konda')}
+                    />
+                  </Field>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label
+                      htmlFor="writer-photo"
+                      className={cn(
+                        s.body,
+                        'inline-flex min-h-tap cursor-pointer items-center gap-1.5 rounded-pill bg-on-ink/15 px-4 text-ui-sm font-semibold text-on-ink transition-colors duration-base hover:bg-on-ink/25',
+                      )}
+                    >
+                      <Icon icon={Camera} size="sm" />
+                      {writerPicture ? L('ఫొటో మార్చండి', 'Change photo') : L('మీ ఫొటో జోడించండి', 'Add your photo')}
+                    </label>
+                    {writerPhoto ? (
+                      <Button variant="ghost" size="sm" icon={X} className="text-on-ink hover:bg-on-ink/15" onClick={() => setWriterPhoto(null)}>
+                        {L('తీసివేయండి', 'Remove')}
+                      </Button>
+                    ) : null}
+                  </div>
+                  {writerPhotoError || show('writerPhoto') ? (
+                    <p role="alert" className={cn(s.body, 'text-ui-sm font-semibold text-wow')}>
+                      {writerPhotoError ?? show('writerPhoto')}
+                    </p>
+                  ) : (
+                    <p className={cn(s.body, 'text-ui-sm text-on-ink/70')}>
+                      {L('ముఖం స్పష్టంగా కనిపించే ఫొటో, 4 MB లోపు.', 'A clear photo of your face, under 4 MB.')}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            {/* How we reach you (never published). */}
+            <div className="space-y-3">
+              <h2 className={cn(s.head, 'text-headline-xs font-bold text-ink')}>{L('మిమ్మల్ని సంప్రదించడానికి', 'How we reach you')}</h2>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label={L('మొబైల్ నంబర్', 'Mobile number')} required error={show('phone')}>
+                  <div className="relative">
+                    <span aria-hidden className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted">
+                      <Icon icon={Phone} size="sm" />
+                    </span>
+                    <Input
+                      id="sender-phone"
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel-national"
+                      maxLength={10}
+                      value={draft.phone}
+                      onChange={(e) => set('phone', e.target.value.replace(/\D/g, ''))}
+                      placeholder="98xxxxxxxx"
+                      className="pl-10"
+                    />
+                  </div>
+                </Field>
+                <Field label={L('ఇమెయిల్', 'Email')} error={show('email')} hint={L('ఐచ్ఛికం', 'Optional')}>
+                  <div className="relative">
+                    <span aria-hidden className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted">
+                      <Icon icon={Mail} size="sm" />
+                    </span>
+                    <Input
+                      id="sender-email"
+                      type="email"
+                      autoComplete="email"
+                      value={draft.email}
+                      onChange={(e) => set('email', e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </Field>
+              </div>
+              <p className={cn(s.body, 'flex items-center gap-1.5 text-ui-sm text-muted')}>
+                <Icon icon={ShieldCheck} size="xs" />
+                {L('మీ ఫోన్, ఇమెయిల్ ప్రచురించం — సంపాదకులు మాత్రమే చూస్తారు.', 'Your phone and email are never published — only editors see them.')}
+              </p>
             </div>
-            <div className="space-y-2">
+
+            <div className="space-y-2 rounded-xl border border-wow/30 bg-wow-tint p-4">
               <Checkbox
                 checked={draft.showName}
                 onChange={(v) => set('showName', v)}
-                label={L('కథనంతో నా పేరు ప్రచురించవచ్చు.', 'My name may be published with the story.')}
+                label={L('కథనంతో నా పేరు, ఫొటో ప్రచురించవచ్చు.', 'My name and photo may be published with the story.')}
               />
               <Checkbox
                 checked={draft.consent}
@@ -677,11 +823,22 @@ export default function ShareVillagePage() {
               )}
             </PreviewBlock>
             <PreviewBlock title={L('పంపినవారు', 'Submitted by')} onEdit={() => go(4)} editLabel={L('మార్చండి', 'Edit')}>
-              <p className={cn(bodyCls, 'font-semibold text-ink')}>{draft.name}</p>
-              <p className={cn(bodyCls, 'text-ink-soft')}>
-                {draft.phone}
-                {draft.email ? ` · ${draft.email}` : ''}
-              </p>
+              <div className="flex items-center gap-3">
+                {writerPicture ? (
+                  <img src={writerPicture} alt="" className="h-14 w-14 shrink-0 rounded-pill object-cover ring-2 ring-wow/60" />
+                ) : (
+                  <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-pill bg-paper-sub text-muted">
+                    <Icon icon={UserRound} size="md" />
+                  </span>
+                )}
+                <div className="min-w-0">
+                  <p className={cn(bodyCls, 'font-semibold text-ink')}>{draft.name}</p>
+                  <p className={cn(bodyCls, 'text-ink-soft')}>
+                    {draft.phone}
+                    {draft.email ? ` · ${draft.email}` : ''}
+                  </p>
+                </div>
+              </div>
             </PreviewBlock>
           </div>
         ) : null}

@@ -63,18 +63,19 @@ export function HeroBanner({ stories }: { stories: ArticleCard[] }) {
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
     >
-      {/* The story's photo fills the banner under a deep-blue wash (solid on
-          the left where the copy sits, clearing to the right) and an orange glow. */}
+      {/* The story's photo fills the banner (centred crop) under a light
+          deep-blue wash: on phones dark only at the bottom where the copy sits,
+          from md dark on the left and clear on the right, so the photo shows. */}
       <div aria-hidden key={`bg-${article.short_id}`} className="absolute inset-0 -z-10 animate-fade-in">
         <NewsImage media={article.hero} ratio="auto" radius="none" priority className="h-full w-full" sizes="100vw" />
       </div>
       <div
         aria-hidden
-        className="absolute inset-0 -z-10 bg-gradient-to-t from-brand-deep via-brand-deep/85 to-brand-deep/40 md:bg-gradient-to-r md:from-brand-deep md:via-brand-deep/80 md:to-brand-deep/10"
+        className="absolute inset-0 -z-10 bg-gradient-to-t from-brand-deep via-brand-deep/70 to-brand-deep/0 md:bg-gradient-to-r md:from-brand-deep/95 md:via-brand-deep/55 md:to-brand-deep/0"
       />
       <div aria-hidden className="absolute -left-20 -top-24 -z-10 h-72 w-72 rounded-full bg-wow/25 blur-3xl" />
 
-      <div className="flex min-h-[340px] flex-col justify-center gap-4 p-5 pb-3 sm:p-7 sm:pb-3 md:min-h-[460px] md:max-w-[80%] md:p-12 lg:min-h-[520px]">
+      <div className="flex min-h-[340px] flex-col justify-end gap-4 p-5 pb-3 pt-24 drop-shadow-md sm:p-7 sm:pb-3 sm:pt-28 md:min-h-[460px] md:max-w-[80%] md:justify-center md:p-12 lg:min-h-[520px]">
         <div className="flex flex-wrap items-center gap-2">
           <span
             lang={tagScript.lang}

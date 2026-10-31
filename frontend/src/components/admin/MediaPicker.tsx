@@ -33,7 +33,7 @@ import { AI_FEATURES } from '@/utils/features';
 
 type Target = 'hero' | 'gallery';
 
-interface LibraryItem {
+export interface LibraryItem {
   id: number;
   url: string;
   alt_te: string | null;
@@ -45,7 +45,7 @@ interface LibraryItem {
   ai_generated?: boolean;
 }
 
-const toRef = (m: LibraryItem): CmsMediaRef => ({
+export const toRef = (m: LibraryItem): CmsMediaRef => ({
   id: m.id,
   url: m.url,
   alt_te: m.alt_te ?? null,
@@ -54,9 +54,9 @@ const toRef = (m: LibraryItem): CmsMediaRef => ({
   height: m.height ?? null,
 });
 
-const ACCEPT = 'image/jpeg,image/png,image/webp';
+export const ACCEPT = 'image/jpeg,image/png,image/webp';
 
-function Tile({
+export function Tile({
   item,
   selected,
   onClick,
@@ -181,7 +181,10 @@ export function MediaPicker({ heroId, hero, gallery, onHeroChange, onGalleryChan
     <div className="space-y-5">
       {/* -------------------------------------------------------- hero -- */}
       <div className="space-y-2">
-        <span className={label}>{L('ప్రధాన చిత్రం', 'Main image')}</span>
+        <span className={label}>
+          {L('ప్రధాన చిత్రం', 'Main image')}{' '}
+          <span className="font-normal text-muted">· {L('ప్రచురణకు తప్పనిసరి', 'required to publish')}</span>
+        </span>
         {hero || heroId ? (
           <div className="flex items-start gap-3">
             {hero ? (
@@ -223,8 +226,15 @@ export function MediaPicker({ heroId, hero, gallery, onHeroChange, onGalleryChan
       {/* ----------------------------------------------------- gallery -- */}
       <div className="space-y-2">
         <span className={label}>
-          {L('ఫోటో గ్యాలరీ', 'Gallery')} <span className="font-normal text-muted">({gallery.length})</span>
+          {L('మరిన్ని చిత్రాలు', 'More images')}{' '}
+          <span className="font-normal text-muted">
+            · {L('ఐచ్ఛికం', 'optional')}
+            {gallery.length ? ` (${gallery.length})` : ''}
+          </span>
         </span>
+        <p className={cn(s.body, 'text-meta text-muted')}>
+          {L('కథనం కింద ఫోటో గ్యాలరీగా కనిపిస్తాయి.', 'Shown as a photo gallery below the story.')}
+        </p>
         {gallery.length > 0 ? (
           <ul className="grid grid-cols-3 gap-3">
             {gallery.map((g, index) => (
@@ -246,7 +256,7 @@ export function MediaPicker({ heroId, hero, gallery, onHeroChange, onGalleryChan
           </ul>
         ) : null}
         <Button variant="secondary" size="sm" icon={ImagePlus} onClick={() => setOpen('gallery')}>
-          {L('చిత్రాలు జోడించండి', 'Add images')}
+          {L('మరిన్ని చిత్రాలు జోడించండి', 'Add more images')}
         </Button>
       </div>
 

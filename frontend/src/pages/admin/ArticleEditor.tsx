@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ImagePlus, Save, X } from 'lucide-react';
@@ -15,9 +15,11 @@ import { ErrorState, QueryState, Skeleton } from '@/components/ui/State';
 import { useToast } from '@/components/ui/Toast';
 import * as cmsApi from '@/features/cms/api';
 import { useI18n } from '@/i18n';
+import { useSiteContent } from '@/features/wow/siteContent';
 import { useAuth } from '@/stores/auth';
 
 import { AssistPanel } from './editor/AssistPanel';
+import { BodyImages } from './editor/BodyImages';
 import { ConvertPanel } from './editor/ConvertPanel';
 import { EngagementPanel } from './editor/EngagementPanel';
 import { MetaSidebar } from './editor/MetaSidebar';
@@ -32,7 +34,8 @@ import { AI_FEATURES } from '@/utils/features';
  * Story column: headline, standfirst, body, byline & source, SEO. Sticky
  * sidebar (./editor/MetaSidebar): status, flags, schedule, category, location,
  * tags, placement, media, audio. The form model and API mapping live in
- * ./editor/form.ts; the body is still a plain textarea over Tiptap JSON.
+ * ./editor/form.ts; the body is still a plain textarea over Tiptap JSON, with
+ * up to two pictures placed between paragraphs (./editor/BodyImages).
  */
 
 function EditorSkeleton() {
@@ -70,10 +73,13 @@ export default function ArticleEditor() {
     enabled: editing,
   });
   const options = useQuery({ queryKey: ['cms', 'editor-options'], queryFn: cmsApi.fetchEditorOptions });
+  // The bylines the desk set in CMS → Site content → Authors.
+  const authorNames = useSiteContent().authors.names;
 
   const [form, setForm] = useState<ArticleForm>(EMPTY_FORM);
   const [baseline, setBaseline] = useState<ArticleForm>(EMPTY_FORM);
   const set = (patch: Partial<ArticleForm>) => setForm((f) => ({ ...f, ...patch }));
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const next = existing.data ? fromArticle(existing.data) : EMPTY_FORM;
@@ -160,8 +166,22 @@ export default function ArticleEditor() {
                 hint={form.isShort ? L('ఉంటే "పూర్తి కథనం" బటన్ కనిపిస్తుంది', 'If filled, readers get a "Read full" button') : undefined}
                 error={errors('body')}
               >
-                <Textarea script="te" required={!form.isShort} rows={form.isShort ? 6 : 16} value={form.body} onChange={(e) => set({ body: e.target.value })} />
+                <Textarea
+                  ref={bodyRef}
+                  script="te"
+                  required={!form.isShort}
+                  rows={form.isShort ? 6 : 16}
+                  value={form.body}
+                  onChange={(e) => set({ body: e.target.value })}
+                />
               </Field>
+              {/* Up to two more pictures between paragraphs, besides the main image. */}
+              <BodyImages
+                body={form.body}
+                images={form.bodyImages}
+                textareaRef={bodyRef}
+                onChange={(body, bodyImages) => set({ body, bodyImages })}
+              />
               <p className="font-sans text-meta tabular-nums text-muted">
                 {words} {t('admin.wordCount')}
               </p>
@@ -221,12 +241,37 @@ export default function ArticleEditor() {
           />
           ) : null}
 
-          <Section title={L('రచయిత & మూలం', 'Byline and source')}>
+          <Section title={L('రచయిత & మూలం', 'Author and source')}>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label={L('బైలైన్', 'Byline')} optionalLabel error={errors('byline_te')}>
-                <Input script="te" value={form.byline} onChange={(e) => set({ byline: e.target.value })} placeholder={L('మా ప్రతినిధి', 'Our correspondent')} />
+              <Field
+                label={L('రచయిత', 'Author')}
+                optionalLabel
+                error={errors('byline_te')}
+                hint={L(
+                  'పాఠకులకు ఈ పేరు కనిపిస్తుంది. పేర్లు జోడించడానికి: CMS → సైట్ కంటెంట్ → రచయితలు',
+                  'Readers see this name. To add names: CMS → Site content → Authors',
+                )}
+              >
+                <Select value={form.byline} onChange={(e) => set({ byline: e.target.value })}>
+                  <option value="">{L('— పేరు లేదు (స్టాఫ్ ఖాతా పేరు) —', '— No name (staff account’s name) —')}</option>
+                  {/* A story saved with another byline (a reader's name, an older one) keeps it. */}
+                  {form.byline && !authorNames.includes(form.byline) ? <option value={form.byline}>{form.byline}</option> : null}
+                  {authorNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </Select>
               </Field>
-              <Field label={L('రచయిత', 'Author')} hint={can('article.approve') ? undefined : L('మార్చడానికి అనుమతి లేదు', 'No permission to change')} error={errors('author_id')}>
+              <Field
+                label={L('స్టాఫ్ ఖాతా', 'Staff account')}
+                hint={
+                  can('article.approve')
+                    ? L('న్యూస్‌రూమ్‌లో ఈ కథనం ఎవరిది. రచయిత పేరు ఎంచుకుంటే పాఠకులకు ఇది కనిపించదు.', 'Who in the newsroom owns this story. Readers don’t see it when an Author name is picked.')
+                    : L('మార్చడానికి అనుమతి లేదు', 'No permission to change')
+                }
+                error={errors('author_id')}
+              >
                 <Select
                   value={form.authorId ?? ''}
                   disabled={!can('article.approve')}

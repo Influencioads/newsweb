@@ -198,3 +198,26 @@ def test_other_roles_cannot_delete(client: TestClient, db: Session, role: RoleKe
     assert r.status_code == 403, r.text
     db.expire_all()
     assert db.get(Article, article.id).deleted_at is None
+
+
+def test_the_list_filters_by_category(client: TestClient, db: Session) -> None:
+    """The Articles list's category filter matches the section or a sub-section."""
+    from app.models.content import Category
+
+    admin = staff_headers(db, role=RoleKey.ADMIN, email="del-admin@test.example.com")
+    heroes, tech = (
+        db.scalar(select(Category).where(Category.slug == slug)) for slug in ("real-heroes", "wow-tech")
+    )
+    in_heroes, in_tech, filed_under = make_article(db), make_article(db), make_article(db)
+    in_heroes.category_id = heroes.id
+    in_tech.category_id = tech.id
+    filed_under.subcategory_id = heroes.id
+    db.commit()
+
+    body = client.get(
+        "/api/v1/cms/articles", params={"category_id": heroes.id, "limit": 100}, headers=admin
+    ).json()
+    ids = {a["id"] for a in body["articles"]}
+    assert {in_heroes.id, filed_under.id} <= ids
+    assert in_tech.id not in ids
+    assert body["total"] == len(ids)

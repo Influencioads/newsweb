@@ -59,6 +59,12 @@ export const lightColor = {
   /** Foreground on a brand-filled surface. White on the logo blue here; ink on
    *  the lightened blue the dark palette uses, where white would not contrast. */
   onBrand: '#FFFFFF',
+  /** WOW orange (web --tn-wow*): `wow` for icons and rules, `wowDeep` for
+   *  filled buttons (white text clears AA on it), `wowTint` for soft fills. */
+  wow: '#EA6C00',
+  wowDeep: '#C2410C',
+  wowTint: '#FFF0E4',
+  onWow: '#FFFFFF',
 } as const;
 
 /**
@@ -201,6 +207,10 @@ export const darkColor: Palette = {
   overlay: '#000000',
   onOverlay: '#FFFFFF',
   onBrand: '#101216',
+  wow: '#FF974A',
+  wowDeep: '#FB8534',
+  wowTint: '#3A2414',
+  onWow: '#16181C',
 };
 
 export type Palette = { -readonly [K in keyof typeof lightColor]: string };

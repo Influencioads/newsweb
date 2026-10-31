@@ -34,6 +34,20 @@ export default {
           tint: 'rgb(var(--tn-wow-tint) / <alpha-value>)',
         },
         'on-wow': 'rgb(var(--tn-on-wow) / <alpha-value>)',
+        hero: {
+          DEFAULT: 'rgb(var(--tn-hero) / <alpha-value>)',
+          tint: 'rgb(var(--tn-hero-tint) / <alpha-value>)',
+          text: 'rgb(var(--tn-hero-text) / <alpha-value>)',
+        },
+        /** The site footer's dark blue (the hero banner's) (constant in both themes; `on-ink` text on it). */
+        footer: 'rgb(var(--tn-footer) / <alpha-value>)',
+        social: {
+          whatsapp: 'rgb(var(--tn-social-whatsapp) / <alpha-value>)',
+          facebook: 'rgb(var(--tn-social-facebook) / <alpha-value>)',
+          instagram: 'rgb(var(--tn-social-instagram) / <alpha-value>)',
+          telegram: 'rgb(var(--tn-social-telegram) / <alpha-value>)',
+          x: 'rgb(var(--tn-social-x) / <alpha-value>)',
+        },
         breaking: {
           DEFAULT: 'rgb(var(--tn-breaking) / <alpha-value>)',
           tint: 'rgb(var(--tn-breaking-tint) / <alpha-value>)',
@@ -114,16 +128,6 @@ export default {
         'on-brand': 'rgb(var(--tn-on-brand) / <alpha-value>)',
         /** Foreground on a constant-dark panel (footer, ink cards, image scrims). */
         'on-ink': 'rgb(var(--tn-on-ink) / <alpha-value>)',
-        /**
-         * Third-party marks for the end-of-article share strip. Fixed in both
-         * themes (they are the networks' colours, not ours); each takes white
-         * text at >= 4.5:1, which is why WhatsApp is darker than its #25D366.
-         */
-        social: {
-          whatsapp: '#1B7F36',
-          x: '#0F172A',
-          telegram: '#0A6BA8',
-        },
       },
       fontFamily: {
         // Headlines and the wordmark: a serif Telugu voice — the editorial
@@ -154,8 +158,13 @@ export default {
          * itself has to satisfy the floor.
          */
         display: ['34px', { lineHeight: '1.5' }],
+        /** The masthead wordmark (WOW · emblem · INDIAN): fluid, phone and md+. */
+        'wordmark-sm': ['clamp(1.5rem, 6.9vw, 2.5rem)', { lineHeight: '1', letterSpacing: '0.01em' }],
+        wordmark: ['clamp(2.25rem, 4.1vw, 3.75rem)', { lineHeight: '1', letterSpacing: '0.02em' }],
         'headline-xl': ['33px', { lineHeight: '1.5' }],
         'headline-lg': ['28px', { lineHeight: '1.5' }],
+        /** Between md and lg: a section title that should sit a step under lg. */
+        'headline-ml': ['24px', { lineHeight: '1.5' }],
         'headline-md': ['20px', { lineHeight: '1.5' }],
         'headline-sm': ['17px', { lineHeight: '1.5' }],
         'headline-xs': ['15.5px', { lineHeight: '1.5' }],
@@ -190,8 +199,8 @@ export default {
         dock: 'var(--player-dock-h, 0px)',
       },
       maxWidth: {
-        site: '1200px',
-        page: '960px',
+        site: '1360px',
+        page: '1040px',
         wrap: '880px',
         article: '680px', // mockup 1c article measure
         form: '560px',

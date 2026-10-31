@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import { Copy, ImageDown, Link2, Share2 } from 'lucide-react';
+import { useState, type ComponentType } from 'react';
+import { ImageDown, Share2, type LucideProps } from 'lucide-react';
 
 import { API_BASE } from '@/api/client';
 import { Button, IconButton } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { TelegramIcon, WhatsAppIcon, XIcon } from '@/components/ui/glyphs';
+import { FacebookIcon, InstagramIcon, TelegramIcon, WhatsAppIcon, XIcon } from '@/components/ui/glyphs';
+import { Icon } from '@/components/ui/Icon';
 import { Sheet } from '@/components/ui/Dialog';
 import { useToast } from '@/components/ui/Toast';
 import { trackShare } from '@/features/engagement/beacon';
@@ -14,11 +14,13 @@ import { cn } from '@/utils/cn';
 /**
  * Sharing one story — the single implementation for every share surface.
  *
- * - `useShareActions`  the four paths (WhatsApp, copy link, card download,
- *                      native share) as plain functions; each reports the
+ * - `useShareActions`  the paths (WhatsApp, Facebook, Instagram, Telegram, X,
+ *                      card download, native share) as plain functions; each reports the
  *                      share so trending does not depend on which one was
  *                      pressed. Reusable by EngagementBar / EpaperPage.
- * - `ShareSheet`       bottom `Sheet` listing those paths as full-width rows.
+ * - `ShareButtons`     the five network pills; `ShareBlock` wraps them with the
+ *                      end-of-story prompt.
+ * - `ShareSheet`       bottom `Sheet` with the network pills (and the card).
  * - `ShareButton`      owns the open state; icon or labelled trigger.
  *
  * WhatsApp sends text + URL; the link preview at the other end carries a
@@ -82,6 +84,32 @@ export function useShareActions(shortId: string, url: string, title: string, tra
   const x = () => intent(`https://x.com/intent/tweet?url=${link}&text=${text}`);
   const telegram = () => intent(`https://t.me/share/url?url=${link}&text=${text}`);
 
+  const facebook = () => intent(`https://www.facebook.com/sharer/sharer.php?u=${link}`);
+
+  /**
+   * Instagram has no web share link. On a phone the system share sheet lists
+   * Instagram, so that is used; on a computer the link is put on the clipboard
+   * and Instagram opens, ready for it to be pasted into a story or DM.
+   */
+  async function instagram() {
+    if (canNative && navigator.share) {
+      try {
+        await navigator.share({ title, url: absolute });
+        report();
+      } catch {
+        // Cancelled.
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(absolute);
+      toast.success(t('ui.instagramCopied'));
+    } catch {
+      // Clipboard refused: Instagram still opens.
+    }
+    intent('https://www.instagram.com/');
+  }
+
   /** Resolves false when the clipboard was refused (a toast has been shown), so the sheet stays open. */
   async function copy(): Promise<boolean> {
     try {
@@ -129,71 +157,101 @@ export function useShareActions(shortId: string, url: string, title: string, tra
     }
   }
 
-  return { whatsapp, x, telegram, copy, download, downloading, native, canNative };
+  return { whatsapp, facebook, instagram, telegram, x, copy, download, downloading, native, canNative };
 }
 
-/** End-of-article strip: four coloured buttons, always on the page — no sheet to open. */
-export function ShareStrip({ shortId, url, title, className }: ShareTarget & { className?: string }) {
-  const { t } = useI18n();
+type Network = 'whatsapp' | 'facebook' | 'instagram' | 'telegram' | 'x';
+
+/** In the order the desk asked for: WhatsApp, Facebook, Instagram, Telegram, X. */
+const NETWORKS: readonly { id: Network; icon: ComponentType<LucideProps>; te: string; en: string; tone: string }[] = [
+  { id: 'whatsapp', icon: WhatsAppIcon, te: 'వాట్సాప్', en: 'WhatsApp', tone: 'bg-social-whatsapp hover:bg-social-whatsapp/90' },
+  { id: 'facebook', icon: FacebookIcon, te: 'ఫేస్‌బుక్', en: 'Facebook', tone: 'bg-social-facebook hover:bg-social-facebook/90' },
+  { id: 'instagram', icon: InstagramIcon, te: 'ఇన్‌స్టాగ్రామ్', en: 'Instagram', tone: 'bg-social-instagram hover:bg-social-instagram/90' },
+  { id: 'telegram', icon: TelegramIcon, te: 'టెలిగ్రామ్', en: 'Telegram', tone: 'bg-social-telegram hover:bg-social-telegram/90' },
+  { id: 'x', icon: XIcon, te: 'X (ట్విట్టర్)', en: 'X (Twitter)', tone: 'bg-social-x hover:bg-social-x/85' },
+];
+
+/**
+ * The five network buttons as a grid of coloured pills, icon and name on one
+ * line. `onDone` runs after a button has opened its network (the sheet uses it
+ * to close itself).
+ */
+export function ShareButtons({
+  shortId,
+  url,
+  title,
+  track,
+  onDone,
+  className,
+}: ShareTarget & { onDone?: () => void; className?: string }) {
+  const { language } = useI18n();
   const s = useScript();
-  const { whatsapp, x, telegram, copy } = useShareActions(shortId, url, title);
-  const pill = cn(s.body, 'inline-flex min-h-tap-lg items-center justify-center gap-2 rounded-pill px-4 text-ui font-semibold');
+  const actions = useShareActions(shortId, url, title, track);
   return (
-    <Card tone="warm" padding="md" as="aside" className={cn('border-l-4 border-l-brand', className)}>
-      <p className={cn(s.body, 'flex items-center gap-2 text-ui font-bold text-ink')}>
-        <span aria-hidden>📢</span>
-        {t('ui.shareStripTitle')}
+    <ul className={cn('grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2.5', className)}>
+      {NETWORKS.map((n) => (
+        <li key={n.id} className="min-w-0">
+          <button
+            type="button"
+            onClick={async () => {
+              await actions[n.id]();
+              onDone?.();
+            }}
+            className={cn(
+              n.tone,
+              s.body,
+              s.te ? 'text-te-body-sm' : 'text-ui',
+              'flex min-h-tap w-full items-center justify-center gap-2 rounded-pill px-3 py-2 font-bold text-on-ink',
+              'transition-[background-color,transform] duration-base ease-standard active:scale-[.98]',
+            )}
+          >
+            <Icon icon={n.icon} size="md" className="shrink-0" />
+            <span className="min-w-0 text-center">{language === 'te' ? n.te : n.en}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The end-of-story prompt: "Liked this story? Share it with friends:" and the five buttons. */
+export function ShareBlock(props: ShareTarget & { className?: string }) {
+  const { language } = useI18n();
+  const s = useScript();
+  return (
+    <section
+      aria-label={language === 'te' ? 'షేర్ చేయండి' : 'Share'}
+      className={cn('rounded-2xl border border-rule border-l-4 border-l-wow bg-surface p-4 shadow-card md:p-5', props.className)}
+    >
+      <p className={cn(s.head, s.te ? 'text-te-body-sm' : 'text-headline-sm', 'mb-3 flex items-center gap-2 font-bold text-ink')}>
+        <Icon icon={Share2} size="md" className="shrink-0 text-wow-deep" />
+        {language === 'te' ? 'ఈ కథనం నచ్చిందా? మిత్రులతో పంచుకోండి:' : 'Liked this story? Share it with friends:'}
       </p>
-      <div className="mt-3 grid grid-cols-2 gap-3">
-        <button type="button" onClick={whatsapp} className={cn(pill, 'bg-social-whatsapp text-on-ink')}>
-          <WhatsAppIcon size={18} />
-          {t('ui.whatsapp')}
-        </button>
-        <button type="button" onClick={x} className={cn(pill, 'bg-social-x text-on-ink')}>
-          <XIcon size={16} />X (Twitter)
-        </button>
-        <button type="button" onClick={telegram} className={cn(pill, 'bg-social-telegram text-on-ink')}>
-          <TelegramIcon size={18} />
-          Telegram
-        </button>
-        <button type="button" onClick={() => void copy()} className={cn(pill, 'border border-rule-strong bg-surface-sub text-ink')}>
-          <Copy size={18} aria-hidden />
-          {t('ui.copyLinkShort')}
-        </button>
-      </div>
-    </Card>
+      <ShareButtons {...props} className={undefined} />
+    </section>
   );
 }
 
 export function ShareSheet({ open, onClose, shortId, url, title, track, cardAvailable }: ShareSheetProps) {
   const { t } = useI18n();
-  const { whatsapp, copy, download, downloading, native, canNative } = useShareActions(shortId, url, title, track);
-
-  // Every row dismisses the sheet once its path has run (focus returns to the
-  // opener) — except a path that reports failure, which stays open for a retry.
-  const run = (action: () => void | boolean | Promise<void | boolean>) => async () => {
-    if ((await action()) !== false) onClose();
-  };
+  const { download, downloading } = useShareActions(shortId, url, title, track);
 
   return (
     <Sheet open={open} onClose={onClose} title={t('ui.share')}>
-      <div className="flex flex-col gap-2">
-        {/* The only filled control in the sheet: WhatsApp is how this
-            product is distributed, so it leads rather than sits in a list. */}
-        <Button variant="primary" size="lg" full icon={WhatsAppIcon} onClick={run(whatsapp)}>
-          {t('ui.whatsapp')}
-        </Button>
-        <Button variant="secondary" size="lg" full icon={Link2} onClick={run(copy)}>
-          {t('ui.copyLink')}
-        </Button>
+      <div className="flex flex-col gap-3">
+        <ShareButtons shortId={shortId} url={url} title={title} track={track} onDone={onClose} />
         {cardAvailable && (
-          <Button variant="secondary" size="lg" full icon={ImageDown} pending={downloading} onClick={run(download)}>
+          <Button
+            variant="secondary"
+            size="lg"
+            full
+            icon={ImageDown}
+            pending={downloading}
+            onClick={async () => {
+              if ((await download()) !== false) onClose();
+            }}
+          >
             {t('ui.shareCard')}
-          </Button>
-        )}
-        {canNative && (
-          <Button variant="secondary" size="lg" full icon={Share2} onClick={run(native)}>
-            {t('ui.shareNative')}
           </Button>
         )}
       </div>

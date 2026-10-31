@@ -22,6 +22,17 @@
      (white text clears AA on it), `wow-tint` for soft backgrounds. */
   --tn-wow: 234 108 0;            --tn-wow-deep: 194 65 12;
   --tn-wow-tint: 255 240 228;     --tn-on-wow: 255 255 255;
+  /* Share buttons: each network's own colour, darkened where needed so white
+     text clears AA. The same in both themes, like the logos they stand for. */
+  --tn-social-whatsapp: 30 126 52;  --tn-social-facebook: 8 102 255;
+  --tn-social-instagram: 193 53 132; --tn-social-telegram: 10 105 168;
+  --tn-social-x: 15 20 25;
+  /* Nominate Your Local Hero: its own green, so the call to action stands
+     apart from the orange WOW accents. `hero` takes white text (AA). */
+  --tn-hero: 21 128 61;           --tn-hero-tint: 225 243 231;
+  --tn-hero-text: 21 110 54;
+  /* Footer: the hero banner's dark blue (#072659), the same in both themes; white text on it. */
+  --tn-footer: 7 38 89;
   --tn-breaking-border: 244 190 193;
   --tn-ink: 23 25 30;             --tn-ink-soft: 72 76 84;
   --tn-ink-panel: 34 37 43;       --tn-ink-deep: 16 18 22;
@@ -90,6 +101,8 @@
   --tn-breaking: 255 110 110;
   --tn-wow: 255 151 74;           --tn-wow-deep: 251 133 52;
   --tn-wow-tint: 58 36 20;        --tn-on-wow: 22 24 28;
+  --tn-hero: 21 128 61;           --tn-hero-tint: 22 52 34;
+  --tn-hero-text: 120 206 148;
   --tn-breaking-tint: 62 28 29;   --tn-breaking-border: 116 44 46;
   --tn-ink: 236 237 240;          --tn-ink-soft: 197 200 206;
   /* muted-inverse is only used on the constant-dark panels (footer, CMS
@@ -313,17 +326,30 @@
     font-size: calc(17px * var(--reader-scale));
     line-height: 1.7;
   }
+  /* Story headings match the home hero headline (headline-md on phones,
+     headline-lg from md up) rather than the larger display size. */
   .reader-h1 {
-    font-size: calc(33px * var(--reader-scale));
+    font-size: calc(22px * var(--reader-scale));
     line-height: 1.5;
   }
   .reader-h2 {
-    font-size: calc(24px * var(--reader-scale));
+    font-size: calc(19px * var(--reader-scale));
     line-height: 1.5;
   }
   .reader-h3 {
-    font-size: calc(20px * var(--reader-scale));
+    font-size: calc(17px * var(--reader-scale));
     line-height: 1.5;
+  }
+  @media (min-width: 768px) {
+    .reader-h1 {
+      font-size: calc(28px * var(--reader-scale));
+    }
+    .reader-h2 {
+      font-size: calc(22px * var(--reader-scale));
+    }
+    .reader-h3 {
+      font-size: calc(19px * var(--reader-scale));
+    }
   }
   .reader-caption {
     font-size: calc(13px * var(--reader-scale));

@@ -14,8 +14,13 @@ export interface ArticleForm {
   subTitle: string;
   summary: string;
   body: string;
+  /** Pictures placed inside the body, keyed by media id. Where each one sits is
+   *  the `[చిత్రం:ID]` marker line in `body`; see BodyImages. */
+  bodyImages: Record<string, BodyImage>;
   categoryId: number | null;
   subcategoryId: number | null;
+  /** More sections the story is also listed in (up to three). */
+  extraCategoryIds: number[];
   location: LocationValue;
   hero: CmsMediaRef | null;
   gallery: CmsMediaRef[];
@@ -45,8 +50,10 @@ export const EMPTY_FORM: ArticleForm = {
   subTitle: '',
   summary: '',
   body: '',
+  bodyImages: {},
   categoryId: null,
   subcategoryId: null,
+  extraCategoryIds: [],
   location: { state: '', districtId: null, mandalId: null, localityId: null },
   hero: null,
   gallery: [],
@@ -70,24 +77,100 @@ export const EMPTY_FORM: ArticleForm = {
   scheduledAt: '',
 };
 
-export const bodyDoc = (text: string) => ({
+/** A picture inside the story body (between paragraphs), with its own caption. */
+export interface BodyImage {
+  media: CmsMediaRef;
+  caption: string;
+}
+
+/** Up to this many pictures can sit between paragraphs, besides the main image. */
+export const MAX_BODY_IMAGES = 2;
+
+/** The line that stands for a body picture in the textarea: `[చిత్రం:123]`. */
+export const imageMarker = (id: number | string) => `[చిత్రం:${id}]`;
+const MARKER = /^\[(?:చిత్రం|image):(\d+)\]$/;
+
+/** The media id a paragraph stands for, or null for an ordinary paragraph. */
+export const markerId = (paragraph: string): string | null => MARKER.exec(paragraph.trim())?.[1] ?? null;
+
+/** The body split into paragraphs, the same way `bodyDoc` splits it. */
+export const paragraphsOf = (text: string): string[] => text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+
+export const bodyDoc = (text: string, images: Record<string, BodyImage> = {}) => ({
   type: 'doc',
-  content: text
-    .split(/\n\s*\n/)
-    .filter(Boolean)
-    .map((p) => ({ type: 'paragraph', content: [{ type: 'text', text: p.trim() }] })),
+  content: paragraphsOf(text).flatMap((p): Record<string, unknown>[] => {
+    const id = markerId(p);
+    if (id !== null) {
+      const img = images[id];
+      // A marker whose picture was removed is dropped, never printed as text.
+      if (!img) return [];
+      const m = img.media;
+      return [
+        {
+          type: 'image',
+          attrs: {
+            src: m.url,
+            media_id: m.id,
+            alt: m.alt_te ?? img.caption ?? null,
+            caption: img.caption.trim() || null,
+            credit: m.credit ?? null,
+            width: m.width ?? null,
+            height: m.height ?? null,
+          },
+        },
+      ];
+    }
+    return [{ type: 'paragraph', content: [{ type: 'text', text: p }] }];
+  }),
 });
 
+interface BodyNode {
+  type?: string;
+  text?: string;
+  attrs?: Record<string, unknown>;
+  content?: unknown[];
+}
+
+/** Body text for the textarea; a picture becomes its marker line. */
 export const extract = (body: Record<string, unknown> | null): string => {
   const out: string[] = [];
   const walk = (node: unknown) => {
     if (!node || typeof node !== 'object') return;
-    const x = node as { text?: string; content?: unknown[] };
+    const x = node as BodyNode;
+    if (x.type === 'image') {
+      const id = Number(x.attrs?.media_id);
+      if (id) out.push(imageMarker(id));
+      return;
+    }
     if (x.text) out.push(x.text);
     x.content?.forEach(walk);
   };
   walk(body);
   return out.join('\n\n');
+};
+
+/** The pictures inside a stored body, keyed by media id. */
+export const extractImages = (body: Record<string, unknown> | null): Record<string, BodyImage> => {
+  const out: Record<string, BodyImage> = {};
+  const walk = (node: unknown) => {
+    if (!node || typeof node !== 'object') return;
+    const x = node as BodyNode;
+    if (x.type === 'image') {
+      const a = x.attrs ?? {};
+      const id = Number(a.media_id);
+      if (!id || typeof a.src !== 'string') return;
+      const str = (v: unknown) => (typeof v === 'string' && v ? v : null);
+      const num = (v: unknown) => (typeof v === 'number' ? v : null);
+      out[String(id)] = {
+        media: { id, url: a.src, alt_te: str(a.alt), credit: str(a.credit), width: num(a.width), height: num(a.height) },
+        caption: str(a.caption) ?? '',
+      };
+      return;
+    }
+    x.content?.forEach(walk);
+  };
+  walk(body);
+  return out;
 };
 
 /** `datetime-local` needs `YYYY-MM-DDTHH:mm` in *local* time. */
@@ -98,7 +181,13 @@ export function toLocalInput(iso: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export const wordCount = (text: string): number => (text.trim() ? text.trim().split(/\s+/).length : 0);
+export const wordCount = (text: string): number => {
+  const words = paragraphsOf(text)
+    .filter((p) => markerId(p) === null)
+    .join(' ')
+    .trim();
+  return words ? words.split(/\s+/).length : 0;
+};
 
 export function fromArticle(a: CmsArticle): ArticleForm {
   return {
@@ -107,8 +196,10 @@ export function fromArticle(a: CmsArticle): ArticleForm {
     subTitle: a.sub_title_te ?? '',
     summary: a.summary_te ?? '',
     body: extract(a.body),
+    bodyImages: extractImages(a.body),
     categoryId: a.category_id,
     subcategoryId: a.subcategory_id,
+    extraCategoryIds: a.extra_category_ids ?? [],
     location: { state: '', districtId: a.district_id, mandalId: a.mandal_id, localityId: a.locality_id },
     hero: a.hero_media,
     gallery: a.gallery ?? [],
@@ -139,9 +230,10 @@ export function toPayload(f: ArticleForm, canPin: boolean): Record<string, unkno
     title_en: f.titleEn || null,
     sub_title_te: f.subTitle || null,
     summary_te: f.summary || null,
-    body: bodyDoc(f.body),
+    body: bodyDoc(f.body, f.bodyImages),
     category_id: f.categoryId,
     subcategory_id: f.subcategoryId,
+    extra_category_ids: f.extraCategoryIds.filter((id) => id !== f.categoryId),
     district_id: f.location.districtId,
     mandal_id: f.location.mandalId,
     locality_id: f.location.localityId,

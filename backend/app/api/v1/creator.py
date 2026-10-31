@@ -138,16 +138,19 @@ async def attach_submission_media(
     hand them the whole CMS media API. This is their own photo on their own
     submission, so it is scoped to `/users/me` like the avatar route.
     """
+    submission = submission_service.check_can_attach(
+        db, submission_id=submission_id, user_id=principal.id
+    )
     profile = kyc_service.profile_for(db, principal.id)
-    if profile is None or not kyc_service.may_attach_images(db, principal.id):
+    # My Village takes photos from any signed-in reader (submission_service.
+    # OPEN_PHOTO_CATEGORIES); elsewhere they still need approved KYC.
+    verified = profile is not None and kyc_service.may_attach_images(db, principal.id)
+    if not verified and not submission_service.photos_open_to_all(db, submission):
         raise ConflictError(
             message_en="Only verified contributors can attach photographs.",
             message_te="ధృవీకరించిన విలేకరులు మాత్రమే ఫోటోలు జోడించగలరు.",
             details={"kyc": "approval required"},
         )
-    submission = submission_service.check_can_attach(
-        db, submission_id=submission_id, user_id=principal.id
-    )
 
     raw = await file.read()
     media = media_service.create_image_media(
@@ -160,7 +163,7 @@ async def attach_submission_media(
         # §12.5: a photograph that is not ours needs a credit, and the
         # contributor's chosen byline is that credit.
         source_type="contributed",
-        credit=profile.display_name_te,
+        credit=(profile.display_name_te if profile else None) or principal.user.name_te,
     )
     submission_service.attach_media(db, submission=submission, media_id=media.id)
     audit_service.record(

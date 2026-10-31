@@ -21,6 +21,12 @@ export interface CategoryOut {
 
 export interface NavCategoryOut extends CategoryOut {
   show_in_nav: boolean;
+  /** A WOW category card (Explore WOW); edited on the CMS Taxonomy page. */
+  in_explore?: boolean;
+  tagline_te?: string | null;
+  tagline_en?: string | null;
+  /** A website icon name (backend site_content.ICONS); lib/siteContent maps it. */
+  icon?: string | null;
 }
 
 export interface DistrictOut {
@@ -131,6 +137,8 @@ export interface HomePayload {
   edition: DistrictOut | null;
   /** §3 — present only when the reader has saved a mandal. */
   mandal_block: HomeSection | null;
+  /** The hero slides the desk chose (CMS → Home hero slides), in order. */
+  hero?: ArticleCard[];
   lead: ArticleCard | null;
   secondary: ArticleCard[];
   mid_column: ArticleCard[];
@@ -170,6 +178,43 @@ export interface SiteConfig {
   categories: NavCategoryOut[];
   states: StateOut[];
   districts: DistrictOut[];
+  /** CMS → Site content (backend app/services/site_content.py); see lib/siteContent. */
+  content?: Partial<SiteContent>;
+}
+
+/** What CMS → Site content edits, as `/public/config` sends it. */
+export interface SiteContent {
+  brand: { logo_url: string; tagline_te: string; tagline_en: string };
+  home: { banner_tag_te: string; banner_tag_en: string };
+  /** The home hero banner's slides, chosen in CMS → Home hero slides. */
+  hero: { article_ids: number[] };
+  /** `mobile_image_url`: the phone version (blank: `image_url`). */
+  radio: { image_url: string; mobile_image_url: string; segments: SiteRadioSegment[] };
+  /** Story Shots pictures uploaded in CMS → Story Shots, in order. */
+  story_shots: { shots: StoryShotItem[] };
+  /** The Nominate banner picture (blank: a Local Hero photo) and the form's hero categories. */
+  nominate: { image_url: string; mobile_image_url: string; categories: { value: string; te: string; en: string }[] };
+  contact: { grievance_email: string };
+}
+
+export interface SiteRadioSegment {
+  id: string;
+  te: string;
+  en: string;
+  tagline_te: string;
+  tagline_en: string;
+  icon: string;
+  tone: string;
+  categories: string[];
+}
+
+export interface StoryShotItem {
+  id: string;
+  image_url: string;
+  title_te: string;
+  title_en: string;
+  /** "Read story" target: a page on the website (/...) or an https address; '' for none. */
+  link: string;
 }
 
 export interface SearchResults {

@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, ChevronLeft, ChevronRight, GalleryVerticalEnd, Pause, Play, X } from 'lucide-react';
+import {
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  GalleryVerticalEnd,
+  Pause,
+  Play,
+  X,
+} from 'lucide-react';
 
 import { ShareButton } from '@/components/article/ShareSheet';
 import { NewsImage } from '@/components/media/NewsImage';
@@ -9,101 +16,198 @@ import { ButtonLink } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { SectionHeader } from '@/components/ui/Layout';
 import { EmptyState } from '@/components/ui/State';
-import * as publicApi from '@/features/public/api';
 import { useI18n, useScript } from '@/i18n';
+import type { MediaOut, StoryShotItem } from '@/types/public';
 import { cn } from '@/utils/cn';
 import { useDocumentTitle } from '@/utils/motion';
 
+import { useSiteConfig } from './siteContent';
+
 /**
- * Story Shots (pitch §2): quick, swipeable visual stories — a tall image, a
- * short caption, one tap to share. The home page shows them as a sideways
- * shelf of 9:16 cards; tapping one opens the full-screen deck at that story,
- * where the reader swipes up for the next.
+ * Story Shots (pitch §2): pictures only.
  *
- * The source is the short-news feed: the newsroom already writes a headline
- * and a short text for those, which is exactly what a Story Shot needs. Until
- * there are short items, the newest stories with a photograph stand in.
+ * A shot is its picture — the home shelf shows four of them, and the
+ * full-screen deck shows one at a time, filling the card, with only the
+ * progress bar and controls on top and Read story / Share at the bottom.
+ * Tapping a shelf picture opens the deck at that shot.
+ *
+ * The pictures are only the ones uploaded in CMS → Story Shots, in the order
+ * the desk set there — never article photos. With none uploaded, the home
+ * shelf is hidden and the page says Story Shots are on the way.
  */
 
-const SHOTS_LIMIT = 12;
-
-function useShots() {
-  return useQuery({
-    queryKey: ['public', 'story-shots'],
-    queryFn: async () => {
-      // The newest illustrated stories. Short news can't feed this any more:
-      // since the short-news cards change it is a picture-only card with no
-      // headline or summary for a shot to show.
-      const latest = (await publicApi.fetchFeed({ limit: SHOTS_LIMIT * 2 })).articles;
-      return latest.filter((a) => a.hero?.url).slice(0, SHOTS_LIMIT);
-    },
-    staleTime: 60_000,
-  });
+/** One uploaded picture, ready for the shelf and the deck. */
+interface Shot {
+  key: string;
+  media: MediaOut;
+  title_te: string;
+  title_en: string;
+  /** "Read story" target: a page on the site or an https address; '' for none. */
+  link: string;
+  external: boolean;
+  /** Share target: the deck opened at this shot. */
+  shareUrl: string;
 }
 
-/** Home shelf: a row of tall cards that scrolls sideways. */
+/** An uploaded picture as the media shape NewsImage draws. */
+function pictureMedia(url: string): MediaOut {
+  return {
+    id: 0,
+    url,
+    srcset: null,
+    alt_te: null,
+    caption_te: null,
+    credit: null,
+    license_label: null,
+    representative: false,
+    source_url: null,
+    width: null,
+    height: null,
+    blurhash: null,
+    ai_generated: false,
+  };
+}
+
+function fromUpload(shot: StoryShotItem): Shot {
+  return {
+    key: shot.id,
+    media: pictureMedia(shot.image_url),
+    title_te: shot.title_te,
+    title_en: shot.title_en,
+    link: shot.link,
+    external: shot.link.startsWith('https:'),
+    shareUrl: `/story-shots?start=${encodeURIComponent(shot.id)}`,
+  };
+}
+
+function useShots(): { data: Shot[]; isLoading: boolean } {
+  const config = useSiteConfig();
+  const uploaded = config.data?.content?.story_shots?.shots;
+  const data = useMemo(() => (uploaded ?? []).map(fromUpload), [uploaded]);
+  return { data, isLoading: config.isLoading };
+}
+
+/** The headline, for each shot's accessible name and share text. */
+function useShotParts(shot: Shot) {
+  const s = useScript();
+  const { language } = useI18n();
+  const head = s.text(shot.title_te, shot.title_en);
+  if (head.text) return { head };
+  return { head: { ...head, text: language === 'te' ? 'స్టోరీ షాట్స్' : 'Story Shots' } };
+}
+
+/* ------------------------------------------------------------------------ */
+/* Home shelf                                                               */
+/* ------------------------------------------------------------------------ */
+
+/** A home shelf tile: just the picture; the headline is its accessible name. */
+function ShelfCard({ shot }: { shot: Shot }) {
+  const p = useShotParts(shot);
+  return (
+    <Link
+      to={`/story-shots?start=${encodeURIComponent(shot.key)}`}
+      aria-label={p.head.text}
+      className="group block overflow-hidden rounded-2xl shadow-card transition-[box-shadow,transform] duration-base hover:-translate-y-0.5 hover:shadow-raised motion-reduce:transform-none"
+    >
+      <NewsImage media={shot.media} ratio="9/16" radius="2xl" sizes="(min-width: 768px) 25vw, 46vw" />
+    </Link>
+  );
+}
+
+/** Home shelf: one row of four pictures (sideways scroll on phones). */
 export function StoryShotsStrip() {
   const { language } = useI18n();
-  const s = useScript();
   const shots = useShots();
-  const items = shots.data ?? [];
+  const items = shots.data;
   if (!items.length) return null;
 
   return (
     <section aria-labelledby="story-shots">
       <SectionHeader
-        title={<span id="story-shots">{language === 'te' ? 'స్టోరీ షాట్స్' : 'Story Shots'}</span>}
+        title={
+          <span id="story-shots" className="inline-flex items-center gap-2">
+            <Icon icon={GalleryVerticalEnd} size="md" className="text-wow-deep" />
+            {language === 'te' ? 'స్టోరీ షాట్స్' : 'Story Shots'}
+          </span>
+        }
         to="/story-shots"
         toLabel={language === 'te' ? 'అన్నీ చూడండి' : 'View all'}
       />
-      <ul className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] md:mx-0 md:px-0">
-        {items.map((article) => {
-          const head = s.text(article.title_te, article.title_en);
-          return (
-            <li key={article.short_id} className="w-[44%] shrink-0 snap-start md:w-[24%] lg:w-[15.5%]">
-              <Link
-                to={`/story-shots?start=${article.short_id}`}
-                className="group relative block overflow-hidden rounded-2xl bg-ink"
-              >
-                <NewsImage media={article.hero} ratio="9/16" radius="2xl" sizes="(max-width: 768px) 45vw, 200px" />
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-t from-overlay/90 via-overlay/25 to-transparent"
-                />
-                <span className="absolute left-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-pill bg-wow-deep text-on-wow ring-2 ring-on-ink/80">
-                  <Icon icon={GalleryVerticalEnd} size="xs" />
-                </span>
-                <p
-                  lang={head.lang}
-                  className={cn(head.head, 'te-clamp-3 absolute inset-x-2.5 bottom-2.5 text-headline-xs font-bold text-on-ink')}
-                >
-                  {head.text}
-                </p>
-              </Link>
-            </li>
-          );
-        })}
+      <ul className="-mx-3 flex snap-x snap-mandatory scroll-px-3 gap-3 overflow-x-auto px-3 pb-2 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-4 md:overflow-visible md:px-0 md:pb-0">
+        {items.slice(0, 4).map((shot) => (
+          <li key={shot.key} className="w-[46%] shrink-0 snap-start sm:w-[42%] md:w-auto">
+            <ShelfCard shot={shot} />
+          </li>
+        ))}
       </ul>
     </section>
   );
 }
 
+/* ------------------------------------------------------------------------ */
+/* Full-screen deck                                                         */
+/* ------------------------------------------------------------------------ */
 
 /** Seconds each shot stays up before the deck moves on by itself. */
-const SHOT_SECONDS = 8;
+const SHOT_SECONDS = 9;
+
+/**
+ * One shot inside the deck card: just the picture, filling the card. The
+ * headline stays as its accessible name; a slim bar at the bottom keeps the
+ * way to the full story and sharing.
+ */
+function Poster({ shot }: { shot: Shot }) {
+  const { language } = useI18n();
+  const te = language === 'te';
+  const p = useShotParts(shot);
+
+  return (
+    <div className="relative h-full bg-ink">
+      <NewsImage
+        media={shot.media}
+        ratio="auto"
+        radius="none"
+        priority
+        className="h-full w-full"
+        sizes="(min-width: 768px) 500px, 100vw"
+      />
+      <h1 className="sr-only">{p.head.text}</h1>
+      {/* Shades under the controls at the top and the buttons at the bottom. */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-overlay/70 to-transparent" />
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-overlay/70 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-end gap-2 p-3 md:p-4">
+        {shot.link ? (
+          <ButtonLink to={shot.link} external={shot.external} variant="wow" size="sm" iconRight={ArrowRight}>
+            {te ? 'కథ చదవండి' : 'Read story'}
+          </ButtonLink>
+        ) : null}
+        <ShareButton
+          shortId={shot.key}
+          url={shot.shareUrl}
+          title={p.head.text}
+          track={false}
+          cardAvailable={false}
+          className="bg-on-ink/15 text-on-ink hover:bg-on-ink/25"
+        />
+      </div>
+    </div>
+  );
+}
 
 /**
  * `/story-shots` — a full-screen story viewer, the way readers already know
- * from WhatsApp Status and Instagram Stories:
+ * from WhatsApp Status and Instagram Stories, showing one infographic poster
+ * at a time:
  *
  *   - segmented progress bars across the top; the current one fills over
  *     SHOT_SECONDS and then the next shot opens on its own;
- *   - tap the right side (or →, or swipe left / up) for next, the left side
- *     (or ←, swipe right / down) for previous; press and hold to pause;
+ *   - tap the right side of the photo (or →, or swipe left / up) for next, the
+ *     left side (or ←, swipe right / down) for previous; press and hold to pause;
  *   - close (✕ or Esc) goes back to where the reader came from.
  *
- * On a desktop the 9:16 card sits in the middle over a blurred copy of its own
- * photo, with round previous / next buttons beside it. Readers who prefer
+ * On a desktop the 9:16 poster sits in the middle over a blurred copy of its
+ * photo, with round previous / next buttons beside it; on a phone a
+ * Previous / Next bar sits under the poster. Readers who prefer
  * reduced motion get no autoplay — they step through by hand.
  */
 export default function StoryShotsPage() {
@@ -113,7 +217,7 @@ export default function StoryShotsPage() {
   useDocumentTitle(te ? 'స్టోరీ షాట్స్' : 'Story Shots');
   const navigate = useNavigate();
   const shots = useShots();
-  const items = useMemo(() => shots.data ?? [], [shots.data]);
+  const items = shots.data;
   const [params] = useSearchParams();
   const start = params.get('start');
 
@@ -122,12 +226,12 @@ export default function StoryShotsPage() {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(Boolean(reducedMotion));
   const [held, setHeld] = useState(false);
-  const touch = useRef<{ x: number; y: number; t: number } | null>(null);
+  const touch = useRef<{ x: number; y: number } | null>(null);
 
   // Open at the shot the reader tapped on the home shelf.
   useEffect(() => {
     if (!start || !items.length) return;
-    const at = items.findIndex((a) => a.short_id === start);
+    const at = items.findIndex((a) => a.key === start);
     if (at >= 0) setIndex(at);
   }, [start, items]);
 
@@ -171,7 +275,7 @@ export default function StoryShotsPage() {
     };
   }, []);
 
-  const article = items[index];
+  const shot = items[index];
   const upcoming = items[index + 1];
   const running = !paused && !held;
 
@@ -186,7 +290,7 @@ export default function StoryShotsPage() {
     );
   }
 
-  if (!article) {
+  if (!shot) {
     return (
       <div className={cn(shell, 'items-center justify-center p-6')}>
         <EmptyState
@@ -200,17 +304,14 @@ export default function StoryShotsPage() {
     );
   }
 
-  const head = s.text(article.title_te, article.title_en);
-  const hasStory = article.reading_time_sec > 0;
-
   return (
     <div className={shell} role="dialog" aria-modal="true" aria-label={te ? 'స్టోరీ షాట్స్' : 'Story Shots'}>
-      {/* Blurred backdrop from the current photo (desktop only — on a phone the card fills the screen). */}
-      {article.hero?.url ? (
+      {/* Blurred backdrop from the current photo (desktop only — on a phone the poster fills the screen). */}
+      {shot.media?.url ? (
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 hidden scale-110 bg-cover bg-center opacity-40 blur-3xl md:block"
-          style={{ backgroundImage: `url(${article.hero.url})` }}
+          style={{ backgroundImage: `url(${shot.media.url})` }}
         />
       ) : null}
 
@@ -226,16 +327,16 @@ export default function StoryShotsPage() {
           <Icon icon={ChevronLeft} size="lg" />
         </button>
 
-        {/* The card */}
+        {/* The poster */}
         <article
-          key={article.short_id}
-          className="relative h-full w-full overflow-hidden bg-ink md:aspect-[9/16] md:h-full md:max-h-[860px] md:w-auto md:rounded-2xl md:shadow-raised"
+          key={shot.key}
+          className="relative h-full w-full animate-fade-in overflow-hidden bg-paper md:aspect-[9/16] md:h-full md:max-h-[880px] md:w-auto md:rounded-2xl md:shadow-raised"
           onPointerDown={() => setHeld(true)}
           onPointerUp={() => setHeld(false)}
           onPointerLeave={() => setHeld(false)}
           onTouchStart={(e) => {
             const t = e.touches[0];
-            if (t) touch.current = { x: t.clientX, y: t.clientY, t: Date.now() };
+            if (t) touch.current = { x: t.clientX, y: t.clientY };
           }}
           onTouchEnd={(e) => {
             const start0 = touch.current;
@@ -249,29 +350,18 @@ export default function StoryShotsPage() {
             else (dy < 0 ? next : prev)();
           }}
         >
-          <NewsImage
-            media={article.hero}
-            ratio="auto"
-            radius="none"
-            priority
-            className="absolute inset-0 h-full w-full"
-            sizes="(max-width: 768px) 100vw, 480px"
-          />
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 bg-gradient-to-b from-overlay/70 via-transparent via-30% to-overlay"
-          />
+          <Poster shot={shot} />
 
-          {/* Top: progress + controls */}
-          <div className="absolute inset-x-0 top-0 z-10 space-y-3 p-3 md:p-4">
+          {/* Top: progress + controls, over the photo. */}
+          <div className="absolute inset-x-0 top-0 z-10 space-y-2.5 p-3 text-on-ink md:p-4">
             <div className="flex gap-1" aria-hidden>
               {items.map((a, i) => (
-                <span key={a.short_id} className="h-[3px] flex-1 overflow-hidden rounded-full bg-on-ink/30">
+                <span key={a.key} className="h-[3px] flex-1 overflow-hidden rounded-full bg-on-ink/35">
                   {i < index ? (
                     <span className="block h-full w-full bg-on-ink" />
                   ) : i === index ? (
                     <span
-                      key={`${a.short_id}-${index}`}
+                      key={`${a.key}-${index}`}
                       className="block h-full w-full origin-left bg-on-ink"
                       style={{
                         animation: reducedMotion ? 'none' : `wow-progress ${SHOT_SECONDS}s linear forwards`,
@@ -285,12 +375,12 @@ export default function StoryShotsPage() {
               ))}
             </div>
             <div className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-pill bg-wow-deep text-on-wow">
+              <span className="flex h-8 w-8 items-center justify-center rounded-pill bg-gradient-to-br from-wow to-wow-deep text-on-wow">
                 <Icon icon={GalleryVerticalEnd} size="sm" />
               </span>
               <div className="min-w-0 flex-1 leading-tight">
                 <p className={cn(s.body, 'text-ui-sm font-bold')}>{te ? 'స్టోరీ షాట్స్' : 'Story Shots'}</p>
-                <p className="font-sans text-meta tabular-nums text-on-ink/75">
+                <p className="font-sans text-meta tabular-nums text-on-ink/80">
                   {index + 1} / {items.length}
                 </p>
               </div>
@@ -313,52 +403,21 @@ export default function StoryShotsPage() {
             </div>
           </div>
 
-          {/* Tap zones: left third back, the rest forward (kept below the controls). */}
+          {/* Tap zones over the photo: left third back, the rest forward. */}
           <button
             type="button"
             tabIndex={-1}
             aria-hidden
             onClick={prev}
-            className="absolute bottom-48 left-0 top-28 w-1/3 cursor-w-resize"
+            className="absolute left-0 top-24 h-[calc(34%-6rem)] w-1/3 cursor-w-resize"
           />
           <button
             type="button"
             tabIndex={-1}
             aria-hidden
             onClick={next}
-            className="absolute bottom-48 right-0 top-28 w-2/3 cursor-e-resize"
+            className="absolute right-0 top-24 h-[calc(34%-6rem)] w-2/3 cursor-e-resize"
           />
-
-          {/* Bottom: caption + actions */}
-          <div className="absolute inset-x-0 bottom-0 z-10 space-y-3 p-5 pb-6">
-            {article.category ? (
-              <span className={cn(s.body, 'inline-block rounded-pill bg-wow-deep px-3 py-0.5 text-meta font-bold text-on-wow')}>
-                {s.pick(article.category.name_te, article.category.name_en)}
-              </span>
-            ) : null}
-            <h1 lang={head.lang} className={cn(head.head, 'text-headline-md font-bold text-on-ink md:text-headline-lg')}>
-              {head.text}
-            </h1>
-            {article.summary_te ? (
-              <p lang="te" className="te te-clamp-4 text-te-body-sm text-on-ink/90">
-                {article.summary_te}
-              </p>
-            ) : null}
-            <div className="flex items-center gap-2 pt-1">
-              {hasStory ? (
-                <ButtonLink to={article.url} variant="wow" iconRight={ArrowRight} className="flex-1 md:flex-none">
-                  {te ? 'పూర్తి కథ చదవండి' : 'Read full story'}
-                </ButtonLink>
-              ) : null}
-              <ShareButton
-                shortId={article.short_id}
-                url={article.url}
-                title={head.text}
-                cardAvailable={false}
-                className="bg-on-ink/15 text-on-ink hover:bg-on-ink/25"
-              />
-            </div>
-          </div>
         </article>
 
         {/* Desktop next */}
@@ -373,8 +432,42 @@ export default function StoryShotsPage() {
         </button>
       </div>
 
+      {/* Phone: previous / next bar under the poster, so moving on never
+          depends on knowing the tap zones or the swipe. */}
+      <div className="relative flex items-center justify-between gap-3 border-t border-on-ink/10 bg-ink-deep px-3 py-2 md:hidden">
+        <button
+          type="button"
+          onClick={prev}
+          disabled={index === 0}
+          aria-label={te ? 'మునుపటి' : 'Previous'}
+          className={cn(
+            s.body,
+            'flex min-h-tap items-center gap-1.5 rounded-pill bg-on-ink/15 pl-2 pr-4 text-ui-sm font-bold text-on-ink transition active:scale-[.97] disabled:invisible',
+          )}
+        >
+          <Icon icon={ChevronLeft} size="md" />
+          {te ? 'మునుపటి' : 'Previous'}
+        </button>
+        <span className="font-sans text-meta tabular-nums text-on-ink/75">
+          {index + 1} / {items.length}
+        </span>
+        <button
+          type="button"
+          onClick={next}
+          disabled={index === items.length - 1}
+          aria-label={te ? 'తదుపరి' : 'Next'}
+          className={cn(
+            s.body,
+            'flex min-h-tap items-center gap-1.5 rounded-pill bg-gradient-to-br from-wow to-wow-deep pl-4 pr-2 text-ui-sm font-bold text-on-wow transition active:scale-[.97] disabled:invisible',
+          )}
+        >
+          {te ? 'తదుపరి' : 'Next'}
+          <Icon icon={ChevronRight} size="md" />
+        </button>
+      </div>
+
       {/* Warm the next photo so the swipe never waits on the network. */}
-      {upcoming?.hero?.url ? <link rel="preload" as="image" href={upcoming.hero.url} /> : null}
+      {upcoming?.media?.url ? <link rel="preload" as="image" href={upcoming.media.url} /> : null}
     </div>
   );
 }

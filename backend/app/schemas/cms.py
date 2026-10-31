@@ -22,6 +22,8 @@ class ArticleWrite(BaseModel):
     # placement
     category_id: int | None = None
     subcategory_id: int | None = None
+    #: Up to three more sections the story is also listed in.
+    extra_category_ids: list[int] | None = Field(default=None, max_length=3)
     district_id: int | None = None
     mandal_id: int | None = None
     locality_id: int | None = None
@@ -86,6 +88,7 @@ class ArticlePatch(BaseModel):
 
     category_id: int | None = None
     subcategory_id: int | None = None
+    extra_category_ids: list[int] | None = Field(default=None, max_length=3)
     district_id: int | None = None
     mandal_id: int | None = None
     locality_id: int | None = None
@@ -200,6 +203,7 @@ class CmsArticleOut(BaseModel):
     body: dict[str, Any] | None
     category_id: int | None
     subcategory_id: int | None = None
+    extra_category_ids: list[int] = []
     district_id: int | None
     mandal_id: int | None
     locality_id: int | None = None

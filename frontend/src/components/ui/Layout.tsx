@@ -9,13 +9,13 @@ import { Icon } from './Icon';
 
 /**
  * PageContainer — the one horizontal measure. Centres content at a named width
- * with the site gutter (16px, 24px from md).
+ * with the site gutter (12px on phones, 20px from md, 24px from lg).
  *
  *     <PageContainer as="main" id="main" tabIndex={-1}>…</PageContainer>
  *     <PageContainer width="article">…</PageContainer>
  */
 export interface PageContainerProps {
-  /** site 1200 / page 960 / wrap 880 / article 680 / form 560. */
+  /** site 1360 / page 1040 / wrap 880 / article 680 / form 560. */
   width?: 'site' | 'page' | 'wrap' | 'article' | 'form';
   as?: ElementType;
   className?: string;
@@ -41,7 +41,7 @@ export function PageContainer({
   tabIndex,
 }: PageContainerProps) {
   return (
-    <Tag id={id} tabIndex={tabIndex} className={cn('mx-auto w-full px-4 md:px-6', WIDTH[width], className)}>
+    <Tag id={id} tabIndex={tabIndex} className={cn('mx-auto w-full px-3 md:px-5 lg:px-6', WIDTH[width], className)}>
       {children}
     </Tag>
   );

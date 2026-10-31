@@ -68,7 +68,7 @@ export default function TopicScreen() {
           refreshControl={
             <RefreshControl
               refreshing={topic.isRefetching}
-              onRefresh={() => topic.refetch()}
+              onRefresh={() => void topic.refetch()}
               tintColor={color.brand}
               colors={[color.brand]}
               progressBackgroundColor={color.surface}

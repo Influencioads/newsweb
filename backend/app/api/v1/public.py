@@ -31,7 +31,7 @@ from app.models.media import Media, ShortNewsCard
 from app.models.video import Video
 from app.models.enums import HomeSectionKind, PinPlacement, TrendingScope
 from app.repositories import article_repo, discovery_repo, site_repo
-from app.services import settings_service, trending_service
+from app.services import settings_service, site_content, trending_service
 from app.schemas.public import (
     ArticleCardOut,
     ArticleDetailOut,
@@ -211,6 +211,7 @@ def get_config(response: Response, db: Session = Depends(get_db)) -> SiteConfigO
             DistrictOut.model_validate(d) for d in article_repo.active_districts(db)
         ],
         brand=settings_service.brand_colors(db),
+        content=site_content.blocks(db),
     )
 
 
@@ -381,11 +382,23 @@ def get_home(
             .limit(1)
         )
 
+    # The desk's own hero slides, in its order. A story unpublished or deleted
+    # since it was chosen simply drops out.
+    slide_ids = site_content.blocks(db)["hero"]["article_ids"]
+    hero: list[Article] = []
+    if slide_ids:
+        live = {
+            a.id: a
+            for a in db.execute(article_repo.published_query().where(Article.id.in_(slide_ids))).unique().scalars()
+        }
+        hero = [live[i] for i in slide_ids if i in live]
+
     payload = HomeOut(
         edition=DistrictOut.model_validate(edition_district)
         if edition_district
         else None,
         mandal_block=mandal_block,
+        hero=_cards(hero, db, districts),
         lead=_cards([lead], db, districts)[0] if lead else None,
         secondary=_cards(secondary, db, districts),
         mid_column=_cards(mid_column, db, districts),
@@ -567,8 +580,11 @@ def get_article(
 
     attached_polls = poll_service.active_polls(db, article_id=article.id)
 
+    # A story with an author name picked in the editor (CMS → Site content →
+    # Authors) is credited to that name only; the staff account behind it is
+    # shown only when no name was picked.
     author = None
-    if article.author_id:
+    if article.author_id and not (article.byline_te or "").strip():
         from app.models.user import User
 
         user = db.get(User, article.author_id)

@@ -13,7 +13,14 @@ from sqlalchemy import Select, and_, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.db.base import utcnow
-from app.models.content import Article, ArticleSearchAlias, ArticleTag, Category, Tag
+from app.models.content import (
+    Article,
+    ArticleCategory,
+    ArticleSearchAlias,
+    ArticleTag,
+    Category,
+    Tag,
+)
 from app.models.enums import ArticleStatus
 from app.models.geo import District, Locality, Mandal, State
 from app.models.user import User
@@ -45,8 +52,13 @@ def published_query() -> Select:
 def in_category(category_id: int):
     """A section's stories: filed under it, or under it as their sub-section
     (a sub-section's page otherwise lists nothing — stories carry the parent
-    in `category_id`)."""
-    return or_(Article.category_id == category_id, Article.subcategory_id == category_id)
+    in `category_id`), or listed in it as one of their extra sections."""
+    extra = select(ArticleCategory.article_id).where(ArticleCategory.category_id == category_id)
+    return or_(
+        Article.category_id == category_id,
+        Article.subcategory_id == category_id,
+        Article.id.in_(extra),
+    )
 
 
 def latest(

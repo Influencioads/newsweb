@@ -39,7 +39,7 @@ export function FeaturedStory({ article }: { article: ArticleCard }) {
       </Link>
       <div className="flex min-w-0 flex-col justify-center gap-3 p-5 md:p-7">
         <div className="flex flex-wrap items-center gap-2">
-          <span className={cn(s.body, 'rounded-pill bg-wow-deep px-3 py-0.5 text-meta font-bold text-on-wow')}>
+          <span className={cn(s.body, 'rounded-pill bg-gradient-to-br from-wow to-wow-deep px-3 py-0.5 text-meta font-bold text-on-wow')}>
             {te ? 'ఫీచర్డ్ స్టోరీ' : 'Featured Story'}
           </span>
           {article.category ? (

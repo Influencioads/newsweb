@@ -19,7 +19,7 @@ export interface CmsArticle {
   id:number; short_id:string; slug:string;
   title_te:string; title_en:string|null; sub_title_te:string|null; summary_te:string|null;
   body:Record<string,unknown>|null;
-  category_id:number|null; subcategory_id:number|null;
+  category_id:number|null; subcategory_id:number|null; extra_category_ids?:number[];
   district_id:number|null; mandal_id:number|null; locality_id:number|null;
   author_id:number|null; byline_te:string|null;
   source_type:string; source_credit:string|null; article_type:ArticleType;

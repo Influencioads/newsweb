@@ -49,7 +49,7 @@ export function BottomNav() {
   const items: Item[] = [
     { to: '/', te: 'హోమ్', en: 'Home', icon: Home, end: true },
     { to: '/story-shots', te: 'స్టోరీస్', en: 'Stories', icon: GalleryVerticalEnd },
-    { to: '/radio', te: 'రేడియో', en: 'Radio', icon: Radio },
+    { to: '/radio', te: 'రేడియో', en: 'Radio', icon: Radio, primary: true },
     { to: '/nominate', te: 'నామినేట్', en: 'Nominate', icon: Award, primary: true },
     { to: authed ? '/profile' : '/login', te: 'ప్రొఫైల్', en: 'Profile', icon: UserRound },
   ];
@@ -83,7 +83,7 @@ export function BottomNav() {
               {({ isActive }) => (
                 <>
                   {item.primary ? (
-                    <span className="flex h-7 w-12 items-center justify-center rounded-pill bg-wow-deep text-on-wow">
+                    <span className="flex h-7 w-12 items-center justify-center rounded-pill bg-gradient-to-br from-wow to-wow-deep text-on-wow">
                       <Icon icon={item.icon} size="md" />
                     </span>
                   ) : (

@@ -1,0 +1,58 @@
+import { useQuery } from '@tanstack/react-query';
+import { router } from 'expo-router';
+import { View } from 'react-native';
+
+import * as publicApi from '@/api/public';
+import type { ArticleCard } from '@/api/types';
+import { RowCard } from '@/components/ArticleCard';
+import { SectionHeader } from '@/components/SectionHeader';
+import { useI18n } from '@/lib/i18n';
+
+/**
+ * Our Heroes — the website's FeaturedHeroes (frontend/src/features/wow/
+ * LocalHeroes.tsx): four hero stories, Local Hero first and topped up from
+ * the older inspiration sections while that one fills up. Renders nothing
+ * until one of them has stories.
+ */
+const HERO_SOURCES = ['local-hero', 'real-heroes', 'zero-to-hero', 'inspiring'] as const;
+const HERO_COUNT = 4;
+
+export async function fetchHeroes(): Promise<{ slug: string; articles: ArticleCard[] }> {
+  const seen = new Set<string>();
+  const articles: ArticleCard[] = [];
+  let slug = '';
+  for (const source of HERO_SOURCES) {
+    if (articles.length >= HERO_COUNT) break;
+    try {
+      const feed = await publicApi.fetchFeed({ category: source, limit: HERO_COUNT });
+      for (const a of feed.articles) {
+        if (articles.length >= HERO_COUNT || seen.has(a.short_id)) continue;
+        seen.add(a.short_id);
+        articles.push(a);
+        slug ||= source;
+      }
+    } catch {
+      // Section not created yet — try the next one.
+    }
+  }
+  return { slug: slug || HERO_SOURCES[0], articles };
+}
+
+export function FeaturedHeroes() {
+  const { pick } = useI18n();
+  const heroes = useQuery({ queryKey: ['wow', 'featured-heroes'], queryFn: fetchHeroes, staleTime: 120_000 });
+  const data = heroes.data;
+  if (!data?.articles.length) return null;
+
+  return (
+    <View>
+      <SectionHeader
+        title={pick('మన హీరోలు', 'Our Heroes')}
+        onSeeAll={() => router.push({ pathname: '/section/[slug]', params: { slug: data.slug } })}
+      />
+      {data.articles.map((article, index) => (
+        <RowCard key={article.short_id} article={article} index={index} />
+      ))}
+    </View>
+  );
+}

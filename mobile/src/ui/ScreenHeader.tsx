@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useI18n } from '@/lib/i18n';
 import { useMotion } from '@/lib/motion';
+import { useLogo } from '@/lib/siteContent';
 import { space } from '@/lib/theme';
 import { makeStyles } from '@/lib/useTheme';
 import { IconButton } from '@/ui/Button';
@@ -29,7 +30,6 @@ import { T, type TLang } from '@/ui/Text';
  * skipped entirely under reduced motion.
  */
 export const HEADER_HEIGHT = 56;
-const LOGO = require('../../assets/images/logo.png');
 const HEADER_MIN = 44;
 
 export interface ScreenHeaderProps {
@@ -66,6 +66,7 @@ export function ScreenHeader({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
+  const logo = useLogo();
 
   const idle = useSharedValue(0);
   const scrollY = collapsible?.scrollY ?? idle;
@@ -117,7 +118,7 @@ export function ScreenHeader({
           <Animated.View style={[styles.titleOrigin, titleStyle]}>
             {large ? (
               <Image
-                source={LOGO}
+                source={logo}
                 style={styles.logo}
                 contentFit="contain"
                 accessible
@@ -157,6 +158,6 @@ const useStyles = makeStyles((color) => ({
   titles: { flex: 1, justifyContent: 'center' },
   titlesAfterControl: { marginLeft: space.xs },
   titleOrigin: { alignSelf: 'flex-start', transformOrigin: 'left center' },
-  /** logo.png is 600×161. */
+  /** logo.png is 600×161; an uploaded logo is fitted into the same box. */
   logo: { height: 40, aspectRatio: 600 / 161 },
 }));

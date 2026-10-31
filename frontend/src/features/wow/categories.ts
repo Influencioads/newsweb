@@ -1,4 +1,5 @@
 import {
+  Briefcase,
   Cpu,
   Flag,
   GalleryVerticalEnd,
@@ -6,8 +7,6 @@ import {
   MapPin,
   Medal,
   Newspaper,
-  NotebookPen,
-  Radio,
   Rocket,
   ScrollText,
   Sunrise,
@@ -18,175 +17,173 @@ import {
 } from 'lucide-react';
 
 /**
- * The 15 WOW content features from the "WOW Indian Telugu" concept pitch.
+ * The WOW category cards as the site shipped them.
  *
- * Each one is a category (slug) in the CMS, except WOW Radio and Story Shots,
- * which are experiences with their own routes. The slugs must match the rows
- * seeded in backend/app/db/seed_content.py (CATEGORIES); an admin can rename
- * them on the Taxonomy page without breaking these links, because the slug is
- * the key.
+ * The live list comes from the Taxonomy page (a category marked "WOW
+ * category", with its tagline and icon) through `/public/config` — see
+ * `useWowFeatures` in ./siteContent. This list is what shows before the
+ * config arrives, and from an API that does not send the card fields yet.
+ * Story Shots is a page, not a category; its card is always taken from here.
  */
 export interface WowFeature {
   slug: string;
   te: string;
   en: string;
-  /** One-line editorial focus, shown on the Explore WOW card. */
+  /** One-line tagline, shown on the Explore WOW card. */
   focusTe: string;
   focusEn: string;
   icon: LucideIcon;
   /** Where the card goes. Category features open their section page. */
   to: string;
+  /** One of the six main categories. */
+  main: boolean;
 }
 
 const section = (slug: string) => `/section/${slug}`;
 
 export const WOW_FEATURES: readonly WowFeature[] = [
+  // ── Main six ──
   {
     slug: 'real-heroes',
     te: 'రియల్ హీరోస్',
     en: 'Real Heroes',
-    focusTe: 'అసాధారణ మార్పు తెస్తున్న సాధారణ మనుషులు',
-    focusEn: 'Real people creating extraordinary impact',
+    focusTe: 'అసాధారణ వ్యక్తుల విజయ గాధలు',
+    focusEn: 'Success stories of extraordinary people',
     icon: Medal,
     to: section('real-heroes'),
+    main: true,
+  },
+  {
+    slug: 'jai-telugoda',
+    te: 'జై తెలుగోడా!',
+    en: 'Jai Telugoda!',
+    focusTe: 'మన తెలుగోళ్ల విజయగాథలు!',
+    focusEn: 'Success stories of our Telugu people!',
+    icon: Flag,
+    to: section('jai-telugoda'),
+    main: true,
   },
   {
     slug: 'morning-mantra',
     te: 'మార్నింగ్ మంత్ర',
     en: 'Morning Mantra',
-    focusTe: 'రోజువారీ ప్రేరణ, జ్ఞానం, సానుకూలత',
-    focusEn: 'Daily motivation, wisdom and positivity',
+    focusTe: 'రోజువారీ ప్రేరణ, స్ఫూర్తి, జ్ఞానం',
+    focusEn: 'Daily motivation, inspiration and wisdom',
     icon: Sunrise,
     to: section('morning-mantra'),
+    main: true,
   },
   {
     slug: 'startup-stories',
     te: 'స్టార్టప్ స్టోరీస్',
     en: 'Startup Stories',
-    focusTe: 'వ్యాపారవేత్తలు, ఆవిష్కరణలు, వ్యాపార ప్రయాణాలు',
-    focusEn: 'Entrepreneurs, innovations and business journeys',
+    focusTe: 'కొత్త ఆలోచనలు.. సరికొత్త విజయాలు!',
+    focusEn: 'New ideas.. brand-new successes!',
     icon: Rocket,
     to: section('startup-stories'),
-  },
-  {
-    slug: 'jai-telugoda',
-    te: 'జై తెలుగోడా',
-    en: 'Jai Telugoda',
-    focusTe: 'తమదైన ముద్ర వేస్తున్న తెలుగువారు',
-    focusEn: 'Telugu achievers making a mark',
-    icon: Flag,
-    to: section('jai-telugoda'),
-  },
-  {
-    slug: 'local-hero',
-    te: 'లోకల్ హీరో',
-    en: 'Local Hero',
-    focusTe: 'పల్లెలు, పట్టణాల్లో గుర్తింపు లేని హీరోలు',
-    focusEn: 'Unsung heroes from towns and villages',
-    icon: MapPin,
-    to: section('local-hero'),
-  },
-  {
-    slug: 'wow-radio',
-    te: 'వావ్ రేడియో',
-    en: 'WOW Radio',
-    focusTe: 'ప్రేరణ, హాస్యం, కథలు — వినండి',
-    focusEn: 'Audio inspiration, comedy and stories',
-    icon: Radio,
-    to: '/radio',
-  },
-  {
-    slug: 'zero-to-hero',
-    te: 'జీరో టు హీరో',
-    en: 'Zero to Hero',
-    focusTe: 'చిన్న మొదలు నుంచి అసాధారణ ప్రయాణాలు',
-    focusEn: 'Extraordinary journeys from humble beginnings',
-    icon: TrendingUp,
-    to: section('zero-to-hero'),
-  },
-  {
-    slug: 'my-village-story',
-    te: 'మై విలేజ్ స్టోరీ',
-    en: 'My Village Story',
-    focusTe: 'ఊరి చరిత్ర, పేర్లు, ప్రత్యేక సంప్రదాయాలు',
-    focusEn: 'Village history, names and unique traditions',
-    icon: Trees,
-    to: section('my-village-story'),
-  },
-  {
-    slug: 'wow-idea',
-    te: 'వావ్ ఐడియా',
-    en: 'WOW Idea',
-    focusTe: 'సృజనాత్మక పరిష్కారాలు, కొత్త ఆలోచనలు',
-    focusEn: 'Creative solutions and breakthrough ideas',
-    icon: Lightbulb,
-    to: section('wow-idea'),
-  },
-  {
-    slug: 'wow-news',
-    te: 'వావ్ న్యూస్',
-    en: 'WOW News',
-    focusTe: 'ఆసక్తికరమైన, ఉపయోగకరమైన, ఆశ్చర్యపరిచే వార్తలు',
-    focusEn: 'Interesting, useful and surprising news',
-    icon: Newspaper,
-    to: section('wow-news'),
-  },
-  {
-    slug: 'my-story',
-    te: 'మై స్టోరీ',
-    en: 'My Story',
-    focusTe: 'స్వీయ అనుభవాలు, వ్యక్తిగత ప్రయాణాలు',
-    focusEn: 'First-person experiences and personal journeys',
-    icon: NotebookPen,
-    to: section('my-story'),
+    main: true,
   },
   {
     slug: 'wow-tech',
     te: 'వావ్ టెక్',
     en: 'WOW Tech',
-    focusTe: 'గ్యాడ్జెట్లు, AI, రోబోటిక్స్, కొత్త టెక్నాలజీ',
-    focusEn: 'Gadgets, AI, robotics and emerging technology',
+    focusTe: 'ఫ్యూచర్ గాడ్జెట్స్.. లేటెస్ట్ టెక్నాలజీ!',
+    focusEn: 'Future gadgets.. latest technology!',
     icon: Cpu,
     to: section('wow-tech'),
+    main: true,
   },
   {
-    slug: 'mystery',
-    te: 'మిస్టరీ',
-    en: 'Mystery',
-    focusTe: 'వివరించలేని సంఘటనలు, ఆసక్తికర ఆవిష్కరణలు',
-    focusEn: 'Unexplained events and fascinating discoveries',
-    icon: Telescope,
-    to: section('mystery'),
+    slug: 'business-guru',
+    te: 'బిజినెస్ గురు',
+    en: 'Business Guru',
+    focusTe: 'వ్యాపారాలు.. సలహాలు',
+    focusEn: 'Businesses.. and advice',
+    icon: Briefcase,
+    to: section('business-guru'),
+    main: true,
+  },
+  // ── Explore more ──
+  {
+    slug: 'my-village-story',
+    te: 'మై విలేజ్',
+    en: 'My Village',
+    focusTe: 'మన ఊళ్ల కథలు.. మనుషులు..',
+    focusEn: 'Stories of our villages.. and their people..',
+    icon: Trees,
+    to: section('my-village-story'),
+    main: false,
   },
   {
-    slug: 'wow-puranam',
-    te: 'వావ్ పురాణం',
-    en: 'WOW Puranam',
-    focusTe: 'పురాణాలు, ఇతిహాసాలు, ప్రాచీన కథలు',
-    focusEn: 'Mythology, epics and ancient stories',
-    icon: ScrollText,
-    to: section('wow-puranam'),
+    slug: 'wow-news',
+    te: 'వావ్ న్యూస్',
+    en: 'WOW News',
+    focusTe: 'వావ్ అనిపించే వార్తలు',
+    focusEn: 'News that makes you say WOW',
+    icon: Newspaper,
+    to: section('wow-news'),
+    main: false,
+  },
+  {
+    slug: 'local-hero',
+    te: 'లోకల్ హీరో',
+    en: 'Local Hero',
+    focusTe: 'పల్లెలు, పట్టణాల్లోని అసాధారణ వ్యక్తులు',
+    focusEn: 'Extraordinary people from villages and towns',
+    icon: MapPin,
+    to: section('local-hero'),
+    main: false,
   },
   {
     slug: 'story-shots',
     te: 'స్టోరీ షాట్స్',
     en: 'Story Shots',
-    focusTe: 'స్వైప్ చేసి చూసే చిన్న విజువల్ కథలు',
-    focusEn: 'Quick, swipeable visual stories',
+    focusTe: 'షార్ట్ స్టోరీస్.. స్మార్ట్ నాలెడ్జ్!',
+    focusEn: 'Short stories.. smart knowledge!',
     icon: GalleryVerticalEnd,
     to: '/story-shots',
+    main: false,
   },
-];
-
-/** Hero categories offered on the nomination form (pitch §4). */
-export const HERO_CATEGORIES: readonly { value: string; te: string; en: string }[] = [
-  { value: 'social-service', te: 'సామాజిక సేవ', en: 'Social Service' },
-  { value: 'education', te: 'విద్య', en: 'Education' },
-  { value: 'innovation', te: 'ఆవిష్కరణ', en: 'Innovation' },
-  { value: 'agriculture', te: 'వ్యవసాయం', en: 'Agriculture' },
-  { value: 'environment', te: 'పర్యావరణం', en: 'Environment' },
-  { value: 'youth', te: 'యువ విజయం', en: 'Youth Achievement' },
-  { value: 'other', te: 'ఇతరాలు', en: 'Other' },
+  {
+    slug: 'zero-to-hero',
+    te: 'వావ్ ఇండియన్',
+    en: 'WOW Indian',
+    focusTe: 'సవాళ్లను ఎదిరించి అద్భుత విజయాలతో స్ఫూర్తినిచ్చిన భారతీయులు',
+    focusEn: 'Indians who took on challenges and inspire with remarkable success',
+    icon: TrendingUp,
+    to: section('zero-to-hero'),
+    main: false,
+  },
+  {
+    slug: 'wow-idea',
+    te: 'వావ్ ఐడియా',
+    en: 'WOW Idea',
+    focusTe: 'ఐడియాతో మొదలైన ఆవిష్కరణలు',
+    focusEn: 'Innovations that began with an idea',
+    icon: Lightbulb,
+    to: section('wow-idea'),
+    main: false,
+  },
+  {
+    slug: 'mystery',
+    te: 'మిస్టరీ',
+    en: 'Mystery',
+    focusTe: 'అద్భుతాలు.. రహస్యాలు..',
+    focusEn: 'Wonders.. and secrets..',
+    icon: Telescope,
+    to: section('mystery'),
+    main: false,
+  },
+  {
+    slug: 'wow-puranam',
+    te: 'వావ్ పురాణం',
+    en: 'WOW Puranam',
+    focusTe: 'పురాణాలు.. ఇతిహాసాలు..',
+    focusEn: 'Puranas.. and epics..',
+    icon: ScrollText,
+    to: section('wow-puranam'),
+    main: false,
+  },
 ];
 
 /** Slug the nomination is filed under, so the desk finds them together. */

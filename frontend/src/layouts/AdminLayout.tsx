@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useState, type FormEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { ChevronRight, Keyboard, LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun } from 'lucide-react';
+import { ChevronRight, Keyboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Search } from 'lucide-react';
 
 import { RouteFallback, SkipLink } from '@/components/app';
 import { LanguageToggle } from '@/components/layout/LanguageToggle';
@@ -12,11 +12,11 @@ import { Sheet } from '@/components/ui/Dialog';
 import { Input, TeluguTypingContext } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
 import { useToast } from '@/components/ui/Toast';
+import { useLogoUrl } from '@/features/wow/siteContent';
 import { useI18n, useScript } from '@/i18n';
 import { useAuth } from '@/stores/auth';
-import { useReaderPrefs } from '@/stores/readerPrefs';
 import { cn } from '@/utils/cn';
-import { useScrolled, withViewTransition } from '@/utils/motion';
+import { useScrolled } from '@/utils/motion';
 
 import { findAdminNav, visibleAdminNav, type AdminNavGroup } from './adminNav';
 
@@ -139,6 +139,7 @@ function NavGroups({ groups, tone, collapsed = false }: NavGroupsProps) {
 
 function Wordmark({ collapsed }: { collapsed: boolean }) {
   const { t } = useI18n();
+  const logo = useLogoUrl();
   const s = useScript();
   return (
     <Link
@@ -151,7 +152,7 @@ function Wordmark({ collapsed }: { collapsed: boolean }) {
       {collapsed ? (
         <img src="/logo-mark.webp" alt="వావ్ ఇండియన్" width={336} height={80} className="h-6 w-auto" />
       ) : (
-        <img src="/logo.webp" alt="వావ్ ఇండియన్" width={960} height={257} className="h-9 w-auto self-start" />
+        <img src={logo} alt="వావ్ ఇండియన్" width={960} height={260} className="h-9 w-auto self-start" />
       )}
       <span
         className={cn(
@@ -175,8 +176,6 @@ export default function AdminLayout() {
   const can = useAuth((a) => a.can);
   const signOut = useAuth((a) => a.signOut);
   const toast = useToast();
-  const resolvedTheme = useReaderPrefs((p) => p.resolvedTheme);
-  const toggleTheme = useReaderPrefs((p) => p.toggleTheme);
   const scrolled = useScrolled(8);
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [teTyping, setTeTyping] = useState(readTeTyping);
@@ -324,13 +323,6 @@ export default function AdminLayout() {
                 English
               </Chip>
             </div>
-
-            <IconButton
-              icon={resolvedTheme === 'dark' ? Sun : Moon}
-              label={t('ui.darkMode')}
-              pressed={resolvedTheme === 'dark'}
-              onClick={() => withViewTransition(toggleTheme)}
-            />
 
             {me ? (
               <span title={chip} className="hidden min-w-0 xl:block">

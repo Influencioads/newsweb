@@ -18,10 +18,11 @@ import { useAuth } from '@/stores/auth';
 import { cn } from '@/utils/cn';
 import { useDocumentTitle } from '@/utils/motion';
 
-import { HERO_CATEGORIES, LOCAL_HERO_SLUG } from './categories';
+import { LOCAL_HERO_SLUG } from './categories';
+import { DEFAULT_CONTENT } from './siteContent';
 
 /**
- * Nominate Your Local Hero (pitch §4) — "మీ ఊరి హీరోను ప్రపంచానికి పరిచయం చేయండి!"
+ * Nominate Your Local Hero (pitch §4) — "మీ లోకల్ హీరోను ప్రపంచానికి పరిచయం చేయండి!"
  *
  * A nomination is filed as a reader submission in the Local Hero section, so
  * it lands in the existing moderation queue (CMS → Review) and follows the
@@ -92,7 +93,7 @@ export default function NominatePage() {
   const te = language === 'te';
   const L = (teText: string, enText: string) => (te ? teText : enText);
   const bodyCls = cn(s.body, s.te ? 'text-te-body-xs' : 'text-ui');
-  useDocumentTitle(L('లోకల్ హీరోను నామినేట్ చేయండి', 'Nominate Your Local Hero'));
+  useDocumentTitle(L('మీ లోకల్ హీరోని నామినేట్ చేయండి', 'Nominate Your Local Hero'));
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -120,7 +121,9 @@ export default function NominatePage() {
     const d = config.data?.districts.find((x) => x.slug === draft.district);
     return d ? d.name_te : draft.district;
   })();
-  const heroCategory = HERO_CATEGORIES.find((c) => c.value === draft.category);
+  // CMS → Site content → Nominate form.
+  const heroCategories = config.data?.content?.nominate?.categories ?? DEFAULT_CONTENT.nominate.categories;
+  const heroCategory = heroCategories.find((c) => c.value === draft.category);
 
   const errors = {
     name: draft.name.trim().length < 3 ? L('హీరో పూర్తి పేరు రాయండి.', "Enter the hero's full name.") : null,
@@ -132,7 +135,7 @@ export default function NominatePage() {
         ? L(`కనీసం ${MIN_REASON} అక్షరాల్లో వివరించండి.`, `Explain in at least ${MIN_REASON} characters.`)
         : null,
     phone:
-      draft.phone.trim() && !PHONE.test(draft.phone.trim())
+      !PHONE.test(draft.phone.trim())
         ? L('10 అంకెల మొబైల్ నంబర్ ఇవ్వండి.', 'Enter a 10-digit mobile number.')
         : null,
     consent: !draft.consent ? L('అనుమతి ధృవీకరణ అవసరం.', 'Please confirm consent.') : null,
@@ -200,9 +203,9 @@ export default function NominatePage() {
           <PageHeader
             icon={Award}
             eyebrow={L('సిగ్నేచర్ ఫీచర్', 'Signature feature')}
-            title={L('లోకల్ హీరోను నామినేట్ చేయండి', 'Nominate Your Local Hero')}
+            title={L('మీ లోకల్ హీరోని నామినేట్ చేయండి', 'Nominate Your Local Hero')}
             subtitle={L(
-              'మీ ఊరి హీరోను ప్రపంచానికి పరిచయం చేయండి! ఉపాధ్యాయులు, రైతులు, ఆవిష్కర్తలు, సామాజిక సేవకులు, విద్యార్థులు, గ్రామ వాలంటీర్లు — మంచి మార్పు తెస్తున్న ఎవరినైనా నామినేట్ చేయవచ్చు.',
+              'మీ లోకల్ హీరోను ప్రపంచానికి పరిచయం చేయండి! ఉపాధ్యాయులు, రైతులు, ఆవిష్కర్తలు, సామాజిక సేవకులు, విద్యార్థులు, గ్రామ వాలంటీర్లు — మంచి మార్పు తెస్తున్న ఎవరినైనా నామినేట్ చేయవచ్చు.',
               'Introduce your village hero to the world! Nominate teachers, farmers, innovators, social workers, students, village volunteers — anyone making a positive impact.',
             )}
             spacing="none"
@@ -279,7 +282,7 @@ export default function NominatePage() {
               <Field label={L('హీరో విభాగం', 'Hero category')} required error={show(errors.category)}>
                 <Select id="nominee-category" value={draft.category} onChange={(e) => set('category', e.target.value)}>
                   <option value="">{L('— ఎంచుకోండి —', '— choose —')}</option>
-                  {HERO_CATEGORIES.map((c) => (
+                  {heroCategories.map((c) => (
                     <option key={c.value} value={c.value}>
                       {pick(c.te, c.en)}
                     </option>
@@ -310,7 +313,7 @@ export default function NominatePage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <Field
                   label={L('మీ ఫోన్ నంబర్', 'Your contact number')}
-                  optionalLabel
+                  required
                   error={show(errors.phone)}
                   hint={L('సంపాదకులు ధృవీకరణ కోసం మాత్రమే వాడతారు.', 'Used only by editors to verify.')}
                 >
@@ -327,8 +330,7 @@ export default function NominatePage() {
                 </Field>
 
                 <Field
-                  label={L('హీరో ఫోటో', 'Hero photo')}
-                  optionalLabel
+                  label={L('లోకల్ హీరో ఫోటో', 'Local Hero photo')}
                   hint={
                     canAttachPhoto
                       ? L('JPG / PNG / WebP, హీరో అనుమతితో మాత్రమే.', 'JPG / PNG / WebP, only with the hero’s permission.')

@@ -1,5 +1,5 @@
 import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
-import { useEffect } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { AccessibilityInfo } from 'react-native';
 
 import { useI18n } from '@/lib/i18n';
@@ -14,8 +14,18 @@ import { attachEngine, usePlayer } from '@/stores/player';
  * silent switch, keeps going in the background, takes audio focus — the last
  * is what lets the lock-screen controls attach), hands the player to the
  * store, and announces each new track to screen readers.
+ *
+ * The web build's server render skips it: expo-audio needs the browser's
+ * `Audio`, which a server doesn't have. The client adds it once it has loaded.
  */
 export function PlayerHost() {
+  const client = useSyncExternalStore(noSubscribe, () => true, () => false);
+  return client ? <AudioEngine /> : null;
+}
+
+const noSubscribe = () => () => undefined;
+
+function AudioEngine() {
   const player = useAudioPlayer(null);
   const { t } = useI18n();
   const title = usePlayer((s) => s.queue[s.index]?.title);

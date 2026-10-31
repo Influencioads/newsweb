@@ -28,6 +28,12 @@ export interface CategoryOut {
 
 export interface NavCategoryOut extends CategoryOut {
   show_in_nav: boolean;
+  /** A WOW category card (Explore WOW, drawer, footer); edited on the Taxonomy page. */
+  in_explore?: boolean;
+  tagline_te?: string | null;
+  tagline_en?: string | null;
+  /** One of the names in features/wow/icons.ts. */
+  icon?: string | null;
 }
 
 export interface DistrictOut {
@@ -151,6 +157,8 @@ export interface HomePayload {
   edition: DistrictOut | null;
   /** §3 — present only when the reader has saved a mandal. */
   mandal_block: HomeSection | null;
+  /** The hero slides the desk chose, in order (an older API sends none). */
+  hero?: ArticleCard[];
   lead: ArticleCard | null;
   secondary: ArticleCard[];
   mid_column: ArticleCard[];
@@ -307,6 +315,62 @@ export interface SiteConfig {
   districts: DistrictOut[];
   /** Admin-set #rrggbb colours; see utils/brand.ts. */
   brand?: { primary?: string; breaking?: string; accent?: string };
+  /** CMS → Site content. Absent from an older API; features/wow/siteContent.ts fills the defaults. */
+  content?: Partial<SiteContent>;
+}
+
+/** What CMS → Site content edits (backend app/services/site_content.py). */
+export interface SiteContent {
+  brand: { logo_url: string; tagline_te: string; tagline_en: string };
+  home: { banner_tag_te: string; banner_tag_en: string };
+  /** The home hero banner's slides, chosen in CMS → Home hero slides, in order. */
+  hero: { article_ids: number[] };
+  /** `mobile_image_url`: the picture phones show instead (blank: `image_url`). */
+  radio: { image_url: string; mobile_image_url: string; segments: RadioSegment[] };
+  story_shots: { shots: StoryShotItem[] };
+  nominate: { image_url: string; mobile_image_url: string; categories: { value: string; te: string; en: string }[] };
+  contact: { grievance_email: string };
+  /** The bylines offered in the article editor (CMS → Site content → Authors). */
+  authors: { names: string[] };
+}
+
+/** A Story Shots picture uploaded in the CMS; the title and link are optional. */
+export interface StoryShotItem {
+  id: string;
+  image_url: string;
+  title_te: string;
+  title_en: string;
+  link: string;
+}
+
+export interface RadioSegment {
+  id: string;
+  te: string;
+  en: string;
+  tagline_te: string;
+  tagline_en: string;
+  icon: string;
+  tone: string;
+  /** Category slugs, tried in order; the first with stories is played. */
+  categories: string[];
+}
+
+/** A footer page (About, Privacy, ...) as CMS → Footer pages saves it. */
+export interface SitePageSection {
+  id: string;
+  heading: string;
+  body: string[];
+}
+
+export interface SitePageLanguage {
+  title: string;
+  sections: SitePageSection[];
+}
+
+export interface SitePage {
+  te: SitePageLanguage;
+  en: SitePageLanguage;
+  updated_at?: string | null;
 }
 
 /** What `GET /public/articles/{short_id}/formats` reports. */

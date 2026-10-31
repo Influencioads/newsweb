@@ -70,6 +70,19 @@ class Category(PKMixin, TimestampMixin, Base):
     )
     seo_title: Mapped[str | None] = mapped_column(String(180), nullable=True)
     seo_description: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    # The WOW category card (Explore WOW, the drawer, the footer chips): its
+    # one-line tagline, its icon, and whether it is listed there at all.
+    tagline_te: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    tagline_en: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    icon: Mapped[str | None] = mapped_column(
+        String(40), nullable=True, doc="One of app.services.site_content.ICONS"
+    )
+    in_explore: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        doc="Listed as a WOW category; with show_in_nav it is one of the main six",
+    )
 
     parent: Mapped["Category | None"] = relationship(
         remote_side="Category.id", back_populates="children"
@@ -447,6 +460,13 @@ class Article(PKMixin, TimestampMixin, SoftDeleteMixin, ActorMixin, Base):
     tags: Mapped[list["ArticleTag"]] = relationship(
         back_populates="article", cascade="all, delete-orphan"
     )
+    #: Up to three more sections the story also appears in, besides
+    #: `category_id` (which still gives the URL and the label).
+    extra_categories: Mapped[list["ArticleCategory"]] = relationship(
+        back_populates="article",
+        cascade="all, delete-orphan",
+        order_by="ArticleCategory.sort",
+    )
     aliases: Mapped[list["ArticleSearchAlias"]] = relationship(
         back_populates="article", cascade="all, delete-orphan"
     )
@@ -486,6 +506,24 @@ class ArticleTag(Base):
 
     article: Mapped["Article"] = relationship(back_populates="tags")
     tag: Mapped["Tag"] = relationship(back_populates="articles", lazy="joined")
+
+
+class ArticleCategory(Base):
+    """A further section a story is listed in. The main one stays on
+    `articles.category_id`; these only add the story to more section pages."""
+
+    __tablename__ = "article_categories"
+    __table_args__ = (MYSQL_TABLE_ARGS,)
+
+    article_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("articles.id", ondelete="CASCADE"), primary_key=True
+    )
+    category_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("categories.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    sort: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    article: Mapped["Article"] = relationship(back_populates="extra_categories")
 
 
 class ArticleSearchAlias(PKMixin, Base):

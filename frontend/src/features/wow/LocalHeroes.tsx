@@ -89,7 +89,7 @@ export function NominateCta({ compact = false }: { compact?: boolean }) {
         <Award size={compact ? 140 : 180} strokeWidth={1.25} />
       </div>
       <div className="space-y-2">
-        <span className={cn(s.body, 'inline-flex items-center gap-1.5 rounded-pill bg-gradient-to-br from-wow to-wow-deep px-3 py-1 text-meta font-bold text-on-wow')}>
+        <span className={cn(s.body, 'mb-3 inline-flex items-center gap-1.5 rounded-pill bg-gradient-to-br from-wow to-wow-deep px-3 py-1 text-meta font-bold text-on-wow md:mb-0')}>
           <Icon icon={HeartHandshake} size="xs" />
           {te ? 'మీ లోకల్ హీరోని నామినేట్ చేయండి' : 'Nominate Your Local Hero'}
         </span>

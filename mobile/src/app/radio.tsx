@@ -7,7 +7,7 @@ import { useI18n } from '@/lib/i18n';
 import { useMotion } from '@/lib/motion';
 import { radius, space } from '@/lib/theme';
 import { makeStyles } from '@/lib/useTheme';
-import { useRadioArt } from '@/lib/siteContent';
+import { useRadioArt, useSiteContent } from '@/lib/siteContent';
 import { Screen } from '@/ui/Screen';
 import { ScreenHeader } from '@/ui/ScreenHeader';
 
@@ -23,6 +23,7 @@ export default function RadioScreen() {
   const { pick } = useI18n();
   const title = pick('వావ్ రేడియో', 'WOW Radio');
   const art = useRadioArt();
+  const phoneArt = Boolean(useSiteContent().radio.mobile_image_url);
 
   return (
     <Screen edges={['top']} scroll bottomInset contentContainerStyle={styles.content}>
@@ -30,7 +31,7 @@ export default function RadioScreen() {
       <ScreenHeader title={title} />
       <Image
         source={art}
-        style={styles.art}
+        style={[styles.art, phoneArt ? styles.phoneArt : null]}
         contentFit="cover"
         transition={m.imageTransition}
         accessible
@@ -52,4 +53,6 @@ const useStyles = makeStyles(() => ({
     aspectRatio: 960 / 540,
     borderRadius: radius.lg,
   },
+  /** The CMS's mobile radio picture is 4:3. */
+  phoneArt: { aspectRatio: 4 / 3 },
 }));

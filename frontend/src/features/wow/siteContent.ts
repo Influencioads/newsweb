@@ -22,6 +22,7 @@ export const DEFAULT_CONTENT: SiteContent = {
   hero: { article_ids: [] },
   radio: {
     image_url: '',
+    mobile_image_url: '',
     segments: [
       {
         id: 'morning-mantra',
@@ -68,6 +69,7 @@ export const DEFAULT_CONTENT: SiteContent = {
   story_shots: { shots: [] },
   nominate: {
     image_url: '',
+    mobile_image_url: '',
     categories: [
       { value: 'social-service', te: 'సామాజిక సేవ', en: 'Social Service' },
       { value: 'education', te: 'విద్య', en: 'Education' },

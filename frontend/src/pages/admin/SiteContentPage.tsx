@@ -275,16 +275,32 @@ function RadioCard({ payload, canManage }: { payload: cmsApi.SiteContentPayload;
         'The card picture and the segments. Each segment reads out the newest stories from its categories.',
       )}
     >
-      <Field label={L('రేడియో చిత్రం', 'Radio picture')}>
-        <ImageField
-          wide
-          value={draft.image_url}
-          fallback={DEFAULT_RADIO_IMAGE}
-          alt={L('వావ్ రేడియో', 'WOW Radio')}
-          disabled={!canManage}
-          onChange={(image_url) => setDraft({ ...draft, image_url })}
-        />
-      </Field>
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Field label={L('రేడియో చిత్రం — డెస్క్‌టాప్', 'Radio picture — desktop')} hint={L('వెడల్పాటి ఫోటో, 1600×700', 'A wide photo, 1600×700')}>
+          <ImageField
+            wide
+            value={draft.image_url}
+            fallback={DEFAULT_RADIO_IMAGE}
+            alt={L('వావ్ రేడియో', 'WOW Radio')}
+            disabled={!canManage}
+            onChange={(image_url) => setDraft({ ...draft, image_url })}
+          />
+        </Field>
+        <Field
+          label={L('రేడియో చిత్రం — మొబైల్', 'Radio picture — mobile')}
+          hint={L('ఫోన్లలో, యాప్‌లో ఇది కనిపిస్తుంది. 1200×900 (4:3)', 'Shown on phones and in the app. 1200×900 (4:3)')}
+        >
+          <ImageField
+            tall
+            value={draft.mobile_image_url}
+            fallback={draft.image_url || DEFAULT_RADIO_IMAGE}
+            alt={L('వావ్ రేడియో — మొబైల్', 'WOW Radio — mobile')}
+            disabled={!canManage}
+            originalLabel={L('డెస్క్‌టాప్ చిత్రం చూపిస్తోంది', 'Showing the desktop picture')}
+            onChange={(mobile_image_url) => setDraft({ ...draft, mobile_image_url })}
+          />
+        </Field>
+      </div>
       <ol className="space-y-3">
         {segments.map((sg, i) => (
           <li key={sg.id || `new-${i}`}>
@@ -638,20 +654,40 @@ function NominateCard({ payload, canManage }: { payload: cmsApi.SiteContentPaylo
         'The picture behind the home page’s "Nominate Your Local Hero" banner, and the choices in the form’s "Hero category" list',
       )}
     >
-      <Field
-        label={L('బ్యానర్ నేపథ్య చిత్రం', 'Banner background picture')}
-        hint={L('వెడల్పాటి ఫోటో (16:9) బాగుంటుంది', 'A wide photo (16:9) works best')}
-      >
-        <ImageField
-          wide
-          value={draft.image_url}
-          fallback=""
-          alt={L('నామినేట్ బ్యానర్', 'Nominate banner')}
-          disabled={!canManage}
-          originalLabel={L('తాజా లోకల్ హీరో కథనం ఫోటో చూపిస్తోంది', 'Showing the newest Local Hero story’s photo')}
-          onChange={(image_url) => setDraft({ ...draft, image_url })}
-        />
-      </Field>
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Field
+          label={L('బ్యానర్ నేపథ్య చిత్రం — డెస్క్‌టాప్', 'Banner background — desktop')}
+          hint={L('వెడల్పాటి ఫోటో, 1600×900 (16:9)', 'A wide photo, 1600×900 (16:9)')}
+        >
+          <ImageField
+            wide
+            value={draft.image_url}
+            fallback=""
+            alt={L('నామినేట్ బ్యానర్', 'Nominate banner')}
+            disabled={!canManage}
+            originalLabel={L('తాజా లోకల్ హీరో కథనం ఫోటో చూపిస్తోంది', 'Showing the newest Local Hero story’s photo')}
+            onChange={(image_url) => setDraft({ ...draft, image_url })}
+          />
+        </Field>
+        <Field
+          label={L('బ్యానర్ నేపథ్య చిత్రం — మొబైల్', 'Banner background — mobile')}
+          hint={L('ఫోన్లలో, యాప్‌లో ఇది కనిపిస్తుంది. నిలువు ఫోటో, 1080×1350 (4:5)', 'Shown on phones and in the app. An upright photo, 1080×1350 (4:5)')}
+        >
+          <ImageField
+            tall
+            value={draft.mobile_image_url}
+            fallback={draft.image_url}
+            alt={L('నామినేట్ బ్యానర్ — మొబైల్', 'Nominate banner — mobile')}
+            disabled={!canManage}
+            originalLabel={
+              draft.image_url
+                ? L('డెస్క్‌టాప్ చిత్రం చూపిస్తోంది', 'Showing the desktop picture')
+                : L('తాజా లోకల్ హీరో కథనం ఫోటో చూపిస్తోంది', 'Showing the newest Local Hero story’s photo')
+            }
+            onChange={(mobile_image_url) => setDraft({ ...draft, mobile_image_url })}
+          />
+        </Field>
+      </div>
       <ol className="space-y-2">
         {rows.map((c, i) => (
           <li key={c.value || `new-${i}`} className="flex flex-wrap items-end gap-3 sm:flex-nowrap">

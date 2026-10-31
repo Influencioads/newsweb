@@ -118,12 +118,13 @@ class TestBlocks:
         }
         ok = client.put(
             "/api/v1/cms/site-content/radio",
-            json={"image_url": "/media/radio.webp", "segments": [segment]},
+            json={"image_url": "/media/radio.webp", "mobile_image_url": "/media/radio-phone.webp", "segments": [segment]},
             headers=admin,
         )
         assert ok.status_code == 200, ok.text
         radio = client.get("/api/v1/public/config").json()["content"]["radio"]
         assert radio["image_url"] == "/media/radio.webp"
+        assert radio["mobile_image_url"] == "/media/radio-phone.webp"
         assert [s["id"] for s in radio["segments"]] == ["night"]
 
         for bad in (
@@ -132,6 +133,7 @@ class TestBlocks:
             {"segments": [segment, segment]},
             {"segments": []},
             {"image_url": "javascript:alert(1)", "segments": [segment]},
+            {"mobile_image_url": "javascript:alert(1)", "segments": [segment]},
         ):
             r = client.put("/api/v1/cms/site-content/radio", json=bad, headers=admin)
             assert r.status_code == 422, bad
@@ -174,17 +176,16 @@ class TestBlocks:
         cats = client.get("/api/v1/public/config").json()["content"]["nominate"]["categories"]
         r = client.put(
             "/api/v1/cms/site-content/nominate",
-            json={"image_url": "/media/banner.webp", "categories": cats},
+            json={"image_url": "/media/banner.webp", "mobile_image_url": "/media/banner-tall.webp", "categories": cats},
             headers=admin,
         )
         assert r.status_code == 200, r.text
-        assert client.get("/api/v1/public/config").json()["content"]["nominate"]["image_url"] == "/media/banner.webp"
-        bad = client.put(
-            "/api/v1/cms/site-content/nominate",
-            json={"image_url": "javascript:alert(1)", "categories": cats},
-            headers=admin,
-        )
-        assert bad.status_code == 422
+        nominate = client.get("/api/v1/public/config").json()["content"]["nominate"]
+        assert nominate["image_url"] == "/media/banner.webp"
+        assert nominate["mobile_image_url"] == "/media/banner-tall.webp"
+        for bad_url in ({"image_url": "javascript:alert(1)"}, {"mobile_image_url": "javascript:alert(1)"}):
+            bad = client.put("/api/v1/cms/site-content/nominate", json={**bad_url, "categories": cats}, headers=admin)
+            assert bad.status_code == 422
         assert client.delete("/api/v1/cms/site-content/nominate", headers=admin).status_code == 200
 
     def test_link_preview_for_other_pages_has_a_full_image_address(self, client: TestClient) -> None:

@@ -31,7 +31,9 @@ export function NominateCta({ compact = false }: { compact?: boolean }) {
   const styles = useStyles();
   const color = useColors();
   const { pick } = useI18n();
-  const uploaded = useSiteContent().nominate.image_url;
+  const { nominate } = useSiteContent();
+  // The CMS's mobile picture is made for phones; else the desktop one.
+  const uploaded = nominate.mobile_image_url || nominate.image_url;
   const heroes = useQuery({ queryKey: ['wow', 'featured-heroes'], queryFn: fetchHeroes, staleTime: 120_000 });
   const storyPhoto = heroes.data?.articles.find((a) => a.hero?.url)?.hero?.url ?? null;
   const photo = absoluteMediaUrl(uploaded || storyPhoto);

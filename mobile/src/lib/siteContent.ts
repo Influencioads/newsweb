@@ -20,6 +20,7 @@ export const DEFAULT_CONTENT: SiteContent = {
   hero: { article_ids: [] },
   radio: {
     image_url: '',
+    mobile_image_url: '',
     segments: RADIO_SEGMENTS.map((sg) => ({
       id: sg.id,
       te: sg.te,
@@ -32,7 +33,7 @@ export const DEFAULT_CONTENT: SiteContent = {
     })),
   },
   story_shots: { shots: [] },
-  nominate: { image_url: '', categories: HERO_CATEGORIES.map((c) => ({ ...c })) },
+  nominate: { image_url: '', mobile_image_url: '', categories: HERO_CATEGORIES.map((c) => ({ ...c })) },
   contact: { grievance_email: 'grievance@example.com' },
 };
 
@@ -99,9 +100,10 @@ export function useLogo(): number | { uri: string } {
   return uri ? { uri } : LOGO;
 }
 
-/** The WOW Radio picture: the one uploaded in the CMS, else the built-in art. */
+/** The WOW Radio picture: the CMS upload (its mobile version first), else the built-in art. */
 export function useRadioArt(): number | { uri: string } {
-  const uri = absoluteMediaUrl(useSiteContent().radio.image_url || null);
+  const { radio } = useSiteContent();
+  const uri = absoluteMediaUrl(radio.mobile_image_url || radio.image_url || null);
   return uri ? { uri } : RADIO_ART;
 }
 

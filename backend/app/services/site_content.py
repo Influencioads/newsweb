@@ -166,12 +166,14 @@ def _default_segments() -> list[RadioSegment]:
 
 
 class Radio(_Block):
-    """WOW Radio: the card picture (blank: the built-in one) and its segments."""
+    """WOW Radio: the card picture (blank: the built-in one), a separate one for
+    phones (blank: the same picture) and its segments."""
 
     image_url: str = Field(default="", max_length=500)
+    mobile_image_url: str = Field(default="", max_length=500)
     segments: list[RadioSegment] = Field(default_factory=_default_segments, min_length=1, max_length=8)
 
-    @field_validator("image_url")
+    @field_validator("image_url", "mobile_image_url")
     @classmethod
     def _img(cls, v: str) -> str:
         return _image(v)
@@ -250,14 +252,16 @@ def _default_hero_categories() -> list[HeroCategory]:
 
 class Nominate(_Block):
     """The home page's Nominate banner picture (blank: the newest Local Hero
-    story's photo) and the hero categories offered on the Nominate form."""
+    story's photo), a separate one for phones (blank: the same picture) and the
+    hero categories offered on the Nominate form."""
 
     image_url: str = Field(default="", max_length=500)
+    mobile_image_url: str = Field(default="", max_length=500)
     categories: list[HeroCategory] = Field(
         default_factory=_default_hero_categories, min_length=1, max_length=20
     )
 
-    @field_validator("image_url")
+    @field_validator("image_url", "mobile_image_url")
     @classmethod
     def _img(cls, v: str) -> str:
         return _image(v)

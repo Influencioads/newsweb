@@ -580,8 +580,11 @@ def get_article(
 
     attached_polls = poll_service.active_polls(db, article_id=article.id)
 
+    # A story with an author name picked in the editor (CMS → Site content →
+    # Authors) is credited to that name only; the staff account behind it is
+    # shown only when no name was picked.
     author = None
-    if article.author_id:
+    if article.author_id and not (article.byline_te or "").strip():
         from app.models.user import User
 
         user = db.get(User, article.author_id)

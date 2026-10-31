@@ -52,3 +52,17 @@ def test_hero_slides_follow_the_desk_order(client: TestClient, db: Session) -> N
     for bad in ({"article_ids": [first.id, first.id]}, {"article_ids": list(range(1, 12))}, {"article_ids": [0]}):
         assert client.put("/api/v1/cms/site-content/hero", json=bad, headers=admin).status_code == 422, bad
     assert client.delete("/api/v1/cms/site-content/hero", headers=admin).status_code == 200
+
+
+def test_picked_author_name_replaces_the_staff_account(client: TestClient, db: Session) -> None:  # noqa: F811
+    admin = staff_headers(db, role=RoleKey.SUPER_ADMIN, email="byline-admin@test.example.com")
+    article = _published(client, db, admin, "రచయిత పేరు")
+    url = f"/api/v1/public/articles/{article.short_id}"
+    # No name picked: readers see the staff account.
+    assert client.get(url).json()["author"] is not None
+
+    article.byline_te = "సాయి మాసుల"
+    db.commit()
+    story = client.get(url).json()
+    assert story["author"] is None
+    assert story["byline_te"] == "సాయి మాసుల"

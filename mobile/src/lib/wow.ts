@@ -37,7 +37,7 @@ export const WOW_FEATURES: readonly WowFeature[] = [
   // ── Explore more ──
   { slug: 'local-hero', te: 'లోకల్ హీరో', en: 'Local Hero', focusTe: 'పల్లెలు, పట్టణాల్లోని అసాధారణ వ్యక్తులు', focusEn: 'Extraordinary people from villages and towns', icon: 'mapPin', href: section('local-hero'), main: false },
   { slug: 'story-shots', te: 'స్టోరీ షాట్స్', en: 'Story Shots', focusTe: 'షార్ట్ స్టోరీస్.. స్మార్ట్ నాలెడ్జ్!', focusEn: 'Short stories.. smart knowledge!', icon: 'galleryVertical', href: '/story-shots', main: false },
-  { slug: 'zero-to-hero', te: 'జీరో టు హీరో', en: 'Zero to Hero', focusTe: 'జీరో నుండి హీరోగా', focusEn: 'From zero to hero', icon: 'trendingUp', href: section('zero-to-hero'), main: false },
+  { slug: 'zero-to-hero', te: 'వావ్ ఇండియన్', en: 'WOW Indian', focusTe: 'జీరో నుండి హీరోగా', focusEn: 'From zero to hero', icon: 'trendingUp', href: section('zero-to-hero'), main: false },
   { slug: 'wow-idea', te: 'వావ్ ఐడియా', en: 'WOW Idea', focusTe: 'ఐడియాతో మొదలైన ఆవిష్కరణలు', focusEn: 'Innovations that began with an idea', icon: 'lightbulb', href: section('wow-idea'), main: false },
   { slug: 'mystery', te: 'మిస్టరీ', en: 'Mystery', focusTe: 'అద్భుతాలు.. రహస్యాలు..', focusEn: 'Wonders.. and secrets..', icon: 'telescope', href: section('mystery'), main: false },
   { slug: 'wow-puranam', te: 'వావ్ పురాణం', en: 'WOW Puranam', focusTe: 'పురాణాలు.. ఇతిహాసాలు..', focusEn: 'Puranas.. and epics..', icon: 'scrollText', href: section('wow-puranam'), main: false },

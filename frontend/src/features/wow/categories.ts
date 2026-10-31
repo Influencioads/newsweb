@@ -146,8 +146,8 @@ export const WOW_FEATURES: readonly WowFeature[] = [
   },
   {
     slug: 'zero-to-hero',
-    te: 'జీరో టు హీరో',
-    en: 'Zero to Hero',
+    te: 'వావ్ ఇండియన్',
+    en: 'WOW Indian',
     focusTe: 'జీరో నుండి హీరోగా',
     focusEn: 'From zero to hero',
     icon: TrendingUp,

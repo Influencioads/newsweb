@@ -15,6 +15,7 @@ import { cn } from '@/utils/cn';
 import { useDocumentTitle } from '@/utils/motion';
 
 import { wowIcon } from './icons';
+import { PhonePicture } from './PhonePicture';
 import { DEFAULT_CONTENT, DEFAULT_RADIO_IMAGE, useSiteContent } from './siteContent';
 
 /**
@@ -67,7 +68,7 @@ const toSegment = (sg: RadioSegment): Segment => ({
 });
 
 /** The segments and the card picture, as set in CMS → Site content → WOW Radio. */
-function useRadio(): { segments: Segment[]; image: string } {
+function useRadio(): { segments: Segment[]; image: string; phoneImage: string } {
   const { radio } = useSiteContent();
   // Memoised on the stored list: the player's effects key on the segment, so a
   // fresh array every render would restart them forever.
@@ -75,7 +76,7 @@ function useRadio(): { segments: Segment[]; image: string } {
     () => (radio.segments.length ? radio.segments : DEFAULT_CONTENT.radio.segments).map(toSegment),
     [radio.segments],
   );
-  return { segments, image: radio.image_url || DEFAULT_RADIO_IMAGE };
+  return { segments, image: radio.image_url || DEFAULT_RADIO_IMAGE, phoneImage: radio.mobile_image_url };
 }
 
 const PER_SEGMENT = 5;
@@ -376,7 +377,7 @@ export function WowRadio({ variant = 'card' }: { variant?: 'card' | 'page' }) {
   const te = language === 'te';
   const page = variant === 'page';
   const radio = useRadioPlayer();
-  const { image } = useRadio();
+  const { image, phoneImage } = useRadio();
 
   return (
     <section
@@ -393,20 +394,26 @@ export function WowRadio({ variant = 'card' }: { variant?: 'card' | 'page' }) {
       />
 
       {page ? (
-        <img
+        <PhonePicture
           src={image}
+          mobileSrc={phoneImage}
           alt={te ? 'వావ్ రేడియో' : 'WOW Radio'}
           width={960}
           height={540}
-          className="relative mb-5 aspect-[16/7] w-full rounded-xl object-cover shadow-raised"
+          className={cn(
+            'relative mb-5 w-full rounded-xl object-cover shadow-raised md:aspect-[16/7]',
+            // The phone picture is 4:3.
+            phoneImage ? 'aspect-[4/3]' : 'aspect-[16/7]',
+          )}
         />
       ) : null}
 
       <div className="relative flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           {!page ? (
-            <img
+            <PhonePicture
               src={image}
+              mobileSrc={phoneImage}
               alt=""
               width={960}
               height={540}

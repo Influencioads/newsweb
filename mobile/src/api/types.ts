@@ -188,11 +188,12 @@ export interface SiteContent {
   home: { banner_tag_te: string; banner_tag_en: string };
   /** The home hero banner's slides, chosen in CMS → Home hero slides. */
   hero: { article_ids: number[] };
-  radio: { image_url: string; segments: SiteRadioSegment[] };
+  /** `mobile_image_url`: the phone version (blank: `image_url`). */
+  radio: { image_url: string; mobile_image_url: string; segments: SiteRadioSegment[] };
   /** Story Shots pictures uploaded in CMS → Story Shots, in order. */
   story_shots: { shots: StoryShotItem[] };
   /** The Nominate banner picture (blank: a Local Hero photo) and the form's hero categories. */
-  nominate: { image_url: string; categories: { value: string; te: string; en: string }[] };
+  nominate: { image_url: string; mobile_image_url: string; categories: { value: string; te: string; en: string }[] };
   contact: { grievance_email: string };
 }
 

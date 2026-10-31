@@ -325,9 +325,10 @@ export interface SiteContent {
   home: { banner_tag_te: string; banner_tag_en: string };
   /** The home hero banner's slides, chosen in CMS → Home hero slides, in order. */
   hero: { article_ids: number[] };
-  radio: { image_url: string; segments: RadioSegment[] };
+  /** `mobile_image_url`: the picture phones show instead (blank: `image_url`). */
+  radio: { image_url: string; mobile_image_url: string; segments: RadioSegment[] };
   story_shots: { shots: StoryShotItem[] };
-  nominate: { image_url: string; categories: { value: string; te: string; en: string }[] };
+  nominate: { image_url: string; mobile_image_url: string; categories: { value: string; te: string; en: string }[] };
   contact: { grievance_email: string };
   /** The bylines offered in the article editor (CMS → Site content → Authors). */
   authors: { names: string[] };

@@ -11,6 +11,7 @@ import { useI18n, useScript } from '@/i18n';
 import type { ArticleCard } from '@/types/public';
 import { cn } from '@/utils/cn';
 
+import { PhonePicture } from './PhonePicture';
 import { useSiteContent } from './siteContent';
 
 /**
@@ -50,9 +51,10 @@ export function NominateCta({ compact = false }: { compact?: boolean }) {
   const { language } = useI18n();
   const s = useScript();
   const te = language === 'te';
-  // The backdrop is the picture uploaded in CMS → Site content → Nominate form,
-  // else a real local hero's photo — the same stories Featured Heroes shows.
-  const uploaded = useSiteContent().nominate.image_url;
+  // The backdrop is the picture uploaded in CMS → Site content → Nominate form
+  // (phones: its mobile version, if uploaded), else a real local hero's photo —
+  // the same stories Featured Heroes shows.
+  const { image_url: uploaded, mobile_image_url: uploadedPhone } = useSiteContent().nominate;
   const heroes = useQuery({ queryKey: ['wow', 'featured-heroes'], queryFn: fetchHeroes, staleTime: 120_000 });
   const photo = heroes.data?.articles.find((a) => a.hero)?.hero ?? null;
   return (
@@ -61,12 +63,26 @@ export function NominateCta({ compact = false }: { compact?: boolean }) {
       className="relative isolate flex h-full min-h-[320px] flex-col justify-end gap-5 overflow-hidden rounded-2xl bg-brand-deep p-5 text-on-ink shadow-raised ring-2 ring-wow/60 md:p-6"
     >
       {uploaded ? (
-        <img aria-hidden src={uploaded} alt="" className="absolute inset-0 -z-20 h-full w-full object-cover" />
-      ) : photo ? (
-        <div aria-hidden className="absolute inset-0 -z-20">
-          <NewsImage media={photo} ratio="auto" radius="none" className="h-full w-full" sizes="(min-width: 1024px) 40vw, 100vw" />
-        </div>
-      ) : null}
+        <PhonePicture
+          aria-hidden
+          src={uploaded}
+          mobileSrc={uploadedPhone}
+          alt=""
+          className="absolute inset-0 -z-20 h-full w-full object-cover"
+        />
+      ) : (
+        <>
+          {/* Only a phone picture uploaded: phones show it, larger screens the story photo. */}
+          {uploadedPhone ? (
+            <img aria-hidden src={uploadedPhone} alt="" loading="lazy" className="absolute inset-0 -z-20 h-full w-full object-cover md:hidden" />
+          ) : null}
+          {photo ? (
+            <div aria-hidden className={cn('absolute inset-0 -z-20', uploadedPhone && 'hidden md:block')}>
+              <NewsImage media={photo} ratio="auto" radius="none" className="h-full w-full" sizes="(min-width: 1024px) 40vw, 100vw" />
+            </div>
+          ) : null}
+        </>
+      )}
       {/* Orange at the top fading into the deep WOW blue, so the copy reads on any photo. */}
       <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-b from-wow/55 via-brand-deep/75 to-brand-deep" />
       <div aria-hidden className="pointer-events-none absolute -bottom-10 -right-6 -z-10 text-on-ink/10">

@@ -87,6 +87,7 @@ export function ImageField({
   onChange,
   disabled,
   wide = false,
+  tall = false,
   originalLabel,
 }: {
   value: string;
@@ -98,6 +99,8 @@ export function ImageField({
   disabled?: boolean;
   /** A 16:9 picture rather than a wide logo strip. */
   wide?: boolean;
+  /** An upright picture (a phone's version of a banner). */
+  tall?: boolean;
 }) {
   const L = useL();
   const toast = useToast();
@@ -109,9 +112,9 @@ export function ImageField({
   });
   return (
     <div className="flex flex-wrap items-center gap-4">
-      <div className={cn('flex items-center justify-center rounded-xl border border-rule bg-paper p-3', wide ? 'h-28 w-48' : 'h-20 min-w-48')}>
+      <div className={cn('flex items-center justify-center rounded-xl border border-rule bg-paper p-3', tall ? 'h-40 w-32' : wide ? 'h-28 w-48' : 'h-20 min-w-48')}>
         {value || fallback ? (
-          <img src={value || fallback} alt={alt} className={cn('max-h-full w-auto', wide && 'rounded-lg object-cover')} />
+          <img src={value || fallback} alt={alt} className={cn('max-h-full w-auto', (wide || tall) && 'rounded-lg object-cover')} />
         ) : (
           <span className="px-2 text-center font-sans text-meta text-muted">{L('చిత్రం లేదు', 'No picture uploaded')}</span>
         )}

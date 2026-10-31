@@ -16,7 +16,7 @@ import {
   PUBLISH_STAGES,
   SPECIALITIES,
 } from '@/lib/myVillage';
-import { radius, shadow, space } from '@/lib/theme';
+import { alpha, radius, shadow, space } from '@/lib/theme';
 import { makeStyles, useColors } from '@/lib/useTheme';
 import { Icon } from '@/ui/Icon';
 import { PressableScale } from '@/ui/PressableScale';
@@ -198,10 +198,10 @@ const useStyles = makeStyles((color) => ({
   },
   ways: { gap: space.md },
   way: { flexDirection: 'row', alignItems: 'flex-start', gap: space.md, padding: space.md, borderRadius: radius.md },
-  wayExplore: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', backgroundColor: 'rgba(255,255,255,0.1)' },
+  wayExplore: { borderWidth: 1, borderColor: alpha(color.onOverlay, 0.2), backgroundColor: alpha(color.onOverlay, 0.1) },
   wayShare: { backgroundColor: color.wowDeep },
   wayIcon: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
-  wayIconShare: { backgroundColor: 'rgba(255,255,255,0.2)' },
+  wayIconShare: { backgroundColor: alpha(color.onOverlay, 0.2) },
   wayText: { flex: 1, minWidth: 0, gap: 2 },
   section: { gap: space.md },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },

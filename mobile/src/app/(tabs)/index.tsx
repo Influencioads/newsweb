@@ -12,6 +12,7 @@ import { EmptyState, ErrorState } from '@/components/Feedback';
 import { HomeControls } from '@/components/home/HomeControls';
 import { HomeListHeader } from '@/components/home/HomeListHeader';
 import { HomeSectionBand } from '@/components/home/HomeSectionBand';
+import { SectionRail } from '@/components/home/SectionRail';
 import { LocationSheet, usePlaceName } from '@/components/LocationSheet';
 import { ExploreWowGrid } from '@/components/wow/ExploreWowGrid';
 import { FeaturedHeroes } from '@/components/wow/FeaturedHeroes';
@@ -244,6 +245,7 @@ export default function HomeScreen() {
           scrollEventThrottle={16}
           ListHeaderComponent={
             <>
+              <SectionRail />
               <HomeControls />
               {filtering ? null : <HomeListHeader breaking={home.data?.breaking ?? []} />}
             </>

@@ -241,16 +241,19 @@ export default function ArticleEditor() {
           />
           ) : null}
 
-          <Section title={L('రచయిత & మూలం', 'Byline and source')}>
+          <Section title={L('రచయిత & మూలం', 'Author and source')}>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
-                label={L('బైలైన్', 'Byline')}
+                label={L('రచయిత', 'Author')}
                 optionalLabel
                 error={errors('byline_te')}
-                hint={L('పేర్లు: CMS → సైట్ కంటెంట్ → రచయితలు', 'Names: CMS → Site content → Authors')}
+                hint={L(
+                  'పాఠకులకు ఈ పేరు కనిపిస్తుంది. పేర్లు జోడించడానికి: CMS → సైట్ కంటెంట్ → రచయితలు',
+                  'Readers see this name. To add names: CMS → Site content → Authors',
+                )}
               >
                 <Select value={form.byline} onChange={(e) => set({ byline: e.target.value })}>
-                  <option value="">{L('— బైలైన్ లేదు —', '— No byline —')}</option>
+                  <option value="">{L('— పేరు లేదు (స్టాఫ్ ఖాతా పేరు) —', '— No name (staff account’s name) —')}</option>
                   {/* A story saved with another byline (a reader's name, an older one) keeps it. */}
                   {form.byline && !authorNames.includes(form.byline) ? <option value={form.byline}>{form.byline}</option> : null}
                   {authorNames.map((name) => (
@@ -260,7 +263,15 @@ export default function ArticleEditor() {
                   ))}
                 </Select>
               </Field>
-              <Field label={L('రచయిత', 'Author')} hint={can('article.approve') ? undefined : L('మార్చడానికి అనుమతి లేదు', 'No permission to change')} error={errors('author_id')}>
+              <Field
+                label={L('స్టాఫ్ ఖాతా', 'Staff account')}
+                hint={
+                  can('article.approve')
+                    ? L('న్యూస్‌రూమ్‌లో ఈ కథనం ఎవరిది. రచయిత పేరు ఎంచుకుంటే పాఠకులకు ఇది కనిపించదు.', 'Who in the newsroom owns this story. Readers don’t see it when an Author name is picked.')
+                    : L('మార్చడానికి అనుమతి లేదు', 'No permission to change')
+                }
+                error={errors('author_id')}
+              >
                 <Select
                   value={form.authorId ?? ''}
                   disabled={!can('article.approve')}

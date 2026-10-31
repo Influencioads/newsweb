@@ -102,6 +102,7 @@ const AdsPage = named(adminDiscovery, 'AdsPage');
 const AnalyticsPage = named(adminDiscovery, 'AnalyticsPage');
 const HomepageSectionsPage = named(adminDiscovery, 'HomepageSectionsPage');
 const SiteContentPage = named(() => import('./pages/admin/SiteContentPage'), 'SiteContentPage');
+const HeroSlidesAdminPage = named(() => import('./pages/admin/SiteContentPage'), 'HeroSlidesAdminPage');
 const StoryShotsAdminPage = named(() => import('./pages/admin/SiteContentPage'), 'StoryShotsAdminPage');
 const SitePagesPage = named(() => import('./pages/admin/SitePagesPage'), 'SitePagesPage');
 const NotificationsAdminPage = named(adminDiscovery, 'NotificationsAdminPage');
@@ -247,6 +248,7 @@ export default function App() {
                 <Route path="/admin/site-content" element={<SiteContentPage />} />
                 <Route path="/admin/pages" element={<SitePagesPage />} />
                 <Route path="/admin/story-shots" element={<StoryShotsAdminPage />} />
+                <Route path="/admin/hero-slides" element={<HeroSlidesAdminPage />} />
                 <Route path="/admin/notifications" element={<NotificationsAdminPage />} />
                 <Route path="/admin/taxonomy" element={<TaxonomyPage />} />
                 <Route path="/admin/media" element={<MediaPage />} />

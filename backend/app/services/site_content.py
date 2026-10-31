@@ -85,6 +85,26 @@ class Home(_Block):
     banner_tag_en: str = Field(default="Every Story Has a WOW!", min_length=1, max_length=80)
 
 
+#: Slides in the home page's hero banner.
+MAX_HERO_SLIDES = 10
+
+
+class Hero(_Block):
+    """The stories the desk puts in the home hero banner, in slide order.
+    Empty: the banner shows the newest top stories, as before."""
+
+    article_ids: list[int] = Field(default_factory=list, max_length=MAX_HERO_SLIDES)
+
+    @field_validator("article_ids")
+    @classmethod
+    def _ids(cls, v: list[int]) -> list[int]:
+        if any(i <= 0 for i in v):
+            raise ValueError("must be story ids")
+        if len(set(v)) != len(v):
+            raise ValueError("each story can be in the banner once")
+        return v
+
+
 class RadioSegment(_Block):
     id: str = Field(min_length=2, max_length=40, pattern=_SLUG)
     te: str = Field(min_length=1, max_length=60)
@@ -267,6 +287,7 @@ class Contact(_Block):
 BLOCKS: dict[str, type[_Block]] = {
     "brand": Brand,
     "home": Home,
+    "hero": Hero,
     "radio": Radio,
     "story_shots": StoryShots,
     "nominate": Nominate,

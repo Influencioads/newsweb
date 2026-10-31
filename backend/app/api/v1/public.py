@@ -382,11 +382,23 @@ def get_home(
             .limit(1)
         )
 
+    # The desk's own hero slides, in its order. A story unpublished or deleted
+    # since it was chosen simply drops out.
+    slide_ids = site_content.blocks(db)["hero"]["article_ids"]
+    hero: list[Article] = []
+    if slide_ids:
+        live = {
+            a.id: a
+            for a in db.execute(article_repo.published_query().where(Article.id.in_(slide_ids))).unique().scalars()
+        }
+        hero = [live[i] for i in slide_ids if i in live]
+
     payload = HomeOut(
         edition=DistrictOut.model_validate(edition_district)
         if edition_district
         else None,
         mandal_block=mandal_block,
+        hero=_cards(hero, db, districts),
         lead=_cards([lead], db, districts)[0] if lead else None,
         secondary=_cards(secondary, db, districts),
         mid_column=_cards(mid_column, db, districts),

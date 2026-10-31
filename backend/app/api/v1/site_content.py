@@ -17,6 +17,7 @@ from fastapi import APIRouter, Body, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from app.core.deps import Principal, require_permission
+from app.core.redis_client import cache_delete_prefix
 from app.core.errors import NotFoundError
 from app.db.session import get_db
 from app.models.enums import AuditAction
@@ -42,6 +43,8 @@ def save_site_content(
     p: Principal = Depends(require_permission("settings.manage")),
 ) -> dict[str, Any]:
     value = site_content.save_block(db, block, payload, p.id)
+    if block == "hero":
+        cache_delete_prefix("home:")
     audit_service.record(
         db,
         action=AuditAction.UPDATE,
@@ -62,6 +65,8 @@ def reset_site_content(
     p: Principal = Depends(require_permission("settings.manage")),
 ) -> dict[str, Any]:
     value = site_content.reset_block(db, block)
+    if block == "hero":
+        cache_delete_prefix("home:")
     audit_service.record(
         db,
         action=AuditAction.DELETE,

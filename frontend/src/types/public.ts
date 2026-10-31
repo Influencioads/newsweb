@@ -157,6 +157,8 @@ export interface HomePayload {
   edition: DistrictOut | null;
   /** §3 — present only when the reader has saved a mandal. */
   mandal_block: HomeSection | null;
+  /** The hero slides the desk chose, in order (an older API sends none). */
+  hero?: ArticleCard[];
   lead: ArticleCard | null;
   secondary: ArticleCard[];
   mid_column: ArticleCard[];
@@ -321,6 +323,8 @@ export interface SiteConfig {
 export interface SiteContent {
   brand: { logo_url: string; tagline_te: string; tagline_en: string };
   home: { banner_tag_te: string; banner_tag_en: string };
+  /** The home hero banner's slides, chosen in CMS → Home hero slides, in order. */
+  hero: { article_ids: number[] };
   radio: { image_url: string; segments: RadioSegment[] };
   story_shots: { shots: StoryShotItem[] };
   nominate: { image_url: string; categories: { value: string; te: string; en: string }[] };

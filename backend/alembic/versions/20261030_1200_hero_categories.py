@@ -4,7 +4,7 @@ Data only. Touches the nomination block the desk saved from the CMS
 (`app_settings` key `content.nominate`); a site that never saved it already
 reads the new defaults from site_content.py. In a saved block:
 
-* "యువ విజయం" becomes "యువత" and "ఇతరులు" becomes "ఇతరాలు" — only those
+* "యువ విజయం" becomes "యువత" and "ఇతరాలు" becomes "ఇతరులు" — only those
   exact labels, so anything else an editor typed is left alone;
 * క్రీడలు / Sports is added (before "Other", if there is one) unless a
   `sports` category is already there or the list is full.
@@ -28,7 +28,7 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 KEY = "content.nominate"
-RENAMES = {"యువ విజయం": "యువత", "ఇతరులు": "ఇతరాలు"}
+RENAMES = {"యువ విజయం": "యువత", "ఇతరాలు": "ఇతరులు"}
 SPORTS = {"value": "sports", "te": "క్రీడలు", "en": "Sports"}
 MAX_CATEGORIES = 20  # site_content.Nominate.categories max_length
 
@@ -73,7 +73,7 @@ def downgrade() -> None:
         return
     value, block = loaded
     # Only the added Sports row comes out. The relabels stay: "యువత" and
-    # "ఇతరాలు" are also the shipped defaults, so there is no telling which
+    # "ఇతరులు" are also the shipped defaults, so there is no telling which
     # rows this migration changed.
     block["categories"] = [c for c in block["categories"] if not (isinstance(c, dict) and c == SPORTS)]
     _save(value)

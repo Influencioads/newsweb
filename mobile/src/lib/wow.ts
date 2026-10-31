@@ -87,7 +87,7 @@ export const HERO_CATEGORIES: readonly { value: string; te: string; en: string }
   { value: 'environment', te: 'పర్యావరణం', en: 'Environment' },
   { value: 'sports', te: 'క్రీడలు', en: 'Sports' },
   { value: 'youth', te: 'యువత', en: 'Youth' },
-  { value: 'other', te: 'ఇతరాలు', en: 'Other' },
+  { value: 'other', te: 'ఇతరులు', en: 'Other' },
 ];
 
 /** Category the nomination is filed under, so the desk finds them together. */

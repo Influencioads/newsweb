@@ -16,22 +16,34 @@ import { useSiteContent } from './siteContent';
 /**
  * The homepage's two hero surfaces (pitch §2, §5):
  *   - NominateCta: the always-visible "Nominate Your Local Hero" call.
- *   - FeaturedHeroes: four published hero stories, from Local Hero first and
- *     the older inspiration sections while that one fills up.
+ *   - FeaturedHeroes: four published hero stories, Local Hero first and topped
+ *     up from the older inspiration sections while that one fills up.
  */
 
 const HERO_SOURCES = ['local-hero', 'real-heroes', 'zero-to-hero', 'inspiring'];
+const HERO_COUNT = 4;
 
+/** Up to four hero stories: Local Hero first, topped up from the older
+ *  inspiration sections — so one Local Hero story does not leave the row at one. */
 async function fetchHeroes(): Promise<{ slug: string; articles: ArticleCard[] }> {
-  for (const slug of HERO_SOURCES) {
+  const seen = new Set<string>();
+  const articles: ArticleCard[] = [];
+  let slug = '';
+  for (const source of HERO_SOURCES) {
+    if (articles.length >= HERO_COUNT) break;
     try {
-      const feed = await publicApi.fetchFeed({ category: slug, limit: 4 });
-      if (feed.articles.length) return { slug, articles: feed.articles.slice(0, 4) };
+      const feed = await publicApi.fetchFeed({ category: source, limit: HERO_COUNT });
+      for (const a of feed.articles) {
+        if (articles.length >= HERO_COUNT || seen.has(a.short_id)) continue;
+        seen.add(a.short_id);
+        articles.push(a);
+        slug ||= source;
+      }
     } catch {
       // Section not created yet — try the next one.
     }
   }
-  return { slug: 'local-hero', articles: [] };
+  return { slug: slug || 'local-hero', articles };
 }
 
 export function NominateCta({ compact = false }: { compact?: boolean }) {

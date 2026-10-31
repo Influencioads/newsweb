@@ -139,25 +139,28 @@ export function Masthead() {
           </span>
         </Link>
 
-        {/* Phone: one line — the brand line small on the left, a small Nominate
-            Your Local Hero pill on the right. */}
-        <div className="order-first col-span-2 flex items-center justify-between gap-1.5 md:hidden">
-          <p lang={taglineScript.lang} className={cn(taglineScript.cls, 'min-w-0 text-eyebrow font-bold leading-snug tracking-normal text-ink')}>
+        {/* Phone: one row — the brand line small on one line on the left, a small
+            two-line Nominate Your Local Hero button on the right. */}
+        <div className="order-first col-span-2 flex items-center justify-between gap-1 md:hidden">
+          <p lang={taglineScript.lang} className={cn(taglineScript.cls, 'min-w-0 whitespace-nowrap text-eyebrow font-bold tracking-normal text-ink')}>
             {tagline}
           </p>
           <Link
             to="/nominate"
             aria-label={t('ui.nominate')}
-            className="flex min-h-tap shrink-0 items-center rounded-pill"
+            className="flex min-h-tap shrink-0 items-center rounded-xl"
           >
             <span
               className={cn(
                 s.body,
-                'inline-flex h-7 items-center gap-0.5 whitespace-nowrap rounded-pill bg-gradient-to-br from-wow to-wow-deep px-2 text-meta font-bold leading-none text-on-wow shadow-card',
+                'inline-flex items-center gap-0.5 rounded-xl bg-gradient-to-br from-wow to-wow-deep px-1.5 py-0.5 text-meta font-bold text-on-wow shadow-card',
               )}
             >
-              <Icon icon={Award} size="xs" />
-              {language === 'te' ? 'లోకల్ హీరో ని నామినేట్ చేయండి' : 'Nominate a Local Hero'}
+              <Icon icon={Award} size="xs" className="shrink-0" />
+              <span className="flex flex-col whitespace-nowrap text-left leading-normal">
+                <span>{language === 'te' ? 'లోకల్ హీరో ని' : 'Nominate a'}</span>
+                <span>{language === 'te' ? 'నామినేట్ చేయండి' : 'Local Hero'}</span>
+              </span>
             </span>
           </Link>
         </div>

@@ -76,7 +76,7 @@ export const DEFAULT_CONTENT: SiteContent = {
       { value: 'environment', te: 'పర్యావరణం', en: 'Environment' },
       { value: 'sports', te: 'క్రీడలు', en: 'Sports' },
       { value: 'youth', te: 'యువత', en: 'Youth' },
-      { value: 'other', te: 'ఇతరాలు', en: 'Other' },
+      { value: 'other', te: 'ఇతరులు', en: 'Other' },
     ],
   },
   contact: { grievance_email: 'grievance@example.com' },

@@ -10,7 +10,7 @@ import { useI18n } from '@/lib/i18n';
 
 /**
  * Our Heroes — the website's FeaturedHeroes (frontend/src/features/wow/
- * LocalHeroes.tsx): four hero stories from Local Hero first, falling back to
+ * LocalHeroes.tsx): four hero stories, Local Hero first and topped up from
  * the older inspiration sections while that one fills up. Renders nothing
  * until one of them has stories.
  */
@@ -18,15 +18,24 @@ const HERO_SOURCES = ['local-hero', 'real-heroes', 'zero-to-hero', 'inspiring'] 
 const HERO_COUNT = 4;
 
 export async function fetchHeroes(): Promise<{ slug: string; articles: ArticleCard[] }> {
-  for (const slug of HERO_SOURCES) {
+  const seen = new Set<string>();
+  const articles: ArticleCard[] = [];
+  let slug = '';
+  for (const source of HERO_SOURCES) {
+    if (articles.length >= HERO_COUNT) break;
     try {
-      const feed = await publicApi.fetchFeed({ category: slug, limit: HERO_COUNT });
-      if (feed.articles.length) return { slug, articles: feed.articles.slice(0, HERO_COUNT) };
+      const feed = await publicApi.fetchFeed({ category: source, limit: HERO_COUNT });
+      for (const a of feed.articles) {
+        if (articles.length >= HERO_COUNT || seen.has(a.short_id)) continue;
+        seen.add(a.short_id);
+        articles.push(a);
+        slug ||= source;
+      }
     } catch {
       // Section not created yet — try the next one.
     }
   }
-  return { slug: HERO_SOURCES[0], articles: [] };
+  return { slug: slug || HERO_SOURCES[0], articles };
 }
 
 export function FeaturedHeroes() {

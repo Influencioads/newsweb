@@ -60,7 +60,7 @@ export function NominateCta({ compact = false }: { compact?: boolean }) {
   return (
     <section
       aria-labelledby="nominate-cta"
-      className="relative isolate flex h-full min-h-[320px] flex-col justify-end gap-5 overflow-hidden rounded-2xl bg-brand-deep p-5 text-on-ink shadow-raised ring-2 ring-wow/60 md:p-6"
+      className="relative isolate flex h-full min-h-[320px] flex-col justify-end gap-5 overflow-hidden rounded-2xl bg-brand-deep p-5 pt-14 text-on-ink shadow-raised ring-2 ring-wow/60 md:p-6 md:pt-16"
     >
       {uploaded ? (
         <PhonePicture
@@ -88,8 +88,8 @@ export function NominateCta({ compact = false }: { compact?: boolean }) {
       <div aria-hidden className="pointer-events-none absolute -bottom-10 -right-6 -z-10 text-on-ink/10">
         <Award size={compact ? 140 : 180} strokeWidth={1.25} />
       </div>
-      {/* The pill sits at the top of the card (mb-auto takes the free space); the copy and button stay at the bottom. */}
-      <span className={cn(s.body, 'mb-auto inline-flex items-center gap-1.5 self-start rounded-pill bg-gradient-to-br from-wow to-wow-deep px-3 py-1 text-meta font-bold text-on-wow')}>
+      {/* A tab hanging from the card's top border; the copy and button stay at the bottom. */}
+      <span className={cn(s.body, 'absolute left-5 top-0 inline-flex items-center gap-1.5 rounded-b-xl bg-gradient-to-br from-wow to-wow-deep px-3 py-1.5 text-meta font-bold text-on-wow shadow-card md:left-6')}>
         <Icon icon={HeartHandshake} size="xs" />
         {te ? 'మీ లోకల్ హీరోని నామినేట్ చేయండి' : 'Nominate Your Local Hero'}
       </span>

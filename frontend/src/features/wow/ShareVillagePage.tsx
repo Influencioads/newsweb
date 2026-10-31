@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, Camera, Check, CheckCircle2, ImagePlus, Mail, Pencil, Phone, Send, ShieldCheck, UserRound, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Camera, Check, CheckCircle2, ImagePlus, LogIn, Mail, Pencil, Phone, Send, ShieldCheck, UserRound, X } from 'lucide-react';
 
-import { api } from '@/api/client';
 import { LocationPicker } from '@/components/location/LocationPicker';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { Checkbox, Field, Input, inputClass, Select, Textarea } from '@/components/ui/Field';
+import { Checkbox, Field, Input, Select, Textarea } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
 import { PageContainer } from '@/components/ui/Layout';
 import { useToast } from '@/components/ui/Toast';
@@ -47,6 +46,8 @@ const DRAFT_KEY = 'wow.village-draft';
 const MIN_STORY = 100;
 /** The profile-picture route takes up to 4 MB (users.py upload_avatar). */
 const MAX_WRITER_PHOTO_BYTES = 4 * 1024 * 1024;
+/** Village photos: the submission photo route takes up to 15 MB (UPLOAD_IMAGE_MAX_BYTES). */
+const MAX_VILLAGE_PHOTO_BYTES = 15 * 1024 * 1024;
 const MAX_STORY = 5000;
 const PHONE = /^[6-9]\d{9}$/;
 const PIN = /^[1-9]\d{5}$/;
@@ -94,6 +95,26 @@ function loadDraft(): Draft {
   }
 }
 
+/** The step to come back to after signing in (sessionStorage, read once). */
+const STEP_KEY = 'wow.village-step';
+function takeSavedStep(): number {
+  try {
+    const raw = sessionStorage.getItem(STEP_KEY);
+    sessionStorage.removeItem(STEP_KEY);
+    const n = raw === null ? 0 : Number(raw);
+    return Number.isInteger(n) && n >= 0 && n <= 5 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+function saveStep(step: number): void {
+  try {
+    sessionStorage.setItem(STEP_KEY, String(step));
+  } catch {
+    /* private mode */
+  }
+}
+
 function saveDraft(draft: Draft | null): void {
   try {
     if (draft) sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
@@ -134,7 +155,7 @@ export default function ShareVillagePage() {
   const bootstrap = useAuth((auth) => auth.bootstrap);
 
   const [draft, setDraft] = useState<Draft>(loadDraft);
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(takeSavedStep);
   const [tried, setTried] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>([]);
   // The writer's own photo: becomes their profile picture on submit, shown
@@ -163,13 +184,11 @@ export default function ShareVillagePage() {
     enabled: Boolean(draft.district),
     staleTime: 3_600_000,
   });
-  const contributor = useQuery({
-    queryKey: ['contributor', 'me'],
-    queryFn: async () => (await api.get<{ kyc_status: string }>('/users/me/contributor')).data,
-    enabled: status === 'authenticated',
-    staleTime: 300_000,
-  });
-  const canAttachPhotos = contributor.data?.kyc_status === 'approved';
+  // Any signed-in reader may add village photos (backend
+  // submission_service.OPEN_PHOTO_CATEGORIES); a guest signs in first so the
+  // photos are not lost on the way to the login page.
+  const canAttachPhotos = status === 'authenticated';
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   const place = useMemo(() => {
     const state = config.data?.states.find((x) => x.code === draft.state);
@@ -309,10 +328,23 @@ export default function ShareVillagePage() {
   const addPhotos = (files: FileList | null) => {
     if (!files) return;
     const room = MAX_VILLAGE_PHOTOS - photos.length;
-    const added = Array.from(files)
-      .slice(0, room)
-      .map((file) => ({ file, kind: PHOTO_KINDS[0]!.value, preview: URL.createObjectURL(file) }));
+    const all = Array.from(files);
+    const ok = all.filter((f) => f.type.startsWith('image/') && f.size <= MAX_VILLAGE_PHOTO_BYTES);
+    setPhotoError(
+      ok.length < all.length
+        ? L('కొన్ని ఫైళ్లు వదిలేశాం — ఫొటోలు (JPG/PNG/WebP) 15 MB లోపు మాత్రమే.', 'Some files were skipped — photos (JPG/PNG/WebP) under 15 MB only.')
+        : all.length > room
+          ? L(`గరిష్ఠంగా ${MAX_VILLAGE_PHOTOS} ఫొటోలు మాత్రమే.`, `At most ${MAX_VILLAGE_PHOTOS} photos.`)
+          : null,
+    );
+    const added = ok.slice(0, room).map((file) => ({ file, kind: PHOTO_KINDS[0]!.value, preview: URL.createObjectURL(file) }));
     setPhotos((list) => [...list, ...added]);
+  };
+
+  const signInForPhotos = () => {
+    saveDraft(draft);
+    saveStep(3);
+    navigate('/login', { state: { from: location.pathname } });
   };
 
   const pickWriterPhoto = (files: FileList | null) => {
@@ -560,12 +592,10 @@ export default function ShareVillagePage() {
             <div>
               <h2 className={cn(s.head, 'text-headline-xs font-bold text-ink')}>{L('గ్రామ ఫొటోలు జోడించండి', 'Add village photos')}</h2>
               <p className={cn(bodyCls, 'text-muted')}>
-                {canAttachPhotos
-                  ? L(`గరిష్ఠంగా ${MAX_VILLAGE_PHOTOS} ఫొటోలు. ప్రతి ఫొటో దేనిదో ఎంచుకోండి.`, `Up to ${MAX_VILLAGE_PHOTOS} photos. Say what each one shows.`)
-                  : L(
-                      'ఫొటోలు ధృవీకరించిన రచయితలు మాత్రమే అప్‌లోడ్ చేయగలరు. లేదంటే ఈ దశ దాటవేయండి — మా సంపాదకులు మిమ్మల్ని సంప్రదించి ఫొటోలు తీసుకుంటారు.',
-                      'Only verified contributors can upload photos. Otherwise skip this step — an editor will contact you for them.',
-                    )}
+                {L(
+                  `గరిష్ఠంగా ${MAX_VILLAGE_PHOTOS} ఫొటోలు. ప్రతి ఫొటో దేనిదో ఎంచుకోండి. ఫొటోలు లేకపోతే ఈ దశ దాటవేయవచ్చు.`,
+                  `Up to ${MAX_VILLAGE_PHOTOS} photos. Say what each one shows. No photos? You can skip this step.`,
+                )}
               </p>
             </div>
             <ul className="flex flex-wrap gap-2">
@@ -606,29 +636,45 @@ export default function ShareVillagePage() {
                 ))}
               </ul>
             ) : null}
-            {photos.length < MAX_VILLAGE_PHOTOS ? (
-              <label
-                className={cn(
-                  'flex min-h-tap cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-rule p-6 text-center hover:border-wow',
-                  !canAttachPhotos && 'pointer-events-none cursor-not-allowed opacity-60',
-                )}
-              >
+            {!canAttachPhotos ? (
+              <div className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-wow/50 bg-wow-tint p-6 text-center">
                 <Icon icon={ImagePlus} size="lg" className="text-wow-deep" />
+                <p className={cn(bodyCls, 'font-semibold text-ink')}>
+                  {L('ఫొటోలు జోడించడానికి సైన్ ఇన్ చేయండి.', 'Sign in to add photos.')}
+                </p>
+                <p className={cn(bodyCls, 'text-ink-soft')}>
+                  {L('మీరు రాసింది సేవ్ అవుతుంది — సైన్ ఇన్ తర్వాత ఇక్కడికే తిరిగి వస్తారు.', 'What you wrote is kept — you come back right here after signing in.')}
+                </p>
+                <Button variant="wow" icon={LogIn} onClick={signInForPhotos}>
+                  {L('సైన్ ఇన్ చేసి ఫొటోలు జోడించండి', 'Sign in and add photos')}
+                </Button>
+              </div>
+            ) : photos.length < MAX_VILLAGE_PHOTOS ? (
+              <label className="group flex min-h-tap cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-wow/50 bg-wow-tint p-6 text-center transition-colors duration-base hover:border-wow focus-within:border-wow">
+                <span className="flex h-12 w-12 items-center justify-center rounded-pill bg-gradient-to-br from-wow to-wow-deep text-on-wow shadow-card">
+                  <Icon icon={ImagePlus} size="md" />
+                </span>
                 <span className={cn(bodyCls, 'font-semibold text-ink')}>
                   {L('ఫొటోలు ఎంచుకోండి', 'Choose photos')} ({photos.length}/{MAX_VILLAGE_PHOTOS})
                 </span>
+                <span className={cn(s.body, 'text-ui-sm text-muted')}>{L('JPG, PNG, WebP · 15 MB లోపు', 'JPG, PNG, WebP · under 15 MB')}</span>
                 <input
+                  id="village-photos"
                   type="file"
                   multiple
                   accept="image/jpeg,image/png,image/webp"
-                  disabled={!canAttachPhotos}
-                  className={cn(inputClass, 'sr-only')}
+                  className="sr-only"
                   onChange={(e) => {
                     addPhotos(e.target.files);
                     e.target.value = '';
                   }}
                 />
               </label>
+            ) : null}
+            {photoError ? (
+              <p role="alert" className={cn(s.body, 'text-ui-sm text-breaking')}>
+                {photoError}
+              </p>
             ) : null}
           </>
         ) : null}
@@ -864,7 +910,7 @@ export default function ShareVillagePage() {
         </div>
         {step === STEPS.length - 1 && status !== 'authenticated' ? (
           <p className={cn(bodyCls, 'text-muted')}>
-            {L('మీరు రాసింది సేవ్ అవుతుంది; ఫొటోలు మళ్లీ జోడించాలి.', 'What you wrote is kept; photos need adding again.')}
+            {L('మీరు రాసింది సేవ్ అవుతుంది; సైన్ ఇన్ తర్వాత ఫొటోలు జోడించి పంపవచ్చు.', 'What you wrote is kept; after signing in you can add photos and send.')}
           </p>
         ) : null}
       </Card>

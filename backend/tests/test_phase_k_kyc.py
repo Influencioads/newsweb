@@ -40,7 +40,7 @@ from app.integrations.kyc import get_kyc  # noqa: E402
 from app.integrations.kyc.base import KycDecision  # noqa: E402
 from app.integrations.storage import get_private_storage, get_storage  # noqa: E402
 from app.main import app  # noqa: E402
-from app.models.content import Article  # noqa: E402
+from app.models.content import Article, Category  # noqa: E402
 from app.models.creator import CreatorSubmission  # noqa: E402
 from app.models.enums import (  # noqa: E402
     ArticleStatus,
@@ -551,6 +551,55 @@ class TestSubmissionGates:
         user = make_reader(db, email="sub-kyc@test.local")
         with pytest.raises(ConflictError):
             self._submit(db, user)
+
+
+class TestMyVillagePhotos:
+    """Share Your Village: any signed-in reader may attach village photos to
+    their own My Village story; other sections still need approved KYC."""
+
+    def _submission(self, db: Session, user: User, slug: str | None):
+        category_id = (
+            db.scalar(select(Category.id).where(Category.slug == slug)) if slug else None
+        )
+        submission = submission_service.create_submission(
+            db,
+            user_id=user.id,
+            title_te="మై విలేజ్: పెదపూడి",
+            body_te="మా ఊరి కథ. " * 20,
+            category_id=category_id,
+            district_id=None,
+            accept_guidelines=True,
+        )
+        db.commit()
+        return submission
+
+    def _headers(self, db: Session, user: User) -> dict[str, str]:
+        _s, access, _r, _e = auth_service.create_session(db, user)
+        db.commit()
+        return {"Authorization": f"Bearer {access}"}
+
+    def test_a_reader_without_kyc_can_add_photos_to_a_village_story(
+        self, db: Session, client: TestClient
+    ) -> None:
+        user = make_reader(db, email="village-photos@test.local")
+        submission = self._submission(db, user, "my-village-story")
+        r = client.post(
+            f"/api/v1/users/me/submissions/{submission.id}/media",
+            files={"file": ("village.png", png_bytes(), "image/png")},
+            headers=self._headers(db, user),
+        )
+        assert r.status_code == 201, r.text
+        assert len(r.json()["media_ids"]) == 1
+
+    def test_other_sections_still_need_kyc(self, db: Session, client: TestClient) -> None:
+        user = make_reader(db, email="other-photos@test.local")
+        submission = self._submission(db, user, None)
+        r = client.post(
+            f"/api/v1/users/me/submissions/{submission.id}/media",
+            files={"file": ("photo.png", png_bytes(), "image/png")},
+            headers=self._headers(db, user),
+        )
+        assert r.status_code == 409, r.text
 
 
 # --------------------------------------------------------------------------- #

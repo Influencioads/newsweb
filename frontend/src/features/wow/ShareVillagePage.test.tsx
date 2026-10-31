@@ -8,6 +8,8 @@ vi.mock('@/features/public/api', () => ({
   fetchDistrictMandals: vi.fn(async () => []),
 }));
 
+import { useAuth } from '@/stores/auth';
+
 import ShareVillagePage from './ShareVillagePage';
 
 function renderPage() {
@@ -21,7 +23,10 @@ function renderPage() {
   );
 }
 
-beforeEach(() => sessionStorage.clear());
+beforeEach(() => {
+  sessionStorage.clear();
+  useAuth.setState({ status: 'anonymous', me: null });
+});
 
 describe('Share Your Village', () => {
   it('starts at village details and will not move on without them', () => {
@@ -81,5 +86,39 @@ describe('Share Your Village', () => {
     fireEvent.click(screen.getByRole('button', { name: /ప్రివ్యూ/ }));
     expect(screen.getByText(/దశ 6 \/ 6/)).toBeInTheDocument();
     expect(screen.getByText('రాముడు కొండా')).toBeInTheDocument();
+  });
+
+  const VILLAGE = {
+    village: 'పెదపూడి',
+    state: 'AP',
+    district: 'east-godavari',
+    mandal: 'pedapudi',
+    specialities: ['history'],
+    story: 'మా ఊరి కథ '.repeat(20),
+  };
+
+  it('asks a guest to sign in before adding village photos, and comes back to that step', () => {
+    sessionStorage.setItem('wow.village-draft', JSON.stringify(VILLAGE));
+    renderPage();
+    for (let i = 0; i < 3; i += 1) fireEvent.click(screen.getByRole('button', { name: /తర్వాత/ }));
+    expect(screen.getByText(/దశ 4 \/ 6/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /సైన్ ఇన్ చేసి ఫొటోలు జోడించండి/ }));
+    expect(sessionStorage.getItem('wow.village-step')).toBe('3');
+  });
+
+  it('lets a signed-in reader without verification choose village photos', () => {
+    sessionStorage.setItem('wow.village-draft', JSON.stringify(VILLAGE));
+    sessionStorage.setItem('wow.village-step', '3');
+    useAuth.setState({
+      status: 'authenticated',
+      me: { user: { name_te: 'పాఠకుడు', name_en: 'Reader', avatar_url: null } } as never,
+    });
+    URL.createObjectURL = vi.fn(() => 'blob:village');
+    URL.revokeObjectURL = vi.fn();
+    renderPage();
+    expect(screen.getByText(/దశ 4 \/ 6/)).toBeInTheDocument();
+    const photo = new File(['x'], 'temple.jpg', { type: 'image/jpeg' });
+    fireEvent.change(document.getElementById('village-photos')!, { target: { files: [photo] } });
+    expect(screen.getByText(/ఫొటోలు ఎంచుకోండి/)).toHaveTextContent('(1/5)');
   });
 });

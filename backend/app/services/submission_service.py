@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.db.base import utcnow
-from app.models.content import Article, WorkflowTransition
+from app.models.content import Article, Category, WorkflowTransition
 from app.models.creator import CreatorSubmission
 from app.models.enums import ArticleStatus, SubmissionStatus, WorkflowState
 from app.models.media import ArticleMedia
@@ -41,6 +41,12 @@ BODY_MAX = 20_000
 #: Photographs per submission. A citizen journalist sends the scene, not an
 #: album, and four is what fits a hero plus a gallery strip.
 MAX_MEDIA = 5
+
+# Sections where any signed-in reader may attach photographs to their own
+# submission, KYC or not: a My Village story is a reader's photos of their own
+# village, and asking for identity documents first meant nobody sent any.
+# Everywhere else photographs stay what verification buys.
+OPEN_PHOTO_CATEGORIES = frozenset({"my-village-story"})
 
 
 def plain_text_to_tiptap(text: str) -> dict[str, Any]:
@@ -167,6 +173,14 @@ def check_can_attach(
             details={"media_ids": f"limit {MAX_MEDIA}"},
         )
     return submission
+
+
+def photos_open_to_all(db: Session, submission: CreatorSubmission) -> bool:
+    """True when the submission's section takes photographs from any reader."""
+    if submission.category_id is None:
+        return False
+    slug = db.scalar(select(Category.slug).where(Category.id == submission.category_id))
+    return slug in OPEN_PHOTO_CATEGORIES
 
 
 def attach_media(

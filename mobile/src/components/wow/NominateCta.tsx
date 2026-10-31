@@ -1,7 +1,14 @@
+import { useQuery } from '@tanstack/react-query';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { ActivityIndicator, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useId } from 'react';
+import { ActivityIndicator, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
+import { absoluteMediaUrl } from '@/api/client';
+import { fetchHeroes } from '@/components/wow/FeaturedHeroes';
 import { useI18n } from '@/lib/i18n';
+import { useSiteContent } from '@/lib/siteContent';
 import { radius, shadow, space, TAP_LG } from '@/lib/theme';
 import { makeStyles, useColors } from '@/lib/useTheme';
 import { Icon, type IconName } from '@/ui/Icon';
@@ -15,14 +22,29 @@ import { T } from '@/ui/Text';
  *
  * The headline stays Telugu in both languages, as it does on the website.
  * `compact` is the tighter version for rails and side slots.
+ *
+ * Behind it, as on the website: the picture uploaded in CMS → Site content →
+ * Nominate form, else the newest Local Hero story's photo, under an orange-to-
+ * deep-blue wash so the white type reads on any photo.
  */
 export function NominateCta({ compact = false }: { compact?: boolean }) {
   const styles = useStyles();
   const color = useColors();
   const { pick } = useI18n();
+  const uploaded = useSiteContent().nominate.image_url;
+  const heroes = useQuery({ queryKey: ['wow', 'featured-heroes'], queryFn: fetchHeroes, staleTime: 120_000 });
+  const storyPhoto = heroes.data?.articles.find((a) => a.hero?.url)?.hero?.url ?? null;
+  const photo = absoluteMediaUrl(uploaded || storyPhoto);
+  const onPhoto = photo ? 'onOverlay' : undefined;
 
   return (
-    <View style={[styles.card, compact ? styles.compact : styles.roomy]}>
+    <View style={[styles.card, photo ? styles.onPhoto : null, compact ? styles.compact : styles.roomy]}>
+      {photo ? (
+        <>
+          <Image source={{ uri: photo }} style={StyleSheet.absoluteFill} contentFit="cover" accessible={false} />
+          <Wash />
+        </>
+      ) : null}
       <View style={styles.copy}>
         <View style={styles.pill}>
           <Icon name="heartHandshake" size={16} color={color.onWow} />
@@ -34,11 +56,12 @@ export function NominateCta({ compact = false }: { compact?: boolean }) {
           variant={compact ? 'headlineMd' : 'headlineLg'}
           weight="bold"
           lang="te"
+          color={onPhoto}
           accessibilityRole="header"
         >
           మీ ఊరి హీరోను ప్రపంచానికి పరిచయం చేయండి!
         </T>
-        <T variant="bodySmall" color="inkSoft" numberOfLines={compact ? 3 : undefined}>
+        <T variant="bodySmall" color={onPhoto ?? 'inkSoft'} numberOfLines={compact ? 3 : undefined}>
           {pick(
             'ఉపాధ్యాయులు, రైతులు, ఆవిష్కర్తలు, సామాజిక సేవకులు, విద్యార్థులు, గ్రామ వాలంటీర్లు — మార్పు తెస్తున్న వారి గురించి మాకు చెప్పండి.',
             'Teachers, farmers, innovators, social workers, students, village volunteers — tell us about the people making a difference.',
@@ -52,6 +75,29 @@ export function NominateCta({ compact = false }: { compact?: boolean }) {
         onPress={() => router.push('/nominate')}
         style={styles.button}
       />
+    </View>
+  );
+}
+
+/**
+ * The website's photo wash: a colour at the top (WOW orange by default) fading
+ * into the deep WOW blue, so white type reads on any photo.
+ */
+export function Wash({ top = 'wow', strength = 0.55, middle = 0.75 }: { top?: 'wow' | 'success'; strength?: number; middle?: number }) {
+  const color = useColors();
+  const id = `wash${useId().replace(/:/g, '')}`;
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill} aria-hidden>
+      <Svg width="100%" height="100%">
+        <Defs>
+          <LinearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={color[top]} stopOpacity={strength} />
+            <Stop offset="0.5" stopColor={color.brandDeep} stopOpacity={middle} />
+            <Stop offset="1" stopColor={color.brandDeep} stopOpacity={1} />
+          </LinearGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} />
+      </Svg>
     </View>
   );
 }
@@ -120,6 +166,7 @@ const useStyles = makeStyles((color) => ({
     backgroundColor: color.wowTint,
     ...shadow('raised', color),
   },
+  onPhoto: { overflow: 'hidden', minHeight: 320, justifyContent: 'flex-end', backgroundColor: color.brandDeep },
   roomy: { padding: space.xl },
   compact: { padding: space.lg },
   copy: { gap: space.sm },

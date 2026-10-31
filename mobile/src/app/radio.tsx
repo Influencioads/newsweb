@@ -7,6 +7,7 @@ import { useI18n } from '@/lib/i18n';
 import { useMotion } from '@/lib/motion';
 import { radius, space } from '@/lib/theme';
 import { makeStyles } from '@/lib/useTheme';
+import { useRadioArt } from '@/lib/siteContent';
 import { Screen } from '@/ui/Screen';
 import { ScreenHeader } from '@/ui/ScreenHeader';
 
@@ -15,20 +16,20 @@ import { ScreenHeader } from '@/ui/ScreenHeader';
  * the station's artwork over the full player — four segments, the device's
  * Telugu voice and the whole running order of the chosen segment.
  */
-const ART = require('../../assets/images/wow-radio.webp');
 
 export default function RadioScreen() {
   const styles = useStyles();
   const m = useMotion();
   const { pick } = useI18n();
   const title = pick('వావ్ రేడియో', 'WOW Radio');
+  const art = useRadioArt();
 
   return (
     <Screen edges={['top']} scroll bottomInset contentContainerStyle={styles.content}>
       <Stack.Screen options={{ headerShown: false, title }} />
       <ScreenHeader title={title} />
       <Image
-        source={ART}
+        source={art}
         style={styles.art}
         contentFit="cover"
         transition={m.imageTransition}

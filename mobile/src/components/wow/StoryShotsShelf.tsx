@@ -1,7 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useCallback, useId, useRef, useState, type ComponentRef } from 'react';
+import { useCallback, useId, useMemo, useRef, useState, type ComponentRef } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -13,9 +12,9 @@ import {
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { absoluteMediaUrl } from '@/api/client';
-import * as publicApi from '@/api/public';
-import type { ArticleCard } from '@/api/types';
+import type { StoryShotItem } from '@/api/types';
 import { useI18n } from '@/lib/i18n';
+import { useSiteConfig } from '@/lib/siteContent';
 import { useMotion } from '@/lib/motion';
 import { radius, space, TAP } from '@/lib/theme';
 import { makeStyles, useColors } from '@/lib/useTheme';
@@ -31,24 +30,37 @@ import { T } from '@/ui/Text';
  * One shot at a time in a vertical window: swipe up for the next shot, down
  * for the previous one (it snaps a whole shot per swipe, like the full-screen
  * deck). The arrows beside it do the same for readers who can't swipe. A tap
- * opens the full-screen deck (`app/story-shots.tsx`) at that shot. The source
- * is the same as the website's: the newest stories that carry a hero photo.
- * The short-news feed is deliberately not used — its items are picture-only
- * cards, with no headline or standfirst for a shot to show.
+ * opens the full-screen deck (`app/story-shots.tsx`) at that shot. As on the
+ * website, the pictures are only the ones uploaded in CMS → Story Shots, in the
+ * desk's order — never article photos; with none uploaded the shelf is hidden.
  */
 
-export const STORY_SHOTS_LIMIT = 12;
+/** One uploaded picture, ready for the shelf and the deck. */
+export interface StoryShot {
+  key: string;
+  uri: string | null;
+  title_te: string;
+  title_en: string;
+  /** "Read story": a page on the website or an https address; '' for none. */
+  link: string;
+}
 
-/** The shots, shared by the shelf and the deck (one query key, one request). */
+function fromUpload(shot: StoryShotItem): StoryShot {
+  return {
+    key: shot.id,
+    uri: absoluteMediaUrl(shot.image_url),
+    title_te: shot.title_te,
+    title_en: shot.title_en,
+    link: shot.link,
+  };
+}
+
+/** The shots, shared by the shelf and the deck (from the site config). */
 export function useStoryShots() {
-  return useQuery({
-    queryKey: ['public', 'story-shots'],
-    queryFn: async () => {
-      const latest = (await publicApi.fetchFeed({ limit: STORY_SHOTS_LIMIT * 2 })).articles;
-      return latest.filter((a) => a.hero?.url).slice(0, STORY_SHOTS_LIMIT);
-    },
-    staleTime: 60_000,
-  });
+  const config = useSiteConfig();
+  const uploaded = config.data?.content?.story_shots?.shots;
+  const data = useMemo(() => (uploaded ?? []).map(fromUpload), [uploaded]);
+  return { data, isLoading: config.isLoading, isError: config.isError, error: config.error, refetch: config.refetch };
 }
 
 /** Open the deck, optionally at one shot. */
@@ -85,12 +97,12 @@ function windowHeight(width: number) {
 }
 
 function ShelfCard({
-  article,
+  shot,
   n,
   count,
   height,
 }: {
-  article: ArticleCard;
+  shot: StoryShot;
   n: number;
   count: number;
   height: number;
@@ -99,27 +111,25 @@ function ShelfCard({
   const color = useColors();
   const m = useMotion();
   const { pick } = useI18n();
-  const uri = absoluteMediaUrl(article.hero?.url ?? null);
-  const title = pick(article.title_te, article.title_en);
-  const category = article.category ? pick(article.category.name_te, article.category.name_en) : null;
+  const title = pick(shot.title_te, shot.title_en);
+  const name = pick('స్టోరీ షాట్స్', 'Story Shots');
 
   return (
     <PressableScale
-      onPress={() => openStoryShots(article.short_id)}
+      onPress={() => openStoryShots(shot.key)}
       haptic="select"
       accessibilityRole="link"
-      accessibilityLabel={[category, title].filter(Boolean).join(', ')}
+      accessibilityLabel={title || `${name} ${n}`}
       style={[styles.card, { height }]}
     >
-      {uri ? (
+      {shot.uri ? (
         <Image
-          source={{ uri }}
+          source={{ uri: shot.uri }}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
-          placeholder={article.hero?.blurhash ? { blurhash: article.hero.blurhash } : undefined}
           transition={m.imageTransition}
-          recyclingKey={article.short_id}
-          accessibilityLabel={article.hero?.alt_te ?? ''}
+          recyclingKey={shot.key}
+          accessible={false}
         />
       ) : null}
       <View style={styles.topBand}>
@@ -131,15 +141,12 @@ function ShelfCard({
         </View>
       </View>
       <View style={styles.caption}>
-        <StoryScrim />
-        {category ? (
-          <T variant="meta" weight="bold" color="wow" numberOfLines={1}>
-            {category}
+        <StoryScrim strength={title ? 0.85 : 0.5} />
+        {title ? (
+          <T variant="headlineMd" weight="bold" color="onOverlay" numberOfLines={4}>
+            {title}
           </T>
         ) : null}
-        <T variant="headlineMd" weight="bold" color="onOverlay" numberOfLines={4}>
-          {title}
-        </T>
         {n < count ? (
           <View style={styles.hint} importantForAccessibility="no-hide-descendants">
             <Icon name="chevronUp" size={16} color={color.mutedLight} />
@@ -159,7 +166,7 @@ export function StoryShotsShelf() {
   const color = useColors();
   const { pick, t } = useI18n();
   const shots = useStoryShots();
-  const items = shots.data ?? [];
+  const items = shots.data;
   const { width: screen } = useWindowDimensions();
   const height = windowHeight(screen - space.lg * 2);
   const scroller = useRef<ComponentRef<typeof ScrollView>>(null);
@@ -219,8 +226,8 @@ export function StoryShotsShelf() {
           onScroll={onScroll}
           scrollEventThrottle={32}
         >
-          {items.map((article, i) => (
-            <ShelfCard key={article.short_id} article={article} n={i + 1} count={count} height={height} />
+          {items.map((shot, i) => (
+            <ShelfCard key={shot.key} shot={shot} n={i + 1} count={count} height={height} />
           ))}
         </ScrollView>
         <View pointerEvents="box-none" style={styles.arrows}>

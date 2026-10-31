@@ -9,7 +9,7 @@ import { ExploreWowGrid } from '@/components/wow/ExploreWowGrid';
 import { useI18n } from '@/lib/i18n';
 import { radius, space, TAP } from '@/lib/theme';
 import { makeStyles } from '@/lib/useTheme';
-import { WOW_FEATURES } from '@/lib/wow';
+import { useWowFeatures } from '@/lib/siteContent';
 import { Chip } from '@/ui/Chip';
 import { Screen } from '@/ui/Screen';
 import { ScreenHeader } from '@/ui/ScreenHeader';
@@ -21,7 +21,6 @@ import { T } from '@/ui/Text';
  * page, frontend/src/features/wow/ExploreWow.tsx), main six first, then every
  * other section the site config lists, each opening its section screen.
  */
-const WOW_SLUGS = new Set(WOW_FEATURES.map((f) => f.slug));
 const SKELETON_CHIPS = 6;
 
 export default function ExploreScreen() {
@@ -30,7 +29,8 @@ export default function ExploreScreen() {
   const title = pick('అన్ని కేటగిరీలు', 'All categories');
 
   const config = useQuery({ queryKey: ['config'], queryFn: publicApi.fetchSiteConfig, staleTime: 300_000 });
-  const others = (config.data?.categories ?? []).filter((c) => !WOW_SLUGS.has(c.slug));
+  const wowSlugs = new Set(useWowFeatures().all.map((f) => f.slug));
+  const others = (config.data?.categories ?? []).filter((c) => !wowSlugs.has(c.slug));
 
   return (
     <Screen

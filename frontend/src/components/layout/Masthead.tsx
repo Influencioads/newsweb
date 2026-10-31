@@ -153,7 +153,7 @@ export function Masthead() {
             <span
               className={cn(
                 s.body,
-                'inline-flex items-center gap-0.5 rounded-xl bg-gradient-to-br from-wow to-wow-deep px-1.5 py-0.5 text-meta font-bold text-on-wow shadow-card',
+                'inline-flex items-center gap-0.5 rounded-xl bg-gradient-to-br from-wow to-wow-deep px-1.5 py-0.5 text-eyebrow font-bold tracking-normal text-on-wow shadow-card',
               )}
             >
               <Icon icon={Award} size="xs" className="shrink-0" />

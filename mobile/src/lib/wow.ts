@@ -85,7 +85,8 @@ export const HERO_CATEGORIES: readonly { value: string; te: string; en: string }
   { value: 'innovation', te: 'ఆవిష్కరణ', en: 'Innovation' },
   { value: 'agriculture', te: 'వ్యవసాయం', en: 'Agriculture' },
   { value: 'environment', te: 'పర్యావరణం', en: 'Environment' },
-  { value: 'youth', te: 'యువ విజయం', en: 'Youth Achievement' },
+  { value: 'sports', te: 'క్రీడలు', en: 'Sports' },
+  { value: 'youth', te: 'యువత', en: 'Youth' },
   { value: 'other', te: 'ఇతరాలు', en: 'Other' },
 ];
 

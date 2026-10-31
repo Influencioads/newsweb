@@ -75,7 +75,7 @@ export const DEFAULT_CONTENT: SiteContent = {
       { value: 'agriculture', te: 'వ్యవసాయం', en: 'Agriculture' },
       { value: 'environment', te: 'పర్యావరణం', en: 'Environment' },
       { value: 'sports', te: 'క్రీడలు', en: 'Sports' },
-      { value: 'youth', te: 'యువ విజయం', en: 'Youth Achievement' },
+      { value: 'youth', te: 'యువత', en: 'Youth' },
       { value: 'other', te: 'ఇతరాలు', en: 'Other' },
     ],
   },

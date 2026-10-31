@@ -242,7 +242,7 @@ def _default_hero_categories() -> list[HeroCategory]:
         ("agriculture", "వ్యవసాయం", "Agriculture"),
         ("environment", "పర్యావరణం", "Environment"),
         ("sports", "క్రీడలు", "Sports"),
-        ("youth", "యువ విజయం", "Youth Achievement"),
+        ("youth", "యువత", "Youth"),
         ("other", "ఇతరాలు", "Other"),
     )
     return [HeroCategory(value=v, te=te, en=en) for v, te, en in rows]

@@ -330,7 +330,7 @@ export default function NominatePage() {
                 </Field>
 
                 <Field
-                  label={L('హీరో ఫోటో', 'Hero photo')}
+                  label={L('లోకల్ హీరో ఫోటో', 'Local Hero photo')}
                   hint={
                     canAttachPhoto
                       ? L('JPG / PNG / WebP, హీరో అనుమతితో మాత్రమే.', 'JPG / PNG / WebP, only with the hero’s permission.')

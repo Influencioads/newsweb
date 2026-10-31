@@ -79,8 +79,11 @@ export function NominateCta({ compact = false }: { compact?: boolean }) {
   );
 }
 
-/** The website's wash: orange at the top fading into the deep WOW blue. */
-function Wash() {
+/**
+ * The website's photo wash: a colour at the top (WOW orange by default) fading
+ * into the deep WOW blue, so white type reads on any photo.
+ */
+export function Wash({ top = 'wow', strength = 0.55, middle = 0.75 }: { top?: 'wow' | 'success'; strength?: number; middle?: number }) {
   const color = useColors();
   const id = `wash${useId().replace(/:/g, '')}`;
   return (
@@ -88,8 +91,8 @@ function Wash() {
       <Svg width="100%" height="100%">
         <Defs>
           <LinearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={color.wow} stopOpacity={0.55} />
-            <Stop offset="0.5" stopColor={color.brandDeep} stopOpacity={0.75} />
+            <Stop offset="0" stopColor={color[top]} stopOpacity={strength} />
+            <Stop offset="0.5" stopColor={color.brandDeep} stopOpacity={middle} />
             <Stop offset="1" stopColor={color.brandDeep} stopOpacity={1} />
           </LinearGradient>
         </Defs>

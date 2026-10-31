@@ -16,6 +16,7 @@ import { LocationSheet, usePlaceName } from '@/components/LocationSheet';
 import { ExploreWowGrid } from '@/components/wow/ExploreWowGrid';
 import { FeaturedHeroes } from '@/components/wow/FeaturedHeroes';
 import { HERO_SLIDES, HeroBanner } from '@/components/wow/HeroBanner';
+import { MyVillageBlock } from '@/components/wow/MyVillageBlock';
 import { NominateCta } from '@/components/wow/NominateCta';
 import { StoryShotsShelf } from '@/components/wow/StoryShotsShelf';
 import { WowRadioCard } from '@/components/wow/WowRadioCard';
@@ -35,7 +36,8 @@ import { T } from '@/ui/Text';
 /**
  * Home — the WOW Indian layout, in the website's order (frontend
  * src/pages/public/Home.tsx): the top-story banner, WOW Radio and the Nominate
- * call straight under it, Explore WOW, the Story Shots shelf, then Our Heroes.
+ * call straight under it, My Village, Explore WOW, the Story Shots shelf, then
+ * Our Heroes.
  * One `/public/home` request feeds the banner; the WOW blocks fetch their own
  * stories. Flattened into a single FlatList so the
  * masthead collapses against one scroll offset.
@@ -46,7 +48,7 @@ import { T } from '@/ui/Text';
  */
 type Row =
   | { key: string; type: 'hero'; articles: ArticleCard[] }
-  | { key: string; type: 'radio' | 'nominate' | 'explore' | 'shots' | 'heroes' | 'empty' | 'loading' | 'pickedEmpty' }
+  | { key: string; type: 'radio' | 'nominate' | 'village' | 'explore' | 'shots' | 'heroes' | 'empty' | 'loading' | 'pickedEmpty' }
   | { key: string; type: 'section'; title: string }
   | { key: string; type: 'compact'; article: ArticleCard };
 
@@ -72,6 +74,7 @@ function flatten(home: HomePayload): Row[] {
   const hero = heroStories(home);
   if (hero.length) rows.push({ key: 'hero', type: 'hero', articles: hero });
   rows.push({ key: 'radio', type: 'radio' }, { key: 'nominate', type: 'nominate' });
+  rows.push({ key: 'village', type: 'village' });
   rows.push({ key: 'explore', type: 'explore' }, { key: 'shots', type: 'shots' });
   rows.push({ key: 'heroes', type: 'heroes' });
   if (!home.lead) rows.push({ key: 'empty', type: 'empty' });
@@ -161,6 +164,8 @@ export default function HomeScreen() {
         return <View style={styles.block}><WowRadioCard variant="card" /></View>;
       case 'nominate':
         return <View style={styles.block}><NominateCta /></View>;
+      case 'village':
+        return <View style={styles.block}><MyVillageBlock /></View>;
       case 'explore':
         return <ExploreWowGrid show="main" />;
       case 'shots':

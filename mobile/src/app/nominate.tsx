@@ -7,9 +7,10 @@ import { api } from '@/api/client';
 import * as publicApi from '@/api/public';
 import { ErrorState } from '@/components/Feedback';
 import { SignInSheet } from '@/components/SignInSheet';
+import { ConsentCheckbox } from '@/components/wow/ConsentCheckbox';
 import { WowButton } from '@/components/wow/NominateCta';
 import { useI18n } from '@/lib/i18n';
-import { radius, space, TAP } from '@/lib/theme';
+import { radius, space } from '@/lib/theme';
 import { makeStyles, useColors } from '@/lib/useTheme';
 import { useSiteContent } from '@/lib/siteContent';
 import { LOCAL_HERO_SLUG } from '@/lib/wow';
@@ -19,7 +20,6 @@ import { Card } from '@/ui/Card';
 import { Chip, ChipRail } from '@/ui/Chip';
 import { Icon, type IconName } from '@/ui/Icon';
 import { Field, Input } from '@/ui/Input';
-import { PressableScale } from '@/ui/PressableScale';
 import { Screen } from '@/ui/Screen';
 import { T } from '@/ui/Text';
 import { useToast } from '@/ui/Toast';
@@ -473,45 +473,6 @@ export default function NominateScreen() {
 }
 
 /** The website's `Checkbox`: a WOW-filled box with a check, the whole row tappable. */
-function ConsentCheckbox({
-  checked,
-  onChange,
-  label,
-  invalid,
-}: {
-  checked: boolean;
-  onChange: (next: boolean) => void;
-  label: string;
-  invalid: boolean;
-}) {
-  const styles = useStyles();
-  const color = useColors();
-  return (
-    <PressableScale
-      onPress={() => onChange(!checked)}
-      haptic="select"
-      scaleTo={0.99}
-      minHeight={TAP}
-      accessibilityRole="checkbox"
-      accessibilityLabel={label}
-      accessibilityState={{ checked }}
-      style={styles.check}
-    >
-      <View
-        style={[
-          styles.box,
-          checked ? styles.boxOn : invalid ? { borderColor: color.breaking } : null,
-        ]}
-      >
-        {checked ? <Icon name="check" size={16} color={color.onWow} strokeWidth={2.5} /> : null}
-      </View>
-      <T variant="bodySmall" color="ink" style={styles.rowText}>
-        {label}
-      </T>
-    </PressableScale>
-  );
-}
-
 const useStyles = makeStyles((color) => ({
   body: { padding: space.lg, paddingBottom: space.xxl, gap: space.lg },
   intro: { gap: space.sm },
@@ -522,19 +483,6 @@ const useStyles = makeStyles((color) => ({
   bleed: { marginHorizontal: -space.xl },
   railPad: { paddingHorizontal: space.xl },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  check: { flexDirection: 'row', alignItems: 'flex-start', gap: space.md },
-  box: {
-    width: 24,
-    height: 24,
-    marginTop: space.xs,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.sm - 2,
-    borderWidth: 2,
-    borderColor: color.ruleStrong,
-    backgroundColor: color.field,
-  },
-  boxOn: { backgroundColor: color.wowDeep, borderColor: color.wowDeep },
   send: { gap: space.sm, marginTop: space.xs },
   success: { borderColor: color.success, borderWidth: 1 },
   successDisc: {

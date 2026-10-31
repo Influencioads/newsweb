@@ -88,11 +88,12 @@ export function NominateCta({ compact = false }: { compact?: boolean }) {
       <div aria-hidden className="pointer-events-none absolute -bottom-10 -right-6 -z-10 text-on-ink/10">
         <Award size={compact ? 140 : 180} strokeWidth={1.25} />
       </div>
+      {/* The pill sits at the top of the card (mb-auto takes the free space); the copy and button stay at the bottom. */}
+      <span className={cn(s.body, 'mb-auto inline-flex items-center gap-1.5 self-start rounded-pill bg-gradient-to-br from-wow to-wow-deep px-3 py-1 text-meta font-bold text-on-wow')}>
+        <Icon icon={HeartHandshake} size="xs" />
+        {te ? 'మీ లోకల్ హీరోని నామినేట్ చేయండి' : 'Nominate Your Local Hero'}
+      </span>
       <div className="space-y-2">
-        <span className={cn(s.body, 'mb-3 inline-flex items-center gap-1.5 rounded-pill bg-gradient-to-br from-wow to-wow-deep px-3 py-1 text-meta font-bold text-on-wow md:mb-0')}>
-          <Icon icon={HeartHandshake} size="xs" />
-          {te ? 'మీ లోకల్ హీరోని నామినేట్ చేయండి' : 'Nominate Your Local Hero'}
-        </span>
         <h2 id="nominate-cta" lang="te" className="th text-headline-md font-bold text-on-ink md:text-headline-lg">
           మీ లోకల్ హీరోను ప్రపంచానికి పరిచయం చేయండి!
         </h2>

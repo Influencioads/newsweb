@@ -39,7 +39,8 @@ function Column({
   className,
   listClassName,
 }: {
-  title: string;
+  /** Blank: no heading. From md a same-height spacer keeps the links level with the other columns. */
+  title?: string;
   children: ReactNode;
   className?: string;
   listClassName?: string;
@@ -47,7 +48,13 @@ function Column({
   const s = useScript();
   return (
     <div className={cn('min-w-0', className)}>
-      <h2 className={cn(s.head, 'mb-2 text-headline-xs font-bold text-on-ink')}>{title}</h2>
+      {title ? (
+        <h2 className={cn(s.head, 'mb-2 text-headline-xs font-bold text-on-ink')}>{title}</h2>
+      ) : (
+        <span aria-hidden className={cn(s.head, 'mb-2 hidden text-headline-xs font-bold md:block')}>
+          &nbsp;
+        </span>
+      )}
       <ul className={listClassName}>{children}</ul>
     </div>
   );
@@ -111,7 +118,8 @@ export function PolicyFooter() {
                 </li>
               ))}
             </Column>
-            <Column title={t('ui.aboutUs')}>
+            {/* The About / Contact / policy links, without a "Company" heading. */}
+            <Column className="-mt-6 md:mt-0">
               {FOOTER_LINKS.slice(0, ABOUT_LINK_COUNT).map(([to, key]) => (
                 <li key={to}>
                   <Link to={to} className={cn(s.body, LINK)}>

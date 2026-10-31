@@ -149,7 +149,7 @@ export const PAGES: Record<string, PolicyEntry> = {
         {
           id: 'timelines',
           heading: 'పరిష్కార గడువు',
-          body: ['IT Rules 2021 ప్రకారం ఫిర్యాదులను 24 గంటల్లో స్వీకరించి, 15 రోజుల్లో పరిష్కరిస్తాం.'],
+          body: ['IT Rules 2021 ప్రకారం ఫిర్యాదులను 24 గంటల్లో స్వీకరించి, 30 రోజుల్లో పరిష్కరిస్తాం.'],
         },
         {
           id: 'officer',
@@ -164,7 +164,7 @@ export const PAGES: Record<string, PolicyEntry> = {
         {
           id: 'timelines',
           heading: 'Response times',
-          body: ['Under IT Rules 2021 we acknowledge complaints within 24 hours and resolve them within 15 days.'],
+          body: ['Under IT Rules 2021 we acknowledge complaints within 24 hours and resolve them within 30 days.'],
         },
         {
           id: 'officer',
@@ -254,7 +254,7 @@ export const PAGES: Record<string, PolicyEntry> = {
           heading: 'తొలగింపు గడువు',
           body: [
             'ముందుగా సమీక్షించని కథనంపై ఫిర్యాదు వస్తే 24 గంటల్లోపు ఒక ఎడిటర్ దాన్ని పరిశీలిస్తారు.',
-            'చట్టవిరుద్ధమని తేలిన విషయాన్ని 36 గంటల్లోపు తొలగిస్తాం — IT Rules 2021 నిర్దేశించిన గడువు ఇదే. ఫిర్యాదును 24 గంటల్లో స్వీకరిస్తాం, 15 రోజుల్లో పరిష్కరిస్తాం.',
+            'చట్టవిరుద్ధమని తేలిన విషయాన్ని 36 గంటల్లోపు తొలగిస్తాం — IT Rules 2021 నిర్దేశించిన గడువు ఇదే. ఫిర్యాదును 24 గంటల్లో స్వీకరిస్తాం, 30 రోజుల్లో పరిష్కరిస్తాం.',
           ],
         },
         {
@@ -298,7 +298,7 @@ export const PAGES: Record<string, PolicyEntry> = {
           heading: 'Takedown times',
           body: [
             'A report against a story that was not pre-reviewed is looked at by an editor within 24 hours.',
-            'Content found unlawful is taken down within 36 hours — the deadline IT Rules 2021 sets. We acknowledge every complaint within 24 hours and resolve it within 15 days.',
+            'Content found unlawful is taken down within 36 hours — the deadline IT Rules 2021 sets. We acknowledge every complaint within 24 hours and resolve it within 30 days.',
           ],
         },
         {

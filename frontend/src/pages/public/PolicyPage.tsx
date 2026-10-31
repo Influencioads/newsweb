@@ -137,8 +137,8 @@ export default function PolicyPage() {
             className={cn(s.body, 'mt-2 text-muted', telugu ? 'text-te-body-xs' : 'text-ui')}
           >
             {L(
-              'IT Rules 2021 ప్రకారం మీ ఫిర్యాదును 24 గంటల్లో స్వీకరించి, 15 రోజుల్లో పరిష్కరిస్తాం.',
-              'Under IT Rules 2021 we acknowledge your complaint within 24 hours and resolve it within 15 days.',
+              'IT Rules 2021 ప్రకారం మీ ఫిర్యాదును 24 గంటల్లో స్వీకరించి, 30 రోజుల్లో పరిష్కరిస్తాం.',
+              'Under IT Rules 2021 we acknowledge your complaint within 24 hours and resolve it within 30 days.',
             )}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">

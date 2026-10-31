@@ -692,6 +692,54 @@ function NominateCard({ payload, canManage }: { payload: cmsApi.SiteContentPaylo
   );
 }
 
+/** The names the article editor offers as a story's byline. */
+function AuthorsCard({ payload, canManage }: { payload: cmsApi.SiteContentPayload; canManage: boolean }) {
+  const L = useL();
+  const state = useBlock('authors', payload, (d) => ({ names: d.names.map((n) => n.trim()).filter(Boolean) }));
+  const { draft, setDraft } = state;
+  const names = draft.names;
+  const setNames = (next: string[]) => setDraft({ names: next });
+  return (
+    <Section
+      title={L('రచయితలు', 'Authors')}
+      subtitle={L(
+        'కథనం ఎడిటర్‌లో "బైలైన్" జాబితాలో కనిపించే పేర్లు. పాఠకులకు కథనంపై ఈ పేరు కనిపిస్తుంది.',
+        'The names offered as a story’s byline in the article editor. Readers see this name on the story.',
+      )}
+    >
+      <ol className="space-y-2">
+        {names.map((name, i) => (
+          <li key={i} className="flex flex-wrap items-end gap-3 sm:flex-nowrap">
+            <Field label={`${i + 1}. ${L('పేరు', 'Name')}`} className="min-w-0 flex-1">
+              <Input
+                script="te"
+                value={name}
+                maxLength={120}
+                disabled={!canManage}
+                onChange={(e) => setNames(names.map((n, j) => (j === i ? e.target.value : n)))}
+              />
+            </Field>
+            {canManage ? (
+              <RowActions
+                index={i}
+                count={names.length}
+                onMove={(d) => setNames(moveItem(names, i, d))}
+                onRemove={() => setNames(names.filter((_, j) => j !== i))}
+              />
+            ) : null}
+          </li>
+        ))}
+      </ol>
+      {canManage && names.length < 50 ? (
+        <Button icon={Plus} variant="secondary" size="sm" onClick={() => setNames([...names, ''])}>
+          {L('పేరు జోడించండి', 'Add a name')}
+        </Button>
+      ) : null}
+      <BlockActions state={state} canManage={canManage} />
+    </Section>
+  );
+}
+
 function ContactCard({ payload, canManage }: { payload: cmsApi.SiteContentPayload; canManage: boolean }) {
   const L = useL();
   const state = useBlock('contact', payload);
@@ -744,6 +792,7 @@ export function SiteContentPage() {
             <RadioCard payload={payload} canManage={canManage} />
             <StoryShotsCard payload={payload} canManage={canManage} />
             <NominateCard payload={payload} canManage={canManage} />
+            <AuthorsCard payload={payload} canManage={canManage} />
             <ContactCard payload={payload} canManage={canManage} />
           </div>
         )}

@@ -15,6 +15,7 @@ import { ErrorState, QueryState, Skeleton } from '@/components/ui/State';
 import { useToast } from '@/components/ui/Toast';
 import * as cmsApi from '@/features/cms/api';
 import { useI18n } from '@/i18n';
+import { useSiteContent } from '@/features/wow/siteContent';
 import { useAuth } from '@/stores/auth';
 
 import { AssistPanel } from './editor/AssistPanel';
@@ -72,6 +73,8 @@ export default function ArticleEditor() {
     enabled: editing,
   });
   const options = useQuery({ queryKey: ['cms', 'editor-options'], queryFn: cmsApi.fetchEditorOptions });
+  // The bylines the desk set in CMS → Site content → Authors.
+  const authorNames = useSiteContent().authors.names;
 
   const [form, setForm] = useState<ArticleForm>(EMPTY_FORM);
   const [baseline, setBaseline] = useState<ArticleForm>(EMPTY_FORM);
@@ -240,8 +243,22 @@ export default function ArticleEditor() {
 
           <Section title={L('రచయిత & మూలం', 'Byline and source')}>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label={L('బైలైన్', 'Byline')} optionalLabel error={errors('byline_te')}>
-                <Input script="te" value={form.byline} onChange={(e) => set({ byline: e.target.value })} placeholder={L('మా ప్రతినిధి', 'Our correspondent')} />
+              <Field
+                label={L('బైలైన్', 'Byline')}
+                optionalLabel
+                error={errors('byline_te')}
+                hint={L('పేర్లు: CMS → సైట్ కంటెంట్ → రచయితలు', 'Names: CMS → Site content → Authors')}
+              >
+                <Select value={form.byline} onChange={(e) => set({ byline: e.target.value })}>
+                  <option value="">{L('— బైలైన్ లేదు —', '— No byline —')}</option>
+                  {/* A story saved with another byline (a reader's name, an older one) keeps it. */}
+                  {form.byline && !authorNames.includes(form.byline) ? <option value={form.byline}>{form.byline}</option> : null}
+                  {authorNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </Select>
               </Field>
               <Field label={L('రచయిత', 'Author')} hint={can('article.approve') ? undefined : L('మార్చడానికి అనుమతి లేదు', 'No permission to change')} error={errors('author_id')}>
                 <Select

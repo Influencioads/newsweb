@@ -159,6 +159,16 @@ class TestBlocks:
             assert r.status_code == 422, bad
         assert client.delete("/api/v1/cms/site-content/story_shots", headers=admin).status_code == 200
 
+    def test_author_names(self, client: TestClient, admin: dict) -> None:
+        names = client.get("/api/v1/public/config").json()["content"]["authors"]["names"]
+        assert names == ["సాయి మాసుల", "అజయ్ మారుతి", "ch.రాకేష్"]
+        r = client.put("/api/v1/cms/site-content/authors", json={"names": [" సాయి మాసుల ", "కొత్త రచయిత"]}, headers=admin)
+        assert r.status_code == 200, r.text
+        assert r.json()["names"] == ["సాయి మాసుల", "కొత్త రచయిత"]
+        for bad in ({"names": []}, {"names": ["  "]}, {"names": ["a", "a"]}):
+            assert client.put("/api/v1/cms/site-content/authors", json=bad, headers=admin).status_code == 422, bad
+        assert client.delete("/api/v1/cms/site-content/authors", headers=admin).status_code == 200
+
     def test_nominate_banner_picture(self, client: TestClient, admin: dict) -> None:
         assert client.get("/api/v1/public/config").json()["content"]["nominate"]["image_url"] == ""
         cats = client.get("/api/v1/public/config").json()["content"]["nominate"]["categories"]

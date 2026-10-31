@@ -271,6 +271,28 @@ class Nominate(_Block):
         return v
 
 
+#: The bylines the desk picks from in the article editor.
+DEFAULT_AUTHORS = ("సాయి మాసుల", "అజయ్ మారుతి", "ch.రాకేష్")
+
+
+class Authors(_Block):
+    """The author names offered as a story's byline in the article editor."""
+
+    names: list[str] = Field(default_factory=lambda: list(DEFAULT_AUTHORS), min_length=1, max_length=50)
+
+    @field_validator("names")
+    @classmethod
+    def _names(cls, v: list[str]) -> list[str]:
+        clean = [n.strip() for n in v if n.strip()]
+        if not clean:
+            raise ValueError("add at least one name")
+        if any(len(n) > 120 for n in clean):
+            raise ValueError("a name may be at most 120 characters")
+        if len(set(clean)) != len(clean):
+            raise ValueError("each name once")
+        return clean
+
+
 class Contact(_Block):
     """Where the "Email the Grievance Officer" button on every policy page goes."""
 
@@ -291,6 +313,7 @@ BLOCKS: dict[str, type[_Block]] = {
     "radio": Radio,
     "story_shots": StoryShots,
     "nominate": Nominate,
+    "authors": Authors,
     "contact": Contact,
 }
 

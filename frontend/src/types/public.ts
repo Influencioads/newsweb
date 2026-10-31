@@ -329,6 +329,8 @@ export interface SiteContent {
   story_shots: { shots: StoryShotItem[] };
   nominate: { image_url: string; categories: { value: string; te: string; en: string }[] };
   contact: { grievance_email: string };
+  /** The bylines offered in the article editor (CMS → Site content → Authors). */
+  authors: { names: string[] };
 }
 
 /** A Story Shots picture uploaded in the CMS; the title and link are optional. */

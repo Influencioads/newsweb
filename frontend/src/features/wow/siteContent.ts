@@ -80,6 +80,7 @@ export const DEFAULT_CONTENT: SiteContent = {
     ],
   },
   contact: { grievance_email: 'grievance@example.com' },
+  authors: { names: ['సాయి మాసుల', 'అజయ్ మారుతి', 'ch.రాకేష్'] },
 };
 
 /** The built-in pictures, used while the CMS field is blank. */
@@ -112,6 +113,7 @@ export function useSiteContent(): SiteContent {
     story_shots: { ...DEFAULT_CONTENT.story_shots, ...content?.story_shots },
     nominate: { ...DEFAULT_CONTENT.nominate, ...content?.nominate },
     contact: { ...DEFAULT_CONTENT.contact, ...content?.contact },
+    authors: { ...DEFAULT_CONTENT.authors, ...content?.authors },
   };
 }
 

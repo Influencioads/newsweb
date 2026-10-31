@@ -55,7 +55,8 @@ export default function Home() {
   const edition = useReaderPrefs((state) => state.edition);
   const mandal = useReaderPrefs((state) => state.mandal);
   const { t } = useI18n();
-  useDocumentTitle(t("page.home"));
+  // The home tab carries the site line ("Wow Indian – …"), not "హోమ్ · …".
+  useDocumentTitle(null);
 
   const home = useQuery({
     queryKey: ["public", "home", edition, mandal],

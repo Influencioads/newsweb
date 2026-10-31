@@ -117,7 +117,7 @@ WOW_CARDS: dict[str, tuple[str, str, str]] = {
     "my-village-story": ("మన ఊళ్ల కథలు.. మనుషులు..", "Stories of our villages.. and their people..", "sprout"),
     "wow-news": ("వావ్ అనిపించే వార్తలు", "News that makes you say WOW", "newspaper"),
     "local-hero": ("పల్లెలు, పట్టణాల్లోని అసాధారణ వ్యక్తులు", "Extraordinary people from villages and towns", "map-pin"),
-    "zero-to-hero": ("జీరో నుండి హీరోగా", "From zero to hero", "trending-up"),
+    "zero-to-hero": ("సవాళ్లను ఎదిరించి అద్భుత విజయాలతో స్ఫూర్తినిచ్చిన భారతీయులు", "Indians who took on challenges and inspire with remarkable success", "trending-up"),
     "wow-idea": ("ఐడియాతో మొదలైన ఆవిష్కరణలు", "Innovations that began with an idea", "lightbulb"),
     "mystery": ("అద్భుతాలు.. రహస్యాలు..", "Wonders.. and secrets..", "telescope"),
     "wow-puranam": ("పురాణాలు.. ఇతిహాసాలు..", "Puranas.. and epics..", "scroll"),

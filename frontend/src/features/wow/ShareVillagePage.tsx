@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, Camera, Check, CheckCircle2, ImagePlus, LogIn, Mail, Pencil, Phone, Send, ShieldCheck, UserRound, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Camera, Check, CheckCircle2, ImagePlus, Mail, Pencil, Phone, Send, ShieldCheck, UserRound, X } from 'lucide-react';
 
 import { LocationPicker } from '@/components/location/LocationPicker';
 import { Button, ButtonLink } from '@/components/ui/Button';
@@ -13,6 +13,8 @@ import { useToast } from '@/components/ui/Toast';
 import * as authApi from '@/features/auth/api';
 import * as creatorApi from '@/features/creator/api';
 import * as publicApi from '@/features/public/api';
+import * as readerApi from '@/features/reader/api';
+import { OtpInput } from '@/features/auth/components/OtpInput';
 import { useI18n, useScript } from '@/i18n';
 import { useAuth } from '@/stores/auth';
 import { cn } from '@/utils/cn';
@@ -95,26 +97,6 @@ function loadDraft(): Draft {
   }
 }
 
-/** The step to come back to after signing in (sessionStorage, read once). */
-const STEP_KEY = 'wow.village-step';
-function takeSavedStep(): number {
-  try {
-    const raw = sessionStorage.getItem(STEP_KEY);
-    sessionStorage.removeItem(STEP_KEY);
-    const n = raw === null ? 0 : Number(raw);
-    return Number.isInteger(n) && n >= 0 && n <= 5 ? n : 0;
-  } catch {
-    return 0;
-  }
-}
-function saveStep(step: number): void {
-  try {
-    sessionStorage.setItem(STEP_KEY, String(step));
-  } catch {
-    /* private mode */
-  }
-}
-
 function saveDraft(draft: Draft | null): void {
   try {
     if (draft) sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
@@ -131,13 +113,15 @@ interface Photo {
 }
 
 const STEPS = [
+  { te: 'రాస్తున్నది ఎవరు', en: 'About you' },
   { te: 'గ్రామ వివరాలు', en: 'Village details' },
   { te: 'ప్రత్యేకతలు', en: 'Specialities' },
   { te: 'మీ ఊరి కథ', en: 'Your story' },
   { te: 'ఫొటోలు', en: 'Photos' },
-  { te: 'మీ వివరాలు', en: 'Your details' },
   { te: 'ప్రివ్యూ', en: 'Preview' },
 ] as const;
+/** Step indices. The writer comes first: who is telling the story, then the village. */
+const STEP = { writer: 0, village: 1, specialities: 2, story: 3, photos: 4, preview: 5 } as const;
 
 export default function ShareVillagePage() {
   const { language } = useI18n();
@@ -147,15 +131,14 @@ export default function ShareVillagePage() {
   const bodyCls = cn(s.body, s.te ? 'text-te-body-xs' : 'text-ui');
   useDocumentTitle(L('మీ ఊరి కథ పంపండి · మై విలేజ్', 'Share Your Village · My Village'));
 
-  const navigate = useNavigate();
-  const location = useLocation();
   const toast = useToast();
   const status = useAuth((auth) => auth.status);
   const me = useAuth((auth) => auth.me);
   const bootstrap = useAuth((auth) => auth.bootstrap);
+  const setMe = useAuth((auth) => auth.setMe);
 
   const [draft, setDraft] = useState<Draft>(loadDraft);
-  const [step, setStep] = useState(takeSavedStep);
+  const [step, setStep] = useState<number>(STEP.writer);
   const [tried, setTried] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>([]);
   // The writer's own photo: becomes their profile picture on submit, shown
@@ -166,7 +149,7 @@ export default function ShareVillagePage() {
   const writerPicture = writerPhoto?.preview ?? savedAvatar;
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((d) => ({ ...d, [key]: value }));
 
-  // Keep the draft while the reader types, so a sign-in round trip loses nothing.
+  // Keep the draft while the reader types, so a reload loses nothing.
   useEffect(() => saveDraft(draft), [draft]);
   // Free the photo previews when they go.
   useEffect(() => () => photos.forEach((p) => URL.revokeObjectURL(p.preview)), [photos]);
@@ -184,11 +167,45 @@ export default function ShareVillagePage() {
     enabled: Boolean(draft.district),
     staleTime: 3_600_000,
   });
-  // Any signed-in reader may add village photos (backend
-  // submission_service.OPEN_PHOTO_CATEGORIES); a guest signs in first so the
-  // photos are not lost on the way to the login page.
-  const canAttachPhotos = status === 'authenticated';
   const [photoError, setPhotoError] = useState<string | null>(null);
+
+  // The writer proves their mobile number with an OTP right here — no separate
+  // sign-in page. A valid code signs them in (registering on first use), which
+  // is what lets the story and its photos be sent (submissions need a verified
+  // phone; My Village photos need only a signed-in reader).
+  const verifiedPhone = status === 'authenticated' && me?.user.phone_verified_at ? (me.user.phone ?? '') : null;
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [devOtp, setDevOtp] = useState<string | null>(null);
+  const requestOtp = useMutation({
+    mutationFn: () => authApi.requestOtp(draft.phone.trim()),
+    onSuccess: (res) => {
+      setOtpSent(true);
+      setOtp('');
+      setDevOtp(res.dev_otp ?? null);
+    },
+    onError: (e) => toast.error(e),
+  });
+  const verifyOtp = useMutation({
+    mutationFn: () => readerApi.verifyReaderOtp(draft.phone.trim(), otp),
+    onSuccess: (res) => {
+      setMe(res.me);
+      setOtpSent(false);
+      setOtp('');
+      toast.success(L('మొబైల్ నంబర్ ధృవీకరించబడింది.', 'Mobile number verified.'));
+    },
+    onError: (e) => {
+      setOtp('');
+      toast.error(e);
+    },
+  });
+  const sendOtp = () => {
+    if (!PHONE.test(draft.phone.trim())) {
+      setTried(true);
+      return;
+    }
+    requestOtp.mutate();
+  };
 
   const place = useMemo(() => {
     const state = config.data?.states.find((x) => x.code === draft.state);
@@ -204,8 +221,18 @@ export default function ShareVillagePage() {
   const typeMandal =
     Boolean(draft.district) && !mandals.isFetching && (mandals.isError || (mandals.isSuccess && mandals.data.length === 0));
 
-  const errorsByStep: Array<Record<string, string | null>> = [
-    {
+  const errorsByStep: Record<number, Record<string, string | null>> = {
+    [STEP.writer]: {
+      name: draft.name.trim().length < 3 ? L('మీ పూర్తి పేరు రాయండి.', 'Enter your full name.') : null,
+      writerPhoto: !writerPicture ? L('మీ ఫొటో జోడించండి.', 'Add your photo.') : null,
+      phone: verifiedPhone
+        ? null
+        : !PHONE.test(draft.phone.trim())
+          ? L('10 అంకెల మొబైల్ నంబర్ ఇవ్వండి.', 'Enter a 10-digit mobile number.')
+          : L('OTP తో మొబైల్ నంబర్ ధృవీకరించండి.', 'Verify your mobile number with the OTP.'),
+      email: draft.email.trim() && !EMAIL.test(draft.email.trim()) ? L('సరైన ఇమెయిల్ ఇవ్వండి.', 'Enter a valid email.') : null,
+    },
+    [STEP.village]: {
       village: draft.village.trim().length < 2 ? L('గ్రామం పేరు రాయండి.', 'Enter the village name.') : null,
       district: !draft.district ? L('రాష్ట్రం, జిల్లా ఎంచుకోండి.', 'Choose the state and district.') : null,
       mandal:
@@ -214,25 +241,19 @@ export default function ShareVillagePage() {
           : null,
       pin: draft.pin.trim() && !PIN.test(draft.pin.trim()) ? L('6 అంకెల పిన్‌కోడ్ ఇవ్వండి.', 'Enter a 6-digit PIN code.') : null,
     },
-    {
+    [STEP.specialities]: {
       specialities: !draft.specialities.length ? L('కనీసం ఒక అంశం ఎంచుకోండి.', 'Choose at least one.') : null,
     },
-    {
+    [STEP.story]: {
       story:
         draft.story.trim().length < MIN_STORY
           ? L(`కనీసం ${MIN_STORY} అక్షరాల్లో రాయండి.`, `Write at least ${MIN_STORY} characters.`)
           : null,
     },
-    {},
-    {
-      name: draft.name.trim().length < 3 ? L('మీ పూర్తి పేరు రాయండి.', 'Enter your full name.') : null,
-      writerPhoto: !writerPicture ? L('మీ ఫొటో జోడించండి.', 'Add your photo.') : null,
-      phone: !PHONE.test(draft.phone.trim()) ? L('10 అంకెల మొబైల్ నంబర్ ఇవ్వండి.', 'Enter a 10-digit mobile number.') : null,
-      email: draft.email.trim() && !EMAIL.test(draft.email.trim()) ? L('సరైన ఇమెయిల్ ఇవ్వండి.', 'Enter a valid email.') : null,
+    [STEP.preview]: {
       consent: !draft.consent ? L('అనుమతి ధృవీకరణ అవసరం.', 'Please confirm.') : null,
     },
-    {},
-  ];
+  };
   const errors = errorsByStep[step] ?? {};
   const stepValid = Object.values(errors).every((e) => e === null);
   const show = (key: string) => (tried ? (errors[key] ?? null) : null);
@@ -269,7 +290,7 @@ export default function ShareVillagePage() {
         '',
         `పంపినవారు: ${draft.name.trim()}`,
         `రచయిత ఫొటో: ${writerPhoto ? 'కొత్తగా జోడించారు (ప్రొఫైల్ ఫొటో)' : savedAvatar ? 'ప్రొఫైల్ ఫొటో' : 'లేదు'}`,
-        `మొబైల్: ${draft.phone.trim()}`,
+        `మొబైల్: ${verifiedPhone || draft.phone.trim()}`,
         `ఇమెయిల్: ${draft.email.trim() || 'ఇవ్వలేదు'}`,
         `పేరు ప్రచురించవచ్చు: ${draft.showName ? 'అవును' : 'వద్దు'}`,
       ].join('\n');
@@ -280,6 +301,14 @@ export default function ShareVillagePage() {
         district_slug: draft.district || null,
         accept_guidelines: true,
       });
+      // The account carries the writer's name and photo, so they appear with the byline.
+      if (draft.name.trim() && draft.name.trim() !== me?.user.name_te) {
+        try {
+          await authApi.updateProfile({ name_te: draft.name.trim() });
+        } catch {
+          /* the name is in the story body as well */
+        }
+      }
       if (writerPhoto) {
         try {
           await authApi.uploadAvatar(writerPhoto.file);
@@ -288,20 +317,18 @@ export default function ShareVillagePage() {
           toast.error(L('మీ ఫొటో అప్‌లోడ్ కాలేదు — కథనం మాత్రం అందింది.', 'Your photo did not upload — the story itself was received.'));
         }
       }
-      if (canAttachPhotos) {
-        let failed = 0;
-        for (const p of photos) {
-          try {
-            await creatorApi.attachSubmissionPhoto(created.id, p.file);
-          } catch {
-            failed += 1;
-          }
+      let failed = 0;
+      for (const p of photos) {
+        try {
+          await creatorApi.attachSubmissionPhoto(created.id, p.file);
+        } catch {
+          failed += 1;
         }
-        if (failed) {
-          toast.error(
-            L(`${failed} ఫొటో(లు) అప్‌లోడ్ కాలేదు — కథనం మాత్రం అందింది.`, `${failed} photo(s) did not upload — the story itself was received.`),
-          );
-        }
+      }
+      if (failed) {
+        toast.error(
+          L(`${failed} ఫొటో(లు) అప్‌లోడ్ కాలేదు — కథనం మాత్రం అందింది.`, `${failed} photo(s) did not upload — the story itself was received.`),
+        );
       }
       return created;
     },
@@ -317,9 +344,11 @@ export default function ShareVillagePage() {
 
   const onSubmit = () => {
     if (submit.isPending) return;
+    setTried(true);
+    if (!stepValid) return;
     if (status !== 'authenticated') {
-      saveDraft(draft);
-      navigate('/login', { state: { from: location.pathname } });
+      // Only reachable if the session ended mid-way: verify the number again.
+      go(STEP.writer);
       return;
     }
     submit.mutate();
@@ -341,11 +370,6 @@ export default function ShareVillagePage() {
     setPhotos((list) => [...list, ...added]);
   };
 
-  const signInForPhotos = () => {
-    saveDraft(draft);
-    saveStep(3);
-    navigate('/login', { state: { from: location.pathname } });
-  };
 
   const pickWriterPhoto = (files: FileList | null) => {
     const file = files?.[0];
@@ -451,7 +475,7 @@ export default function ShareVillagePage() {
       </nav>
 
       <Card as="section" padding="lg" className="space-y-5">
-        {step === 0 ? (
+        {step === STEP.village ? (
           <>
             <Field label={L('గ్రామం పేరు', 'Village name')} required error={show('village')}>
               <Input
@@ -508,7 +532,7 @@ export default function ShareVillagePage() {
           </>
         ) : null}
 
-        {step === 1 ? (
+        {step === STEP.specialities ? (
           <fieldset>
             <legend className={cn(s.head, 'mb-1 text-headline-xs font-bold text-ink')}>
               {L('మీ గ్రామం ప్రత్యేకత ఏమిటి?', 'What makes your village special?')}
@@ -556,7 +580,7 @@ export default function ShareVillagePage() {
           </fieldset>
         ) : null}
 
-        {step === 2 ? (
+        {step === STEP.story ? (
           <>
             <div className="rounded-xl border-l-4 border-wow bg-wow-tint/60 p-4">
               <p className={cn(s.body, 'mb-2 text-ui-sm font-bold text-wow-deep')}>{L('ఈ ప్రశ్నలు సహాయపడతాయి', 'These questions can help')}</p>
@@ -587,7 +611,7 @@ export default function ShareVillagePage() {
           </>
         ) : null}
 
-        {step === 3 ? (
+        {step === STEP.photos ? (
           <>
             <div>
               <h2 className={cn(s.head, 'text-headline-xs font-bold text-ink')}>{L('గ్రామ ఫొటోలు జోడించండి', 'Add village photos')}</h2>
@@ -636,20 +660,7 @@ export default function ShareVillagePage() {
                 ))}
               </ul>
             ) : null}
-            {!canAttachPhotos ? (
-              <div className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-wow/50 bg-wow-tint p-6 text-center">
-                <Icon icon={ImagePlus} size="lg" className="text-wow-deep" />
-                <p className={cn(bodyCls, 'font-semibold text-ink')}>
-                  {L('ఫొటోలు జోడించడానికి సైన్ ఇన్ చేయండి.', 'Sign in to add photos.')}
-                </p>
-                <p className={cn(bodyCls, 'text-ink-soft')}>
-                  {L('మీరు రాసింది సేవ్ అవుతుంది — సైన్ ఇన్ తర్వాత ఇక్కడికే తిరిగి వస్తారు.', 'What you wrote is kept — you come back right here after signing in.')}
-                </p>
-                <Button variant="wow" icon={LogIn} onClick={signInForPhotos}>
-                  {L('సైన్ ఇన్ చేసి ఫొటోలు జోడించండి', 'Sign in and add photos')}
-                </Button>
-              </div>
-            ) : photos.length < MAX_VILLAGE_PHOTOS ? (
+            {photos.length < MAX_VILLAGE_PHOTOS ? (
               <label className="group flex min-h-tap cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-wow/50 bg-wow-tint p-6 text-center transition-colors duration-base hover:border-wow focus-within:border-wow">
                 <span className="flex h-12 w-12 items-center justify-center rounded-pill bg-gradient-to-br from-wow to-wow-deep text-on-wow shadow-card">
                   <Icon icon={ImagePlus} size="md" />
@@ -679,7 +690,7 @@ export default function ShareVillagePage() {
           </>
         ) : null}
 
-        {step === 4 ? (
+        {step === STEP.writer ? (
           <>
             {/* About you: the writer's photo and name, as they appear with the story. */}
             <section
@@ -767,23 +778,44 @@ export default function ShareVillagePage() {
             <div className="space-y-3">
               <h2 className={cn(s.head, 'text-headline-xs font-bold text-ink')}>{L('మిమ్మల్ని సంప్రదించడానికి', 'How we reach you')}</h2>
               <div className="grid gap-4 md:grid-cols-2">
-                <Field label={L('మొబైల్ నంబర్', 'Mobile number')} required error={show('phone')}>
-                  <div className="relative">
-                    <span aria-hidden className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted">
-                      <Icon icon={Phone} size="sm" />
-                    </span>
-                    <Input
-                      id="sender-phone"
-                      type="tel"
-                      inputMode="numeric"
-                      autoComplete="tel-national"
-                      maxLength={10}
-                      value={draft.phone}
-                      onChange={(e) => set('phone', e.target.value.replace(/\D/g, ''))}
-                      placeholder="98xxxxxxxx"
-                      className="pl-10"
-                    />
-                  </div>
+                <Field
+                  label={L('మొబైల్ నంబర్', 'Mobile number')}
+                  required
+                  error={show('phone')}
+                  hint={verifiedPhone ? undefined : L('మీ నంబర్‌ను OTP తో ఇక్కడే ధృవీకరిస్తాం.', 'We verify your number with an OTP, right here.')}
+                >
+                  {verifiedPhone ? (
+                    <div className="flex min-h-tap items-center gap-2 rounded-xl border border-success/40 bg-success-tint px-3">
+                      <Icon icon={ShieldCheck} size="sm" className="text-success" />
+                      <span className="font-sans text-ui font-semibold text-ink">{verifiedPhone}</span>
+                      <span className={cn(s.body, 'ml-auto text-ui-sm font-semibold text-success')}>{L('ధృవీకరించబడింది', 'Verified')}</span>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <div className="relative min-w-0 flex-1">
+                        <span aria-hidden className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted">
+                          <Icon icon={Phone} size="sm" />
+                        </span>
+                        <Input
+                          id="sender-phone"
+                          type="tel"
+                          inputMode="numeric"
+                          autoComplete="tel-national"
+                          maxLength={10}
+                          value={draft.phone}
+                          onChange={(e) => {
+                            set('phone', e.target.value.replace(/\D/g, ''));
+                            setOtpSent(false);
+                          }}
+                          placeholder="98xxxxxxxx"
+                          className="pl-10"
+                        />
+                      </div>
+                      <Button variant="wow" pending={requestOtp.isPending} onClick={sendOtp} className="shrink-0">
+                        {otpSent ? L('మళ్లీ పంపండి', 'Resend') : L('OTP పంపండి', 'Send OTP')}
+                      </Button>
+                    </div>
+                  )}
                 </Field>
                 <Field label={L('ఇమెయిల్', 'Email')} error={show('email')} hint={L('ఐచ్ఛికం', 'Optional')}>
                   <div className="relative">
@@ -801,6 +833,26 @@ export default function ShareVillagePage() {
                   </div>
                 </Field>
               </div>
+              {otpSent && !verifiedPhone ? (
+                <div className="space-y-3 rounded-xl border border-wow/40 bg-wow-tint p-4">
+                  <p className={cn(bodyCls, 'font-semibold text-ink')}>
+                    {L(`${draft.phone} కి వచ్చిన 6 అంకెల OTP నమోదు చేయండి.`, `Enter the 6-digit OTP sent to ${draft.phone}.`)}
+                  </p>
+                  <OtpInput
+                    id="village-otp"
+                    label={L('OTP', 'OTP')}
+                    value={otp}
+                    onChange={setOtp}
+                    onComplete={() => verifyOtp.mutate()}
+                    disabled={verifyOtp.isPending}
+                    autoFocus
+                  />
+                  {devOtp ? <p className="font-sans text-ui-sm text-muted">Dev OTP: {devOtp}</p> : null}
+                  <Button variant="wow" pending={verifyOtp.isPending} disabled={otp.length !== 6} onClick={() => verifyOtp.mutate()}>
+                    {L('ధృవీకరించండి', 'Verify')}
+                  </Button>
+                </div>
+              ) : null}
               <p className={cn(s.body, 'flex items-center gap-1.5 text-ui-sm text-muted')}>
                 <Icon icon={ShieldCheck} size="xs" />
                 {L('మీ ఫోన్, ఇమెయిల్ ప్రచురించం — సంపాదకులు మాత్రమే చూస్తారు.', 'Your phone and email are never published — only editors see them.')}
@@ -813,26 +865,13 @@ export default function ShareVillagePage() {
                 onChange={(v) => set('showName', v)}
                 label={L('కథనంతో నా పేరు, ఫొటో ప్రచురించవచ్చు.', 'My name and photo may be published with the story.')}
               />
-              <Checkbox
-                checked={draft.consent}
-                onChange={(v) => set('consent', v)}
-                label={L(
-                  'ఈ వివరాలు, ఫొటోలు నిజమైనవి; వాటిని ప్రచురించే హక్కు నాకు ఉంది.',
-                  'These details and photos are true, and I have the right to share them.',
-                )}
-              />
-              {show('consent') ? (
-                <p role="alert" className={cn(s.body, 'text-ui-sm text-breaking')}>
-                  {show('consent')}
-                </p>
-              ) : null}
             </div>
           </>
         ) : null}
 
-        {step === 5 ? (
+        {step === STEP.preview ? (
           <div className="space-y-5">
-            <PreviewBlock title={L('గ్రామం', 'Village')} onEdit={() => go(0)} editLabel={L('మార్చండి', 'Edit')}>
+            <PreviewBlock title={L('గ్రామం', 'Village')} onEdit={() => go(STEP.village)} editLabel={L('మార్చండి', 'Edit')}>
               <p lang="te" className="te text-te-body-sm font-bold text-ink">
                 {draft.village}
               </p>
@@ -841,7 +880,7 @@ export default function ShareVillagePage() {
                 {draft.pin ? ` · ${draft.pin}` : ''}
               </p>
             </PreviewBlock>
-            <PreviewBlock title={L('ప్రత్యేకతలు', 'Specialities')} onEdit={() => go(1)} editLabel={L('మార్చండి', 'Edit')}>
+            <PreviewBlock title={L('ప్రత్యేకతలు', 'Specialities')} onEdit={() => go(STEP.specialities)} editLabel={L('మార్చండి', 'Edit')}>
               <ul className="flex flex-wrap gap-2">
                 {SPECIALITIES.filter((sp) => draft.specialities.includes(sp.value)).map((sp) => (
                   <li key={sp.value} className={cn(s.body, 'rounded-pill bg-wow-tint px-3 py-1 text-meta font-semibold text-wow-deep')}>
@@ -850,12 +889,12 @@ export default function ShareVillagePage() {
                 ))}
               </ul>
             </PreviewBlock>
-            <PreviewBlock title={L('గ్రామ కథ', 'Village story')} onEdit={() => go(2)} editLabel={L('కథ మార్చండి', 'Edit story')}>
+            <PreviewBlock title={L('గ్రామ కథ', 'Village story')} onEdit={() => go(STEP.story)} editLabel={L('కథ మార్చండి', 'Edit story')}>
               <p lang="te" className="te whitespace-pre-line text-te-body-xs text-ink">
                 {draft.story}
               </p>
             </PreviewBlock>
-            <PreviewBlock title={L('ఫొటోలు', 'Photos')} onEdit={() => go(3)} editLabel={L('మార్చండి', 'Edit')}>
+            <PreviewBlock title={L('ఫొటోలు', 'Photos')} onEdit={() => go(STEP.photos)} editLabel={L('మార్చండి', 'Edit')}>
               {photos.length ? (
                 <ul className="grid grid-cols-3 gap-2 sm:grid-cols-5">
                   {photos.map((p) => (
@@ -868,7 +907,7 @@ export default function ShareVillagePage() {
                 <p className={cn(bodyCls, 'text-muted')}>{L('ఫొటోలు జోడించలేదు.', 'No photos added.')}</p>
               )}
             </PreviewBlock>
-            <PreviewBlock title={L('పంపినవారు', 'Submitted by')} onEdit={() => go(4)} editLabel={L('మార్చండి', 'Edit')}>
+            <PreviewBlock title={L('రాసినవారు', 'Written by')} onEdit={() => go(STEP.writer)} editLabel={L('మార్చండి', 'Edit')}>
               <div className="flex items-center gap-3">
                 {writerPicture ? (
                   <img src={writerPicture} alt="" className="h-14 w-14 shrink-0 rounded-pill object-cover ring-2 ring-wow/60" />
@@ -886,6 +925,21 @@ export default function ShareVillagePage() {
                 </div>
               </div>
             </PreviewBlock>
+            <div className="space-y-2 rounded-xl border border-wow/30 bg-wow-tint p-4">
+              <Checkbox
+                checked={draft.consent}
+                onChange={(v) => set('consent', v)}
+                label={L(
+                  'ఈ వివరాలు, ఫొటోలు నిజమైనవి; వాటిని ప్రచురించే హక్కు నాకు ఉంది.',
+                  'These details and photos are true, and I have the right to share them.',
+                )}
+              />
+              {show('consent') ? (
+                <p role="alert" className={cn(s.body, 'text-ui-sm text-breaking')}>
+                  {show('consent')}
+                </p>
+              ) : null}
+            </div>
           </div>
         ) : null}
 
@@ -904,15 +958,10 @@ export default function ShareVillagePage() {
             </Button>
           ) : (
             <Button variant="wow" icon={Send} pending={submit.isPending} onClick={onSubmit}>
-              {status === 'authenticated' ? L('కథనం పంపండి', 'Submit story') : L('సైన్ ఇన్ చేసి పంపండి', 'Sign in and submit')}
+              {L('కథనం పంపండి', 'Submit story')}
             </Button>
           )}
         </div>
-        {step === STEPS.length - 1 && status !== 'authenticated' ? (
-          <p className={cn(bodyCls, 'text-muted')}>
-            {L('మీరు రాసింది సేవ్ అవుతుంది; సైన్ ఇన్ తర్వాత ఫొటోలు జోడించి పంపవచ్చు.', 'What you wrote is kept; after signing in you can add photos and send.')}
-          </p>
-        ) : null}
       </Card>
     </PageContainer>
   );

@@ -238,7 +238,7 @@ export function ModerationPage() {
           ) : undefined
         }
         fields={[
-          { name: 'note', label: L('రచయితకు గమనిక (ఐచ్ఛికం):', 'Note to the creator (optional):'), type: 'textarea' },
+          { name: 'note', label: L('రచయితకు గమనిక (ఆప్షనల్):', 'Note to the creator (optional):'), type: 'textarea' },
         ]}
         submitLabel={L('తిరస్కరించండి', 'Reject')}
         pending={rejectSub.isPending}

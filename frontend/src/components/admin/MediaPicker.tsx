@@ -228,7 +228,7 @@ export function MediaPicker({ heroId, hero, gallery, onHeroChange, onGalleryChan
         <span className={label}>
           {L('మరిన్ని చిత్రాలు', 'More images')}{' '}
           <span className="font-normal text-muted">
-            · {L('ఐచ్ఛికం', 'optional')}
+            · {L('ఆప్షనల్', 'optional')}
             {gallery.length ? ` (${gallery.length})` : ''}
           </span>
         </span>

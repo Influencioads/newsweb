@@ -182,7 +182,7 @@ export function MandalPage() {
       slug={slug}
       icon={MapPin}
       eyebrow={t('page.mandal')}
-      subtitle={L('మండలం నుంచి తాజా వార్తలు', 'The latest reporting from this mandal')}
+      subtitle={L('మండలం నుంచి తాజా కథనాలు', 'The latest reporting from this mandal')}
     />
   );
 }

@@ -117,7 +117,7 @@ export default function NominateScreen() {
     name: draft.name.trim().length < 3 ? pick('లోకల్ హీరో పూర్తి పేరు రాయండి.', "Enter the local hero's full name.") : null,
     village: draft.village.trim().length < 2 ? pick('ఊరు / పట్టణం రాయండి.', 'Enter the village or town.') : null,
     district: !draft.district ? pick('జిల్లా ఎంచుకోండి.', 'Choose the district.') : null,
-    category: !draft.category ? pick('హీరో విభాగం ఎంచుకోండి.', 'Choose a hero category.') : null,
+    category: !draft.category ? pick('హీరో కేటగిరీ ఎంచుకోండి.', 'Choose a hero category.') : null,
     reason:
       draft.reason.trim().length < MIN_REASON
         ? pick(`కనీసం ${MIN_REASON} అక్షరాల్లో వివరించండి.`, `Explain in at least ${MIN_REASON} characters.`)
@@ -346,10 +346,10 @@ export default function NominateScreen() {
           <View
             style={styles.group}
             accessibilityRole="radiogroup"
-            accessibilityLabel="హీరో విభాగం (Hero category)"
+            accessibilityLabel="హీరో కేటగిరీ (Hero category)"
           >
             <T variant="ui" weight="semibold">
-              {'హీరో విభాగం (Hero category)'}
+              {'హీరో కేటగిరీ (Hero category)'}
               <T variant="ui" weight="semibold" color="breaking" lang="en">
                 {' *'}
               </T>
@@ -392,7 +392,7 @@ export default function NominateScreen() {
           </Field>
 
           <Field
-            label={`${pick('మీ ఫోన్ నంబర్', 'Your contact number')} (${pick('ఐచ్ఛికం', 'optional')})`}
+            label={`${pick('మీ ఫోన్ నంబర్', 'Your contact number')} (${pick('ఆప్షనల్', 'optional')})`}
             error={show(errors.phone)}
             hint={pick(
               'సంపాదకులు ధృవీకరణ కోసం మాత్రమే వాడతారు. ఫోటో ఉంటే సంపాదకులు మిమ్మల్ని సంప్రదిస్తారు.',

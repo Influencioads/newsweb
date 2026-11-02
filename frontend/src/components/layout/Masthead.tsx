@@ -133,56 +133,51 @@ export function Masthead() {
           {/* Brand line (CMS → Site content), e.g. "Ordinary People. Extraordinary Stories." */}
           <span
             lang={taglineScript.lang}
-            className={cn(taglineScript.cls, 'mt-0.5 hidden whitespace-nowrap text-center text-meta font-bold tracking-wide text-ink md:block lg:text-ui-sm')}
+            className={cn(taglineScript.cls, '-mt-0.5 block whitespace-nowrap text-center text-eyebrow font-bold tracking-normal text-ink md:mt-0.5 md:text-meta md:tracking-wide lg:text-ui-sm')}
           >
             {tagline}
           </span>
         </Link>
 
-        {/* Phone: one row — the brand line small on the left (wrapping to two lines
-            when it must), small two-line Story Shots and Nominate buttons on the right. */}
-        <div className="order-first col-span-2 flex items-center justify-between gap-1 md:hidden">
-          <p lang={taglineScript.lang} className={cn(taglineScript.cls, 'min-w-0 text-eyebrow font-bold leading-snug tracking-normal text-ink')}>
-            {tagline}
-          </p>
-          <div className="flex shrink-0 items-center gap-1">
-            <Link
-              to="/story-shots"
-              aria-label={t('ui.storyShots')}
-              className="flex min-h-tap shrink-0 items-center rounded-xl"
+        {/* Phone: the brand line sits right under the wordmark; this row puts the
+            small two-line Story Shots button on the left and Nominate on the right. */}
+        <div className="order-first col-span-2 flex items-center justify-between gap-2 md:hidden">
+          <Link
+            to="/story-shots"
+            aria-label={t('ui.storyShots')}
+            className="flex min-h-tap shrink-0 items-center rounded-xl"
+          >
+            <span
+              className={cn(
+                s.body,
+                'inline-flex items-center gap-0.5 rounded-xl bg-gradient-to-br from-wow to-wow-deep px-1.5 py-0.5 text-eyebrow font-bold tracking-normal text-on-wow shadow-card',
+              )}
             >
-              <span
-                className={cn(
-                  s.body,
-                  'inline-flex items-center gap-0.5 rounded-xl bg-gradient-to-br from-wow to-wow-deep px-1.5 py-0.5 text-eyebrow font-bold tracking-normal text-on-wow shadow-card',
-                )}
-              >
-                <Icon icon={GalleryVerticalEnd} size="xs" className="shrink-0" />
-                <span className="flex flex-col whitespace-nowrap text-left leading-normal">
-                  <span>{language === 'te' ? 'స్టోరీ' : 'Story'}</span>
-                  <span>{language === 'te' ? 'షాట్స్' : 'Shots'}</span>
-                </span>
+              <Icon icon={GalleryVerticalEnd} size="xs" className="shrink-0" />
+              <span className="flex flex-col whitespace-nowrap text-left leading-normal">
+                <span>{language === 'te' ? 'స్టోరీ' : 'Story'}</span>
+                <span>{language === 'te' ? 'షాట్స్' : 'Shots'}</span>
               </span>
-            </Link>
-            <Link
-              to="/nominate"
-              aria-label={t('ui.nominate')}
-              className="flex min-h-tap shrink-0 items-center rounded-xl"
+            </span>
+          </Link>
+          <Link
+            to="/nominate"
+            aria-label={t('ui.nominate')}
+            className="flex min-h-tap shrink-0 items-center rounded-xl"
+          >
+            <span
+              className={cn(
+                s.body,
+                'inline-flex items-center gap-0.5 rounded-xl bg-gradient-to-br from-wow to-wow-deep px-1.5 py-0.5 text-eyebrow font-bold tracking-normal text-on-wow shadow-card',
+              )}
             >
-              <span
-                className={cn(
-                  s.body,
-                  'inline-flex items-center gap-0.5 rounded-xl bg-gradient-to-br from-wow to-wow-deep px-1.5 py-0.5 text-eyebrow font-bold tracking-normal text-on-wow shadow-card',
-                )}
-              >
-                <Icon icon={Award} size="xs" className="shrink-0" />
-                <span className="flex flex-col whitespace-nowrap text-left leading-normal">
-                  <span>{language === 'te' ? 'లోకల్ హీరో ని' : 'Nominate a'}</span>
-                  <span>{language === 'te' ? 'నామినేట్ చేయండి' : 'Local Hero'}</span>
-                </span>
+              <Icon icon={Award} size="xs" className="shrink-0" />
+              <span className="flex flex-col whitespace-nowrap text-left leading-normal">
+                <span>{language === 'te' ? 'లోకల్ హీరో ని' : 'Nominate a'}</span>
+                <span>{language === 'te' ? 'నామినేట్ చేయండి' : 'Local Hero'}</span>
               </span>
-            </Link>
-          </div>
+            </span>
+          </Link>
         </div>
 
         {/* Right column: one row under md; from md account on top, the rest beneath. */}

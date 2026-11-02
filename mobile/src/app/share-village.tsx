@@ -419,7 +419,7 @@ export default function ShareVillageScreen() {
                 </>
               )
             ) : null}
-            <Field label={`${pick('పిన్‌కోడ్', 'PIN code')} (${pick('ఐచ్ఛికం', 'optional')})`} error={show('pin')}>
+            <Field label={`${pick('పిన్‌కోడ్', 'PIN code')} (${pick('ఆప్షనల్', 'optional')})`} error={show('pin')}>
               <Input
                 lang="en"
                 keyboardType="number-pad"
@@ -567,7 +567,7 @@ export default function ShareVillageScreen() {
                 placeholder="98xxxxxxxx"
               />
             </Field>
-            <Field label={`${pick('ఇమెయిల్', 'Email')} (${pick('ఐచ్ఛికం', 'optional')})`} error={show('email')}>
+            <Field label={`${pick('ఇమెయిల్', 'Email')} (${pick('ఆప్షనల్', 'optional')})`} error={show('email')}>
               <Input
                 lang="en"
                 leading="mail"

@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, House } from 'lucide-react';
 
 import { NewsImage } from '@/components/media/NewsImage';
 import { ButtonLink } from '@/components/ui/Button';
+import { Icon } from '@/components/ui/Icon';
 import * as publicApi from '@/features/public/api';
 import { useI18n, useScript } from '@/i18n';
 import type { ArticleCard } from '@/types/public';
@@ -100,7 +101,16 @@ export function MyVillageStory() {
       <div className="relative isolate mb-5 grid overflow-hidden rounded-2xl bg-brand-deep text-on-ink shadow-raised md:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         <div aria-hidden className="pointer-events-none absolute -left-16 -top-16 -z-10 h-64 w-64 rounded-full bg-wow/25 blur-3xl" />
         <div className="order-2 flex flex-col justify-center gap-3 p-5 md:order-1 md:p-10">
-          <h2 id="my-village-story" lang={s.language} className={cn(s.head, 'text-headline-sm font-bold md:text-headline-ml')}>
+          {/* The title as an orange pill, like "Nominate Your Local Hero" on the Local Heroes card. */}
+          <h2
+            id="my-village-story"
+            lang={s.language}
+            className={cn(
+              s.head,
+              'inline-flex items-center gap-2 self-start rounded-pill bg-gradient-to-br from-wow to-wow-deep px-4 py-1.5 text-ui font-bold text-on-wow shadow-card md:px-5 md:py-2 md:text-headline-xs',
+            )}
+          >
+            <Icon icon={House} size="sm" className="shrink-0" />
             {te ? MY_VILLAGE_TITLE.te : MY_VILLAGE_TITLE.en}
           </h2>
           {(te ? MY_VILLAGE_INTRO.te : MY_VILLAGE_INTRO.en).map((para) => (
@@ -132,10 +142,12 @@ export function MyVillageStory() {
       </div>
 
       {data?.articles.length ? (
-        // Two photo cards: one per row on phones, side by side from tablets up.
+        // One photo card on phones; two side by side from tablets up.
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">
           {data.articles.map((article, i) => (
-            <VillageCard key={article.short_id} article={article} tint={TINTS[i % TINTS.length]!} />
+            <div key={article.short_id} className={i > 0 ? 'hidden md:block' : undefined}>
+              <VillageCard article={article} tint={TINTS[i % TINTS.length]!} />
+            </div>
           ))}
         </div>
       ) : stories.isPending ? null : (

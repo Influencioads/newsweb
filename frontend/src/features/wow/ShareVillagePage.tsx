@@ -498,7 +498,7 @@ export default function ShareVillagePage() {
                 </p>
               ) : null}
             </div>
-            <Field label={L('పిన్‌కోడ్', 'PIN code')} error={show('pin')} hint={L('ఐచ్ఛికం', 'Optional')}>
+            <Field label={L('పిన్‌కోడ్', 'PIN code')} error={show('pin')} hint={L('ఆప్షనల్', 'Optional')}>
               <Input
                 id="village-pin"
                 inputMode="numeric"

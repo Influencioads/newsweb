@@ -606,7 +606,7 @@ function StoryShotsCard({ payload, canManage }: { payload: cmsApi.SiteContentPay
                     ) : null}
                   </div>
                   <PairFields
-                    label={L('శీర్షిక (ఐచ్ఛికం)', 'Headline (optional)')}
+                    label={L('శీర్షిక (ఆప్షనల్)', 'Headline (optional)')}
                     te={sh.title_te}
                     en={sh.title_en}
                     onTe={(title_te) => patch(i, { title_te })}
@@ -614,7 +614,7 @@ function StoryShotsCard({ payload, canManage }: { payload: cmsApi.SiteContentPay
                     disabled={!canManage}
                   />
                   <Field
-                    label={L('"కథ చదవండి" లింక్ (ఐచ్ఛికం)', '"Read story" link (optional)')}
+                    label={L('"కథ చదవండి" లింక్ (ఆప్షనల్)', '"Read story" link (optional)')}
                     hint={L(
                       'ఈ సైట్‌లోని పేజీ (/...) లేదా https:// చిరునామా. ఖాళీగా ఉంటే బటన్ కనిపించదు.',
                       'A page on this site (/...) or an https:// address. Leave blank for no button.',
@@ -650,7 +650,7 @@ function NominateCard({ payload, canManage }: { payload: cmsApi.SiteContentPaylo
     <Section
       title={L('నామినేట్ ఫారం', 'Nominate form')}
       subtitle={L(
-        'హోమ్ పేజీ "మీ లోకల్ హీరోను నామినేట్ చేయండి" బ్యానర్ చిత్రం, ఫారంలోని "హీరో విభాగం" ఎంపికలు',
+        'హోమ్ పేజీ "మీ లోకల్ హీరోను నామినేట్ చేయండి" బ్యానర్ చిత్రం, ఫారంలోని "హీరో కేటగిరీ" ఎంపికలు',
         'The picture behind the home page’s "Nominate Your Local Hero" banner, and the choices in the form’s "Hero category" list',
       )}
     >

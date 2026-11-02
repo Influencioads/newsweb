@@ -592,6 +592,19 @@ class TestMyVillagePhotos:
         assert r.status_code == 201, r.text
         assert len(r.json()["media_ids"]) == 1
 
+    def test_a_reader_without_kyc_can_add_the_local_hero_photo(
+        self, db: Session, client: TestClient
+    ) -> None:
+        user = make_reader(db, email="hero-photo@test.local")
+        submission = self._submission(db, user, "local-hero")
+        r = client.post(
+            f"/api/v1/users/me/submissions/{submission.id}/media",
+            files={"file": ("hero.png", png_bytes(), "image/png")},
+            headers=self._headers(db, user),
+        )
+        assert r.status_code == 201, r.text
+        assert len(r.json()["media_ids"]) == 1
+
     def test_a_guest_can_share_a_village_with_name_and_photos_and_no_phone(
         self, db: Session, client: TestClient
     ) -> None:

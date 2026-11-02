@@ -44,9 +44,10 @@ MAX_MEDIA = 5
 
 # Sections where any signed-in reader may attach photographs to their own
 # submission, KYC or not: a My Village story is a reader's photos of their own
-# village, and asking for identity documents first meant nobody sent any.
+# village, and asking for identity documents first meant nobody sent any. A
+# Local Hero nomination is the same: the hero's photo, sent with their consent.
 # Everywhere else photographs stay what verification buys.
-OPEN_PHOTO_CATEGORIES = frozenset({"my-village-story"})
+OPEN_PHOTO_CATEGORIES = frozenset({"my-village-story", "local-hero"})
 
 
 def plain_text_to_tiptap(text: str) -> dict[str, Any]:

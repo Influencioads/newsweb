@@ -58,7 +58,7 @@ export const STRINGS = {
 
   // --- home ----------------------------------------------------------------
   'home.breaking': { te: 'బ్రేకింగ్', en: 'Breaking' },
-  'home.latest': { te: 'తాజా వార్తలు', en: 'Latest News' },
+  'home.latest': { te: 'తాజా కథనాలు', en: 'Latest News' },
   'home.topStories': { te: 'ముఖ్య కథనాలు', en: 'Top stories' },
   'home.briefs': { te: 'క్లుప్తంగా', en: 'In Brief' },
   'home.seeAll': { te: 'అన్నీ చూడండి', en: 'See all' },
@@ -171,7 +171,7 @@ export const STRINGS = {
   'ui.clear': { te: 'క్లియర్', en: 'Clear' },
   'ui.select': { te: 'ఎంచుకోండి', en: 'Select' },
   'ui.selected': { te: 'ఎంచుకున్నవి', en: 'selected' },
-  'ui.optional': { te: 'ఐచ్ఛికం', en: 'optional' },
+  'ui.optional': { te: 'ఆప్షనల్', en: 'optional' },
   'ui.required': { te: 'తప్పనిసరి', en: 'required' },
   'ui.characters': { te: 'అక్షరాలు', en: 'characters' },
   'ui.copy': { te: 'కాపీ చేయండి', en: 'Copy' },

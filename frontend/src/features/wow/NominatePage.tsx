@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Award, CheckCircle2, FileSearch, Megaphone, PenLine, ShieldCheck } from 'lucide-react';
+import { Award, Camera, CheckCircle2, FileSearch, ImagePlus, Megaphone, PenLine, ShieldCheck, X } from 'lucide-react';
 
-import { api } from '@/api/client';
 import { LocationPicker } from '@/components/location/LocationPicker';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { Checkbox, Field, Input, inputClass, Select, Textarea } from '@/components/ui/Field';
+import { Checkbox, Field, Input, Select, Textarea } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
 import { PageContainer, PageHeader } from '@/components/ui/Layout';
 import { useToast } from '@/components/ui/Toast';
@@ -112,13 +111,31 @@ export default function NominatePage() {
   useEffect(() => saveDraft(draft), [draft]);
 
   const config = useQuery({ queryKey: ['public', 'config'], queryFn: publicApi.fetchSiteConfig, staleTime: 300_000 });
-  const contributor = useQuery({
-    queryKey: ['contributor', 'me'],
-    queryFn: async () => (await api.get<{ kyc_status: string }>('/users/me/contributor')).data,
-    enabled: status === 'authenticated',
-    staleTime: 300_000,
-  });
-  const canAttachPhoto = contributor.data?.kyc_status === 'approved';
+  // The hero's photo: checked here, previewed in the form, sent after the nomination.
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  useEffect(() => {
+    if (!photo) {
+      setPhotoPreview(null);
+      return undefined;
+    }
+    const url = URL.createObjectURL(photo);
+    setPhotoPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photo]);
+  const pickPhoto = (file: File | null) => {
+    if (!file) return;
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+      setPhotoError(L('JPG, PNG లేదా WebP ఫోటో ఎంచుకోండి.', 'Choose a JPG, PNG or WebP photo.'));
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setPhotoError(L('ఫోటో 4 MB లోపు ఉండాలి.', 'The photo must be under 4 MB.'));
+      return;
+    }
+    setPhotoError(null);
+    setPhoto(file);
+  };
 
   const districtName = (() => {
     const d = config.data?.districts.find((x) => x.slug === draft.district);
@@ -132,7 +149,7 @@ export default function NominatePage() {
     name: draft.name.trim().length < 3 ? L('లోకల్ హీరో పూర్తి పేరు రాయండి.', "Enter the local hero's full name.") : null,
     village: draft.village.trim().length < 2 ? L('ఊరు / పట్టణం రాయండి.', 'Enter the village or town.') : null,
     district: !draft.district ? L('జిల్లా ఎంచుకోండి.', 'Choose the district.') : null,
-    category: !draft.category ? L('హీరో విభాగం ఎంచుకోండి.', 'Choose a hero category.') : null,
+    category: !draft.category ? L('హీరో కేటగిరీ ఎంచుకోండి.', 'Choose a hero category.') : null,
     reason:
       draft.reason.trim().length < MIN_REASON
         ? L(`కనీసం ${MIN_REASON} అక్షరాల్లో వివరించండి.`, `Explain in at least ${MIN_REASON} characters.`)
@@ -324,7 +341,7 @@ export default function NominatePage() {
                 ) : null}
               </div>
 
-              <Field label="హీరో విభాగం (Hero category)" required error={show(errors.category)}>
+              <Field label="హీరో కేటగిరీ (Hero category)" required error={show(errors.category)}>
                 <Select id="nominee-category" value={draft.category} onChange={(e) => set('category', e.target.value)}>
                   <option value="">{L('— ఎంచుకోండి —', '— choose —')}</option>
                   {heroCategories.map((c) => (
@@ -355,26 +372,61 @@ export default function NominatePage() {
                 />
               </Field>
 
-              <Field
-                label={L('లోకల్ హీరో ఫోటో', 'Local Hero photo')}
-                hint={
-                  canAttachPhoto
-                    ? L('JPG / PNG / WebP, హీరో అనుమతితో మాత్రమే.', 'JPG / PNG / WebP, only with the hero’s permission.')
-                    : L(
-                        'ఫోటోలు ధృవీకరించిన రచయితలు మాత్రమే పంపగలరు. లేదంటే మా సంపాదకులు మిమ్మల్ని సంప్రదిస్తారు.',
-                        'Only verified contributors can upload photos. Otherwise an editor will collect it from you.',
-                      )
-                }
-              >
+              {/* The hero's photo: any reader may send one (with the hero's consent). */}
+              <div className="space-y-2">
+                <p className={cn(s.body, 'text-ui-sm font-semibold text-ink')}>
+                  {L('లోకల్ హీరో ఫోటో', 'Local Hero photo')}{' '}
+                  <span className="font-normal text-muted">({L('ఆప్షనల్', 'Optional')})</span>
+                </p>
+                <div className="flex flex-wrap items-center gap-4">
+                  <label
+                    htmlFor="nominee-photo"
+                    className="relative flex h-24 w-24 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-wow/50 bg-wow-tint text-wow-deep transition-colors duration-base hover:border-wow"
+                  >
+                    {photoPreview ? (
+                      <img src={photoPreview} alt={L('లోకల్ హీరో ఫోటో', 'Local Hero photo')} className="h-full w-full object-cover" />
+                    ) : (
+                      <Icon icon={ImagePlus} size="lg" />
+                    )}
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label
+                      htmlFor="nominee-photo"
+                      className={cn(
+                        s.body,
+                        'inline-flex min-h-tap cursor-pointer items-center gap-1.5 rounded-pill bg-gradient-to-br from-wow to-wow-deep px-4 text-ui-sm font-semibold text-on-wow shadow-card',
+                      )}
+                    >
+                      <Icon icon={Camera} size="sm" />
+                      {photo ? L('ఫోటో మార్చండి', 'Change photo') : L('ఫోటో ఎంచుకోండి', 'Choose a photo')}
+                    </label>
+                    {photo ? (
+                      <Button variant="ghost" size="sm" icon={X} onClick={() => setPhoto(null)}>
+                        {L('తీసివేయండి', 'Remove')}
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
                 <input
                   id="nominee-photo"
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
-                  disabled={!canAttachPhoto}
-                  className={cn(inputClass, 'disabled:cursor-not-allowed disabled:opacity-60')}
-                  onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+                  className="sr-only"
+                  onChange={(e) => {
+                    pickPhoto(e.target.files?.[0] ?? null);
+                    e.target.value = '';
+                  }}
                 />
-              </Field>
+                {photoError ? (
+                  <p role="alert" className={cn(s.body, 'text-ui-sm text-breaking')}>
+                    {photoError}
+                  </p>
+                ) : (
+                  <p className={cn(s.body, 'text-ui-sm text-muted')}>
+                    {L('JPG / PNG / WebP, 4 MB లోపు, హీరో అనుమతితో మాత్రమే.', 'JPG / PNG / WebP under 4 MB, only with the hero’s permission.')}
+                  </p>
+                )}
+              </div>
 
               <fieldset className="pt-1">
                 <legend className={cn(s.body, 'mb-1.5 text-ui-sm font-semibold text-ink')}>

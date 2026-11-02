@@ -133,14 +133,14 @@ export function Masthead() {
           {/* Brand line (CMS → Site content), e.g. "Ordinary People. Extraordinary Stories." */}
           <span
             lang={taglineScript.lang}
-            className={cn(taglineScript.cls, '-mt-0.5 block whitespace-nowrap text-center text-eyebrow font-bold tracking-normal text-ink md:mt-0.5 md:text-meta md:tracking-wide lg:text-ui-sm')}
+            className={cn(taglineScript.cls, '-mt-0.5 block self-start whitespace-nowrap text-left text-eyebrow font-bold tracking-normal text-ink md:mt-0.5 md:self-auto md:text-center md:text-meta md:tracking-wide lg:text-ui-sm')}
           >
             {tagline}
           </span>
         </Link>
 
-        {/* Phone: the brand line sits right under the wordmark; this row puts the
-            small two-line Story Shots button on the left and Nominate on the right. */}
+        {/* Phone: the brand line sits under the wordmark on the left; this row puts the
+            one-line Story Shots button on the left and Nominate on the right. */}
         <div className="order-first col-span-2 flex items-center justify-between gap-2 md:hidden">
           <Link
             to="/story-shots"
@@ -150,14 +150,11 @@ export function Masthead() {
             <span
               className={cn(
                 s.body,
-                'inline-flex items-center gap-0.5 rounded-xl bg-gradient-to-br from-wow to-wow-deep px-1.5 py-0.5 text-eyebrow font-bold tracking-normal text-on-wow shadow-card',
+                'inline-flex items-center gap-1 rounded-pill bg-gradient-to-br from-wow to-wow-deep px-2.5 py-1 text-eyebrow font-bold tracking-normal text-on-wow shadow-card',
               )}
             >
               <Icon icon={GalleryVerticalEnd} size="xs" className="shrink-0" />
-              <span className="flex flex-col whitespace-nowrap text-left leading-normal">
-                <span>{language === 'te' ? 'స్టోరీ' : 'Story'}</span>
-                <span>{language === 'te' ? 'షాట్స్' : 'Shots'}</span>
-              </span>
+              <span className="whitespace-nowrap">{language === 'te' ? 'స్టోరీ షాట్స్' : 'Story Shots'}</span>
             </span>
           </Link>
           <Link
@@ -168,14 +165,11 @@ export function Masthead() {
             <span
               className={cn(
                 s.body,
-                'inline-flex items-center gap-0.5 rounded-xl bg-gradient-to-br from-wow to-wow-deep px-1.5 py-0.5 text-eyebrow font-bold tracking-normal text-on-wow shadow-card',
+                'inline-flex items-center gap-1 rounded-pill bg-gradient-to-br from-wow to-wow-deep px-2.5 py-1 text-eyebrow font-bold tracking-normal text-on-wow shadow-card',
               )}
             >
               <Icon icon={Award} size="xs" className="shrink-0" />
-              <span className="flex flex-col whitespace-nowrap text-left leading-normal">
-                <span>{language === 'te' ? 'లోకల్ హీరో ని' : 'Nominate a'}</span>
-                <span>{language === 'te' ? 'నామినేట్ చేయండి' : 'Local Hero'}</span>
-              </span>
+              <span className="whitespace-nowrap">{language === 'te' ? 'లోకల్ హీరోని నామినేట్ చేయండి' : 'Nominate a Local Hero'}</span>
             </span>
           </Link>
         </div>

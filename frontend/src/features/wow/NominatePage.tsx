@@ -341,7 +341,7 @@ export default function NominatePage() {
                 ) : null}
               </div>
 
-              <Field label="హీరో కేటగిరీ (Hero category)" required error={show(errors.category)}>
+              <Field label={L('హీరో కేటగిరీ', 'Hero category')} required error={show(errors.category)}>
                 <Select id="nominee-category" value={draft.category} onChange={(e) => set('category', e.target.value)}>
                   <option value="">{L('— ఎంచుకోండి —', '— choose —')}</option>
                   {heroCategories.map((c) => (

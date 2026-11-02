@@ -346,10 +346,10 @@ export default function NominateScreen() {
           <View
             style={styles.group}
             accessibilityRole="radiogroup"
-            accessibilityLabel="హీరో కేటగిరీ (Hero category)"
+            accessibilityLabel={pick('హీరో కేటగిరీ', 'Hero category')}
           >
             <T variant="ui" weight="semibold">
-              {'హీరో కేటగిరీ (Hero category)'}
+              {pick('హీరో కేటగిరీ', 'Hero category')}
               <T variant="ui" weight="semibold" color="breaking" lang="en">
                 {' *'}
               </T>

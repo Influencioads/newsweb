@@ -56,6 +56,8 @@ interface Draft {
   district: string;
   category: string;
   reason: string;
+  /** The person nominating (who is writing this). */
+  nominator: string;
   phone: string;
   consent: boolean;
 }
@@ -67,6 +69,7 @@ const EMPTY: Draft = {
   district: '',
   category: '',
   reason: '',
+  nominator: '',
   phone: '',
   consent: false,
 };
@@ -111,7 +114,7 @@ export default function NominateScreen() {
   const heroCategory = heroCategories.find((c) => c.value === draft.category);
 
   const errors = {
-    name: draft.name.trim().length < 3 ? pick('హీరో పూర్తి పేరు రాయండి.', "Enter the hero's full name.") : null,
+    name: draft.name.trim().length < 3 ? pick('లోకల్ హీరో పూర్తి పేరు రాయండి.', "Enter the local hero's full name.") : null,
     village: draft.village.trim().length < 2 ? pick('ఊరు / పట్టణం రాయండి.', 'Enter the village or town.') : null,
     district: !draft.district ? pick('జిల్లా ఎంచుకోండి.', 'Choose the district.') : null,
     category: !draft.category ? pick('హీరో విభాగం ఎంచుకోండి.', 'Choose a hero category.') : null,
@@ -119,6 +122,7 @@ export default function NominateScreen() {
       draft.reason.trim().length < MIN_REASON
         ? pick(`కనీసం ${MIN_REASON} అక్షరాల్లో వివరించండి.`, `Explain in at least ${MIN_REASON} characters.`)
         : null,
+    nominator: draft.nominator.trim().length < 3 ? pick('మీ పేరు రాయండి.', 'Enter your name.') : null,
     phone:
       draft.phone.trim() && !PHONE.test(draft.phone.trim())
         ? pick('10 అంకెల మొబైల్ నంబర్ ఇవ్వండి.', 'Enter a 10-digit mobile number.')
@@ -141,6 +145,7 @@ export default function NominateScreen() {
         `ఎందుకు గుర్తింపు పొందాలి:`,
         draft.reason.trim(),
         '',
+        `నామినేట్ చేసినవారు: ${draft.nominator.trim()}`,
         `నామినేట్ చేసినవారి ఫోన్: ${draft.phone.trim() || 'ఇవ్వలేదు'}`,
         `అనుమతి: హీరో అనుమతితో ఫోటో, వివరాలు పంపినట్లు నామినేటర్ ధృవీకరించారు.`,
       ].join('\n');
@@ -237,7 +242,7 @@ export default function NominateScreen() {
         </Card>
       ) : (
         <Card padding="lg" style={styles.form}>
-          <Field label={pick('హీరో పూర్తి పేరు', "Hero's full name")} required error={show(errors.name)}>
+          <Field label={pick('లోకల్ హీరో పూర్తి పేరు', "Local Hero's full name")} required error={show(errors.name)}>
             <Input
               lang="te"
               leading="user"
@@ -327,10 +332,10 @@ export default function NominateScreen() {
           <View
             style={styles.group}
             accessibilityRole="radiogroup"
-            accessibilityLabel={pick('హీరో విభాగం', 'Hero category')}
+            accessibilityLabel="హీరో విభాగం (Hero category)"
           >
             <T variant="ui" weight="semibold">
-              {pick('హీరో విభాగం', 'Hero category')}
+              {'హీరో విభాగం (Hero category)'}
               <T variant="ui" weight="semibold" color="breaking" lang="en">
                 {' *'}
               </T>
@@ -369,6 +374,18 @@ export default function NominateScreen() {
                 'వారు ఏం చేశారు, ఎంతమందికి సహాయపడ్డారు, ఎన్నాళ్లుగా చేస్తున్నారు…',
                 'What they did, how many people it helped, for how long…',
               )}
+            />
+          </Field>
+
+          <Field label={pick('మీ పేరు (నామినేట్ చేస్తున్నవారు)', 'Your name (nominating)')} required error={show(errors.nominator)}>
+            <Input
+              lang="te"
+              leading="user"
+              value={draft.nominator}
+              maxLength={120}
+              autoCapitalize="words"
+              autoComplete="name"
+              onChangeText={(v) => set('nominator', v)}
             />
           </Field>
 

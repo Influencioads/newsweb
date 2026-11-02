@@ -47,6 +47,8 @@ interface Draft {
   district: string;
   category: string;
   reason: string;
+  /** The person nominating (who is writing this). */
+  nominator: string;
   phone: string;
   consent: boolean;
 }
@@ -58,6 +60,7 @@ const EMPTY: Draft = {
   district: '',
   category: '',
   reason: '',
+  nominator: '',
   phone: '',
   consent: false,
 };
@@ -126,7 +129,7 @@ export default function NominatePage() {
   const heroCategory = heroCategories.find((c) => c.value === draft.category);
 
   const errors = {
-    name: draft.name.trim().length < 3 ? L('హీరో పూర్తి పేరు రాయండి.', "Enter the hero's full name.") : null,
+    name: draft.name.trim().length < 3 ? L('లోకల్ హీరో పూర్తి పేరు రాయండి.', "Enter the local hero's full name.") : null,
     village: draft.village.trim().length < 2 ? L('ఊరు / పట్టణం రాయండి.', 'Enter the village or town.') : null,
     district: !draft.district ? L('జిల్లా ఎంచుకోండి.', 'Choose the district.') : null,
     category: !draft.category ? L('హీరో విభాగం ఎంచుకోండి.', 'Choose a hero category.') : null,
@@ -134,6 +137,7 @@ export default function NominatePage() {
       draft.reason.trim().length < MIN_REASON
         ? L(`కనీసం ${MIN_REASON} అక్షరాల్లో వివరించండి.`, `Explain in at least ${MIN_REASON} characters.`)
         : null,
+    nominator: draft.nominator.trim().length < 3 ? L('మీ పేరు రాయండి.', 'Enter your name.') : null,
     phone:
       !PHONE.test(draft.phone.trim())
         ? L('10 అంకెల మొబైల్ నంబర్ ఇవ్వండి.', 'Enter a 10-digit mobile number.')
@@ -155,6 +159,7 @@ export default function NominatePage() {
         `ఎందుకు గుర్తింపు పొందాలి:`,
         draft.reason.trim(),
         '',
+        `నామినేట్ చేసినవారు: ${draft.nominator.trim()}`,
         `నామినేట్ చేసినవారి ఫోన్: ${draft.phone.trim() || 'ఇవ్వలేదు'}`,
         `అనుమతి: హీరో అనుమతితో ఫోటో, వివరాలు పంపినట్లు నామినేటర్ ధృవీకరించారు.`,
       ].join('\n');
@@ -243,7 +248,7 @@ export default function NominatePage() {
           <Card as="section" padding="lg">
             <form className="space-y-5" onSubmit={onSubmit} noValidate>
               <div className="grid gap-4 md:grid-cols-2">
-                <Field label={L('హీరో పూర్తి పేరు', "Hero's full name")} required error={show(errors.name)}>
+                <Field label={L('లోకల్ హీరో పూర్తి పేరు', "Local Hero's full name")} required error={show(errors.name)}>
                   <Input
                     id="nominee-name"
                     script="te"
@@ -279,7 +284,7 @@ export default function NominatePage() {
                 ) : null}
               </div>
 
-              <Field label={L('హీరో విభాగం', 'Hero category')} required error={show(errors.category)}>
+              <Field label="హీరో విభాగం (Hero category)" required error={show(errors.category)}>
                 <Select id="nominee-category" value={draft.category} onChange={(e) => set('category', e.target.value)}>
                   <option value="">{L('— ఎంచుకోండి —', '— choose —')}</option>
                   {heroCategories.map((c) => (
@@ -311,6 +316,17 @@ export default function NominatePage() {
               </Field>
 
               <div className="grid gap-4 md:grid-cols-2">
+                <Field label={L('మీ పేరు (నామినేట్ చేస్తున్నవారు)', 'Your name (nominating)')} required error={show(errors.nominator)}>
+                  <Input
+                    id="nominator-name"
+                    script="te"
+                    autoComplete="name"
+                    maxLength={120}
+                    value={draft.nominator}
+                    onChange={(e) => set('nominator', e.target.value)}
+                  />
+                </Field>
+
                 <Field
                   label={L('మీ ఫోన్ నంబర్', 'Your contact number')}
                   required

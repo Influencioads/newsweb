@@ -28,6 +28,7 @@ import {
   SPECIALITIES,
   STORY_PROMPTS,
 } from './myVillage';
+import { SelfieCamera } from './SelfieCamera';
 
 /**
  * `/my-village/share` — Share Your Village, the process document's Steps 2–8:
@@ -348,8 +349,9 @@ export default function ShareVillagePage() {
   };
 
 
-  const pickWriterPhoto = (files: FileList | null) => {
-    const file = files?.[0];
+  const [selfieOpen, setSelfieOpen] = useState(false);
+  const pickWriterPhoto = (files: FileList | null) => acceptWriterPhoto(files?.[0]);
+  const acceptWriterPhoto = (file: File | undefined) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
       setWriterPhotoError(L('ఫొటో (JPG/PNG) మాత్రమే ఎంచుకోండి.', 'Choose a photo (JPG/PNG).'));
@@ -722,6 +724,9 @@ export default function ShareVillagePage() {
                     />
                   </Field>
                   <div className="flex flex-wrap items-center gap-2">
+                    <Button variant="wow" icon={Camera} onClick={() => setSelfieOpen(true)}>
+                      {L('సెల్ఫీ తీయండి', 'Take a selfie')}
+                    </Button>
                     <label
                       htmlFor="writer-photo"
                       className={cn(
@@ -729,8 +734,8 @@ export default function ShareVillagePage() {
                         'inline-flex min-h-tap cursor-pointer items-center gap-1.5 rounded-pill bg-on-ink/15 px-4 text-ui-sm font-semibold text-on-ink transition-colors duration-base hover:bg-on-ink/25',
                       )}
                     >
-                      <Icon icon={Camera} size="sm" />
-                      {writerPicture ? L('ఫొటో మార్చండి', 'Change photo') : L('మీ ఫొటో జోడించండి', 'Add your photo')}
+                      <Icon icon={ImagePlus} size="sm" />
+                      {L('గ్యాలరీ నుండి', 'From gallery')}
                     </label>
                     {writerPhoto ? (
                       <Button variant="ghost" size="sm" icon={X} className="text-on-ink hover:bg-on-ink/15" onClick={() => setWriterPhoto(null)}>
@@ -738,6 +743,7 @@ export default function ShareVillagePage() {
                       </Button>
                     ) : null}
                   </div>
+                  <SelfieCamera open={selfieOpen} onClose={() => setSelfieOpen(false)} onCapture={(file) => acceptWriterPhoto(file)} />
                   {writerPhotoError || show('writerPhoto') ? (
                     <p role="alert" className={cn(s.body, 'text-ui-sm font-semibold text-wow')}>
                       {writerPhotoError ?? show('writerPhoto')}

@@ -247,6 +247,46 @@ export default function NominatePage() {
 
           <Card as="section" padding="lg">
             <form className="space-y-5" onSubmit={onSubmit} noValidate>
+              {/* Who is nominating: shown first, like the writer card on Share Your Village. */}
+              <section
+                aria-labelledby="nominator-heading"
+                className="relative isolate overflow-hidden rounded-2xl bg-gradient-to-br from-brand-deep to-brand-dark p-5 text-on-ink shadow-raised md:p-6"
+              >
+                <div aria-hidden className="pointer-events-none absolute -right-12 -top-12 -z-10 h-48 w-48 rounded-full bg-wow/30 blur-3xl" />
+                <h2 id="nominator-heading" className={cn(s.head, 'text-headline-xs font-bold')}>
+                  {L('నామినేట్ చేస్తున్నది ఎవరు?', 'Who is nominating?')}
+                </h2>
+                <p className={cn(bodyCls, 'mt-1 text-on-ink/80')}>
+                  {L('మీ వివరాలు సంపాదకులు ధృవీకరణ కోసం మాత్రమే చూస్తారు.', 'Only editors see your details, to verify the nomination.')}
+                </p>
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <Field label={L('మీ పూర్తి పేరు', 'Your full name')} required error={show(errors.nominator)} className="[&_label]:text-on-ink">
+                    <Input
+                      id="nominator-name"
+                      script="te"
+                      autoComplete="name"
+                      maxLength={120}
+                      value={draft.nominator}
+                      onChange={(e) => set('nominator', e.target.value)}
+                      placeholder={L('ఉదా: రాముడు కొండా', 'e.g. Ramudu Konda')}
+                    />
+                  </Field>
+                  <Field label={L('మీ ఫోన్ నంబర్', 'Your contact number')} required error={show(errors.phone)} className="[&_label]:text-on-ink">
+                    <Input
+                      id="nominator-phone"
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel-national"
+                      maxLength={10}
+                      value={draft.phone}
+                      onChange={(e) => set('phone', e.target.value.replace(/\D/g, ''))}
+                      placeholder="98xxxxxxxx"
+                    />
+                  </Field>
+                </div>
+              </section>
+
+              <h2 className={cn(s.head, 'text-headline-xs font-bold text-ink')}>{L('లోకల్ హీరో వివరాలు', 'About the Local Hero')}</h2>
               <div className="grid gap-4 md:grid-cols-2">
                 <Field label={L('లోకల్ హీరో పూర్తి పేరు', "Local Hero's full name")} required error={show(errors.name)}>
                   <Input
@@ -315,57 +355,26 @@ export default function NominatePage() {
                 />
               </Field>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field label={L('మీ పేరు (నామినేట్ చేస్తున్నవారు)', 'Your name (nominating)')} required error={show(errors.nominator)}>
-                  <Input
-                    id="nominator-name"
-                    script="te"
-                    autoComplete="name"
-                    maxLength={120}
-                    value={draft.nominator}
-                    onChange={(e) => set('nominator', e.target.value)}
-                  />
-                </Field>
-
-                <Field
-                  label={L('మీ ఫోన్ నంబర్', 'Your contact number')}
-                  required
-                  error={show(errors.phone)}
-                  hint={L('సంపాదకులు ధృవీకరణ కోసం మాత్రమే వాడతారు.', 'Used only by editors to verify.')}
-                >
-                  <Input
-                    id="nominator-phone"
-                    type="tel"
-                    inputMode="numeric"
-                    autoComplete="tel-national"
-                    maxLength={10}
-                    value={draft.phone}
-                    onChange={(e) => set('phone', e.target.value.replace(/\D/g, ''))}
-                    placeholder="98xxxxxxxx"
-                  />
-                </Field>
-
-                <Field
-                  label={L('లోకల్ హీరో ఫోటో', 'Local Hero photo')}
-                  hint={
-                    canAttachPhoto
-                      ? L('JPG / PNG / WebP, హీరో అనుమతితో మాత్రమే.', 'JPG / PNG / WebP, only with the hero’s permission.')
-                      : L(
-                          'ఫోటోలు ధృవీకరించిన రచయితలు మాత్రమే పంపగలరు. లేదంటే మా సంపాదకులు మిమ్మల్ని సంప్రదిస్తారు.',
-                          'Only verified contributors can upload photos. Otherwise an editor will collect it from you.',
-                        )
-                  }
-                >
-                  <input
-                    id="nominee-photo"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    disabled={!canAttachPhoto}
-                    className={cn(inputClass, 'disabled:cursor-not-allowed disabled:opacity-60')}
-                    onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
-                  />
-                </Field>
-              </div>
+              <Field
+                label={L('లోకల్ హీరో ఫోటో', 'Local Hero photo')}
+                hint={
+                  canAttachPhoto
+                    ? L('JPG / PNG / WebP, హీరో అనుమతితో మాత్రమే.', 'JPG / PNG / WebP, only with the hero’s permission.')
+                    : L(
+                        'ఫోటోలు ధృవీకరించిన రచయితలు మాత్రమే పంపగలరు. లేదంటే మా సంపాదకులు మిమ్మల్ని సంప్రదిస్తారు.',
+                        'Only verified contributors can upload photos. Otherwise an editor will collect it from you.',
+                      )
+                }
+              >
+                <input
+                  id="nominee-photo"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  disabled={!canAttachPhoto}
+                  className={cn(inputClass, 'disabled:cursor-not-allowed disabled:opacity-60')}
+                  onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+                />
+              </Field>
 
               <fieldset className="pt-1">
                 <legend className={cn(s.body, 'mb-1.5 text-ui-sm font-semibold text-ink')}>

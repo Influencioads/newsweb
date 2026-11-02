@@ -685,22 +685,26 @@ export default function ShareVillagePage() {
               </p>
 
               <div className="mt-5 flex flex-col items-center gap-5 md:flex-row md:items-center">
-                <label
-                  htmlFor="writer-photo"
-                  className="group relative block h-28 w-28 shrink-0 cursor-pointer rounded-pill ring-4 ring-wow/70 ring-offset-4 ring-offset-brand-deep transition-transform duration-base hover:scale-[1.02] motion-reduce:transform-none"
-                >
-                  {writerPicture ? (
-                    <img src={writerPicture} alt={L('మీ ఫొటో', 'Your photo')} className="h-full w-full rounded-pill object-cover" />
-                  ) : (
-                    <span className="flex h-full w-full items-center justify-center rounded-pill bg-on-ink/10 text-on-ink/70">
-                      <Icon icon={UserRound} size="lg" />
+                <div className="flex shrink-0 flex-col items-center gap-3">
+                  <label
+                    htmlFor="writer-photo"
+                    className="group relative block h-28 w-28 shrink-0 cursor-pointer rounded-pill ring-4 ring-wow/70 ring-offset-4 ring-offset-brand-deep transition-transform duration-base hover:scale-[1.02] motion-reduce:transform-none"
+                  >
+                    {writerPicture ? (
+                      <img src={writerPicture} alt={L('మీ ఫొటో', 'Your photo')} className="h-full w-full rounded-pill object-cover" />
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center rounded-pill bg-on-ink/10 text-on-ink/70">
+                        <Icon icon={UserRound} size="lg" />
+                      </span>
+                    )}
+                    <span className="absolute -bottom-1 -right-1 flex h-10 w-10 items-center justify-center rounded-pill bg-gradient-to-br from-wow to-wow-deep text-on-wow shadow-card">
+                      <Icon icon={Camera} size="sm" />
                     </span>
-                  )}
-                  <span className="absolute -bottom-1 -right-1 flex h-10 w-10 items-center justify-center rounded-pill bg-gradient-to-br from-wow to-wow-deep text-on-wow shadow-card">
-                    <Icon icon={Camera} size="sm" />
-                  </span>
-                  <span className="sr-only">{writerPicture ? L('ఫొటో మార్చండి', 'Change photo') : L('ఫొటో జోడించండి', 'Add photo')}</span>
-                </label>
+                  </label>
+                  <label htmlFor="writer-photo" className={cn(s.body, 'cursor-pointer text-ui-sm font-semibold text-on-ink hover:underline')}>
+                    {writerPicture ? L('ఫొటో మార్చండి', 'Change photo') : L('ఫొటో జోడించండి', 'Add photo')}
+                  </label>
+                </div>
                 <input
                   id="writer-photo"
                   type="file"
@@ -761,7 +765,7 @@ export default function ShareVillagePage() {
             <div className="space-y-3">
               <h2 className={cn(s.head, 'text-headline-xs font-bold text-ink')}>{L('మిమ్మల్ని సంప్రదించడానికి', 'How we reach you')}</h2>
               <div className="grid gap-4 md:grid-cols-2">
-                <Field label={L('మొబైల్ నంబర్', 'Mobile number')} error={show('phone')} hint={verifiedPhone ? undefined : L('ఐచ్ఛికం', 'Optional')}>
+                <Field label={L('మొబైల్ నంబర్', 'Mobile number')} error={show('phone')}>
                   {verifiedPhone ? (
                     <div className="flex min-h-tap items-center gap-2 rounded-xl border border-success/40 bg-success-tint px-3">
                       <Icon icon={ShieldCheck} size="sm" className="text-success" />
@@ -787,7 +791,7 @@ export default function ShareVillagePage() {
                     </div>
                   )}
                 </Field>
-                <Field label={L('ఇమెయిల్', 'Email')} error={show('email')} hint={L('ఐచ్ఛికం', 'Optional')}>
+                <Field label={L('ఇమెయిల్', 'Email')} error={show('email')}>
                   <div className="relative">
                     <span aria-hidden className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted">
                       <Icon icon={Mail} size="sm" />

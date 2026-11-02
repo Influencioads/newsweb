@@ -242,6 +242,20 @@ export default function NominateScreen() {
         </Card>
       ) : (
         <Card padding="lg" style={styles.form}>
+          {/* Who is nominating comes first, as on the website. */}
+          <Field label={pick('మీ పూర్తి పేరు (నామినేట్ చేస్తున్నవారు)', 'Your full name (nominating)')} required error={show(errors.nominator)}>
+            <Input
+              lang="te"
+              leading="user"
+              value={draft.nominator}
+              maxLength={120}
+              autoCapitalize="words"
+              autoComplete="name"
+              onChangeText={(v) => set('nominator', v)}
+              placeholder={pick('ఉదా: రాముడు కొండా', 'e.g. Ramudu Konda')}
+            />
+          </Field>
+
           <Field label={pick('లోకల్ హీరో పూర్తి పేరు', "Local Hero's full name")} required error={show(errors.name)}>
             <Input
               lang="te"
@@ -374,18 +388,6 @@ export default function NominateScreen() {
                 'వారు ఏం చేశారు, ఎంతమందికి సహాయపడ్డారు, ఎన్నాళ్లుగా చేస్తున్నారు…',
                 'What they did, how many people it helped, for how long…',
               )}
-            />
-          </Field>
-
-          <Field label={pick('మీ పేరు (నామినేట్ చేస్తున్నవారు)', 'Your name (nominating)')} required error={show(errors.nominator)}>
-            <Input
-              lang="te"
-              leading="user"
-              value={draft.nominator}
-              maxLength={120}
-              autoCapitalize="words"
-              autoComplete="name"
-              onChangeText={(v) => set('nominator', v)}
             />
           </Field>
 

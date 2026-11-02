@@ -68,7 +68,7 @@ export function HeroBanner({ stories }: { stories: ArticleCard[] }) {
           deep-blue wash: on phones dark only at the bottom where the copy sits,
           from md dark on the left and clear on the right, so the photo shows. */}
       <div aria-hidden key={`bg-${article.short_id}`} className="absolute inset-0 -z-10 animate-fade-in">
-        <NewsImage media={article.hero} ratio="auto" radius="none" focus="top" priority className="h-full w-full" sizes="100vw" />
+        <NewsImage media={article.hero} ratio="auto" radius="none" focus="hero" priority className="h-full w-full" sizes="100vw" />
       </div>
       <div
         aria-hidden

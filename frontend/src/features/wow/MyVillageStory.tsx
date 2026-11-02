@@ -46,7 +46,8 @@ export async function fetchVillageStories(count = SHOWN): Promise<{ slug: string
 /** Each card's wash: a colour at the top fading into the deep WOW blue. */
 export const TINTS = [
   'from-wow/45 via-brand-deep/55 to-brand-deep',
-  'from-hero/45 via-brand-deep/55 to-brand-deep',
+  // Orange on phones too; the second colour comes back from tablets up.
+  'from-wow/45 via-brand-deep/55 to-brand-deep md:from-hero/45 md:via-brand-deep/55 md:to-brand-deep',
 ] as const;
 
 /** A full-bleed photo card: tinted overlay, big headline, standfirst, button. */

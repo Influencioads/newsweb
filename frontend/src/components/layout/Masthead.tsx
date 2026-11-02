@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Award, Bell, MapPin, Newspaper, SlidersHorizontal, UserRound } from 'lucide-react';
+import { Award, Bell, GalleryVerticalEnd, MapPin, Newspaper, SlidersHorizontal, UserRound } from 'lucide-react';
 
 import { LocationPicker, useReaderPlace, useReaderPlaceName } from '@/components/location/LocationPicker';
 import { Button, ButtonLink, IconButton, IconButtonLink } from '@/components/ui/Button';
@@ -139,30 +139,50 @@ export function Masthead() {
           </span>
         </Link>
 
-        {/* Phone: one row — the brand line small on one line on the left, a small
-            two-line Nominate Your Local Hero button on the right. */}
+        {/* Phone: one row — the brand line small on the left (wrapping to two lines
+            when it must), small two-line Story Shots and Nominate buttons on the right. */}
         <div className="order-first col-span-2 flex items-center justify-between gap-1 md:hidden">
-          <p lang={taglineScript.lang} className={cn(taglineScript.cls, 'min-w-0 whitespace-nowrap text-eyebrow font-bold tracking-normal text-ink')}>
+          <p lang={taglineScript.lang} className={cn(taglineScript.cls, 'min-w-0 text-eyebrow font-bold leading-snug tracking-normal text-ink')}>
             {tagline}
           </p>
-          <Link
-            to="/nominate"
-            aria-label={t('ui.nominate')}
-            className="flex min-h-tap shrink-0 items-center rounded-xl"
-          >
-            <span
-              className={cn(
-                s.body,
-                'inline-flex items-center gap-0.5 rounded-xl bg-gradient-to-br from-wow to-wow-deep px-1.5 py-0.5 text-eyebrow font-bold tracking-normal text-on-wow shadow-card',
-              )}
+          <div className="flex shrink-0 items-center gap-1">
+            <Link
+              to="/story-shots"
+              aria-label={t('ui.storyShots')}
+              className="flex min-h-tap shrink-0 items-center rounded-xl"
             >
-              <Icon icon={Award} size="xs" className="shrink-0" />
-              <span className="flex flex-col whitespace-nowrap text-left leading-normal">
-                <span>{language === 'te' ? 'లోకల్ హీరో ని' : 'Nominate a'}</span>
-                <span>{language === 'te' ? 'నామినేట్ చేయండి' : 'Local Hero'}</span>
+              <span
+                className={cn(
+                  s.body,
+                  'inline-flex items-center gap-0.5 rounded-xl bg-gradient-to-br from-wow to-wow-deep px-1.5 py-0.5 text-eyebrow font-bold tracking-normal text-on-wow shadow-card',
+                )}
+              >
+                <Icon icon={GalleryVerticalEnd} size="xs" className="shrink-0" />
+                <span className="flex flex-col whitespace-nowrap text-left leading-normal">
+                  <span>{language === 'te' ? 'స్టోరీ' : 'Story'}</span>
+                  <span>{language === 'te' ? 'షాట్స్' : 'Shots'}</span>
+                </span>
               </span>
-            </span>
-          </Link>
+            </Link>
+            <Link
+              to="/nominate"
+              aria-label={t('ui.nominate')}
+              className="flex min-h-tap shrink-0 items-center rounded-xl"
+            >
+              <span
+                className={cn(
+                  s.body,
+                  'inline-flex items-center gap-0.5 rounded-xl bg-gradient-to-br from-wow to-wow-deep px-1.5 py-0.5 text-eyebrow font-bold tracking-normal text-on-wow shadow-card',
+                )}
+              >
+                <Icon icon={Award} size="xs" className="shrink-0" />
+                <span className="flex flex-col whitespace-nowrap text-left leading-normal">
+                  <span>{language === 'te' ? 'లోకల్ హీరో ని' : 'Nominate a'}</span>
+                  <span>{language === 'te' ? 'నామినేట్ చేయండి' : 'Local Hero'}</span>
+                </span>
+              </span>
+            </Link>
+          </div>
         </div>
 
         {/* Right column: one row under md; from md account on top, the rest beneath. */}
@@ -184,9 +204,14 @@ export function Masthead() {
           <IconButton icon={SlidersHorizontal} label={t('ui.readerSettings')} onClick={() => setSettings(true)} />
           {authed && <NotificationBell />}
           </div>
-          <ButtonLink to="/nominate" variant="wow" size="sm" icon={Award} className="hidden md:inline-flex">
-            {t('ui.nominate')}
-          </ButtonLink>
+          <div className="hidden items-center gap-1 md:flex">
+            <ButtonLink to="/story-shots" variant="wow" size="sm" icon={GalleryVerticalEnd}>
+              {t('ui.storyShots')}
+            </ButtonLink>
+            <ButtonLink to="/nominate" variant="wow" size="sm" icon={Award}>
+              {t('ui.nominate')}
+            </ButtonLink>
+          </div>
           {/* Signed-in readers keep their profile here; there is no sign-in button in the header. */}
           {authed && me ? (
             <div className="md:order-first">

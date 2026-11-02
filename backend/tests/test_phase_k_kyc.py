@@ -17,7 +17,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -50,6 +50,7 @@ from app.models.enums import (  # noqa: E402
     MediaType,
     RoleKey,
     ScopeType,
+    SubmissionStatus,
     UserStatus,
     Vertical,
     WorkflowState,
@@ -590,6 +591,58 @@ class TestMyVillagePhotos:
         )
         assert r.status_code == 201, r.text
         assert len(r.json()["media_ids"]) == 1
+
+    def test_a_guest_can_share_a_village_with_name_and_photos_and_no_phone(
+        self, db: Session, client: TestClient
+    ) -> None:
+        r = client.post(
+            "/api/v1/public/my-village/submissions",
+            data={
+                "name": "రాముడు కొండా",
+                "title_te": "మై విలేజ్: పెదపూడి (తూర్పు గోదావరి)",
+                "body_te": "మా ఊరి కథ. " * 20,
+                "accept_guidelines": "true",
+            },
+            files=[
+                ("writer_photo", ("me.png", png_bytes(), "image/png")),
+                ("photos", ("temple.png", png_bytes(), "image/png")),
+                ("photos", ("lake.png", png_bytes(), "image/png")),
+            ],
+        )
+        assert r.status_code == 201, r.text
+        submission = db.get(CreatorSubmission, r.json()["id"])
+        assert submission is not None
+        assert submission.status == SubmissionStatus.PENDING
+        assert len(submission.media_ids or []) == 2
+        guest = db.get(User, submission.user_id)
+        assert guest.name_te == "రాముడు కొండా"
+        assert guest.phone is None and guest.email is None
+        assert guest.status == UserStatus.DISABLED  # a guest can never sign in
+        assert guest.avatar_media_id is not None
+        category = db.get(Category, submission.category_id)
+        assert category.slug == "my-village-story"
+
+    def test_a_guest_still_needs_a_name(self, client: TestClient) -> None:
+        r = client.post(
+            "/api/v1/public/my-village/submissions",
+            data={"name": "", "title_te": "మై విలేజ్: పెదపూడి", "body_te": "మా ఊరి కథ. " * 20, "accept_guidelines": "true"},
+        )
+        assert r.status_code == 422, r.text
+
+    def test_the_honeypot_stores_nothing(self, db: Session, client: TestClient) -> None:
+        before = db.scalar(select(func.count(CreatorSubmission.id)))
+        r = client.post(
+            "/api/v1/public/my-village/submissions",
+            data={
+                "name": "Bot Bot",
+                "title_te": "మై విలేజ్: పెదపూడి",
+                "body_te": "మా ఊరి కథ. " * 20,
+                "accept_guidelines": "true",
+                "website": "http://spam.example",
+            },
+        )
+        assert r.status_code == 201
+        assert db.scalar(select(func.count(CreatorSubmission.id))) == before
 
     def test_other_sections_still_need_kyc(self, db: Session, client: TestClient) -> None:
         user = make_reader(db, email="other-photos@test.local")

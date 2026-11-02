@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, Camera, Check, CheckCircle2, ImagePlus, Mail, Pencil, Phone, Send, ShieldCheck, UserRound, X } from 'lucide-react';
 
+import { api } from '@/api/client';
 import { LocationPicker } from '@/components/location/LocationPicker';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -13,8 +14,6 @@ import { useToast } from '@/components/ui/Toast';
 import * as authApi from '@/features/auth/api';
 import * as creatorApi from '@/features/creator/api';
 import * as publicApi from '@/features/public/api';
-import * as readerApi from '@/features/reader/api';
-import { OtpInput } from '@/features/auth/components/OtpInput';
 import { useI18n, useScript } from '@/i18n';
 import { useAuth } from '@/stores/auth';
 import { cn } from '@/utils/cn';
@@ -135,7 +134,6 @@ export default function ShareVillagePage() {
   const status = useAuth((auth) => auth.status);
   const me = useAuth((auth) => auth.me);
   const bootstrap = useAuth((auth) => auth.bootstrap);
-  const setMe = useAuth((auth) => auth.setMe);
 
   const [draft, setDraft] = useState<Draft>(loadDraft);
   const [step, setStep] = useState<number>(STEP.writer);
@@ -169,43 +167,9 @@ export default function ShareVillagePage() {
   });
   const [photoError, setPhotoError] = useState<string | null>(null);
 
-  // The writer proves their mobile number with an OTP right here — no separate
-  // sign-in page. A valid code signs them in (registering on first use), which
-  // is what lets the story and its photos be sent (submissions need a verified
-  // phone; My Village photos need only a signed-in reader).
+  // The mobile number is optional. A signed-in reader's verified number is
+  // shown as such; anyone else may type one so the desk can call them.
   const verifiedPhone = status === 'authenticated' && me?.user.phone_verified_at ? (me.user.phone ?? '') : null;
-  const [otpSent, setOtpSent] = useState(false);
-  const [otp, setOtp] = useState('');
-  const [devOtp, setDevOtp] = useState<string | null>(null);
-  const requestOtp = useMutation({
-    mutationFn: () => authApi.requestOtp(draft.phone.trim()),
-    onSuccess: (res) => {
-      setOtpSent(true);
-      setOtp('');
-      setDevOtp(res.dev_otp ?? null);
-    },
-    onError: (e) => toast.error(e),
-  });
-  const verifyOtp = useMutation({
-    mutationFn: () => readerApi.verifyReaderOtp(draft.phone.trim(), otp),
-    onSuccess: (res) => {
-      setMe(res.me);
-      setOtpSent(false);
-      setOtp('');
-      toast.success(L('మొబైల్ నంబర్ ధృవీకరించబడింది.', 'Mobile number verified.'));
-    },
-    onError: (e) => {
-      setOtp('');
-      toast.error(e);
-    },
-  });
-  const sendOtp = () => {
-    if (!PHONE.test(draft.phone.trim())) {
-      setTried(true);
-      return;
-    }
-    requestOtp.mutate();
-  };
 
   const place = useMemo(() => {
     const state = config.data?.states.find((x) => x.code === draft.state);
@@ -225,11 +189,10 @@ export default function ShareVillagePage() {
     [STEP.writer]: {
       name: draft.name.trim().length < 3 ? L('మీ పూర్తి పేరు రాయండి.', 'Enter your full name.') : null,
       writerPhoto: !writerPicture ? L('మీ ఫొటో జోడించండి.', 'Add your photo.') : null,
-      phone: verifiedPhone
-        ? null
-        : !PHONE.test(draft.phone.trim())
+      phone:
+        !verifiedPhone && draft.phone.trim() && !PHONE.test(draft.phone.trim())
           ? L('10 అంకెల మొబైల్ నంబర్ ఇవ్వండి.', 'Enter a 10-digit mobile number.')
-          : L('OTP తో మొబైల్ నంబర్ ధృవీకరించండి.', 'Verify your mobile number with the OTP.'),
+          : null,
       email: draft.email.trim() && !EMAIL.test(draft.email.trim()) ? L('సరైన ఇమెయిల్ ఇవ్వండి.', 'Enter a valid email.') : null,
     },
     [STEP.village]: {
@@ -290,12 +253,31 @@ export default function ShareVillagePage() {
         '',
         `పంపినవారు: ${draft.name.trim()}`,
         `రచయిత ఫొటో: ${writerPhoto ? 'కొత్తగా జోడించారు (ప్రొఫైల్ ఫొటో)' : savedAvatar ? 'ప్రొఫైల్ ఫొటో' : 'లేదు'}`,
-        `మొబైల్: ${verifiedPhone || draft.phone.trim()}`,
+        `మొబైల్: ${verifiedPhone || draft.phone.trim() || 'ఇవ్వలేదు'}`,
         `ఇమెయిల్: ${draft.email.trim() || 'ఇవ్వలేదు'}`,
         `పేరు ప్రచురించవచ్చు: ${draft.showName ? 'అవును' : 'వద్దు'}`,
       ].join('\n');
+      const title = `మై విలేజ్: ${draft.village.trim()} (${place.district})`;
+
+      // No account: the whole story, the writer's photo and the village photos
+      // go in one request (backend POST /public/my-village/submissions).
+      if (status !== 'authenticated') {
+        const form = new FormData();
+        form.append('name', draft.name.trim());
+        form.append('title_te', title);
+        form.append('body_te', body);
+        form.append('accept_guidelines', 'true');
+        if (draft.district) form.append('district_slug', draft.district);
+        if (writerPhoto) form.append('writer_photo', writerPhoto.file);
+        for (const p of photos) form.append('photos', p.file);
+        const { data } = await api.post<{ id: number }>('/public/my-village/submissions', form, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return data;
+      }
+
       const created = await creatorApi.submitArticle({
-        title_te: `మై విలేజ్: ${draft.village.trim()} (${place.district})`,
+        title_te: title,
         body_te: body,
         category_slug: MY_VILLAGE_SLUG,
         district_slug: draft.district || null,
@@ -346,11 +328,6 @@ export default function ShareVillagePage() {
     if (submit.isPending) return;
     setTried(true);
     if (!stepValid) return;
-    if (status !== 'authenticated') {
-      // Only reachable if the session ended mid-way: verify the number again.
-      go(STEP.writer);
-      return;
-    }
     submit.mutate();
   };
 
@@ -778,12 +755,7 @@ export default function ShareVillagePage() {
             <div className="space-y-3">
               <h2 className={cn(s.head, 'text-headline-xs font-bold text-ink')}>{L('మిమ్మల్ని సంప్రదించడానికి', 'How we reach you')}</h2>
               <div className="grid gap-4 md:grid-cols-2">
-                <Field
-                  label={L('మొబైల్ నంబర్', 'Mobile number')}
-                  required
-                  error={show('phone')}
-                  hint={verifiedPhone ? undefined : L('మీ నంబర్‌ను OTP తో ఇక్కడే ధృవీకరిస్తాం.', 'We verify your number with an OTP, right here.')}
-                >
+                <Field label={L('మొబైల్ నంబర్', 'Mobile number')} error={show('phone')} hint={verifiedPhone ? undefined : L('ఐచ్ఛికం', 'Optional')}>
                   {verifiedPhone ? (
                     <div className="flex min-h-tap items-center gap-2 rounded-xl border border-success/40 bg-success-tint px-3">
                       <Icon icon={ShieldCheck} size="sm" className="text-success" />
@@ -791,29 +763,21 @@ export default function ShareVillagePage() {
                       <span className={cn(s.body, 'ml-auto text-ui-sm font-semibold text-success')}>{L('ధృవీకరించబడింది', 'Verified')}</span>
                     </div>
                   ) : (
-                    <div className="flex gap-2">
-                      <div className="relative min-w-0 flex-1">
-                        <span aria-hidden className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted">
-                          <Icon icon={Phone} size="sm" />
-                        </span>
-                        <Input
-                          id="sender-phone"
-                          type="tel"
-                          inputMode="numeric"
-                          autoComplete="tel-national"
-                          maxLength={10}
-                          value={draft.phone}
-                          onChange={(e) => {
-                            set('phone', e.target.value.replace(/\D/g, ''));
-                            setOtpSent(false);
-                          }}
-                          placeholder="98xxxxxxxx"
-                          className="pl-10"
-                        />
-                      </div>
-                      <Button variant="wow" pending={requestOtp.isPending} onClick={sendOtp} className="shrink-0">
-                        {otpSent ? L('మళ్లీ పంపండి', 'Resend') : L('OTP పంపండి', 'Send OTP')}
-                      </Button>
+                    <div className="relative">
+                      <span aria-hidden className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted">
+                        <Icon icon={Phone} size="sm" />
+                      </span>
+                      <Input
+                        id="sender-phone"
+                        type="tel"
+                        inputMode="numeric"
+                        autoComplete="tel-national"
+                        maxLength={10}
+                        value={draft.phone}
+                        onChange={(e) => set('phone', e.target.value.replace(/\D/g, ''))}
+                        placeholder="98xxxxxxxx"
+                        className="pl-10"
+                      />
                     </div>
                   )}
                 </Field>
@@ -833,26 +797,6 @@ export default function ShareVillagePage() {
                   </div>
                 </Field>
               </div>
-              {otpSent && !verifiedPhone ? (
-                <div className="space-y-3 rounded-xl border border-wow/40 bg-wow-tint p-4">
-                  <p className={cn(bodyCls, 'font-semibold text-ink')}>
-                    {L(`${draft.phone} కి వచ్చిన 6 అంకెల OTP నమోదు చేయండి.`, `Enter the 6-digit OTP sent to ${draft.phone}.`)}
-                  </p>
-                  <OtpInput
-                    id="village-otp"
-                    label={L('OTP', 'OTP')}
-                    value={otp}
-                    onChange={setOtp}
-                    onComplete={() => verifyOtp.mutate()}
-                    disabled={verifyOtp.isPending}
-                    autoFocus
-                  />
-                  {devOtp ? <p className="font-sans text-ui-sm text-muted">Dev OTP: {devOtp}</p> : null}
-                  <Button variant="wow" pending={verifyOtp.isPending} disabled={otp.length !== 6} onClick={() => verifyOtp.mutate()}>
-                    {L('ధృవీకరించండి', 'Verify')}
-                  </Button>
-                </div>
-              ) : null}
               <p className={cn(s.body, 'flex items-center gap-1.5 text-ui-sm text-muted')}>
                 <Icon icon={ShieldCheck} size="xs" />
                 {L('మీ ఫోన్, ఇమెయిల్ ప్రచురించం — సంపాదకులు మాత్రమే చూస్తారు.', 'Your phone and email are never published — only editors see them.')}

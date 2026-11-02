@@ -8,18 +8,11 @@ vi.mock('@/features/public/api', () => ({
   fetchDistrictMandals: vi.fn(async () => []),
 }));
 vi.mock('@/features/auth/api', () => ({
-  requestOtp: vi.fn(async () => ({ sent: true, expires_in_seconds: 300, dev_otp: null })),
   uploadAvatar: vi.fn(),
   updateProfile: vi.fn(),
 }));
-vi.mock('@/features/reader/api', () => ({
-  verifyReaderOtp: vi.fn(async () => ({
-    is_new_account: true,
-    me: { user: { name_te: '', name_en: '', phone: '9876543210', phone_verified_at: '2026-10-31T00:00:00Z', avatar_url: null } },
-  })),
-}));
 
-import * as authApi from '@/features/auth/api';
+import { api } from '@/api/client';
 import { useAuth } from '@/stores/auth';
 
 import ShareVillagePage from './ShareVillagePage';
@@ -61,7 +54,7 @@ beforeEach(() => {
 });
 
 describe('Share Your Village', () => {
-  it('starts with who is writing: name, photo and a verified mobile', () => {
+  it('starts with who is writing: name and photo', () => {
     renderPage();
     expect(screen.getByText(/దశ 1 \/ 6/)).toBeInTheDocument();
     expect(screen.getByText('ఈ కథ రాస్తున్నది ఎవరు?')).toBeInTheDocument();
@@ -73,25 +66,43 @@ describe('Share Your Village', () => {
     expect(screen.queryByText(/సైన్ ఇన్/)).not.toBeInTheDocument();
   });
 
-  it('verifies the mobile with an OTP right on the page, then moves on to the village', async () => {
+  it('needs only a name and photo — the mobile number is optional', () => {
     renderPage();
     fireEvent.change(document.getElementById('sender-name')!, { target: { value: 'రాముడు కొండా' } });
     fireEvent.change(document.getElementById('writer-photo')!, {
       target: { files: [new File(['x'], 'me.jpg', { type: 'image/jpeg' })] },
     });
-    fireEvent.change(document.getElementById('sender-phone')!, { target: { value: '9876543210' } });
+    // A half-typed number is caught; an empty one is fine.
+    fireEvent.change(document.getElementById('sender-phone')!, { target: { value: '98765' } });
     next();
-    expect(screen.getByText('OTP తో మొబైల్ నంబర్ ధృవీకరించండి.')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /OTP పంపండి/ }));
-    await waitFor(() => expect(authApi.requestOtp).toHaveBeenCalledWith('9876543210'));
-    const firstBox = await screen.findByLabelText('OTP 1');
-    fireEvent.change(firstBox, { target: { value: '123456' } });
-    await screen.findByText('ధృవీకరించబడింది');
-
+    expect(screen.getByText('10 అంకెల మొబైల్ నంబర్ ఇవ్వండి.')).toBeInTheDocument();
+    fireEvent.change(document.getElementById('sender-phone')!, { target: { value: '' } });
     next();
     expect(screen.getByText(/దశ 2 \/ 6/)).toBeInTheDocument();
     expect(document.getElementById('village-name')).toBeInTheDocument();
+  });
+
+  it('sends a guest story, its photos and the writer photo in one request', async () => {
+    sessionStorage.setItem('wow.village-draft', JSON.stringify({ ...VILLAGE, name: 'రాముడు కొండా', consent: true }));
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { id: 7 } } as never);
+    renderPage();
+    fireEvent.change(document.getElementById('writer-photo')!, {
+      target: { files: [new File(['x'], 'me.jpg', { type: 'image/jpeg' })] },
+    });
+    for (let i = 0; i < 4; i += 1) next();
+    fireEvent.change(document.getElementById('village-photos')!, {
+      target: { files: [new File(['x'], 'temple.jpg', { type: 'image/jpeg' })] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /ప్రివ్యూ/ }));
+    fireEvent.click(screen.getByRole('button', { name: /కథనం పంపండి/ }));
+    await waitFor(() => expect(post).toHaveBeenCalled());
+    const [url, form] = post.mock.calls[0]!;
+    expect(url).toBe('/public/my-village/submissions');
+    const body = form as FormData;
+    expect(body.get('name')).toBe('రాముడు కొండా');
+    expect(body.getAll('photos')).toHaveLength(1);
+    expect(body.get('writer_photo')).toBeInstanceOf(File);
+    expect(String(body.get('body_te'))).toContain('మొబైల్: ఇవ్వలేదు');
   });
 
   it('a verified reader with a profile photo goes straight through to the specialities', () => {

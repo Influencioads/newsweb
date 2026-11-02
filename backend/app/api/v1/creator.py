@@ -1,6 +1,7 @@
 """Creator submissions (updated doc §17) and the CMS assist endpoint (§18).
 
 POST /users/me/submissions          — submit an article (signed-in reader)
+POST /public/my-village/submissions — Share Your Village with no account (guest)
 GET  /users/me/submissions          — my submissions with status
 GET  /cms/moderation/submissions    — moderation queue
 POST /cms/moderation/submissions/{id}/approve | /reject
@@ -12,7 +13,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -116,6 +117,85 @@ def create_submission(
         accept_guidelines=payload.accept_guidelines,
     )
     return _submission_out(submission, None)
+
+
+@router.post(
+    "/public/my-village/submissions",
+    status_code=201,
+    summary="Share Your Village without signing in (name and photo; phone optional)",
+)
+async def create_guest_village_submission(
+    request: Request,
+    name: str = Form(...),
+    title_te: str = Form(...),
+    body_te: str = Form(...),
+    accept_guidelines: bool = Form(...),
+    district_slug: str | None = Form(default=None),
+    # Honeypot: a field people never see. A bot that fills every input gets a
+    # 201 and nothing is stored.
+    website: str | None = Form(default=None),
+    writer_photo: UploadFile | None = File(default=None),
+    photos: list[UploadFile] = File(default=[]),
+    db: Session = Depends(get_db),
+    _rl: None = Depends(rate_limit("guest_village", 2)),
+) -> dict:
+    """The whole story in one request — the guest has no session to attach
+    photos with later. Everything lands in the moderation queue like any
+    reader submission; the writer's photo becomes the guest account's avatar."""
+    if website:
+        return {"id": 0, "status": SubmissionStatus.PENDING}
+    if len(photos) > submission_service.MAX_MEDIA:
+        raise ConflictError(
+            message_en=f"At most {submission_service.MAX_MEDIA} photographs per submission.",
+            message_te=f"ఒక రచనకు గరిష్ఠంగా {submission_service.MAX_MEDIA} ఫోటోలు మాత్రమే.",
+            details={"photos": f"limit {submission_service.MAX_MEDIA}"},
+        )
+    district = article_repo.get_district_by_slug(db, district_slug) if district_slug else None
+    submission = submission_service.create_guest_village_submission(
+        db,
+        name=name,
+        title_te=title_te,
+        body_te=body_te,
+        district_id=district.id if district else None,
+        accept_guidelines=accept_guidelines,
+    )
+    guest = submission.user
+    if writer_photo is not None:
+        avatar = media_service.create_image_media(
+            db,
+            raw=await writer_photo.read(),
+            filename=writer_photo.filename or "writer",
+            mime=writer_photo.content_type or "application/octet-stream",
+            max_bytes=min(settings.UPLOAD_IMAGE_MAX_BYTES, 4 * 1024 * 1024),
+            uploaded_by=guest.id,
+            alt_te=guest.name_te,
+            credit=guest.name_te,
+            source_type="contributed",
+        )
+        guest.avatar_media_id = avatar.id
+    for photo in photos:
+        media = media_service.create_image_media(
+            db,
+            raw=await photo.read(),
+            filename=photo.filename or "photo",
+            mime=photo.content_type or "application/octet-stream",
+            max_bytes=settings.UPLOAD_IMAGE_MAX_BYTES,
+            uploaded_by=guest.id,
+            source_type="contributed",
+            credit=guest.name_te,
+        )
+        submission_service.attach_media(db, submission=submission, media_id=media.id)
+    audit_service.record(
+        db,
+        action=AuditAction.SUBMIT,
+        entity_type="creator_submission",
+        entity_id=submission.id,
+        actor=None,
+        after={"guest_user_id": guest.id, "media_ids": submission.media_ids or []},
+        note="Share Your Village (guest)",
+        request=request,
+    )
+    return {"id": submission.id, "status": submission.status}
 
 
 @router.post(

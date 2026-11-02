@@ -19,7 +19,7 @@ from app.core.errors import ConflictError, NotFoundError, ValidationError
 from app.db.base import utcnow
 from app.models.content import Article, Category, WorkflowTransition
 from app.models.creator import CreatorSubmission
-from app.models.enums import ArticleStatus, SubmissionStatus, WorkflowState
+from app.models.enums import ArticleStatus, SubmissionStatus, UserStatus, WorkflowState
 from app.models.media import ArticleMedia
 from app.models.user import User
 from app.services import kyc_service, settings_service, tiptap
@@ -135,6 +135,66 @@ def create_submission(
 
     submission = CreatorSubmission(
         user_id=user_id,
+        title_te=title,
+        body_te=body,
+        category_id=category_id,
+        district_id=district_id,
+    )
+    db.add(submission)
+    db.flush()
+    return submission
+
+
+GUEST_NAME_MIN = 3
+GUEST_NAME_MAX = 120
+
+
+def create_guest_village_submission(
+    db: Session,
+    *,
+    name: str,
+    title_te: str,
+    body_te: str,
+    district_id: int | None,
+    accept_guidelines: bool,
+) -> CreatorSubmission:
+    """Share Your Village without an account or a phone number.
+
+    The story is filed under a guest account — the writer's name, no phone,
+    no email, no password, status DISABLED so it can never sign in — so the
+    moderation queue, the byline on approval and the photo credit all work as
+    they do for a reader. Nothing is published without an editor approving it.
+    """
+    if not accept_guidelines:
+        raise ValidationError(
+            message_en="Please accept the content guidelines first.",
+            message_te="ముందుగా కంటెంట్ మార్గదర్శకాలను అంగీకరించండి.",
+        )
+    if not settings_service.get_bool(db, "submissions.enabled"):
+        raise ConflictError(
+            message_en="Reader submissions are closed right now.",
+            message_te="ప్రస్తుతం పాఠకుల రచనలు స్వీకరించడం లేదు.",
+        )
+    writer = normalize_text(name or "").strip()
+    if not (GUEST_NAME_MIN <= len(writer) <= GUEST_NAME_MAX):
+        raise ValidationError(
+            message_en="Enter your full name.",
+            message_te="మీ పూర్తి పేరు రాయండి.",
+            details={"name": f"{GUEST_NAME_MIN}–{GUEST_NAME_MAX} characters"},
+        )
+    title = normalize_headline(title_te or "").strip()
+    body = normalize_text(body_te or "").strip()
+    if len(title) < TITLE_MIN:
+        raise ValidationError(details={"title_te": f"at least {TITLE_MIN} characters"})
+    if not (BODY_MIN <= len(body) <= BODY_MAX):
+        raise ValidationError(details={"body_te": f"{BODY_MIN}–{BODY_MAX} characters"})
+    category_id = db.scalar(select(Category.id).where(Category.slug == "my-village-story"))
+
+    guest = User(name_te=writer, name_en=writer, status=UserStatus.DISABLED)
+    db.add(guest)
+    db.flush()
+    submission = CreatorSubmission(
+        user_id=guest.id,
         title_te=title,
         body_te=body,
         category_id=category_id,

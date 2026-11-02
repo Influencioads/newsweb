@@ -63,11 +63,12 @@ export function HeroBanner({ stories }: { stories: ArticleCard[] }) {
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
     >
-      {/* The story's photo fills the banner (centred crop) under a light
+      {/* The story's photo fills the banner (cropped from the top, so heads
+          and the top of the scene stay in) under a light
           deep-blue wash: on phones dark only at the bottom where the copy sits,
           from md dark on the left and clear on the right, so the photo shows. */}
       <div aria-hidden key={`bg-${article.short_id}`} className="absolute inset-0 -z-10 animate-fade-in">
-        <NewsImage media={article.hero} ratio="auto" radius="none" priority className="h-full w-full" sizes="100vw" />
+        <NewsImage media={article.hero} ratio="auto" radius="none" focus="top" priority className="h-full w-full" sizes="100vw" />
       </div>
       <div
         aria-hidden

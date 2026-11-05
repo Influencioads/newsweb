@@ -355,6 +355,18 @@ export interface RadioSegment {
   tone: string;
   /** Category slugs, tried in order; the first with stories is played. */
   categories: string[];
+  /** Recorded episodes (MP3 / MP4 uploaded in the CMS); played instead of the stories. */
+  episodes?: RadioEpisode[];
+}
+
+/** A recorded WOW Radio episode uploaded in CMS → Site content → WOW Radio. */
+export interface RadioEpisode {
+  id: string;
+  url: string;
+  kind: 'audio' | 'video';
+  title_te: string;
+  title_en: string;
+  duration_sec: number;
 }
 
 /** A footer page (About, Privacy, ...) as CMS → Footer pages saves it. */

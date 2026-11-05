@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, ImageUp, Plus, RotateCcw, Save, X } from 'lucide-react';
+import { ExternalLink, ImageUp, Music, Plus, RotateCcw, Save, Video, X } from 'lucide-react';
 
 import { AdminPage } from '@/components/admin/AdminPage';
 import { Section } from '@/components/admin/FormControls';
@@ -17,7 +17,7 @@ import { wowIcon } from '@/features/wow/icons';
 import { DEFAULT_LOGO, DEFAULT_RADIO_IMAGE, useSiteConfig } from '@/features/wow/siteContent';
 import { useI18n } from '@/i18n';
 import { useAuth } from '@/stores/auth';
-import type { RadioSegment, SiteContent, StoryShotItem } from '@/types/public';
+import type { RadioEpisode, RadioSegment, SiteContent, StoryShotItem } from '@/types/public';
 
 import { ImageField, moveItem, ownMediaPath, RowActions, slugify, uniqueSlug } from './siteContentShared';
 import { useL } from './useL';
@@ -271,8 +271,8 @@ function RadioCard({ payload, canManage }: { payload: cmsApi.SiteContentPayload;
     <Section
       title={L('వావ్ రేడియో', 'WOW Radio')}
       subtitle={L(
-        'హోమ్ కార్డు చిత్రం, సెగ్మెంట్లు. ప్రతి సెగ్మెంట్ దాని విభాగాల్లోని తాజా కథనాలను చదువుతుంది.',
-        'The card picture and the segments. Each segment reads out the newest stories from its categories.',
+        'హోమ్ కార్డు చిత్రం, సెగ్మెంట్లు. అప్‌లోడ్ చేసిన ఎపిసోడ్‌లు (MP3 / MP4) ఉంటే అవి ప్లే అవుతాయి; లేకపోతే విభాగాల్లోని తాజా కథనాలను చదువుతుంది.',
+        'The card picture and the segments. A segment plays its uploaded episodes (MP3 / MP4); with none, it reads out the newest stories from its categories.',
       )}
     >
       <div className="grid gap-5 lg:grid-cols-2">
@@ -364,6 +364,7 @@ function RadioCard({ payload, canManage }: { payload: cmsApi.SiteContentPayload;
               >
                 <SegmentCategories value={sg.categories} onChange={(categories) => patch(i, { categories })} disabled={!canManage} />
               </Field>
+              <RadioEpisodes value={sg.episodes ?? []} onChange={(episodes) => patch(i, { episodes })} disabled={!canManage} />
             </Card>
           </li>
         ))}
@@ -377,6 +378,165 @@ function RadioCard({ payload, canManage }: { payload: cmsApi.SiteContentPayload;
     </Section>
   );
 }
+
+/** As many as the API keeps per segment (site_content.MAX_RADIO_EPISODES). */
+const MAX_RADIO_EPISODES = 30;
+/** What the API stores (site_content.RADIO_FILE_TYPES). */
+const RADIO_FILE_ACCEPT = '.mp3,.m4a,.aac,.wav,.ogg,.mp4,.webm,audio/*,video/mp4,video/webm';
+
+/**
+ * A segment's recorded episodes: MP3 / MP4 files uploaded here and played in
+ * this order. With none, the segment reads out its stories as before.
+ */
+function RadioEpisodes({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: RadioEpisode[];
+  onChange: (next: RadioEpisode[]) => void;
+  disabled: boolean;
+}) {
+  const L = useL();
+  const toast = useToast();
+  const input = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(0);
+  // Uploads finish one by one; add each to the newest list, not the one from the click.
+  const latest = useRef(value);
+  useEffect(() => {
+    latest.current = value;
+  }, [value]);
+  const room = MAX_RADIO_EPISODES - value.length;
+  const patch = (i: number, change: Partial<RadioEpisode>) =>
+    onChange(value.map((ep, j) => (j === i ? { ...ep, ...change } : ep)));
+
+  const addFiles = async (files: File[]) => {
+    const take = files.slice(0, room);
+    if (files.length > take.length) {
+      toast.error(L(`గరిష్ఠంగా ${MAX_RADIO_EPISODES} ఎపిసోడ్‌లు`, `At most ${MAX_RADIO_EPISODES} episodes`));
+    }
+    setUploading(take.length);
+    for (const [i, file] of take.entries()) {
+      try {
+        const stored = await cmsApi.uploadRadioFile(file);
+        const duration_sec = await fileDuration(file);
+        const title = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 160);
+        latest.current = [
+          ...latest.current,
+          {
+            id: `ep-${Date.now().toString(36)}-${i}`,
+            url: ownMediaPath(stored.url),
+            kind: stored.kind,
+            title_te: title,
+            title_en: title,
+            duration_sec,
+          },
+        ];
+        onChange(latest.current);
+      } catch (err) {
+        toast.error(err);
+      }
+      setUploading((n) => n - 1);
+    }
+  };
+
+  return (
+    <Field
+      label={L('ఎపిసోడ్‌లు (MP3 / MP4)', 'Episodes (MP3 / MP4)')}
+      hint={L(
+        'ఈ వరుసలో ప్లే అవుతాయి. ఎపిసోడ్‌లు లేకపోతే పై విభాగాల కథనాలు చదవబడతాయి. అప్‌లోడ్ తర్వాత సేవ్ నొక్కండి.',
+        'Played in this order. With no episodes, the stories from the categories above are read out. Press Save after uploading.',
+      )}
+    >
+      <div className="space-y-3">
+        {value.length ? (
+          <ol className="space-y-2">
+            {value.map((ep, i) => (
+              <li key={ep.id} className="space-y-2 rounded-lg border border-rule bg-surface p-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-wow-tint text-wow-deep">
+                    <Icon icon={ep.kind === 'video' ? Video : Music} size="sm" />
+                  </span>
+                  <p className="min-w-0 flex-1 truncate font-sans text-ui-sm font-semibold text-ink">
+                    {i + 1}. {ep.title_en || ep.title_te || L('శీర్షిక లేదు', 'No title')}
+                    {ep.duration_sec ? <span className="ml-2 font-normal text-muted">{clock(ep.duration_sec)}</span> : null}
+                  </p>
+                  {!disabled ? (
+                    <RowActions
+                      index={i}
+                      count={value.length}
+                      minCount={0}
+                      onMove={(d) => onChange(moveItem(value, i, d))}
+                      onRemove={() => onChange(value.filter((_, j) => j !== i))}
+                    />
+                  ) : null}
+                </div>
+                {ep.kind === 'video' ? (
+                  <video src={ep.url} controls preload="metadata" className="max-h-48 w-full rounded-md bg-ink" />
+                ) : (
+                  <audio src={ep.url} controls preload="none" className="w-full" />
+                )}
+                <PairFields
+                  label={L('శీర్షిక', 'Title')}
+                  te={ep.title_te}
+                  en={ep.title_en}
+                  onTe={(title_te) => patch(i, { title_te })}
+                  onEn={(title_en) => patch(i, { title_en })}
+                  disabled={disabled}
+                />
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="font-sans text-meta text-muted">
+            {L('ఇంకా ఎపిసోడ్‌లు లేవు — కథనాలు చదవబడతాయి.', 'No episodes yet — the stories are read out.')}
+          </p>
+        )}
+        {!disabled ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              ref={input}
+              type="file"
+              multiple
+              accept={RADIO_FILE_ACCEPT}
+              className="sr-only"
+              tabIndex={-1}
+              onChange={(e) => {
+                const files = Array.from(e.target.files ?? []);
+                e.target.value = '';
+                if (files.length) void addFiles(files);
+              }}
+            />
+            <Button icon={Music} variant="secondary" size="sm" pending={uploading > 0} disabled={room <= 0} onClick={() => input.current?.click()}>
+              {L('ఆడియో / వీడియో అప్‌లోడ్', 'Upload audio / video')}
+            </Button>
+            <span className="font-sans text-meta text-muted">
+              MP3, M4A, MP4 · {L('ఒక్కోటి 200 MB వరకు', 'up to 200 MB each')} ({value.length}/{MAX_RADIO_EPISODES})
+            </span>
+          </div>
+        ) : null}
+      </div>
+    </Field>
+  );
+}
+
+/** The file's length in whole seconds, as the browser reads it (0 when it can't tell). */
+function fileDuration(file: File): Promise<number> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const el = document.createElement(file.type.startsWith('video') ? 'video' : 'audio');
+    const done = (sec: number) => {
+      URL.revokeObjectURL(url);
+      resolve(Number.isFinite(sec) && sec > 0 ? Math.round(sec) : 0);
+    };
+    el.preload = 'metadata';
+    el.onloadedmetadata = () => done(el.duration);
+    el.onerror = () => done(0);
+    el.src = url;
+  });
+}
+
+const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 
 /** A new segment gets its link (/radio/<id>) from its English name. */
 function withSegmentIds(radio: SiteContent['radio']): SiteContent['radio'] {

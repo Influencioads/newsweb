@@ -138,6 +138,42 @@ class TestBlocks:
             r = client.put("/api/v1/cms/site-content/radio", json=bad, headers=admin)
             assert r.status_code == 422, bad
 
+    def test_radio_episode_files_upload_and_play(self, client: TestClient, admin: dict) -> None:
+        url = "/api/v1/cms/site-content/radio-file"
+        mp3 = client.post(url, files={"file": ("morning.mp3", b"ID3 fake-mp3", "audio/mpeg")}, headers=admin)
+        assert mp3.status_code == 201, mp3.text
+        assert mp3.json()["kind"] == "audio" and mp3.json()["url"].endswith(".mp3")
+        # A phone that sends no type: the extension decides.
+        mp4 = client.post(url, files={"file": ("clip.mp4", b"....ftypmp42", "application/octet-stream")}, headers=admin)
+        assert mp4.status_code == 201, mp4.text
+        assert mp4.json()["kind"] == "video" and mp4.json()["url"].endswith(".mp4")
+        assert client.post(url, files={"file": ("notes.txt", b"hello", "text/plain")}, headers=admin).status_code == 415
+        assert client.post(url, files={"file": ("empty.mp3", b"", "audio/mpeg")}, headers=admin).status_code == 415
+        assert client.post(url, files={"file": ("a.mp3", b"ID3", "audio/mpeg")}).status_code == 401
+
+        segment = {
+            "id": "night", "te": "రాత్రి", "en": "Night", "icon": "sparkles", "tone": "blue",
+            "categories": ["mystery"],
+            "episodes": [
+                {"id": "ep-1", "url": mp3.json()["url"], "kind": "audio", "title_te": "మొదటి ఎపిసోడ్"},
+                {"id": "ep-2", "url": mp4.json()["url"], "kind": "video", "title_en": "Second"},
+            ],
+        }
+        ok = client.put("/api/v1/cms/site-content/radio", json={"segments": [segment]}, headers=admin)
+        assert ok.status_code == 200, ok.text
+        radio = client.get("/api/v1/public/config").json()["content"]["radio"]
+        assert [(e["id"], e["kind"]) for e in radio["segments"][0]["episodes"]] == [("ep-1", "audio"), ("ep-2", "video")]
+
+        episode = segment["episodes"][0]
+        for bad in (
+            [{**episode, "url": "javascript:alert(1)"}],
+            [{**episode, "kind": "pdf"}],
+            [episode, episode],
+        ):
+            r = client.put("/api/v1/cms/site-content/radio", json={"segments": [{**segment, "episodes": bad}]}, headers=admin)
+            assert r.status_code == 422, bad
+        assert client.delete("/api/v1/cms/site-content/radio", headers=admin).status_code == 200
+
     def test_story_shots_are_their_own_uploads(self, client: TestClient, admin: dict) -> None:
         assert client.get("/api/v1/public/config").json()["content"]["story_shots"] == {"shots": []}
         shot = {"id": "s1", "image_url": "/media/shot-1.webp", "title_en": "Village fair", "link": "/section/mystery"}

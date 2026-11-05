@@ -3,6 +3,7 @@
     GET    /cms/site-content            every block, with defaults
     PUT    /cms/site-content/{block}    save one block
     DELETE /cms/site-content/{block}    back to the default
+    POST   /cms/site-content/radio-file a WOW Radio episode file (MP3, MP4, ...)
     GET    /cms/pages                   the saved footer pages
     PUT    /cms/pages/{slug}            save a footer page
     DELETE /cms/pages/{slug}            back to the website's original copy
@@ -13,7 +14,7 @@ The blocks reach readers through `GET /public/config` (`content`).
 
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, Request, Response
+from fastapi import APIRouter, Body, Depends, File, Request, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.deps import Principal, require_permission
@@ -32,6 +33,30 @@ def admin_site_content(
     _p: Principal = Depends(require_permission("settings.view")),
 ) -> dict[str, Any]:
     return site_content.admin_blocks(db)
+
+
+@router.post("/cms/site-content/radio-file", status_code=201, summary="Upload a WOW Radio episode (MP3, MP4, ...)")
+async def upload_radio_file(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    p: Principal = Depends(require_permission("settings.manage")),
+) -> dict[str, Any]:
+    stored = site_content.store_radio_file(
+        await file.read(),
+        filename=file.filename or "episode",
+        mime=file.content_type or "",
+    )
+    audit_service.record(
+        db,
+        action=AuditAction.MEDIA_UPLOAD,
+        entity_type="radio_file",
+        entity_id=stored["url"],
+        actor=p.user,
+        after={"bytes": stored["bytes"], "mime": stored["mime"]},
+        request=request,
+    )
+    return stored
 
 
 @router.put("/cms/site-content/{block}", summary="Save one site content block")

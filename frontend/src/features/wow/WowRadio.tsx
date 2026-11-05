@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Pause, Play, Square, type LucideIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pause, Play, Square, Video, type LucideIcon } from 'lucide-react';
 
 import { Icon } from '@/components/ui/Icon';
 import { PageContainer } from '@/components/ui/Layout';
@@ -10,7 +10,7 @@ import { audioQuery } from '@/components/article/AudioPlayer';
 import { useTts } from '@/features/reader/tts';
 import { usePlayer, type Track } from '@/stores/player';
 import { useI18n, useScript } from '@/i18n';
-import type { ArticleCard, RadioSegment } from '@/types/public';
+import type { ArticleCard, RadioEpisode, RadioSegment } from '@/types/public';
 import { cn } from '@/utils/cn';
 import { useDocumentTitle } from '@/utils/motion';
 
@@ -31,8 +31,9 @@ import { DEFAULT_CONTENT, DEFAULT_RADIO_IMAGE, useSiteContent } from './siteCont
  * its categories and read aloud on the listener's own device in Telugu (the
  * same Web Speech voice the article "Listen" control uses —
  * features/reader/tts). Each segment lists fallbacks so it is not silent while
- * its own category fills up. When recorded episodes exist they replace the
- * device voice here and nothing else on the page changes.
+ * its own category fills up. A segment with recorded episodes (MP3 / MP4
+ * uploaded in the CMS) plays those instead, in the global player; its video
+ * episodes can also be watched on the segment page.
  */
 
 interface Segment {
@@ -46,6 +47,8 @@ interface Segment {
   tone: string;
   /** Tried in order; the first with stories is played. */
   categories: string[];
+  /** Uploaded episodes; when there are any they are played instead of the stories. */
+  episodes: RadioEpisode[];
 }
 
 /** The CMS's tone names (backend site_content.RADIO_TONES) as theme gradients. */
@@ -65,6 +68,7 @@ const toSegment = (sg: RadioSegment): Segment => ({
   icon: wowIcon(sg.icon),
   tone: TONES[sg.tone] ?? TONES.orange!,
   categories: sg.categories,
+  episodes: sg.episodes ?? [],
 });
 
 /** The segments and the card picture, as set in CMS → Site content → WOW Radio. */
@@ -231,6 +235,19 @@ function SegmentTiles({
 /** The audio route of a story — also its track id in the global player. */
 const audioRoute = (a: ArticleCard) => `/public/articles/${a.short_id}/audio`;
 
+/** A segment's uploaded episodes as player tracks (an MP4 plays its sound). */
+const episodeTracks = (segment: Segment, image: string): Track[] =>
+  segment.episodes.map((ep) => ({
+    id: `radio:${segment.id}:${ep.id}`,
+    kind: 'article',
+    title: ep.title_te || ep.title_en || segment.te,
+    subtitle: `వావ్ రేడియో · ${segment.te}`,
+    url: ep.url,
+    durationSec: ep.duration_sec || null,
+    href: `/radio/${segment.id}`,
+    artwork: image,
+  }));
+
 /**
  * WOW Radio playback, shared by the home card and the segment pages.
  *
@@ -246,13 +263,15 @@ function useRadioPlayer(initial: string | null = null) {
   const [startWhenReady, setStartWhenReady] = useState(false);
   const [mode, setMode] = useState<'server' | 'voice' | null>(null);
   const [trackIds, setTrackIds] = useState<string[]>([]);
-  const { segments } = useRadio();
+  const { segments, image } = useRadio();
   const segment = segments.find((sg) => sg.id === active) ?? null;
+  const episodes = segment?.episodes ?? [];
   const programme = useQuery({
     // Segments are edited in the CMS; the key carries its categories so an edit refetches.
     queryKey: ['wow-radio', active, segment?.categories.join(',')],
     queryFn: () => (segment ? fetchSegment(segment) : Promise.resolve([])),
-    enabled: Boolean(segment),
+    // Uploaded episodes play instead of the stories, so there is nothing to fetch.
+    enabled: Boolean(segment) && !segment?.episodes.length,
     staleTime: 120_000,
   });
   const items = useMemo(() => programme.data ?? [], [programme.data]);
@@ -312,9 +331,10 @@ function useRadioPlayer(initial: string | null = null) {
     if (ours) usePlayer.getState().pause();
   }, [tts, ours]);
 
+  // `start`: begin a segment's uploaded episodes at this one rather than toggling.
   const play = useCallback(
-    (id: string) => {
-      if (id === active && ours) {
+    (id: string, start?: number) => {
+      if (id === active && ours && start === undefined) {
         usePlayer.getState().toggle();
         return;
       }
@@ -324,11 +344,19 @@ function useRadioPlayer(initial: string | null = null) {
       }
       stop();
       request.current += 1;
-      setMode(null);
       setActive(id);
+      const chosen = segments.find((sg) => sg.id === id);
+      if (chosen?.episodes.length) {
+        const tracks = episodeTracks(chosen, image);
+        setMode('server');
+        setTrackIds(tracks.map((tr) => tr.id));
+        usePlayer.getState().playQueue(tracks, start ?? 0);
+        return;
+      }
+      setMode(null);
       setStartWhenReady(true);
     },
-    [active, ours, mode, tts, stop],
+    [active, ours, mode, tts, stop, segments, image],
   );
 
   const playState: PlayState = ours
@@ -352,7 +380,7 @@ function useRadioPlayer(initial: string | null = null) {
           ? 'unavailable'
           : null;
 
-  return { active, items, loading: programme.isLoading, play, stop, playState, note };
+  return { active, items, episodes, loading: programme.isLoading, play, stop, playState, note };
 }
 
 function OnAirLabel() {
@@ -508,6 +536,8 @@ function SegmentView({ segment }: { segment: Segment }) {
 
   const radio = useRadioPlayer(segment.id);
   const items = radio.items;
+  const episodes = radio.episodes;
+  const videos = episodes.filter((ep) => ep.kind === 'video');
   const live = radio.playState === 'speaking';
   const stop = radio.stop;
 
@@ -515,7 +545,7 @@ function SegmentView({ segment }: { segment: Segment }) {
     ? te
       ? 'ట్యూన్ అవుతోంది…'
       : 'Tuning…'
-    : !items.length
+    : !items.length && !episodes.length
       ? te
         ? 'ఈ సెగ్మెంట్ ఎపిసోడ్‌లు త్వరలో'
         : 'Episodes for this segment are coming soon'
@@ -586,7 +616,7 @@ function SegmentView({ segment }: { segment: Segment }) {
           <button
             type="button"
             onClick={() => radio.play(segment.id)}
-            disabled={radio.note === 'unavailable' || !items.length}
+            disabled={radio.note === 'unavailable' || (!items.length && !episodes.length)}
             aria-label={live ? (te ? 'ఆపు' : 'Pause') : te ? 'ప్లే' : 'Play'}
             className="flex h-16 w-16 shrink-0 items-center justify-center rounded-pill bg-on-ink text-wow-deep shadow-raised transition-transform duration-base hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transform-none"
           >
@@ -615,8 +645,37 @@ function SegmentView({ segment }: { segment: Segment }) {
           ) : null}
         </div>
 
-        {/* Running order */}
-        {items.length ? (
+        {/* Running order: the uploaded episodes, or else the stories read out */}
+        {episodes.length ? (
+          <ol className="relative mt-5 space-y-1 border-t border-on-ink/15 pt-4">
+            <li className={cn(s.body, 'mb-1 text-meta font-semibold uppercase tracking-wide text-on-ink/60')}>
+              {te ? 'ఈ కార్యక్రమంలో' : 'In this programme'}
+            </li>
+            {episodes.map((ep, i) => (
+              <li key={ep.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Start the segment's queue at this episode.
+                    radio.play(segment.id, i);
+                  }}
+                  className="flex w-full items-baseline gap-3 rounded-lg px-1 py-1 text-left hover:bg-on-ink/5"
+                >
+                  <span className="font-sans text-meta font-bold tabular-nums text-wow">{String(i + 1).padStart(2, '0')}</span>
+                  <span lang="te" className="te te-clamp-2 flex-1 text-te-body-xs text-on-ink/90">
+                    {(te ? ep.title_te : ep.title_en) || ep.title_te || ep.title_en || segment.te}
+                  </span>
+                  {ep.kind === 'video' ? <Icon icon={Video} size="xs" className="shrink-0 text-on-ink/60" /> : null}
+                  {ep.duration_sec ? (
+                    <span className="shrink-0 font-sans text-meta tabular-nums text-on-ink/60">
+                      {Math.floor(ep.duration_sec / 60)}:{String(ep.duration_sec % 60).padStart(2, '0')}
+                    </span>
+                  ) : null}
+                </button>
+              </li>
+            ))}
+          </ol>
+        ) : items.length ? (
           <ol className="relative mt-5 space-y-1 border-t border-on-ink/15 pt-4">
             <li className={cn(s.body, 'mb-1 text-meta font-semibold uppercase tracking-wide text-on-ink/60')}>
               {te ? 'ఈ కార్యక్రమంలో' : 'In this programme'}
@@ -634,6 +693,33 @@ function SegmentView({ segment }: { segment: Segment }) {
           </ol>
         ) : null}
       </section>
+
+      {/* Video episodes, to watch here */}
+      {videos.length ? (
+        <section aria-labelledby="radio-videos" className="space-y-3">
+          <h2 id="radio-videos" className={cn(s.body, 'text-ui font-bold text-ink')}>
+            {te ? 'వీడియోలు' : 'Videos'}
+          </h2>
+          <ul className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {videos.map((ep) => (
+              <li key={ep.id} className="overflow-hidden rounded-xl border border-rule bg-surface">
+                <video
+                  src={ep.url}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  poster={image}
+                  onPlay={stop}
+                  className="aspect-video w-full bg-ink object-contain"
+                />
+                <p lang="te" className="te px-3 py-2 text-te-body-xs font-semibold text-ink">
+                  {(te ? ep.title_te : ep.title_en) || ep.title_te || ep.title_en}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {/* The other three segments */}
       <nav aria-label={te ? 'ఇతర సెగ్మెంట్లు' : 'Other segments'} className="space-y-2">

@@ -18,6 +18,7 @@ edited on the Taxonomy page; `ICONS` is the closed set their icon comes from.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from datetime import datetime
 from typing import Any
@@ -52,6 +53,7 @@ _SLUG = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
 # Our own path (an upload is served from /media/...) or an https address.
 # Quotes, spaces and angle brackets are refused: it lands in an <img src>.
 _IMAGE_URL = re.compile(r"^(?:/[^\s\"'<>]*|https://[^\s\"'<>]+)$")
+_FILE_URL = re.compile(r"^(?:/[^\s\"'<>]*|https?://[^\s\"'<>]+)$")
 _EMAIL = re.compile(r"^[^@\s<>\"']+@[^@\s<>\"']+\.[^@\s<>\"']+$")
 
 
@@ -105,6 +107,38 @@ class Hero(_Block):
         return v
 
 
+#: Recorded episodes kept per WOW Radio segment.
+MAX_RADIO_EPISODES = 30
+RADIO_EPISODE_KINDS: tuple[str, ...] = ("audio", "video")
+
+
+class RadioEpisode(_Block):
+    """A recorded episode (an MP3 or MP4 uploaded in the CMS). When a segment
+    has any, the website plays them instead of reading out its stories."""
+
+    id: str = Field(min_length=1, max_length=40, pattern=_SLUG)
+    url: str = Field(min_length=1, max_length=500)
+    kind: str = "audio"
+    title_te: str = Field(default="", max_length=160)
+    title_en: str = Field(default="", max_length=160)
+    duration_sec: int = Field(default=0, ge=0, le=24 * 3600)
+
+    @field_validator("url")
+    @classmethod
+    def _file(cls, v: str) -> str:
+        # The storage's own address, which is plain http on a local machine.
+        if not _FILE_URL.fullmatch(v):
+            raise ValueError("must be an uploaded file (/media/...) or a web address")
+        return v
+
+    @field_validator("kind")
+    @classmethod
+    def _known_kind(cls, v: str) -> str:
+        if v not in RADIO_EPISODE_KINDS:
+            raise ValueError(f"must be one of {', '.join(RADIO_EPISODE_KINDS)}")
+        return v
+
+
 class RadioSegment(_Block):
     id: str = Field(min_length=2, max_length=40, pattern=_SLUG)
     te: str = Field(min_length=1, max_length=60)
@@ -115,6 +149,8 @@ class RadioSegment(_Block):
     tone: str = "orange"
     #: Category slugs, tried in order; the first with stories is played.
     categories: list[str] = Field(min_length=1, max_length=10)
+    #: Recorded episodes, played in this order; none: the stories are read out.
+    episodes: list[RadioEpisode] = Field(default_factory=list, max_length=MAX_RADIO_EPISODES)
 
     @field_validator("icon")
     @classmethod
@@ -137,6 +173,14 @@ class RadioSegment(_Block):
         if not clean or any(not re.fullmatch(_SLUG, s) or len(s) > 80 for s in clean):
             raise ValueError("must be category slugs like morning-mantra")
         return clean
+
+    @field_validator("episodes")
+    @classmethod
+    def _unique_episodes(cls, v: list[RadioEpisode]) -> list[RadioEpisode]:
+        ids = [e.id for e in v]
+        if len(set(ids)) != len(ids):
+            raise ValueError("each episode needs its own id")
+        return v
 
 
 def _default_segments() -> list[RadioSegment]:
@@ -406,6 +450,66 @@ def admin_blocks(db: Session) -> dict[str, Any]:
         "icons": list(ICONS),
         "radio_tones": list(RADIO_TONES),
     }
+
+
+#: WOW Radio episode files: what browsers and phones play without a plug-in.
+RADIO_FILE_TYPES: dict[str, tuple[str, str]] = {
+    "audio/mpeg": ("mp3", "audio"),
+    "audio/mp3": ("mp3", "audio"),
+    "audio/mp4": ("m4a", "audio"),
+    "audio/x-m4a": ("m4a", "audio"),
+    "audio/aac": ("aac", "audio"),
+    "audio/wav": ("wav", "audio"),
+    "audio/x-wav": ("wav", "audio"),
+    "audio/ogg": ("ogg", "audio"),
+    "audio/webm": ("webm", "audio"),
+    "video/mp4": ("mp4", "video"),
+    "video/webm": ("webm", "video"),
+}
+#: Phones often send a file with no type; then the name's extension decides.
+_RADIO_EXTENSIONS: dict[str, str] = {
+    "mp3": "audio/mpeg",
+    "m4a": "audio/mp4",
+    "aac": "audio/aac",
+    "wav": "audio/wav",
+    "ogg": "audio/ogg",
+    "mp4": "video/mp4",
+    "webm": "video/webm",
+}
+MAX_RADIO_FILE_BYTES = 200 * 1024 * 1024
+
+
+def store_radio_file(raw: bytes, *, filename: str, mime: str) -> dict[str, Any]:
+    """Store an uploaded WOW Radio episode (MP3, MP4, ...) and say where it is.
+
+    The file is only stored here; it joins a segment when the WOW Radio block
+    is saved with it in that segment's `episodes`.
+    """
+    from app.core.errors import FileTooLargeError, UnsupportedMediaTypeError
+    from app.integrations.storage import get_storage
+
+    mime = (mime or "").split(";")[0].strip().lower()
+    if mime not in RADIO_FILE_TYPES:
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+        mime = _RADIO_EXTENSIONS.get(ext, mime)
+    if mime not in RADIO_FILE_TYPES:
+        raise UnsupportedMediaTypeError(
+            details={"mime": mime, "allowed": sorted(_RADIO_EXTENSIONS)}
+        )
+    if not raw:
+        raise UnsupportedMediaTypeError(details={"file": "empty"})
+    if len(raw) > MAX_RADIO_FILE_BYTES:
+        raise FileTooLargeError(details={"bytes": len(raw), "max_bytes": MAX_RADIO_FILE_BYTES})
+
+    extension, kind = RADIO_FILE_TYPES[mime]
+    digest = hashlib.sha256(raw).hexdigest()
+    stored = get_storage().put(
+        f"radio/{digest[:20]}.{extension}",
+        raw,
+        content_type=mime,
+        cache_control="public, max-age=31536000, immutable",
+    )
+    return {"url": stored.url, "kind": kind, "mime": mime, "bytes": stored.bytes}
 
 
 def save_block(db: Session, name: str, payload: Any, actor_id: int | None) -> dict[str, Any]:

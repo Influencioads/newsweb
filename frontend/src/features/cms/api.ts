@@ -17,6 +17,7 @@ export const fetchModeration=async<T>(kind:'reports'|'comments',status?:string)=
 /** CMS → Site content and Footer pages (backend app/api/v1/site_content.py). */
 export const fetchSiteContent=async()=>(await api.get<SiteContentPayload>('/cms/site-content')).data;
 export const saveSiteContent=async<K extends keyof SiteContent>(block:K,value:SiteContent[K])=>(await api.put<SiteContent[K]>(`/cms/site-content/${block}`,value)).data;
+export const uploadRadioFile=async(file:File)=>{const fd=new FormData();fd.append('file',file);return (await api.post<{url:string;kind:'audio'|'video';mime:string;bytes:number}>('/cms/site-content/radio-file',fd,{headers:{'Content-Type':'multipart/form-data'},timeout:0})).data};
 export const resetSiteContent=async<K extends keyof SiteContent>(block:K)=>(await api.delete<SiteContent[K]>(`/cms/site-content/${block}`)).data;
 export const fetchSitePages=async()=>(await api.get<{slugs:string[];pages:Record<string,SitePage>}>('/cms/pages')).data;
 export const saveSitePage=async(slug:string,page:SitePage)=>(await api.put<SitePage>(`/cms/pages/${slug}`,page)).data;

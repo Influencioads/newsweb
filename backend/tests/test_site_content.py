@@ -155,7 +155,7 @@ class TestBlocks:
             "id": "night", "te": "రాత్రి", "en": "Night", "icon": "sparkles", "tone": "blue",
             "categories": ["mystery"],
             "episodes": [
-                {"id": "ep-1", "url": mp3.json()["url"], "kind": "audio", "title_te": "మొదటి ఎపిసోడ్"},
+                {"id": "ep-1", "url": mp3.json()["url"], "kind": "audio", "title_te": "మొదటి ఎపిసోడ్", "image_url": "/media/ep-1.webp"},
                 {"id": "ep-2", "url": mp4.json()["url"], "kind": "video", "title_en": "Second"},
             ],
         }
@@ -163,11 +163,14 @@ class TestBlocks:
         assert ok.status_code == 200, ok.text
         radio = client.get("/api/v1/public/config").json()["content"]["radio"]
         assert [(e["id"], e["kind"]) for e in radio["segments"][0]["episodes"]] == [("ep-1", "audio"), ("ep-2", "video")]
+        # Each episode has its own thumbnail; one without falls back to the WOW Radio picture.
+        assert [e["image_url"] for e in radio["segments"][0]["episodes"]] == ["/media/ep-1.webp", ""]
 
         episode = segment["episodes"][0]
         for bad in (
             [{**episode, "url": "javascript:alert(1)"}],
             [{**episode, "kind": "pdf"}],
+            [{**episode, "image_url": "javascript:alert(1)"}],
             [episode, episode],
         ):
             r = client.put("/api/v1/cms/site-content/radio", json={"segments": [{**segment, "episodes": bad}]}, headers=admin)

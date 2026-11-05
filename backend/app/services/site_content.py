@@ -122,6 +122,16 @@ class RadioEpisode(_Block):
     title_te: str = Field(default="", max_length=160)
     title_en: str = Field(default="", max_length=160)
     duration_sec: int = Field(default=0, ge=0, le=24 * 3600)
+    #: The episode's thumbnail picture, uploaded in the CMS; blank: the WOW Radio picture.
+    image_url: str = Field(default="", max_length=500)
+
+    @field_validator("image_url")
+    @classmethod
+    def _thumbnail(cls, v: str) -> str:
+        v = v.strip()
+        if v and not _IMAGE_URL.fullmatch(v):
+            raise ValueError("must be an uploaded picture (/media/...) or an https address")
+        return v
 
     @field_validator("url")
     @classmethod

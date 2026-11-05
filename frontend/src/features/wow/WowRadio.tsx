@@ -237,16 +237,20 @@ const audioRoute = (a: ArticleCard) => `/public/articles/${a.short_id}/audio`;
 
 /** A segment's uploaded episodes as player tracks (an MP4 plays its sound). */
 const episodeTracks = (segment: Segment, image: string): Track[] =>
-  segment.episodes.map((ep) => ({
+  segment.episodes.map((ep, i) => ({
     id: `radio:${segment.id}:${ep.id}`,
     kind: 'article',
-    title: ep.title_te || ep.title_en || segment.te,
+    title: episodeTitle(ep, i, true),
     subtitle: `వావ్ రేడియో · ${segment.te}`,
     url: ep.url,
     durationSec: ep.duration_sec || null,
     href: `/radio/${segment.id}`,
-    artwork: image,
+    artwork: ep.image_url || image,
   }));
+
+/** The title typed in the CMS, or "Episode 3" — never the uploaded file's name. */
+const episodeTitle = (ep: RadioEpisode, index: number, te: boolean) =>
+  (te ? ep.title_te || ep.title_en : ep.title_en || ep.title_te) || `${te ? 'ఎపిసోడ్' : 'Episode'} ${index + 1}`;
 
 /**
  * WOW Radio playback, shared by the home card and the segment pages.
@@ -647,33 +651,50 @@ function SegmentView({ segment }: { segment: Segment }) {
 
         {/* Running order: the uploaded episodes, or else the stories read out */}
         {episodes.length ? (
-          <ol className="relative mt-5 space-y-1 border-t border-on-ink/15 pt-4">
+          <ol className="relative mt-5 space-y-2 border-t border-on-ink/15 pt-4">
             <li className={cn(s.body, 'mb-1 text-meta font-semibold uppercase tracking-wide text-on-ink/60')}>
               {te ? 'ఈ కార్యక్రమంలో' : 'In this programme'}
             </li>
-            {episodes.map((ep, i) => (
-              <li key={ep.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    // Start the segment's queue at this episode.
-                    radio.play(segment.id, i);
-                  }}
-                  className="flex w-full items-baseline gap-3 rounded-lg px-1 py-1 text-left hover:bg-on-ink/5"
-                >
-                  <span className="font-sans text-meta font-bold tabular-nums text-wow">{String(i + 1).padStart(2, '0')}</span>
-                  <span lang="te" className="te te-clamp-2 flex-1 text-te-body-xs text-on-ink/90">
-                    {(te ? ep.title_te : ep.title_en) || ep.title_te || ep.title_en || segment.te}
-                  </span>
-                  {ep.kind === 'video' ? <Icon icon={Video} size="xs" className="shrink-0 text-on-ink/60" /> : null}
-                  {ep.duration_sec ? (
-                    <span className="shrink-0 font-sans text-meta tabular-nums text-on-ink/60">
-                      {Math.floor(ep.duration_sec / 60)}:{String(ep.duration_sec % 60).padStart(2, '0')}
+            {episodes.map((ep, i) => {
+              const title = episodeTitle(ep, i, te);
+              return (
+                <li key={ep.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Start the segment's queue at this episode.
+                      radio.play(segment.id, i);
+                    }}
+                    aria-label={`${te ? 'ప్లే' : 'Play'}: ${title}`}
+                    className="group flex w-full items-center gap-3 rounded-xl p-1.5 text-left hover:bg-on-ink/5 md:gap-4"
+                  >
+                    {/* The episode's thumbnail (CMS), else the WOW Radio picture. */}
+                    <span className="relative aspect-video w-28 shrink-0 overflow-hidden rounded-lg bg-on-ink/10 md:w-36">
+                      <img src={ep.image_url || image} alt="" loading="lazy" className="h-full w-full object-cover" />
+                      <span aria-hidden className="absolute inset-0 flex items-center justify-center bg-ink/20 transition-colors group-hover:bg-ink/35">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-pill bg-on-ink/90 text-wow-deep shadow-card">
+                          <Icon icon={Play} size="xs" className="translate-x-px" />
+                        </span>
+                      </span>
+                      {ep.duration_sec ? (
+                        <span className="absolute bottom-1 right-1 rounded-pill bg-ink/75 px-1.5 font-sans text-meta tabular-nums text-on-ink">
+                          {Math.floor(ep.duration_sec / 60)}:{String(ep.duration_sec % 60).padStart(2, '0')}
+                        </span>
+                      ) : null}
                     </span>
-                  ) : null}
-                </button>
-              </li>
-            ))}
+                    <span className="min-w-0 flex-1">
+                      <span lang={te ? 'te' : 'en'} className={cn(te ? 'te text-te-body-xs' : 'font-sans text-ui', 'te-clamp-2 block font-semibold text-on-ink/95')}>
+                        {title}
+                      </span>
+                      <span className="mt-0.5 flex items-center gap-1.5 font-sans text-meta text-on-ink/60">
+                        <Icon icon={ep.kind === 'video' ? Video : Play} size="xs" />
+                        {ep.kind === 'video' ? (te ? 'వీడియో' : 'Video') : te ? 'ఆడియో' : 'Audio'}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
           </ol>
         ) : items.length ? (
           <ol className="relative mt-5 space-y-1 border-t border-on-ink/15 pt-4">
@@ -708,12 +729,12 @@ function SegmentView({ segment }: { segment: Segment }) {
                   controls
                   playsInline
                   preload="metadata"
-                  poster={image}
+                  poster={ep.image_url || image}
                   onPlay={stop}
                   className="aspect-video w-full bg-ink object-contain"
                 />
                 <p lang="te" className="te px-3 py-2 text-te-body-xs font-semibold text-ink">
-                  {(te ? ep.title_te : ep.title_en) || ep.title_te || ep.title_en}
+                  {episodeTitle(ep, episodes.indexOf(ep), te)}
                 </p>
               </li>
             ))}

@@ -364,7 +364,12 @@ function RadioCard({ payload, canManage }: { payload: cmsApi.SiteContentPayload;
               >
                 <SegmentCategories value={sg.categories} onChange={(categories) => patch(i, { categories })} disabled={!canManage} />
               </Field>
-              <RadioEpisodes value={sg.episodes ?? []} onChange={(episodes) => patch(i, { episodes })} disabled={!canManage} />
+              <RadioEpisodes
+                value={sg.episodes ?? []}
+                onChange={(episodes) => patch(i, { episodes })}
+                radioImage={draft.image_url || DEFAULT_RADIO_IMAGE}
+                disabled={!canManage}
+              />
             </Card>
           </li>
         ))}
@@ -391,10 +396,13 @@ const RADIO_FILE_ACCEPT = '.mp3,.m4a,.aac,.wav,.ogg,.mp4,.webm,audio/*,video/mp4
 function RadioEpisodes({
   value,
   onChange,
+  radioImage,
   disabled,
 }: {
   value: RadioEpisode[];
   onChange: (next: RadioEpisode[]) => void;
+  /** What an episode without its own thumbnail shows. */
+  radioImage: string;
   disabled: boolean;
 }) {
   const L = useL();
@@ -420,16 +428,17 @@ function RadioEpisodes({
       try {
         const stored = await cmsApi.uploadRadioFile(file);
         const duration_sec = await fileDuration(file);
-        const title = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 160);
         latest.current = [
           ...latest.current,
           {
             id: `ep-${Date.now().toString(36)}-${i}`,
             url: ownMediaPath(stored.url),
             kind: stored.kind,
-            title_te: title,
-            title_en: title,
+            // Typed below: a file name ("morning1") is not a title readers should see.
+            title_te: '',
+            title_en: '',
             duration_sec,
+            image_url: '',
           },
         ];
         onChange(latest.current);
@@ -458,7 +467,7 @@ function RadioEpisodes({
                     <Icon icon={ep.kind === 'video' ? Video : Music} size="sm" />
                   </span>
                   <p className="min-w-0 flex-1 truncate font-sans text-ui-sm font-semibold text-ink">
-                    {i + 1}. {ep.title_en || ep.title_te || L('శీర్షిక లేదు', 'No title')}
+                    {i + 1}. {ep.title_en || ep.title_te || L('శీర్షిక ఇంకా లేదు', 'No title yet')}
                     {ep.duration_sec ? <span className="ml-2 font-normal text-muted">{clock(ep.duration_sec)}</span> : null}
                   </p>
                   {!disabled ? (
@@ -484,6 +493,21 @@ function RadioEpisodes({
                   onEn={(title_en) => patch(i, { title_en })}
                   disabled={disabled}
                 />
+                <div className="space-y-1.5">
+                  <p className="font-sans text-ui-sm font-semibold text-ink">
+                    {L('థంబ్‌నెయిల్ చిత్రం', 'Thumbnail picture')}{' '}
+                    <span className="font-normal text-muted">· 1280 × 720 (16:9)</span>
+                  </p>
+                  <ImageField
+                    value={ep.image_url ?? ''}
+                    fallback={radioImage}
+                    alt={ep.title_te || ep.title_en}
+                    onChange={(image_url) => patch(i, { image_url })}
+                    disabled={disabled}
+                    wide
+                    originalLabel={L('వావ్ రేడియో చిత్రం చూపిస్తోంది', 'Showing the WOW Radio picture')}
+                  />
+                </div>
               </li>
             ))}
           </ol>

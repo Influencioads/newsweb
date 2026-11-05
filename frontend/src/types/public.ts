@@ -367,6 +367,8 @@ export interface RadioEpisode {
   title_te: string;
   title_en: string;
   duration_sec: number;
+  /** The episode's thumbnail picture; blank: the WOW Radio picture. */
+  image_url?: string;
 }
 
 /** A footer page (About, Privacy, ...) as CMS → Footer pages saves it. */

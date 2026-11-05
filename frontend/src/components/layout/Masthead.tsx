@@ -133,13 +133,13 @@ export function Masthead() {
           {/* Brand line (CMS → Site content), e.g. "Ordinary People. Extraordinary Stories." */}
           <span
             lang={taglineScript.lang}
-            className={cn(taglineScript.cls, '-mt-0.5 block self-start whitespace-nowrap text-left text-eyebrow font-bold tracking-normal text-ink md:mt-0.5 md:self-auto md:text-center md:text-meta md:tracking-wide lg:text-ui-sm')}
+            className={cn(taglineScript.cls, '-mt-0.5 block whitespace-nowrap text-center text-eyebrow font-bold tracking-normal text-ink md:mt-0.5 md:text-meta md:tracking-wide lg:text-ui-sm')}
           >
             {tagline}
           </span>
         </Link>
 
-        {/* Phone: the brand line sits under the wordmark on the left; this row puts the
+        {/* Phone: the brand line sits centred under the wordmark; this row puts the
             one-line Story Shots button on the left and Nominate on the right. */}
         <div className="order-first col-span-2 flex items-center justify-between gap-2 md:hidden">
           <Link

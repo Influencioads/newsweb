@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { Linking, View, type LayoutChangeEvent, type ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,6 +28,7 @@ import { PollCard } from '@/components/PollCard';
 import { SectionHeader } from '@/components/SectionHeader';
 import { ShareStrip } from '@/components/ShareSheet';
 import { useReadingBeacon } from '@/lib/beacon';
+import { MY_VILLAGE_SLUG } from '@/lib/myVillage';
 import { timeAgo, useI18n } from '@/lib/i18n';
 import { SPRING, useMotion } from '@/lib/motion';
 import { radius, space } from '@/lib/theme';
@@ -248,9 +250,22 @@ export default function ArticleScreen() {
 
               <View style={styles.byline}>
                 {data.byline_te || data.author ? (
-                  <T variant="bodySmall" weight="semibold">
-                    {data.author ? pick(data.author.name_te, data.author.name_en) : data.byline_te}
-                  </T>
+                  // "Written by" with the writer's photo, set in the CMS (My Village stories).
+                  <View style={styles.writer}>
+                    {!data.author && data.byline_photo_url ? (
+                      <Image source={{ uri: absoluteMediaUrl(data.byline_photo_url) ?? undefined }} style={styles.writerPhoto} contentFit="cover" accessible={false} />
+                    ) : null}
+                    <View style={styles.writerText}>
+                      {!data.author && (data.byline_photo_url || data.category?.slug === MY_VILLAGE_SLUG) ? (
+                        <T variant="meta" color="muted">
+                          {pick('రాసిన వారు', 'Written by')}
+                        </T>
+                      ) : null}
+                      <T variant="bodySmall" weight="semibold">
+                        {data.author ? pick(data.author.name_te, data.author.name_en) : data.byline_te}
+                      </T>
+                    </View>
+                  </View>
                 ) : null}
                 <T variant="meta" color="muted">
                   {[
@@ -400,6 +415,9 @@ const useStyles = makeStyles((color) => ({
   standfirst: { marginTop: space.sm },
   rule: { marginTop: space.lg },
   byline: { paddingTop: space.md, gap: space.xs },
+  writer: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  writerPhoto: { width: 44, height: 44, borderRadius: 22 },
+  writerText: { flexShrink: 1 },
   audio: { paddingHorizontal: space.lg, paddingTop: space.lg },
   body: { paddingHorizontal: space.lg, paddingTop: space.lg },
   correction: {

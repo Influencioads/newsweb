@@ -22,6 +22,8 @@ export interface CmsArticle {
   category_id:number|null; subcategory_id:number|null; extra_category_ids?:number[];
   district_id:number|null; mandal_id:number|null; locality_id:number|null;
   author_id:number|null; byline_te:string|null;
+  /** The writer's photo beside the byline ("Written by" on My Village stories). */
+  byline_photo_media_id?:number|null; byline_photo?:CmsMediaRef|null;
   source_type:string; source_credit:string|null; article_type:ArticleType;
   status:string; workflow_state:string;
   is_breaking:boolean; is_exclusive:boolean; is_featured:boolean; is_short:boolean; voice_enabled:boolean;

@@ -150,6 +150,8 @@ def _cards(
     from app.models.media import Media
 
     hero_ids = {a.hero_media_id for a in articles if a.hero_media_id}
+    # The writer photos ride in the same query as the heroes.
+    hero_ids |= {a.byline_photo_media_id for a in articles if a.byline_photo_media_id}
     media_by_id: dict[int, Media] = {}
     if hero_ids:
         # One query for the whole page rather than one per card.
@@ -167,6 +169,9 @@ def _cards(
             card.district = DistrictOut.model_validate(districts[a.district_id])
         if a.hero_media_id:
             card.hero = _media_out(media_by_id.get(a.hero_media_id))
+        if a.byline_photo_media_id:
+            photo = _media_out(media_by_id.get(a.byline_photo_media_id))
+            card.byline_photo_url = photo.url if photo else None
         out.append(card)
     return out
 

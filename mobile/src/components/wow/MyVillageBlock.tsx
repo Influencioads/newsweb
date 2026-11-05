@@ -7,7 +7,7 @@ import { absoluteMediaUrl } from '@/api/client';
 import type { ArticleCard } from '@/api/types';
 import { Wash, WowButton } from '@/components/wow/NominateCta';
 import { useI18n } from '@/lib/i18n';
-import { fetchVillageStories, MY_VILLAGE_IMAGE, MY_VILLAGE_INTRO, MY_VILLAGE_TITLE } from '@/lib/myVillage';
+import { fetchVillageStories, MY_VILLAGE_IMAGE, MY_VILLAGE_INTRO, MY_VILLAGE_SLUG, MY_VILLAGE_TITLE } from '@/lib/myVillage';
 import { radius, shadow, space } from '@/lib/theme';
 import { makeStyles } from '@/lib/useTheme';
 import { Button } from '@/ui/Button';
@@ -36,6 +36,7 @@ export function VillageCard({ article, index }: { article: ArticleCard; index: n
   const { pick } = useI18n();
   const uri = absoluteMediaUrl(article.hero?.url ?? null);
   const head = pick(article.title_te, article.title_en);
+  const writer = absoluteMediaUrl(article.byline_photo_url ?? null);
   return (
     <PressableScale onPress={() => openArticle(article)} accessibilityRole="link" accessibilityLabel={head} style={styles.card}>
       {uri ? (
@@ -56,6 +57,18 @@ export function VillageCard({ article, index }: { article: ArticleCard; index: n
           <T variant="bodySmall" color="onOverlay" lang="te" numberOfLines={3}>
             {article.summary_te}
           </T>
+        ) : null}
+        {article.byline_te && article.category?.slug === MY_VILLAGE_SLUG ? (
+          // "Written by" with the writer's photo, both set in the CMS.
+          <View style={styles.writer}>
+            {writer ? <Image source={{ uri: writer }} style={styles.writerPhoto} contentFit="cover" accessible={false} /> : null}
+            <T variant="meta" color="onOverlay" style={styles.writerText}>
+              {pick('రాసిన వారు', 'Written by')}{' '}
+              <T variant="meta" weight="semibold" color="onOverlay" lang="te">
+                {article.byline_te}
+              </T>
+            </T>
+          </View>
         ) : null}
         <WowButton label={pick('కథ చదవండి', 'Read the story')} iconRight="arrowRight" onPress={() => openArticle(article)} style={styles.cardButton} />
       </View>
@@ -131,4 +144,7 @@ const useStyles = makeStyles((color) => ({
   },
   cardCopy: { gap: space.sm, padding: space.lg },
   cardButton: { alignSelf: 'flex-start', marginTop: space.xs },
+  writer: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  writerPhoto: { width: 36, height: 36, borderRadius: 18, borderWidth: 2, borderColor: color.onOverlay },
+  writerText: { flexShrink: 1, opacity: 0.9 },
 }));

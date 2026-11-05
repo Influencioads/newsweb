@@ -74,6 +74,8 @@ export interface ArticleCard {
   district: DistrictOut | null;
   hero: MediaOut | null;
   byline_te: string | null;
+  /** The writer's photo beside the byline ("Written by" on My Village stories). */
+  byline_photo_url?: string | null;
   is_breaking: boolean;
   is_exclusive: boolean;
   ai_generated: boolean;

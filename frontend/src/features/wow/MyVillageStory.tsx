@@ -10,7 +10,7 @@ import { useI18n, useScript } from '@/i18n';
 import type { ArticleCard } from '@/types/public';
 import { cn } from '@/utils/cn';
 
-import { MY_VILLAGE_IMAGE, MY_VILLAGE_INTRO, MY_VILLAGE_PATH, MY_VILLAGE_TITLE } from './myVillage';
+import { MY_VILLAGE_IMAGE, MY_VILLAGE_INTRO, MY_VILLAGE_PATH, MY_VILLAGE_SLUG, MY_VILLAGE_TITLE } from './myVillage';
 
 /**
  * My Village (మై విలేజ్): the home page's village shelf, straight under WOW
@@ -72,6 +72,21 @@ export function VillageCard({ article, tint }: { article: ArticleCard; tint: str
         {article.summary_te ? (
           <p lang="te" className="te te-clamp-3 text-te-body-xs text-on-ink/85">
             {article.summary_te}
+          </p>
+        ) : null}
+        {article.byline_te && article.category?.slug === MY_VILLAGE_SLUG ? (
+          // "Written by", with the writer's photo — both set in the CMS. Only on
+          // My Village stories: the top-up stories from other sections carry desk bylines.
+          <p className="flex items-center gap-2.5">
+            {article.byline_photo_url ? (
+              <img src={article.byline_photo_url} alt="" aria-hidden loading="lazy" className="h-9 w-9 shrink-0 rounded-pill object-cover ring-2 ring-on-ink/70" />
+            ) : null}
+            <span className={cn(s.body, 'text-meta text-on-ink/80')}>
+              {language === 'te' ? 'రాసిన వారు' : 'Written by'}{' '}
+              <span lang="te" className="te font-semibold text-on-ink">
+                {article.byline_te}
+              </span>
+            </span>
           </p>
         ) : null}
         <ButtonLink to={article.url} variant="wow" size="md" iconRight={ArrowRight} className="mt-1">

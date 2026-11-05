@@ -28,6 +28,8 @@ export interface ArticleForm {
   videoId: number | null;
   tags: string[];
   byline: string;
+  /** The writer's photo beside the byline ("Written by" on My Village stories). */
+  bylinePhoto: CmsMediaRef | null;
   authorId: number | null;
   sourceType: string;
   sourceCredit: string;
@@ -61,6 +63,7 @@ export const EMPTY_FORM: ArticleForm = {
   videoId: null,
   tags: [],
   byline: '',
+  bylinePhoto: null,
   authorId: null,
   sourceType: 'own',
   sourceCredit: '',
@@ -207,6 +210,7 @@ export function fromArticle(a: CmsArticle): ArticleForm {
     videoUrl: a.video ? `https://www.youtube.com/watch?v=${a.video.youtube_id}` : '',
     tags: (a.tags ?? []).map((t) => t.name_te),
     byline: a.byline_te ?? '',
+    bylinePhoto: a.byline_photo ?? null,
     authorId: a.author_id,
     sourceType: a.source_type,
     sourceCredit: a.source_credit ?? '',
@@ -244,6 +248,7 @@ export function toPayload(f: ArticleForm, canPin: boolean): Record<string, unkno
     video_id: f.videoUrl.trim() ? f.videoId : null,
     tags: f.tags,
     byline_te: f.byline || null,
+    byline_photo_media_id: f.bylinePhoto?.id ?? null,
     author_id: f.authorId,
     source_type: f.sourceType,
     source_credit: f.sourceCredit || null,

@@ -134,6 +134,10 @@ def _out(db: Session, article: Article) -> CmsArticleOut:
         hero = db.get(Media, article.hero_media_id)
         if hero is not None:
             payload.hero_media = _media_ref(hero)
+    if article.byline_photo_media_id:
+        photo = db.get(Media, article.byline_photo_media_id)
+        if photo is not None and photo.deleted_at is None:
+            payload.byline_photo = _media_ref(photo)
     gallery = (
         db.execute(
             select(Media)

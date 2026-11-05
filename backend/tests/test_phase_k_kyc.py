@@ -635,6 +635,50 @@ class TestMyVillagePhotos:
         category = db.get(Category, submission.category_id)
         assert category.slug == "my-village-story"
 
+        # Approved, the story is "Written by" the guest, with their selfie.
+        moderator, headers = staff(db, role=RoleKey.SUPER_ADMIN, email="village-mod@test.local")
+        _sub, article = submission_service.approve_submission(
+            db, submission_id=submission.id, moderator_id=moderator.id
+        )
+        db.commit()
+        assert article.byline_te == "రాముడు కొండా"
+        assert article.byline_photo_media_id == guest.avatar_media_id
+        cms = client.get(f"/api/v1/cms/articles/{article.id}", headers=headers).json()
+        assert cms["byline_photo"]["id"] == guest.avatar_media_id
+
+        # The editor can change the name and the photo from the CMS.
+        photo = client.post(
+            "/api/v1/cms/media",
+            files={"file": ("writer.png", png_bytes(), "image/png")},
+            headers=headers,
+        ).json()
+        r = client.patch(
+            f"/api/v1/cms/articles/{article.id}",
+            json={"byline_te": "కొండా రాముడు", "byline_photo_media_id": photo["id"]},
+            headers=headers,
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["byline_photo"]["id"] == photo["id"]
+
+        # Readers see both on the story.
+        db.refresh(article)
+        article.status = ArticleStatus.PUBLISHED
+        article.workflow_state = WorkflowState.PUBLISHED
+        article.published_at = utcnow()
+        db.commit()
+        story = client.get(f"/api/v1/public/articles/{article.short_id}").json()
+        assert story["byline_te"] == "కొండా రాముడు"
+        assert story["byline_photo_url"]
+
+        # And the photo can be taken off again.
+        r = client.patch(
+            f"/api/v1/cms/articles/{article.id}",
+            json={"byline_photo_media_id": None},
+            headers=headers,
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["byline_photo"] is None
+
     def test_a_guest_still_needs_a_name(self, client: TestClient) -> None:
         r = client.post(
             "/api/v1/public/my-village/submissions",

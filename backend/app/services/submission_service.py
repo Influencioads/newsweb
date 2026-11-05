@@ -286,6 +286,12 @@ def approve_submission(
         article_source_type="USER",
         updated_by=moderator_id,
     )
+    # A My Village story starts with the writer's own photo (the selfie from
+    # Share Your Village) beside "Written by"; the editor can change both.
+    if creator is not None and creator.avatar_media_id and submission.category_id is not None:
+        slug = db.scalar(select(Category.slug).where(Category.id == submission.category_id))
+        if slug == "my-village-story":
+            article.byline_photo_media_id = creator.avatar_media_id
     db.add(article)
     db.flush()
 

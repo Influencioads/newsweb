@@ -163,6 +163,8 @@ class ArticleCardOut(BaseModel):
     district: DistrictOut | None
     hero: MediaOut | None
     byline_te: str | None
+    #: The writer's photo beside the byline ("Written by" on My Village stories).
+    byline_photo_url: str | None = None
     is_breaking: bool
     is_exclusive: bool
     ai_generated: bool

@@ -339,6 +339,12 @@ class Article(PKMixin, TimestampMixin, SoftDeleteMixin, ActorMixin, Base):
         BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     byline_te: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    byline_photo_media_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("media.id", ondelete="SET NULL"),
+        nullable=True,
+        doc="The writer's photo beside the byline (\"Written by\" on My Village stories)",
+    )
     byline_badge: Mapped[str | None] = mapped_column(
         String(30),
         nullable=True,

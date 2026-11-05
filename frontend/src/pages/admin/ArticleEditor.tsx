@@ -15,6 +15,7 @@ import { ErrorState, QueryState, Skeleton } from '@/components/ui/State';
 import { useToast } from '@/components/ui/Toast';
 import * as cmsApi from '@/features/cms/api';
 import { useI18n } from '@/i18n';
+import { MY_VILLAGE_SLUG } from '@/features/wow/myVillage';
 import { useSiteContent } from '@/features/wow/siteContent';
 import { useAuth } from '@/stores/auth';
 
@@ -24,6 +25,7 @@ import { ConvertPanel } from './editor/ConvertPanel';
 import { EngagementPanel } from './editor/EngagementPanel';
 import { MetaSidebar } from './editor/MetaSidebar';
 import { OriginCompare } from './editor/OriginCompare';
+import { WrittenBy } from './editor/WrittenBy';
 import { EMPTY_FORM, fieldError, fromArticle, toPayload, wordCount, type ArticleForm } from './editor/form';
 import { useL } from './useL';
 import { AI_FEATURES } from '@/utils/features';
@@ -123,6 +125,9 @@ export default function ArticleEditor() {
 
   const title = editing ? t('admin.page.editArticle') : t('admin.page.newArticle');
   const categories = options.data?.categories ?? [];
+  // A My Village story is credited "Written by" a villager: a typed name and a photo.
+  const villageIds = categories.filter((c) => c.slug === MY_VILLAGE_SLUG).map((c) => c.id);
+  const isVillage = [form.categoryId, form.subcategoryId, ...form.extraCategoryIds].some((cid) => cid != null && villageIds.includes(cid));
   const words = wordCount(form.body);
   const shortWords = wordCount(form.summary);
 
@@ -243,6 +248,15 @@ export default function ArticleEditor() {
 
           <Section title={L('రచయిత & మూలం', 'Author and source')}>
             <div className="grid gap-4 sm:grid-cols-2">
+              {isVillage ? (
+                <WrittenBy
+                  name={form.byline}
+                  photo={form.bylinePhoto}
+                  onName={(byline) => set({ byline })}
+                  onPhoto={(bylinePhoto) => set({ bylinePhoto })}
+                  error={errors('byline_te')}
+                />
+              ) : (
               <Field
                 label={L('రచయిత', 'Author')}
                 optionalLabel
@@ -263,6 +277,7 @@ export default function ArticleEditor() {
                   ))}
                 </Select>
               </Field>
+              )}
               <Field
                 label={L('స్టాఫ్ ఖాతా', 'Staff account')}
                 hint={

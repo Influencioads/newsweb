@@ -49,6 +49,7 @@ _SCALARS = (
     "voice_enabled",
     "article_type",
     "hero_media_id",
+    "byline_photo_media_id",
     "video_id",
     "author_id",
 )
@@ -255,6 +256,7 @@ def apply_copy(
         "mandal_id",
         "locality_id",
         "hero_media_id",
+        "byline_photo_media_id",
         "video_id",
     ):
         if key in values and values[key] is None:

@@ -2,14 +2,14 @@
   "expo": {
     "name": "WowIndian",
     "slug": "wowindian",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "wowindian",
     "userInterfaceStyle": "automatic",
     "android": {
       "package": "com.wowindian.app",
-      "versionCode": 6,
+      "versionCode": 7,
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

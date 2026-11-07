@@ -15,6 +15,7 @@ import { EpaperSheet } from '@/features/epaper/EpaperSheet';
 import { EpaperSheetViewport } from '@/features/epaper/EpaperSheetViewport';
 import * as api from '@/features/epaper/adminApi';
 import { firstEmptySlot, placeAt, slotIds, swapSlots } from '@/features/epaper/slots';
+import { useLogoUrl } from '@/features/wow/siteContent';
 import { useI18n } from '@/i18n';
 import { useAuth } from '@/stores/auth';
 import type { EpaperArticle, EpaperCandidate, EpaperEdition, EpaperSlot } from '@/types/epaper';
@@ -39,6 +40,7 @@ import { SIZE_LABEL, SIZE_TONE, layoutOptions, useL } from './shared';
 const REVIEWABLE = ['GENERATED', 'UNDER_REVIEW'];
 
 function Workspace({ edition }: { edition: EpaperEdition }) {
+  const logoUrl = useLogoUrl();
   const { t, language } = useI18n();
   const L = useL();
   const toast = useToast();
@@ -325,7 +327,7 @@ function Workspace({ edition }: { edition: EpaperEdition }) {
               <EpaperPageEditor key={page.id} edition={edition} page={page} locked={!canEdit} />
               {/* View-only staff get the print layout (no hotspots): the public reader is one button away. */}
               <EpaperSheetViewport zoom={1} fit="width">
-                <EpaperSheet page={page} edition={edition} mode="print" editable={canEdit} renderSlot={renderSlot} />
+                <EpaperSheet logoUrl={logoUrl} page={page} edition={edition} mode="print" editable={canEdit} renderSlot={renderSlot} />
               </EpaperSheetViewport>
             </div>
             {canEdit ? (

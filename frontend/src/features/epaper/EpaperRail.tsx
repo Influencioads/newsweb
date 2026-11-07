@@ -30,9 +30,11 @@ export interface EpaperRailProps {
   href: (pageNumber: number) => string;
   clipHref: (article: EpaperArticle) => string;
   className?: string;
+  /** The masthead logo for the thumbnails (CMS → Site content); EpaperSheet's default when omitted. */
+  logoUrl?: string;
 }
 
-export function EpaperRail({ edition, open, page, href, clipHref, className }: EpaperRailProps) {
+export function EpaperRail({ edition, open, page, href, clipHref, className, logoUrl }: EpaperRailProps) {
   const { t, language } = useI18n();
   // Page-specific copy with no strings.ts key yet (see neededStrings).
   const L = (te: string, en: string) => (language === 'te' ? te : en);
@@ -63,7 +65,7 @@ export function EpaperRail({ edition, open, page, href, clipHref, className }: E
                 className="flex shrink-0 flex-col items-center gap-1 rounded-xl p-1 transition-[colors,transform,box-shadow] duration-base ease-standard hover:bg-paper-sub"
               >
                 <span className={cn('ep-thumb block border bg-paper', current ? 'border-brand ring-2 ring-brand/30' : 'border-rule')}>
-                  <EpaperSheet page={p} edition={edition} mode="thumbnail" />
+                  <EpaperSheet logoUrl={logoUrl} page={p} edition={edition} mode="thumbnail" />
                 </span>
                 <span className={cn('font-sans text-meta tabular-nums', current ? 'font-bold text-brand' : 'text-muted')}>{p.page_number}</span>
               </Link>

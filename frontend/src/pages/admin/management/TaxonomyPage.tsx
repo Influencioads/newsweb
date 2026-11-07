@@ -14,6 +14,7 @@ import { PromptDialog, type PromptField } from '@/components/ui/PromptDialog';
 import { QueryState } from '@/components/ui/State';
 import { useToast } from '@/components/ui/Toast';
 import * as cmsApi from '@/features/cms/api';
+import { WOW_ICONS } from '@/features/wow/icons';
 import { useI18n, useScript } from '@/i18n';
 import { useAuth } from '@/stores/auth';
 import { cn } from '@/utils/cn';
@@ -35,6 +36,11 @@ type CategoryRow = {
   sort: number;
   is_active: boolean;
   show_in_nav: boolean;
+  /** The WOW category card (Explore WOW, drawer, footer chips). */
+  in_explore: boolean;
+  tagline_te: string | null;
+  tagline_en: string | null;
+  icon: string | null;
   article_count: number;
 };
 type TaxonomyPayload = { categories: CategoryRow[]; districts: Row[]; tags: Row[] };
@@ -203,6 +209,36 @@ export function TaxonomyPage() {
         hint: hasKids ? L('దీనికి ఉప-విభాగాలు ఉన్నాయి, కాబట్టి ఇది ప్రధాన విభాగంగానే ఉంటుంది', 'It has sub-categories, so it stays top level') : undefined,
       },
       { name: 'description_te', label: L('వివరణ', 'Description'), type: 'textarea', defaultValue: c?.description_te ?? '' },
+      {
+        name: 'in_explore',
+        label: L('వావ్ కేటగిరీ కార్డుగా చూపించాలా?', 'Show as a WOW category card?'),
+        type: 'select',
+        defaultValue: String(c?.in_explore ?? false),
+        options: yesNo,
+        hint: L(
+          'ఎక్స్‌ప్లోర్ వావ్, మెనూ, ఫుటర్‌లో. నావిగేషన్‌లో కూడా ఉంటే ముఖ్య కేటగిరీ.',
+          'On Explore WOW, in the menu and the footer. Also in the navigation = one of the main ones.',
+        ),
+      },
+      {
+        name: 'tagline_te',
+        label: L('కార్డు లైన్ (తెలుగు)', 'Card line (Telugu)'),
+        defaultValue: c?.tagline_te ?? '',
+        placeholder: 'అసాధారణ వ్యక్తుల విజయ గాధలు',
+      },
+      {
+        name: 'tagline_en',
+        label: L('కార్డు లైన్ (ఇంగ్లీష్)', 'Card line (English)'),
+        defaultValue: c?.tagline_en ?? '',
+        placeholder: 'Success stories of extraordinary people',
+      },
+      {
+        name: 'icon',
+        label: L('కార్డు ఐకాన్', 'Card icon'),
+        type: 'select',
+        defaultValue: c?.icon ?? '',
+        options: [{ value: '', label: L('— సాధారణ —', '— default —') }, ...Object.keys(WOW_ICONS).map((k) => ({ value: k, label: k }))],
+      },
       // A new one is left to the server: top level joins the nav, a sub-category doesn't.
       ...(c
         ? [
@@ -227,7 +263,7 @@ export function TaxonomyPage() {
     ];
   };
 
-  const flag = (c: CategoryRow, key: 'show_in_nav' | 'is_active', title: string) =>
+  const flag = (c: CategoryRow, key: 'show_in_nav' | 'is_active' | 'in_explore', title: string) =>
     canManage ? (
       <Switch
         checked={c[key]}
@@ -290,6 +326,7 @@ export function TaxonomyPage() {
       render: (c) => <span className="tabular-nums">{c.article_count}</span>,
     },
     { key: 'show_in_nav', header: L('నావిగేషన్', 'In nav'), nowrap: true, render: (c) => flag(c, 'show_in_nav', L('నావిగేషన్', 'In nav')) },
+    { key: 'in_explore', header: L('వావ్ కార్డు', 'WOW card'), nowrap: true, render: (c) => flag(c, 'in_explore', L('వావ్ కార్డు', 'WOW card')) },
     { key: 'is_active', header: L('క్రియాశీలం', 'Active'), nowrap: true, render: (c) => flag(c, 'is_active', L('క్రియాశీలం', 'Active')) },
   ];
 
@@ -392,6 +429,10 @@ export function TaxonomyPage() {
             slug: text('slug').toLowerCase(),
             parent_id: text('parent_id') ? Number(text('parent_id')) : null,
             description_te: text('description_te') || null,
+            in_explore: v.in_explore === 'true',
+            tagline_te: text('tagline_te') || null,
+            tagline_en: text('tagline_en') || null,
+            icon: text('icon') || null,
             ...(editing.cat ? { show_in_nav: v.show_in_nav === 'true' } : {}),
             is_active: v.is_active === 'true',
           };

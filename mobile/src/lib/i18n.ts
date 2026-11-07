@@ -14,7 +14,7 @@ const STRINGS = {
   'home.breaking': { te: 'బ్రేకింగ్', en: 'BREAKING' },
   'home.topStory': { te: 'ముఖ్య కథనం', en: 'TOP STORY' },
   'home.topStories': { te: 'ముఖ్య కథనాలు', en: 'Top stories' },
-  'home.latest': { te: 'తాజా వార్తలు', en: 'Latest' },
+  'home.latest': { te: 'తాజా కథనాలు', en: 'Latest' },
   'home.seeAll': { te: 'అన్నీ చూడండి', en: 'See all' },
   'state.loading': { te: 'లోడ్ అవుతోంది…', en: 'Loading…' },
   'state.error': { te: 'లోడ్ కాలేదు. మళ్లీ ప్రయత్నించండి.', en: 'Could not load. Try again.' },

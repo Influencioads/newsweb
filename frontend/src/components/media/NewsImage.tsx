@@ -45,6 +45,13 @@ interface Props {
   placeholderLabel?: string;
   /** Render the AI label. Defaults to the media's own flag. */
   showAiLabel?: boolean;
+  /**
+   * Which part of the photo the cover crop keeps: the middle (default), the
+   * top (heads are not cut), or `hero` — the home banner: on phones, where the
+   * box is near-square, the left edge and top (people stand on the left of
+   * most banner photos), from md the top centre.
+   */
+  focus?: 'center' | 'top' | 'hero';
 }
 
 const RADIUS = { xl: 'rounded-xl', '2xl': 'rounded-2xl', none: 'rounded-none' } as const;
@@ -80,6 +87,7 @@ export function NewsImage({
   priority = false,
   placeholderLabel,
   showAiLabel,
+  focus = 'center',
 }: Props) {
   const { t } = useI18n();
   const s = useScript();
@@ -118,6 +126,7 @@ export function NewsImage({
             onError={() => setFailed(true)}
             className={cn(
               'h-full w-full object-cover transition-opacity duration-slow ease-standard',
+              focus === 'top' ? 'object-top' : focus === 'hero' ? 'object-left-top md:object-top' : 'object-center',
               loaded ? 'opacity-100' : 'opacity-0',
             )}
           />

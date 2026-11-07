@@ -43,7 +43,7 @@ export default function LiveNewsPage() {
             {t('ui.live')}
           </span>
         }
-        title={L('తాజా వార్తలు — ప్రత్యక్ష అప్‌డేట్లు', 'Breaking news — live updates')}
+        title={L('తాజా కథనాలు — ప్రత్యక్ష అప్‌డేట్లు', 'Breaking news — live updates')}
         subtitle={L(
           'ముఖ్యమైన వార్తలు వచ్చిన వెంటనే ఇక్కడ అప్‌డేట్ అవుతాయి.',
           'Important developments, updated here as they happen.',

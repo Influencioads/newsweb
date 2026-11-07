@@ -29,6 +29,7 @@ import { EpaperRail } from '@/features/epaper/EpaperRail';
 import { EpaperSearch, type SearchHit } from '@/features/epaper/EpaperSearch';
 import { EpaperSheet } from '@/features/epaper/EpaperSheet';
 import { EpaperSheetViewport, ZOOM } from '@/features/epaper/EpaperSheetViewport';
+import { useLogoUrl } from '@/features/wow/siteContent';
 import { useI18n } from '@/i18n';
 import type { EpaperArticle, EpaperEdition } from '@/types/epaper';
 import { cn } from '@/utils/cn';
@@ -135,6 +136,7 @@ export interface EditionReaderProps {
 }
 
 export function EditionReader({ edition, personalId, requestedPage }: EditionReaderProps) {
+  const logoUrl = useLogoUrl();
   const { t, language } = useI18n();
   // Page-specific copy with no strings.ts key yet (see neededStrings).
   const L = (te: string, en: string) => (language === 'te' ? te : en);
@@ -325,6 +327,7 @@ export function EditionReader({ edition, personalId, requestedPage }: EditionRea
 
       <div className="mt-3 md:grid md:grid-cols-[208px_minmax(0,1fr)] md:items-start md:gap-4">
         <EpaperRail
+          logoUrl={logoUrl}
           edition={edition}
           open={openNumbers}
           page={page}
@@ -348,7 +351,7 @@ export function EditionReader({ edition, personalId, requestedPage }: EditionRea
           {/* A fixed-height box: the fit is measured from it, so it must not grow with the zoomed sheet. */}
           <EpaperSheetViewport zoom={zoom} columns={twoUp ? 2 : 1} className={cn('h-[65vh]', chrome)}>
             {sheets.map((p) => (
-              <EpaperSheet key={p.id} page={p} edition={edition} clipHref={(a) => clipHref(a, p.page_number)} showClips={showClips} />
+              <EpaperSheet logoUrl={logoUrl} key={p.id} page={p} edition={edition} clipHref={(a) => clipHref(a, p.page_number)} showClips={showClips} />
             ))}
           </EpaperSheetViewport>
         </div>

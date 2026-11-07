@@ -31,6 +31,7 @@ from app.api.v1 import (
     notifications,
     polls,
     public,
+    site_content,
     story_formats,
     users,
     videos,
@@ -69,3 +70,4 @@ api_router.include_router(cms_ingestion.router, dependencies=_AI_OFF)
 api_router.include_router(cms_voice.router, dependencies=_AI_OFF)
 api_router.include_router(cms_kyc.router)
 api_router.include_router(contributor.router)
+api_router.include_router(site_content.router)

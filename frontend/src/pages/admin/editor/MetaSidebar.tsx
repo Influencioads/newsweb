@@ -171,7 +171,8 @@ export function MetaSidebar({ form, set, errors, options, article, canPin }: Met
           categories={options.data?.categories ?? []}
           categoryId={form.categoryId}
           subcategoryId={form.subcategoryId}
-          onChange={(c, sub) => set({ categoryId: c, subcategoryId: sub })}
+          extraIds={form.extraCategoryIds}
+          onChange={(c, sub, extra) => set({ categoryId: c, subcategoryId: sub, extraCategoryIds: extra })}
           error={errors('category_id')}
         />
         <LocationSelector

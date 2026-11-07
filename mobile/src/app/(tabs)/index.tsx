@@ -1,25 +1,26 @@
 import { useQuery } from '@tanstack/react-query';
-import { router, type Href } from 'expo-router';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { RefreshControl, View, useWindowDimensions, type ListRenderItem } from 'react-native';
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 
-import * as engagementApi from '@/api/engagement';
-import * as epaperApi from '@/api/epaper';
-import type { Poll } from '@/api/epaper';
 import * as notificationsApi from '@/api/notifications';
 import * as publicApi from '@/api/public';
 import type { ArticleCard, HomePayload } from '@/api/types';
-import { CompactCard, LeadCard, RowCard } from '@/components/ArticleCard';
-import { BulletinBanner } from '@/components/BulletinBanner';
-import { useBulletin, type BulletinSummary } from '@/components/BulletinCard';
+import { CompactCard } from '@/components/ArticleCard';
 import { EmptyState, ErrorState } from '@/components/Feedback';
-import { HomeListHeader, HomePromos } from '@/components/home/HomeListHeader';
+import { HomeControls } from '@/components/home/HomeControls';
+import { HomeListHeader } from '@/components/home/HomeListHeader';
 import { HomeSectionBand } from '@/components/home/HomeSectionBand';
-import { LeadSlider } from '@/components/home/LeadSlider';
+import { SectionRail } from '@/components/home/SectionRail';
 import { LocationSheet, usePlaceName } from '@/components/LocationSheet';
-import { PollCard } from '@/components/PollCard';
-import { VideoStrip } from '@/components/VideoStrip';
+import { ExploreWowGrid } from '@/components/wow/ExploreWowGrid';
+import { FeaturedHeroes } from '@/components/wow/FeaturedHeroes';
+import { HERO_SLIDES, HeroBanner } from '@/components/wow/HeroBanner';
+import { MyVillageBlock } from '@/components/wow/MyVillageBlock';
+import { NominateCta } from '@/components/wow/NominateCta';
+import { StoryShotsShelf } from '@/components/wow/StoryShotsShelf';
+import { WowRadioCard } from '@/components/wow/WowRadioCard';
 import { useI18n } from '@/lib/i18n';
 import { space } from '@/lib/theme';
 import { makeStyles, useColors } from '@/lib/useTheme';
@@ -32,106 +33,76 @@ import { Screen } from '@/ui/Screen';
 import { ScreenHeader } from '@/ui/ScreenHeader';
 import { SkeletonFeed } from '@/ui/Skeleton';
 import { T } from '@/ui/Text';
-import { AI_FEATURES } from '@/lib/features';
 
 /**
- * Home feed: breaking strip, bulletin banner, top-stories slider (lead + secondary), e-paper
- * promo, top topics, for-you rail, big question, latest rail, mandal block, video
- * strip, then the admin-configured section blocks — one `/public/home`
- * request (§23), flattened into a single FlatList so the masthead collapses
- * against one scroll offset.
+ * Home — the WOW Indian layout, in the website's order (frontend
+ * src/pages/public/Home.tsx): the top-story banner, WOW Radio and the Nominate
+ * call straight under it, My Village, Explore WOW, the Story Shots shelf, then
+ * Our Heroes.
+ * One `/public/home` request feeds the banner; the WOW blocks fetch their own
+ * stories. Flattened into a single FlatList so the
+ * masthead collapses against one scroll offset.
+ *
+ * At the top, `HomeControls` holds the language and light/dark switches and the
+ * category pick. With categories picked, Home shows only their stories (newest
+ * first, merged from each category's feed) instead of the WOW layout.
  */
 type Row =
-  | { key: string; type: 'slider'; articles: ArticleCard[] }
-  | { key: string; type: 'lead' | 'row' | 'compact'; article: ArticleCard }
-  | { key: string; type: 'section'; title: string; sectionKey: string; href?: Href }
-  | { key: string; type: 'poll'; poll: Poll }
-  | { key: string; type: 'bulletin'; bulletin: BulletinSummary }
-  | { key: string; type: 'video' | 'promos' | 'empty' };
+  | { key: string; type: 'hero'; articles: ArticleCard[] }
+  | { key: string; type: 'radio' | 'nominate' | 'village' | 'explore' | 'shots' | 'heroes' | 'empty' | 'loading' | 'pickedEmpty' }
+  | { key: string; type: 'section'; title: string }
+  | { key: string; type: 'compact'; article: ArticleCard };
 
 const STAGGER_MAX = 6;
 
-function flatten(
-  home: HomePayload,
-  forYou: ArticleCard[],
-  bulletin: BulletinSummary | undefined,
-  poll: Poll | undefined,
-  pick: (te: string | null, en: string | null) => string,
-  forYouTitle: string,
-  latestTitle: string,
-  exclusiveTitle: string,
-): Row[] {
+/** The desk's slides (CMS → Home hero slides) in their order, topped up to
+ *  HERO_SLIDES with the newest top stories — as the website's Home does. */
+function heroStories(home: HomePayload): ArticleCard[] {
+  const seen = new Set<string>();
+  const out: ArticleCard[] = [];
+  const all = [...(home.hero ?? []), home.lead, ...home.secondary, ...home.mid_column, ...home.latest, ...home.sections.flatMap((sec) => sec.articles)];
+  for (const a of all) {
+    if (!a || seen.has(a.short_id)) continue;
+    seen.add(a.short_id);
+    out.push(a);
+    if (out.length === HERO_SLIDES) break;
+  }
+  return out;
+}
+
+function flatten(home: HomePayload): Row[] {
   const rows: Row[] = [];
-  const article = (type: 'lead' | 'row' | 'compact', prefix: string, a: ArticleCard) =>
-    rows.push({ key: `${prefix}-${a.short_id}`, type, article: a });
-
-  // The listen banner leads; no row at all when no bulletin is on air (between slots, or switched off).
-  if (AI_FEATURES && bulletin) rows.push({ key: 'bulletin', type: 'bulletin', bulletin });
-
-  // The top stories slide — the lead, then the secondary stories — as on the web.
-  if (home.lead) rows.push({ key: 'lead-slider', type: 'slider', articles: [home.lead, ...home.secondary] });
-  rows.push({ key: 'promos', type: 'promos' });
-  home.mid_column.forEach((a) => article('row', 'mid', a));
-
-  // §3.2 personalised rail — only once there is enough to call it one.
-  if (forYou.length >= 3) {
-    rows.push({ key: 'fy-h', type: 'section', title: forYouTitle, sectionKey: 'default' });
-    forYou.forEach((a) => article('row', 'fy', a));
-  }
-
-  if (poll) rows.push({ key: `poll-${poll.id}`, type: 'poll', poll });
-
-  if (home.latest.length) {
-    rows.push({ key: 'latest-h', type: 'section', title: latestTitle, sectionKey: 'default' });
-    home.latest.slice(0, 6).forEach((a) => article('compact', 'latest', a));
-  }
-
-  // A dedicated exclusive shelf makes the editorial flag discoverable even
-  // when the admin has not configured an "exclusive" homepage category.
-  const exclusivePool = [
-    ...home.secondary,
-    ...home.mid_column,
-    ...home.briefs,
-    ...home.latest,
-    ...(home.mandal_block?.articles ?? []),
-    ...home.sections.flatMap((section) => section.articles),
-  ];
-  const exclusives = exclusivePool
-    .filter((candidate, index) =>
-      candidate.is_exclusive &&
-      candidate.short_id !== home.lead?.short_id &&
-      exclusivePool.findIndex((article) => article.short_id === candidate.short_id) === index,
-    )
-    .slice(0, 4);
-  if (exclusives.length && !home.sections.some((section) => section.key === 'exclusive')) {
-    rows.push({ key: 'exclusive-h', type: 'section', title: exclusiveTitle, sectionKey: 'exclusive' });
-    exclusives.forEach((a) => article('row', 'exclusive', a));
-  }
-
-  // §3 what's happening in your mandal.
-  const mandal = home.mandal_block;
-  if (mandal?.articles.length) {
-    rows.push({ key: 'mandal-h', type: 'section', title: pick(mandal.title_te, mandal.title_en), sectionKey: 'default', href: '/local' });
-    article('lead', 'mandal', mandal.articles[0]);
-    mandal.articles.slice(1, 5).forEach((a) => article('row', 'mandal', a));
-  }
-
-  rows.push({ key: 'video', type: 'video' });
-
-  for (const section of home.sections) {
-    rows.push({
-      key: `s-${section.key}-h`,
-      type: 'section',
-      title: pick(section.title_te, section.title_en),
-      sectionKey: section.key,
-      href: section.key === 'trending' ? '/trending' : { pathname: '/section/[slug]', params: { slug: section.key } },
-    });
-    if (section.articles[0]) article('lead', `s-${section.key}`, section.articles[0]);
-    section.articles.slice(1, 5).forEach((a) => article('row', `s-${section.key}`, a));
-  }
-
-  if (!home.lead && !home.sections.length) rows.push({ key: 'empty', type: 'empty' });
+  const hero = heroStories(home);
+  if (hero.length) rows.push({ key: 'hero', type: 'hero', articles: hero });
+  rows.push({ key: 'radio', type: 'radio' }, { key: 'nominate', type: 'nominate' });
+  rows.push({ key: 'village', type: 'village' });
+  rows.push({ key: 'explore', type: 'explore' }, { key: 'shots', type: 'shots' });
+  rows.push({ key: 'heroes', type: 'heroes' });
+  if (!home.lead) rows.push({ key: 'empty', type: 'empty' });
   return rows;
+}
+
+/** Home for a category pick: those categories' stories only, newest first. */
+function pickedRows(articles: ArticleCard[] | undefined, title: string): Row[] {
+  if (!articles) return [{ key: 'loading', type: 'loading' }];
+  if (!articles.length) return [{ key: 'picked-empty', type: 'pickedEmpty' }];
+  const rows: Row[] = [];
+  const lead = articles.filter((a) => a.hero?.url).slice(0, 4);
+  if (lead.length) rows.push({ key: 'hero', type: 'hero', articles: lead });
+  const shown = new Set(lead.map((a) => a.short_id));
+  rows.push({ key: 'picked-h', type: 'section', title });
+  articles
+    .filter((a) => !shown.has(a.short_id))
+    .forEach((a) => rows.push({ key: `picked-${a.short_id}`, type: 'compact', article: a }));
+  return rows;
+}
+
+/** Each picked category's newest stories, merged: one copy each, newest first. */
+async function fetchPicked(slugs: string[]): Promise<ArticleCard[]> {
+  const feeds = await Promise.all(slugs.map((category) => publicApi.fetchFeed({ category, limit: 20 })));
+  const byId = new Map<string, ArticleCard>();
+  feeds.forEach((f) => f.articles.forEach((a) => byId.set(a.short_id, a)));
+  return [...byId.values()].sort((a, b) => (b.published_at ?? '').localeCompare(a.published_at ?? ''));
 }
 
 const keyOf = (row: Row) => row.key;
@@ -149,6 +120,14 @@ export default function HomeScreen() {
     queryFn: () => publicApi.fetchHome(edition, mandal),
   });
 
+  const picked = usePrefs((s) => s.homeCategories);
+  const filtering = picked.length > 0;
+  const pickedFeed = useQuery({
+    queryKey: ['home-picked', [...picked].sort()],
+    queryFn: () => fetchPicked(picked),
+    enabled: filtering,
+  });
+
   const unread = useQuery({
     queryKey: ['inbox-unread'],
     queryFn: () => notificationsApi.fetchInbox(0),
@@ -156,29 +135,6 @@ export default function HomeScreen() {
     refetchInterval: 60_000,
     staleTime: 30_000,
   });
-
-  // §3.2 personalized rail — fetched separately so the shared home payload
-  // stays cacheable; anonymous readers simply never see the block.
-  const forYou = useQuery({
-    queryKey: ['for-you-home'],
-    queryFn: () => engagementApi.fetchForYou(0, 5),
-    enabled: authed,
-    staleTime: 120_000,
-  });
-
-  const topics = useQuery({
-    queryKey: ['top-topics'],
-    queryFn: epaperApi.fetchTopics,
-  });
-  const polls = useQuery({
-    queryKey: ['big-question'],
-    queryFn: () => epaperApi.fetchPolls(true),
-  });
-
-  // The row is only a trigger: playback belongs to the global player, so a
-  // virtualised row unmounting a few viewports down cannot cut a bulletin off.
-  const bulletin = useBulletin();
-  const onAir = bulletin.data?.available && bulletin.data.url ? bulletin.data : undefined;
 
   // Always on screen, naming the reader's place: the chooser is the only way a
   // location is ever set, so it must never be hard to find.
@@ -203,43 +159,44 @@ export default function HomeScreen() {
   const renderRow: ListRenderItem<Row> = ({ item, index }) => {
     const stagger = firstPaint && index < STAGGER_MAX ? index : undefined;
     switch (item.type) {
-      case 'slider':
-        return <LeadSlider articles={item.articles} index={stagger} />;
-      case 'lead':
-        return <LeadCard article={item.article} index={stagger} />;
-      case 'row':
-        return <RowCard article={item.article} index={stagger} />;
+      case 'hero':
+        return <HeroBanner stories={item.articles} index={stagger} />;
+      case 'radio':
+        return <View style={styles.block}><WowRadioCard variant="card" /></View>;
+      case 'nominate':
+        return <View style={styles.block}><NominateCta /></View>;
+      case 'village':
+        return <View style={styles.block}><MyVillageBlock /></View>;
+      case 'explore':
+        return <ExploreWowGrid show="main" />;
+      case 'shots':
+        return <StoryShotsShelf />;
+      case 'section':
+        return <HomeSectionBand title={item.title} sectionKey="trending" />;
       case 'compact':
         return <CompactCard article={item.article} index={stagger} />;
-      case 'section': {
-        const href = item.href;
-        return <HomeSectionBand title={item.title} sectionKey={item.sectionKey} onSeeAll={href ? () => router.push(href) : undefined} />;
-      }
-      case 'promos':
-        return <HomePromos epaper={home.data?.epaper ?? null} topics={topics.data?.items ?? []} />;
-      case 'poll':
-        return <PollCard poll={item.poll} />;
-      case 'bulletin':
-        return <BulletinBanner bulletin={item.bulletin} />;
-      case 'video':
-        return <VideoStrip />;
+      case 'heroes':
+        return <FeaturedHeroes />;
       case 'empty':
         return <EmptyState />;
+      case 'loading':
+        return <SkeletonFeed rows={4} />;
+      case 'pickedEmpty':
+        return (
+          <EmptyState
+            icon="filter"
+            title={pick('ఈ విభాగాల్లో ఇంకా కథలు లేవు', 'No stories in these categories yet')}
+            body={pick('ఇంకో విభాగం ఎంచుకోండి, లేదా "అన్నీ" నొక్కండి.', 'Pick another category, or tap "All".')}
+          />
+        );
     }
   };
 
-  const rows = home.data
-    ? flatten(
-        home.data,
-        authed ? (forYou.data?.articles ?? []) : [],
-        onAir,
-        polls.data?.[0],
-        pick,
-        t('foryou.title'),
-        t('home.latest'),
-        t('ui.exclusive'),
-      )
-    : [];
+  const rows = filtering
+    ? pickedRows(pickedFeed.data, pick('మీరు ఎంచుకున్న విభాగాలు', 'Your categories'))
+    : home.data
+      ? flatten(home.data)
+      : [];
 
   return (
     <Screen>
@@ -287,17 +244,18 @@ export default function HomeScreen() {
           onScrollBeginDrag={() => setFirstPaint(false)}
           scrollEventThrottle={16}
           ListHeaderComponent={
-            <HomeListHeader
-              breaking={home.data?.breaking ?? []}
-            />
+            <>
+              <SectionRail />
+              <HomeControls />
+              {filtering ? null : <HomeListHeader breaking={home.data?.breaking ?? []} />}
+            </>
           }
           contentContainerStyle={styles.content}
           refreshControl={
             <RefreshControl
-              refreshing={home.isRefetching}
+              refreshing={filtering ? pickedFeed.isRefetching : home.isRefetching}
               onRefresh={() => {
-                void home.refetch();
-                void bulletin.refetch();
+                void (filtering ? pickedFeed.refetch() : home.refetch());
               }}
               tintColor={color.brand}
               colors={[color.brand]}
@@ -318,4 +276,5 @@ const useStyles = makeStyles(() => ({
   place: { flexDirection: 'row', alignItems: 'center', gap: space.xs, maxWidth: 160, paddingHorizontal: space.sm, flexShrink: 1 },
   placeText: { flexShrink: 1 },
   content: { paddingBottom: space.xl },
+  block: { paddingHorizontal: space.lg, paddingTop: space.xl },
 }));

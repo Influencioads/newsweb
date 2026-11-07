@@ -168,7 +168,7 @@ export default function SearchScreen() {
           refreshControl={
             <RefreshControl
               refreshing={results.isRefetching && !results.isFetchingNextPage}
-              onRefresh={() => results.refetch()}
+              onRefresh={() => void results.refetch()}
               tintColor={color.brand}
               colors={[color.brand]}
               progressBackgroundColor={color.surface}

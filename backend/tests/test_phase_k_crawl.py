@@ -1827,7 +1827,11 @@ class TestEnrichment:
     def test_the_model_is_offered_only_sections_it_may_file_under(
         self, db: Session, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        self._sections(db)
+        cats = self._sections(db)
+        # The WOW seed keeps the old news desks out of the menu; an admin can
+        # bring them back from Taxonomy, and then the model may file to them.
+        for slug in ("politics", "sports", "national", "travel"):
+            cats[slug].show_in_nav = True
         db.add(AppSetting(key="taxonomy.retired_slugs", value={"v": ["travel"]}))
         db.commit()
         tax = crawl_service._taxonomy(db)

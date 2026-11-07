@@ -5,6 +5,7 @@ import { ImageCaption, NewsImage } from '@/components/media/NewsImage';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
 import { FollowButton } from '@/features/engagement/components/FollowButton';
+import { MY_VILLAGE_SLUG } from '@/features/wow/myVillage';
 import { useI18n, useScript } from '@/i18n';
 import type { ArticleDetail } from '@/types/public';
 import { cn } from '@/utils/cn';
@@ -81,6 +82,9 @@ export function ArticleHead({ article }: { article: ArticleDetail }) {
       : { text: t('reader.desk'), lang: s.language, cls: s.body };
   // One code unit would split a Telugu akshara from its matra (శ్రీ -> శ).
   const initial = firstGrapheme(byline.text);
+  // The writer's photo and "Written by", set in the CMS (My Village stories).
+  const photo = author ? null : (article.byline_photo_url ?? null);
+  const writtenBy = !author && Boolean(article.byline_te) && (Boolean(photo) || category?.slug === MY_VILLAGE_SLUG);
 
   // §7.3 — standfirst and body exist only in Telugu until AI translation lands.
   const teluguOnly = language === 'en' && Boolean(article.title_en);
@@ -128,17 +132,24 @@ export function ArticleHead({ article }: { article: ArticleDetail }) {
       ) : null}
 
       <div className="mt-5 flex flex-wrap items-center gap-3 border-y border-rule py-3">
-        <span
-          aria-hidden
-          lang={byline.lang}
-          className={cn(
-            byline.cls,
-            'flex h-11 w-11 shrink-0 items-center justify-center rounded-pill bg-brand-tint text-ui font-bold text-brand',
-          )}
-        >
-          {initial}
-        </span>
+        {photo ? (
+          <img src={photo} alt="" aria-hidden className="h-11 w-11 shrink-0 rounded-pill object-cover ring-2 ring-wow/40" />
+        ) : (
+          <span
+            aria-hidden
+            lang={byline.lang}
+            className={cn(
+              byline.cls,
+              'flex h-11 w-11 shrink-0 items-center justify-center rounded-pill bg-brand-tint text-ui font-bold text-brand',
+            )}
+          >
+            {initial}
+          </span>
+        )}
         <div className="min-w-0">
+          {writtenBy ? (
+            <p className={cn(s.body, 'text-meta text-muted')}>{language === 'te' ? 'రాసిన వారు' : 'Written by'}</p>
+          ) : null}
           <div className="flex flex-wrap items-center gap-2">
             {author?.author_slug ? (
               <Link

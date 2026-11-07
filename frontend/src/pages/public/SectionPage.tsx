@@ -152,7 +152,7 @@ export default function SectionPage() {
 
               {latest.length ? (
                 <section>
-                  <SectionHeader title={L('తాజా వార్తలు', 'Latest news')} tone="ink" />
+                  <SectionHeader title={L('తాజా కథనాలు', 'Latest stories')} tone="ink" />
                   <div className="grid gap-x-8 lg:grid-cols-2">
                     {latest.map((article) => (
                       <div key={article.short_id} ref={reveal}>

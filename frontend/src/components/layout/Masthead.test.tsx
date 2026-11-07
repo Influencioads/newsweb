@@ -45,7 +45,8 @@ function renderMasthead() {
 }
 
 async function chooseGuntur() {
-  fireEvent.click(screen.getByRole('button', { name: 'ప్రాంతం ఎంచుకోండి' }));
+  // The header has two location buttons (desktop row and phone row); the first is enough.
+  fireEvent.click(screen.getAllByRole('button', { name: 'ప్రాంతం ఎంచుకోండి' })[0]!);
   const dialog = screen.getByRole('dialog');
   const district = within(dialog).getByRole('combobox', { name: /జిల్లా/ });
   await within(district).findByRole('option', { name: 'గుంటూరు' });
@@ -67,7 +68,7 @@ describe('Masthead location', () => {
 
     expect(useReaderPrefs.getState().edition).toBe('guntur');
     fireEvent.click(within(dialog).getByRole('button', { name: 'పూర్తయింది' }));
-    expect(await screen.findByRole('button', { name: 'మీ ప్రాంతం: గుంటూరు' })).toBeInTheDocument();
+    expect((await screen.findAllByRole('button', { name: 'మీ ప్రాంతం: గుంటూరు' })).length).toBeGreaterThan(0);
     expect(readerApi.updatePreferences).not.toHaveBeenCalled();
   });
 
@@ -88,7 +89,7 @@ describe('Masthead location', () => {
 
   it('follows a district another picker chose, even after a state was picked here', async () => {
     renderMasthead();
-    fireEvent.click(screen.getByRole('button', { name: 'ప్రాంతం ఎంచుకోండి' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'ప్రాంతం ఎంచుకోండి' })[0]!);
     const dialog = screen.getByRole('dialog');
     const state = within(dialog).getByRole('combobox', { name: /రాష్ట్రం/ });
     await within(state).findByRole('option', { name: 'తెలంగాణ' });

@@ -208,7 +208,7 @@ export default function NotificationsScreen() {
           refreshControl={
             <RefreshControl
               refreshing={inbox.isRefetching && !inbox.isFetchingNextPage}
-              onRefresh={() => inbox.refetch()}
+              onRefresh={() => void inbox.refetch()}
               tintColor={color.brand}
               colors={[color.brand]}
               progressBackgroundColor={color.surface}

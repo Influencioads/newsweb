@@ -67,29 +67,40 @@ function renderHome(payload: HomePayload) {
 
 afterEach(() => useLanguage.setState({ language: 'te' }));
 
-/** The WOW home page (Pallavi's design): Featured Story, Explore WOW, Story
- *  Shots, WOW Radio beside the Nominate call, Trending, Featured Heroes. */
+/** The WOW home page: hero banner, WOW Radio beside the Nominate call,
+ *  Explore WOW, Story Shots, Trending, Featured Heroes. */
 describe('Home (WOW layout)', () => {
   function follows(a: Element, b: Element) {
     return Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
   }
 
-  it('leads with the featured story, then the WOW shelves in order', () => {
+  it('leads with the hero banner, then WOW Radio, Nominate and Explore WOW', () => {
     renderHome(homePayload());
     const lead = screen.getByRole('heading', { name: 'ముఖ్య కథనం' });
-    const explore = document.getElementById('explore-wow')!;
     const radio = screen.getByRole('heading', { name: /WOW Radio/ });
     const nominate = document.getElementById('nominate-cta')!;
-    expect(lead.closest('article')).toBeInTheDocument();
-    expect(follows(lead, explore)).toBe(true);
-    expect(follows(explore, radio)).toBe(true);
+    const explore = document.getElementById('explore-wow')!;
+    expect(lead.closest('section[aria-roledescription="carousel"]')).toBeInTheDocument();
+    expect(follows(lead, radio)).toBe(true);
     expect(follows(radio, nominate)).toBe(true);
+    expect(follows(nominate, explore)).toBe(true);
   });
 
-  it('keeps the lead out of the trending list', () => {
+  it('rotates up to ten banner stories, each once, and puts My Village after WOW Radio', () => {
+    renderHome(homePayload());
+    // lead, exclusive-one, exclusive-two and the national section story (repeats skipped).
+    expect(screen.getAllByRole('tab', { name: /\/ 4$/ })).toHaveLength(4);
+    const radio = screen.getByRole('heading', { name: /WOW Radio/ });
+    const village = document.getElementById('my-village-story')!;
+    const explore = document.getElementById('explore-wow')!;
+    expect(follows(radio, village)).toBe(true);
+    expect(follows(village, explore)).toBe(true);
+  });
+
+  it('shows the lead once and no Trending shelf', () => {
     renderHome(homePayload());
     expect(screen.getAllByRole('heading', { name: 'ముఖ్య కథనం' })).toHaveLength(1);
-    expect(document.querySelectorAll('a[href="/national/exclusive-one"]').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('heading', { name: /ట్రెండింగ్/ })).toBeNull();
   });
 
   it('no longer renders the newspaper exclusive shelf', () => {

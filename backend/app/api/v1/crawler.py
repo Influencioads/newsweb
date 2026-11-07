@@ -155,7 +155,9 @@ def og_article(slug_and_id: str, db: Session = Depends(get_db)):
     url = _abs(article.url_path)
     title = article.seo_title or article.title_te or ""
     description = (article.seo_description or article.summary_te or "")[:300]
-    image = share_card_service.ensure_card(db, article)
+    # The photo alone first: WhatsApp often shows a square cut from the middle,
+    # and on the headline card that square is half photo, half cut-off text.
+    image = share_card_service.ensure_preview(db, article) or share_card_service.ensure_card(db, article)
     # Load the hero by id. `Article` has no `hero_media` relationship, so the
     # getattr this replaced always returned None and the photo never reached
     # og:image — see share_card_service.hero_media_url.
@@ -247,7 +249,10 @@ def og_home() -> HTMLResponse:
             title=settings.APP_NAME,
             description="తెలుగు వార్తలు — ఆంధ్రప్రదేశ్, తెలంగాణ, జాతీయం.",
             url=_site(),
-            image=None,
+            # The site's own preview picture (frontend/public), as a full
+            # address: WhatsApp ignores a relative og:image.
+            image=_abs("/og-default.png"),
+            image_size=CARD_SIZE,
         ),
         f"<h1>{escape(settings.APP_NAME)}</h1>",
     )

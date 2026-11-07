@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Award, CheckCircle2, FileSearch, Megaphone, PenLine, ShieldCheck } from 'lucide-react';
+import { Award, Camera, CheckCircle2, FileSearch, ImagePlus, Megaphone, PenLine, ShieldCheck, X } from 'lucide-react';
 
-import { api } from '@/api/client';
 import { LocationPicker } from '@/components/location/LocationPicker';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { Checkbox, Field, Input, inputClass, Select, Textarea } from '@/components/ui/Field';
+import { Checkbox, Field, Input, Select, Textarea } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
 import { PageContainer, PageHeader } from '@/components/ui/Layout';
 import { useToast } from '@/components/ui/Toast';
@@ -18,10 +17,11 @@ import { useAuth } from '@/stores/auth';
 import { cn } from '@/utils/cn';
 import { useDocumentTitle } from '@/utils/motion';
 
-import { HERO_CATEGORIES, LOCAL_HERO_SLUG } from './categories';
+import { LOCAL_HERO_SLUG } from './categories';
+import { DEFAULT_CONTENT } from './siteContent';
 
 /**
- * Nominate Your Local Hero (pitch §4) — "మీ ఊరి హీరోను ప్రపంచానికి పరిచయం చేయండి!"
+ * Nominate Your Local Hero (pitch §4) — "మీ లోకల్ హీరోను ప్రపంచానికి పరిచయం చేయండి!"
  *
  * A nomination is filed as a reader submission in the Local Hero section, so
  * it lands in the existing moderation queue (CMS → Review) and follows the
@@ -46,6 +46,8 @@ interface Draft {
   district: string;
   category: string;
   reason: string;
+  /** The person nominating (who is writing this). */
+  nominator: string;
   phone: string;
   consent: boolean;
 }
@@ -57,6 +59,7 @@ const EMPTY: Draft = {
   district: '',
   category: '',
   reason: '',
+  nominator: '',
   phone: '',
   consent: false,
 };
@@ -92,7 +95,7 @@ export default function NominatePage() {
   const te = language === 'te';
   const L = (teText: string, enText: string) => (te ? teText : enText);
   const bodyCls = cn(s.body, s.te ? 'text-te-body-xs' : 'text-ui');
-  useDocumentTitle(L('లోకల్ హీరోను నామినేట్ చేయండి', 'Nominate Your Local Hero'));
+  useDocumentTitle(L('మీ లోకల్ హీరోని నామినేట్ చేయండి', 'Nominate Your Local Hero'));
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -108,31 +111,52 @@ export default function NominatePage() {
   useEffect(() => saveDraft(draft), [draft]);
 
   const config = useQuery({ queryKey: ['public', 'config'], queryFn: publicApi.fetchSiteConfig, staleTime: 300_000 });
-  const contributor = useQuery({
-    queryKey: ['contributor', 'me'],
-    queryFn: async () => (await api.get<{ kyc_status: string }>('/users/me/contributor')).data,
-    enabled: status === 'authenticated',
-    staleTime: 300_000,
-  });
-  const canAttachPhoto = contributor.data?.kyc_status === 'approved';
+  // The hero's photo: checked here, previewed in the form, sent after the nomination.
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  useEffect(() => {
+    if (!photo) {
+      setPhotoPreview(null);
+      return undefined;
+    }
+    const url = URL.createObjectURL(photo);
+    setPhotoPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photo]);
+  const pickPhoto = (file: File | null) => {
+    if (!file) return;
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+      setPhotoError(L('JPG, PNG లేదా WebP ఫోటో ఎంచుకోండి.', 'Choose a JPG, PNG or WebP photo.'));
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setPhotoError(L('ఫోటో 4 MB లోపు ఉండాలి.', 'The photo must be under 4 MB.'));
+      return;
+    }
+    setPhotoError(null);
+    setPhoto(file);
+  };
 
   const districtName = (() => {
     const d = config.data?.districts.find((x) => x.slug === draft.district);
     return d ? d.name_te : draft.district;
   })();
-  const heroCategory = HERO_CATEGORIES.find((c) => c.value === draft.category);
+  // CMS → Site content → Nominate form.
+  const heroCategories = config.data?.content?.nominate?.categories ?? DEFAULT_CONTENT.nominate.categories;
+  const heroCategory = heroCategories.find((c) => c.value === draft.category);
 
   const errors = {
-    name: draft.name.trim().length < 3 ? L('హీరో పూర్తి పేరు రాయండి.', "Enter the hero's full name.") : null,
+    name: draft.name.trim().length < 3 ? L('లోకల్ హీరో పూర్తి పేరు రాయండి.', "Enter the local hero's full name.") : null,
     village: draft.village.trim().length < 2 ? L('ఊరు / పట్టణం రాయండి.', 'Enter the village or town.') : null,
     district: !draft.district ? L('జిల్లా ఎంచుకోండి.', 'Choose the district.') : null,
-    category: !draft.category ? L('హీరో విభాగం ఎంచుకోండి.', 'Choose a hero category.') : null,
+    category: !draft.category ? L('హీరో కేటగిరీ ఎంచుకోండి.', 'Choose a hero category.') : null,
     reason:
       draft.reason.trim().length < MIN_REASON
         ? L(`కనీసం ${MIN_REASON} అక్షరాల్లో వివరించండి.`, `Explain in at least ${MIN_REASON} characters.`)
         : null,
+    nominator: draft.nominator.trim().length < 3 ? L('మీ పేరు రాయండి.', 'Enter your name.') : null,
     phone:
-      draft.phone.trim() && !PHONE.test(draft.phone.trim())
+      !PHONE.test(draft.phone.trim())
         ? L('10 అంకెల మొబైల్ నంబర్ ఇవ్వండి.', 'Enter a 10-digit mobile number.')
         : null,
     consent: !draft.consent ? L('అనుమతి ధృవీకరణ అవసరం.', 'Please confirm consent.') : null,
@@ -152,6 +176,7 @@ export default function NominatePage() {
         `ఎందుకు గుర్తింపు పొందాలి:`,
         draft.reason.trim(),
         '',
+        `నామినేట్ చేసినవారు: ${draft.nominator.trim()}`,
         `నామినేట్ చేసినవారి ఫోన్: ${draft.phone.trim() || 'ఇవ్వలేదు'}`,
         `అనుమతి: హీరో అనుమతితో ఫోటో, వివరాలు పంపినట్లు నామినేటర్ ధృవీకరించారు.`,
       ].join('\n');
@@ -200,9 +225,9 @@ export default function NominatePage() {
           <PageHeader
             icon={Award}
             eyebrow={L('సిగ్నేచర్ ఫీచర్', 'Signature feature')}
-            title={L('లోకల్ హీరోను నామినేట్ చేయండి', 'Nominate Your Local Hero')}
+            title={L('మీ లోకల్ హీరోని నామినేట్ చేయండి', 'Nominate Your Local Hero')}
             subtitle={L(
-              'మీ ఊరి హీరోను ప్రపంచానికి పరిచయం చేయండి! ఉపాధ్యాయులు, రైతులు, ఆవిష్కర్తలు, సామాజిక సేవకులు, విద్యార్థులు, గ్రామ వాలంటీర్లు — మంచి మార్పు తెస్తున్న ఎవరినైనా నామినేట్ చేయవచ్చు.',
+              'మీ లోకల్ హీరోను ప్రపంచానికి పరిచయం చేయండి! ఉపాధ్యాయులు, రైతులు, ఆవిష్కర్తలు, సామాజిక సేవకులు, విద్యార్థులు, గ్రామ వాలంటీర్లు — మంచి మార్పు తెస్తున్న ఎవరినైనా నామినేట్ చేయవచ్చు.',
               'Introduce your village hero to the world! Nominate teachers, farmers, innovators, social workers, students, village volunteers — anyone making a positive impact.',
             )}
             spacing="none"
@@ -239,8 +264,48 @@ export default function NominatePage() {
 
           <Card as="section" padding="lg">
             <form className="space-y-5" onSubmit={onSubmit} noValidate>
+              {/* Who is nominating: shown first, like the writer card on Share Your Village. */}
+              <section
+                aria-labelledby="nominator-heading"
+                className="relative isolate overflow-hidden rounded-2xl bg-gradient-to-br from-brand-deep to-brand-dark p-5 text-on-ink shadow-raised md:p-6"
+              >
+                <div aria-hidden className="pointer-events-none absolute -right-12 -top-12 -z-10 h-48 w-48 rounded-full bg-wow/30 blur-3xl" />
+                <h2 id="nominator-heading" className={cn(s.head, 'text-headline-xs font-bold')}>
+                  {L('నామినేట్ చేస్తున్నది ఎవరు?', 'Who is nominating?')}
+                </h2>
+                <p className={cn(bodyCls, 'mt-1 text-on-ink/80')}>
+                  {L('మీ వివరాలు సంపాదకులు ధృవీకరణ కోసం మాత్రమే చూస్తారు.', 'Only editors see your details, to verify the nomination.')}
+                </p>
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <Field label={L('మీ పూర్తి పేరు', 'Your full name')} required error={show(errors.nominator)} className="[&_label]:text-on-ink">
+                    <Input
+                      id="nominator-name"
+                      script="te"
+                      autoComplete="name"
+                      maxLength={120}
+                      value={draft.nominator}
+                      onChange={(e) => set('nominator', e.target.value)}
+                      placeholder={L('ఉదా: రాముడు కొండా', 'e.g. Ramudu Konda')}
+                    />
+                  </Field>
+                  <Field label={L('మీ ఫోన్ నంబర్', 'Your contact number')} required error={show(errors.phone)} className="[&_label]:text-on-ink">
+                    <Input
+                      id="nominator-phone"
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel-national"
+                      maxLength={10}
+                      value={draft.phone}
+                      onChange={(e) => set('phone', e.target.value.replace(/\D/g, ''))}
+                      placeholder="98xxxxxxxx"
+                    />
+                  </Field>
+                </div>
+              </section>
+
+              <h2 className={cn(s.head, 'text-headline-xs font-bold text-ink')}>{L('లోకల్ హీరో వివరాలు', 'About the Local Hero')}</h2>
               <div className="grid gap-4 md:grid-cols-2">
-                <Field label={L('హీరో పూర్తి పేరు', "Hero's full name")} required error={show(errors.name)}>
+                <Field label={L('లోకల్ హీరో పూర్తి పేరు', "Local Hero's full name")} required error={show(errors.name)}>
                   <Input
                     id="nominee-name"
                     script="te"
@@ -276,10 +341,10 @@ export default function NominatePage() {
                 ) : null}
               </div>
 
-              <Field label={L('హీరో విభాగం', 'Hero category')} required error={show(errors.category)}>
+              <Field label={L('హీరో కేటగిరీ', 'Hero category')} required error={show(errors.category)}>
                 <Select id="nominee-category" value={draft.category} onChange={(e) => set('category', e.target.value)}>
                   <option value="">{L('— ఎంచుకోండి —', '— choose —')}</option>
-                  {HERO_CATEGORIES.map((c) => (
+                  {heroCategories.map((c) => (
                     <option key={c.value} value={c.value}>
                       {pick(c.te, c.en)}
                     </option>
@@ -307,46 +372,60 @@ export default function NominatePage() {
                 />
               </Field>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field
-                  label={L('మీ ఫోన్ నంబర్', 'Your contact number')}
-                  optionalLabel
-                  error={show(errors.phone)}
-                  hint={L('సంపాదకులు ధృవీకరణ కోసం మాత్రమే వాడతారు.', 'Used only by editors to verify.')}
-                >
-                  <Input
-                    id="nominator-phone"
-                    type="tel"
-                    inputMode="numeric"
-                    autoComplete="tel-national"
-                    maxLength={10}
-                    value={draft.phone}
-                    onChange={(e) => set('phone', e.target.value.replace(/\D/g, ''))}
-                    placeholder="98xxxxxxxx"
-                  />
-                </Field>
-
-                <Field
-                  label={L('హీరో ఫోటో', 'Hero photo')}
-                  optionalLabel
-                  hint={
-                    canAttachPhoto
-                      ? L('JPG / PNG / WebP, హీరో అనుమతితో మాత్రమే.', 'JPG / PNG / WebP, only with the hero’s permission.')
-                      : L(
-                          'ఫోటోలు ధృవీకరించిన రచయితలు మాత్రమే పంపగలరు. లేదంటే మా సంపాదకులు మిమ్మల్ని సంప్రదిస్తారు.',
-                          'Only verified contributors can upload photos. Otherwise an editor will collect it from you.',
-                        )
-                  }
-                >
-                  <input
-                    id="nominee-photo"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    disabled={!canAttachPhoto}
-                    className={cn(inputClass, 'disabled:cursor-not-allowed disabled:opacity-60')}
-                    onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
-                  />
-                </Field>
+              {/* The hero's photo: any reader may send one (with the hero's consent). */}
+              <div className="space-y-2">
+                <p className={cn(s.body, 'text-ui-sm font-semibold text-ink')}>
+                  {L('లోకల్ హీరో ఫోటో', 'Local Hero photo')}{' '}
+                  <span className="font-normal text-muted">({L('ఆప్షనల్', 'Optional')})</span>
+                </p>
+                <div className="flex flex-wrap items-center gap-4">
+                  <label
+                    htmlFor="nominee-photo"
+                    className="relative flex h-24 w-24 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-wow/50 bg-wow-tint text-wow-deep transition-colors duration-base hover:border-wow"
+                  >
+                    {photoPreview ? (
+                      <img src={photoPreview} alt={L('లోకల్ హీరో ఫోటో', 'Local Hero photo')} className="h-full w-full object-cover" />
+                    ) : (
+                      <Icon icon={ImagePlus} size="lg" />
+                    )}
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label
+                      htmlFor="nominee-photo"
+                      className={cn(
+                        s.body,
+                        'inline-flex min-h-tap cursor-pointer items-center gap-1.5 rounded-pill bg-gradient-to-br from-wow to-wow-deep px-4 text-ui-sm font-semibold text-on-wow shadow-card',
+                      )}
+                    >
+                      <Icon icon={Camera} size="sm" />
+                      {photo ? L('ఫోటో మార్చండి', 'Change photo') : L('ఫోటో ఎంచుకోండి', 'Choose a photo')}
+                    </label>
+                    {photo ? (
+                      <Button variant="ghost" size="sm" icon={X} onClick={() => setPhoto(null)}>
+                        {L('తీసివేయండి', 'Remove')}
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+                <input
+                  id="nominee-photo"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  onChange={(e) => {
+                    pickPhoto(e.target.files?.[0] ?? null);
+                    e.target.value = '';
+                  }}
+                />
+                {photoError ? (
+                  <p role="alert" className={cn(s.body, 'text-ui-sm text-breaking')}>
+                    {photoError}
+                  </p>
+                ) : (
+                  <p className={cn(s.body, 'text-ui-sm text-muted')}>
+                    {L('JPG / PNG / WebP, 4 MB లోపు, హీరో అనుమతితో మాత్రమే.', 'JPG / PNG / WebP under 4 MB, only with the hero’s permission.')}
+                  </p>
+                )}
               </div>
 
               <fieldset className="pt-1">

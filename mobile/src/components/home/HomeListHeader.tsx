@@ -108,7 +108,7 @@ export function HomePromos({ epaper, topics }: HomePromosProps) {
               color={color.onOverlay}
               onPress={() =>
                 Share.share({
-                  message: `Today's WowIndian E-Paper\nhttps://toptelugunews.com/epaper/${epaper.pub_date}/page/1`,
+                  message: `Today's WowIndian E-Paper\nhttps://wowindia.influencioweb.com/epaper/${epaper.pub_date}/page/1`,
                 })
               }
             />

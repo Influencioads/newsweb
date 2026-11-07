@@ -242,19 +242,24 @@ def og_bulletin(date: date_type, slot: int, db: Session = Depends(get_db)):
     )
 
 
+#: The home page's title and description, the same as frontend/index.html.
+HOME_TITLE = "Wow Indian – సామాన్య భారతీయుల అసామాన్య విజయాలు!"
+HOME_DESCRIPTION = "మన విజయాలు.. మన ఆవిష్కరణలు.. మన స్ఫూర్తిదాయక కథలు!"
+
+
 @router.get("/_og/home", response_class=HTMLResponse)
 def og_home() -> HTMLResponse:
     return _page(
         _head(
-            title=settings.APP_NAME,
-            description="తెలుగు వార్తలు — ఆంధ్రప్రదేశ్, తెలంగాణ, జాతీయం.",
+            title=HOME_TITLE,
+            description=HOME_DESCRIPTION,
             url=_site(),
             # The site's own preview picture (frontend/public), as a full
             # address: WhatsApp ignores a relative og:image.
             image=_abs("/og-default.png"),
             image_size=CARD_SIZE,
         ),
-        f"<h1>{escape(settings.APP_NAME)}</h1>",
+        f"<h1>{escape(HOME_TITLE)}</h1><p>{escape(HOME_DESCRIPTION)}</p>",
     )
 
 

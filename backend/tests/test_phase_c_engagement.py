@@ -160,6 +160,27 @@ class TestBeacon:
         db.expire_all()
         assert db.get(Article, article.id).view_count == 2
 
+    def test_views_and_shares_are_not_edits(self, client: TestClient, db: Session) -> None:
+        article = make_article(db, title_te="అప్‌డేట్ సమయం పరీక్ష")
+        db.commit()
+        db.expire_all()
+        edited = db.get(Article, article.id).updated_at
+
+        client.post(
+            "/api/v1/public/events",
+            json={
+                "anon_id": "device-edit",
+                "events": [
+                    {"short_id": article.short_id, "type": "view"},
+                    {"short_id": article.short_id, "type": "share"},
+                ],
+            },
+        )
+        db.expire_all()
+        after = db.get(Article, article.id)
+        assert (after.view_count, after.share_count) == (1, 1)
+        assert after.updated_at == edited
+
     def test_read_seconds_accumulate_and_scroll_keeps_max(
         self, client: TestClient, db: Session
     ) -> None:

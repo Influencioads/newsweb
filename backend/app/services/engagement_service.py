@@ -8,8 +8,9 @@ so they can drift only if someone writes the tables by hand.
 
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import set_committed_value
 
 from app.core.errors import NotFoundError, ValidationError
 from app.core.logging import get_logger
@@ -62,6 +63,24 @@ def _viewer_key(user_id: int | None, anon_id: str | None) -> str | None:
     if anon_id:
         return f"anon:{anon_id[:56]}"
     return None
+
+
+def _bump(db: Session, article: Article, counter: str) -> None:
+    """Add one to a reader counter without touching `updated_at`.
+
+    A view or a share is not an edit: through the ORM the counter would bump
+    `updated_at` (its onupdate), so every read made the story look edited in
+    the CMS and gave Google a fresh `dateModified`.
+    """
+    column = getattr(Article, counter)
+    db.execute(
+        update(Article)
+        .where(Article.id == article.id)
+        .values({column: func.coalesce(column, 0) + 1, Article.updated_at: Article.updated_at})
+        .execution_options(synchronize_session=False)
+    )
+    # Keep the loaded row in step without marking it changed.
+    set_committed_value(article, counter, (getattr(article, counter) or 0) + 1)
 
 
 def _log_event(
@@ -144,7 +163,7 @@ def ingest_beacon(
             )
             db.add(row)
             # First sight of this viewer today — the deduplicated view count.
-            article.view_count = (article.view_count or 0) + 1
+            _bump(db, article, "view_count")
         sessions[article.id] = row
         return row
 
@@ -180,7 +199,7 @@ def ingest_beacon(
                 row.updated_at = now
             value = clamped
         elif event_type == EventType.SHARE:
-            article.share_count = (article.share_count or 0) + 1
+            _bump(db, article, "share_count")
 
         _log_event(
             db,

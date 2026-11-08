@@ -182,6 +182,8 @@ export interface SiteConfig {
   districts: DistrictOut[];
   /** CMS → Site content (backend app/services/site_content.py); see lib/siteContent. */
   content?: Partial<SiteContent>;
+  /** How people sign in: Google, and whether phone OTP / passwords are still open. */
+  auth?: { google: boolean; password: boolean };
 }
 
 /** What CMS → Site content edits, as `/public/config` sends it. */

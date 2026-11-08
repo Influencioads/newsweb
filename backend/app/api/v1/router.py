@@ -15,7 +15,9 @@ from app.api.v1 import (
     audio,
     bulletins,
     auth,
+    auth_google,
     cms_admin,
+    cms_staff,
     cms_ai,
     cms_articles,
     cms_assistant,
@@ -48,6 +50,7 @@ _AI_OFF = [Depends(require_ai_features)]
 
 # health is mounted at the application root (see app/main.py), not under /api/v1
 api_router.include_router(auth.router)
+api_router.include_router(auth_google.router)
 api_router.include_router(public.router)
 api_router.include_router(users.router)
 api_router.include_router(engagement.router)
@@ -63,6 +66,7 @@ api_router.include_router(story_formats.router)
 api_router.include_router(cms_articles.router)
 api_router.include_router(cms_dashboard.router)
 api_router.include_router(cms_admin.router)
+api_router.include_router(cms_staff.router)
 api_router.include_router(cms_ai.router, dependencies=_AI_OFF)
 api_router.include_router(cms_assistant.router, dependencies=_AI_OFF)
 api_router.include_router(cms_discovery.router)

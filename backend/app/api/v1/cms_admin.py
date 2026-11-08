@@ -215,12 +215,24 @@ async def upload_media(
 def users(
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
+    kind: str = Query("all", pattern="^(all|staff|readers)$"),
     db: Session = Depends(get_db),
     _p: Principal = Depends(require_permission("user.view")),
 ):
+    from app.services.google_auth_service import READER_ROLES
+
     stmt = (
         select(User).where(User.deleted_at.is_(None)).order_by(User.created_at.desc())
     )
+    staff = (
+        select(UserRole.user_id)
+        .join(Role, Role.id == UserRole.role_id)
+        .where(Role.key.not_in(READER_ROLES))
+    )
+    if kind == "staff":
+        stmt = stmt.where(User.id.in_(staff))
+    elif kind == "readers":
+        stmt = stmt.where(User.id.not_in(staff))
     rows, total = page(db, User, stmt, offset, limit)
     return {
         "items": [

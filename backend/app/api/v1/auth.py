@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 
 from app.core import security
 from app.core.deps import Principal, get_current_principal
-from app.core.errors import NotFoundError, ValidationError
+from app.core.config import settings
+from app.core.errors import AppError, NotFoundError, ValidationError
 from app.db.session import get_db
 from app.models.enums import AuditAction
 from app.models.user import UserSession
@@ -44,6 +45,20 @@ from app.services import audit_service, auth_service
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+class PasswordLoginOffError(AppError):
+    code = "USE_GOOGLE_SIGN_IN"
+    status_code = status.HTTP_403_FORBIDDEN
+    message_en = "Sign in with Google instead."
+    message_te = "గూగుల్‌తో సైన్ ఇన్ చేయండి."
+
+
+def password_login_on() -> None:
+    """Password, phone-OTP and signup routes are closed once Google sign-in
+    is the only way in (settings.password_login_allowed)."""
+    if not settings.password_login_allowed:
+        raise PasswordLoginOffError()
+
+
 def _me_payload(principal: Principal) -> MeOut:
     return MeOut(
         user=UserOut.model_validate(principal.user),
@@ -72,6 +87,7 @@ def _me_payload(principal: Principal) -> MeOut:
 # --------------------------------------------------------------------------- #
 @router.post(
     "/login",
+    dependencies=[Depends(password_login_on)],
     response_model=LoginResponse,
     summary="Sign in with email and password",
     description=(
@@ -125,6 +141,7 @@ def login(
 # --------------------------------------------------------------------------- #
 @router.post(
     "/otp/request",
+    dependencies=[Depends(password_login_on)],
     response_model=OtpRequestResponse,
     summary="Request a login OTP by phone",
     description=(
@@ -144,6 +161,7 @@ def request_otp(
 
 @router.post(
     "/otp/verify",
+    dependencies=[Depends(password_login_on)],
     response_model=LoginResponse,
     summary="Verify an OTP and sign in",
     description="Single-use. A verified code is deleted immediately.",
@@ -185,6 +203,7 @@ def verify_otp(
 
 @router.post(
     "/reader/otp/verify",
+    dependencies=[Depends(password_login_on)],
     response_model=ReaderLoginResponse,
     summary="Reader sign-in: verify an OTP, registering on first use",
     description=(
@@ -238,6 +257,7 @@ def verify_reader_otp(
 # --------------------------------------------------------------------------- #
 @router.post(
     "/register",
+    dependencies=[Depends(password_login_on)],
     response_model=ReaderLoginResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Reader signup with email and password",
@@ -487,6 +507,7 @@ def revoke_session(
 # --------------------------------------------------------------------------- #
 @router.post(
     "/password/reset-request",
+    dependencies=[Depends(password_login_on)],
     response_model=SimpleMessage,
     summary="Request a password reset link",
     description=(
@@ -522,6 +543,7 @@ def request_password_reset(
 
 @router.post(
     "/password/reset",
+    dependencies=[Depends(password_login_on)],
     response_model=SimpleMessage,
     summary="Set a new password using a reset token",
     description="Consumes the token and signs the account out of every device.",

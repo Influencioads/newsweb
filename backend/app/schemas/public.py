@@ -347,6 +347,8 @@ class SiteConfigOut(BaseModel):
         default_factory=dict,
         description="Site content edited in the CMS: brand, home, radio, nominate, contact",
     )
+    #: How people sign in: {"google": bool, "password": bool}.
+    auth: dict[str, bool] = Field(default_factory=dict)
 
 
 class SearchResultsOut(BaseModel):

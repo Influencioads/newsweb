@@ -26,6 +26,7 @@ const TrendingPage = lazy(() => import('./pages/public/TrendingPage'));
 const LocalPage = lazy(() => import('./pages/public/LocalPage'));
 const NotificationsPage = lazy(() => import('./pages/public/NotificationsPage'));
 const LoginPage = lazy(() => import('./pages/public/LoginPage'));
+const GoogleDonePage = lazy(() => import('./pages/public/GoogleDonePage'));
 const ProfilePage = lazy(() => import('./pages/public/ProfilePage'));
 const SubmitPage = lazy(() => import('./pages/public/SubmitPage'));
 const EpaperPage = lazy(() => import('./pages/public/EpaperPage'));
@@ -165,6 +166,7 @@ export default function App() {
               <Route path="/local" element={<LocalPage />} />
               <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/auth/google/done" element={<GoogleDonePage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />

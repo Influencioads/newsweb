@@ -12,6 +12,7 @@ import { PageContainer } from '@/components/ui/Layout';
 import { ErrorState } from '@/components/ui/State';
 import { Tabs } from '@/components/ui/Tabs';
 import * as authApi from '@/features/auth/api';
+import { GoogleSignInButton, useSignInMethods } from '@/features/auth/google';
 import { OtpInput } from '@/features/auth/components/OtpInput';
 import { useI18n, useScript } from '@/i18n';
 import { useAuth } from '@/stores/auth';
@@ -268,6 +269,7 @@ export default function AdminLogin() {
   const navigate = useNavigate();
   const location = useLocation();
   const [panel, setPanel] = useState<Panel>('password');
+  const methods = useSignInMethods();
   useDocumentTitle(t('admin.page.login'));
 
   const redirectTo = (location.state as { from?: string } | null)?.from ?? '/admin/dashboard';
@@ -290,23 +292,39 @@ export default function AdminLogin() {
             <h1 className={cn(s.head, 'text-headline-sm font-bold text-ink')}>{t('admin.page.login')}</h1>
           </div>
 
-          <Tabs
-            ariaLabel={t('nav.signIn')}
-            className="mb-5"
-            items={[
-              { key: 'password', label: en ? 'Desk / editor' : 'డెస్క్ / ఎడిటర్' },
-              { key: 'otp', label: en ? 'Reporter / stringer' : 'రిపోర్టర్ / స్ట్రింగర్' },
-            ]}
-            value={panel}
-            onChange={(key) => setPanel(key === 'otp' ? 'otp' : 'password')}
-          />
+          {methods.google ? (
+            <div className="mb-5 space-y-3">
+              <GoogleSignInButton target="cms" next={redirectTo} />
+              <PanelIntro>
+                {en
+                  ? 'Use the Gmail address an admin added for you.'
+                  : 'అడ్మిన్ మీ కోసం జోడించిన జీమెయిల్ చిరునామాతో సైన్ ఇన్ చేయండి.'}
+              </PanelIntro>
+            </div>
+          ) : null}
 
-          <div role="tabpanel" hidden={panel !== 'password'}>
-            <PasswordPanel onSignedIn={handleSignedIn} />
-          </div>
-          <div role="tabpanel" hidden={panel !== 'otp'}>
-            <OtpPanel onSignedIn={handleSignedIn} />
-          </div>
+          {/* Passwords and OTP only until Google is the one way in. */}
+          {methods.password && !methods.loading ? (
+            <>
+              <Tabs
+                ariaLabel={t('nav.signIn')}
+                className="mb-5"
+                items={[
+                  { key: 'password', label: en ? 'Desk / editor' : 'డెస్క్ / ఎడిటర్' },
+                  { key: 'otp', label: en ? 'Reporter / stringer' : 'రిపోర్టర్ / స్ట్రింగర్' },
+                ]}
+                value={panel}
+                onChange={(key) => setPanel(key === 'otp' ? 'otp' : 'password')}
+              />
+
+              <div role="tabpanel" hidden={panel !== 'password'}>
+                <PasswordPanel onSignedIn={handleSignedIn} />
+              </div>
+              <div role="tabpanel" hidden={panel !== 'otp'}>
+                <OtpPanel onSignedIn={handleSignedIn} />
+              </div>
+            </>
+          ) : null}
         </Card>
       </PageContainer>
     </div>

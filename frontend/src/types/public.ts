@@ -319,6 +319,8 @@ export interface SiteConfig {
   brand?: { primary?: string; breaking?: string; accent?: string };
   /** CMS → Site content. Absent from an older API; features/wow/siteContent.ts fills the defaults. */
   content?: Partial<SiteContent>;
+  /** How people sign in (backend settings): Google, and whether passwords are still open. */
+  auth?: { google: boolean; password: boolean };
 }
 
 /** What CMS → Site content edits (backend app/services/site_content.py). */

@@ -217,6 +217,7 @@ def get_config(response: Response, db: Session = Depends(get_db)) -> SiteConfigO
         ],
         brand=settings_service.brand_colors(db),
         content=site_content.blocks(db),
+        auth={"google": settings.google_login_enabled, "password": settings.password_login_allowed},
     )
 
 

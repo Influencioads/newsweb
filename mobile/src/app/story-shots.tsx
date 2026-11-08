@@ -38,7 +38,7 @@ import { T } from '@/ui/Text';
  * opens at the shot tapped on the home shelf.
  */
 
-const SITE = 'https://wowindia.influencioweb.com';
+const SITE = 'https://wowindian.com';
 
 function close() {
   if (router.canGoBack()) router.back();

@@ -21,7 +21,7 @@ import { Screen } from '@/ui/Screen';
  * CMS → Footer pages).
  */
 
-const SITE = 'https://wowindia.influencioweb.com';
+const SITE = 'https://wowindian.com';
 
 interface Row {
   label: string;

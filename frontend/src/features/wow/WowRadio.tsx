@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Pause, Play, Square, Video, type LucideIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pause, Play, Share2, Square, Video, type LucideIcon } from 'lucide-react';
 
-import { ShareButton } from '@/components/article/ShareSheet';
+import { ShareSheet } from '@/components/article/ShareSheet';
 import { Icon } from '@/components/ui/Icon';
 import { PageContainer } from '@/components/ui/Layout';
 import * as publicApi from '@/features/public/api';
@@ -174,8 +174,8 @@ function SegmentTiles({
                 // Phone: icon on top (play button beside it), name and English underneath,
                 // so a long Telugu name never runs into the play button.
                 large
-                  ? 'items-center gap-3 p-4 pr-16'
-                  : 'flex-col items-start gap-2 p-3 md:flex-row md:items-center md:gap-3 md:pr-[5.75rem]',
+                  ? 'items-center gap-3 p-4 pr-[5.5rem]'
+                  : 'flex-col items-start gap-2 p-3 md:flex-row md:items-center md:gap-3 md:pr-[5.5rem]',
               )}
             >
               <span
@@ -208,7 +208,8 @@ function SegmentTiles({
                 </span>
               </span>
               {!onPlay ? (
-                <span aria-hidden className={cn(playMark, 'group-hover:scale-110')}>
+                // In the tile's right corner, with the share circle just before it (as on the home card).
+                <span aria-hidden className={cn(playMark, 'absolute right-[0.375rem] top-1/2 -translate-y-1/2 group-hover:scale-110')}>
                   <Icon icon={Play} size="xs" />
                 </span>
               ) : null}
@@ -217,11 +218,9 @@ function SegmentTiles({
             <span
               className={cn(
                 'absolute z-10',
-                large
-                  ? 'right-3 top-1/2 -translate-y-1/2'
-                  : onPlay
-                    ? 'right-12 top-1 md:top-1/2 md:-translate-y-1/2'
-                    : 'right-1 top-1 md:top-1/2 md:-translate-y-1/2',
+                large || !onPlay
+                  ? 'right-11 top-1/2 -translate-y-1/2'
+                  : 'right-11 top-1 md:top-1/2 md:-translate-y-1/2',
               )}
             >
               <SegmentShare segment={sg} />
@@ -248,20 +247,42 @@ function SegmentTiles({
   );
 }
 
-/** Share a segment: its own page, /radio/<segment>, with its name. */
-function SegmentShare({ segment, title, className }: { segment: Segment; title?: string; className?: string }) {
+/**
+ * Share a segment: its own page, /radio/<segment>, with its name. Drawn as a
+ * small see-through circle beside the white play circle (a full 44px tap area
+ * around it), or as a larger round button in a segment page's banner.
+ */
+function SegmentShare({ segment, title, size = 'sm' }: { segment: Segment; title?: string; size?: 'sm' | 'lg' }) {
   const { language } = useI18n();
   const te = language === 'te';
+  const [open, setOpen] = useState(false);
   return (
-    <ShareButton
-      shortId={`radio-${segment.id}`}
-      url={`/radio/${segment.id}`}
-      title={title ?? `${te ? 'వావ్ రేడియో' : 'WOW Radio'} · ${te ? segment.te : segment.en}`}
-      track={false}
-      cardAvailable={false}
-      label={te ? `షేర్ చేయండి · ${segment.te}` : `Share · ${segment.en}`}
-      className={cn('bg-on-ink/15 text-on-ink hover:bg-on-ink/25', className)}
-    />
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label={te ? `షేర్ చేయండి · ${segment.te}` : `Share · ${segment.en}`}
+        className="group/share flex h-11 w-11 shrink-0 items-center justify-center rounded-pill"
+      >
+        <span
+          className={cn(
+            'flex items-center justify-center rounded-pill bg-on-ink/15 text-on-ink ring-1 ring-on-ink/30 transition-[background-color,transform] duration-base group-hover/share:scale-110 group-hover/share:bg-on-ink/25 motion-reduce:transform-none',
+            size === 'lg' ? 'h-11 w-11' : 'h-8 w-8',
+          )}
+        >
+          <Icon icon={Share2} size={size === 'lg' ? 'sm' : 'xs'} />
+        </span>
+      </button>
+      <ShareSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        shortId={`radio-${segment.id}`}
+        url={`/radio/${segment.id}`}
+        title={title ?? `${te ? 'వావ్ రేడియో' : 'WOW Radio'} · ${te ? segment.te : segment.en}`}
+        track={false}
+        cardAvailable={false}
+      />
+    </>
   );
 }
 
@@ -646,7 +667,9 @@ function SegmentView({ segment }: { segment: Segment }) {
             height={540}
             className="ml-auto hidden h-16 w-auto shrink-0 rounded-xl object-cover shadow-raised ring-1 ring-on-ink/20 md:block md:h-20"
           />
-          <SegmentShare segment={segment} className="ml-auto shrink-0 md:ml-0" />
+          <span className="-mr-1 ml-auto self-start md:ml-0 md:self-center">
+            <SegmentShare segment={segment} size="lg" />
+          </span>
         </div>
 
         {/* Player */}
@@ -726,7 +749,7 @@ function SegmentView({ segment }: { segment: Segment }) {
                       </span>
                     </span>
                   </button>
-                  <SegmentShare segment={segment} title={`${title} · ${te ? 'వావ్ రేడియో' : 'WOW Radio'} · ${segment.te}`} className="shrink-0" />
+                  <SegmentShare segment={segment} title={`${title} · ${te ? 'వావ్ రేడియో' : 'WOW Radio'} · ${segment.te}`} />
                 </li>
               );
             })}

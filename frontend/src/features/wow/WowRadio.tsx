@@ -3,6 +3,7 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Pause, Play, Square, Video, type LucideIcon } from 'lucide-react';
 
+import { ShareButton } from '@/components/article/ShareSheet';
 import { Icon } from '@/components/ui/Icon';
 import { PageContainer } from '@/components/ui/Layout';
 import * as publicApi from '@/features/public/api';
@@ -172,7 +173,9 @@ function SegmentTiles({
                 'flex h-full text-left',
                 // Phone: icon on top (play button beside it), name and English underneath,
                 // so a long Telugu name never runs into the play button.
-                large ? 'items-center gap-3 p-4' : 'flex-col items-start gap-2 p-3 md:flex-row md:items-center md:gap-3 md:pr-12',
+                large
+                  ? 'items-center gap-3 p-4 pr-16'
+                  : 'flex-col items-start gap-2 p-3 md:flex-row md:items-center md:gap-3 md:pr-[5.75rem]',
               )}
             >
               <span
@@ -210,6 +213,19 @@ function SegmentTiles({
                 </span>
               ) : null}
             </Link>
+            {/* Share this segment's page (the wrapper places it: the button itself is `relative`). */}
+            <span
+              className={cn(
+                'absolute z-10',
+                large
+                  ? 'right-3 top-1/2 -translate-y-1/2'
+                  : onPlay
+                    ? 'right-12 top-1 md:top-1/2 md:-translate-y-1/2'
+                    : 'right-1 top-1 md:top-1/2 md:-translate-y-1/2',
+              )}
+            >
+              <SegmentShare segment={sg} />
+            </span>
             {onPlay ? (
               // A full 44px tap area in the tile's corner, so it never covers the
               // name; the white circle inside stays small.
@@ -229,6 +245,23 @@ function SegmentTiles({
         );
       })}
     </ul>
+  );
+}
+
+/** Share a segment: its own page, /radio/<segment>, with its name. */
+function SegmentShare({ segment, title, className }: { segment: Segment; title?: string; className?: string }) {
+  const { language } = useI18n();
+  const te = language === 'te';
+  return (
+    <ShareButton
+      shortId={`radio-${segment.id}`}
+      url={`/radio/${segment.id}`}
+      title={title ?? `${te ? 'వావ్ రేడియో' : 'WOW Radio'} · ${te ? segment.te : segment.en}`}
+      track={false}
+      cardAvailable={false}
+      label={te ? `షేర్ చేయండి · ${segment.te}` : `Share · ${segment.en}`}
+      className={cn('bg-on-ink/15 text-on-ink hover:bg-on-ink/25', className)}
+    />
   );
 }
 
@@ -613,6 +646,7 @@ function SegmentView({ segment }: { segment: Segment }) {
             height={540}
             className="ml-auto hidden h-16 w-auto shrink-0 rounded-xl object-cover shadow-raised ring-1 ring-on-ink/20 md:block md:h-20"
           />
+          <SegmentShare segment={segment} className="ml-auto shrink-0 md:ml-0" />
         </div>
 
         {/* Player */}
@@ -658,7 +692,7 @@ function SegmentView({ segment }: { segment: Segment }) {
             {episodes.map((ep, i) => {
               const title = episodeTitle(ep, i, te);
               return (
-                <li key={ep.id}>
+                <li key={ep.id} className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => {
@@ -666,7 +700,7 @@ function SegmentView({ segment }: { segment: Segment }) {
                       radio.play(segment.id, i);
                     }}
                     aria-label={`${te ? 'ప్లే' : 'Play'}: ${title}`}
-                    className="group flex w-full items-center gap-3 rounded-xl p-1.5 text-left hover:bg-on-ink/5 md:gap-4"
+                    className="group flex min-w-0 flex-1 items-center gap-3 rounded-xl p-1.5 text-left hover:bg-on-ink/5 md:gap-4"
                   >
                     {/* The episode's thumbnail (CMS), else the WOW Radio picture. */}
                     <span className="relative aspect-video w-28 shrink-0 overflow-hidden rounded-lg bg-on-ink/10 md:w-36">
@@ -692,6 +726,7 @@ function SegmentView({ segment }: { segment: Segment }) {
                       </span>
                     </span>
                   </button>
+                  <SegmentShare segment={segment} title={`${title} · ${te ? 'వావ్ రేడియో' : 'WOW Radio'} · ${segment.te}`} className="shrink-0" />
                 </li>
               );
             })}

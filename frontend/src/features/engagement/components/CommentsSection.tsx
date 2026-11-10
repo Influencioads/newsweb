@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CornerDownRight, Flag, MessageCircle, Send, Trash2, X } from 'lucide-react';
 
 import { Badge } from '@/components/ui/Badge';
-import { Button, ButtonLink, IconButton } from '@/components/ui/Button';
+import { Button, IconButton } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { useConfirm } from '@/components/ui/Dialog';
 import { Textarea } from '@/components/ui/Field';
@@ -241,6 +241,10 @@ export function CommentsSection({ shortId }: { shortId: string }) {
   const replyName = replyTo ? s.text(replyTo.author_name_te, replyTo.author_name_en) : null;
   const total = list.data?.total_visible ?? 0;
 
+  // Signed-out readers see the comments, with no sign-in box; with none yet
+  // there is nothing to show them, so the section stays out of the way.
+  if (!authed && (list.isPending || (list.isSuccess && threads.length === 0))) return null;
+
   return (
     <section id="comments" className="mt-7 md:mt-10">
       <SectionHeader
@@ -281,19 +285,7 @@ export function CommentsSection({ shortId }: { shortId: string }) {
             </Button>
           </div>
         </form>
-      ) : (
-        <Card tone="paper" padding="md" className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className={cn(s.head, 'text-headline-xs font-bold text-ink')}>{t('ui.signInToContinue')}</p>
-            <p className={cn(s.body, s.te ? 'text-te-body-sm' : 'text-ui', 'mt-1 text-muted')}>
-              {t('ui.signInBody')}
-            </p>
-          </div>
-          <ButtonLink to="/login" variant="secondary">
-            {L('సైన్ ఇన్ చేయండి', 'Sign in')}
-          </ButtonLink>
-        </Card>
-      )}
+      ) : null}
 
       <QueryState
         query={list}

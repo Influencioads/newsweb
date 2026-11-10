@@ -4,6 +4,33 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#FFFFFF" />
+    <!-- Google Search Console ownership check. -->
+    <meta name="google-site-verification" content="E09JRx875uRY7NJ2ntFMle1xQjghnxpZGRbNZ0l41UM" />
+
+    <!--
+      Google Tag Manager, two containers on the one dataLayer:
+        GTM-KV35PS6R  the WOW Indian website tag
+        GTM-W6CWDHVW  Google Analytics
+      The standard GTM loader: it records gtm.start, so each container's
+      "All Pages" triggers fire. Page changes inside the app are pushed to the
+      same dataLayer as `virtual_pageview` (src/utils/analytics.ts).
+    -->
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() { window.dataLayer.push(arguments); }
+      gtag('js', new Date());
+      (function (w, d, s, l, ids) {
+        w[l] = w[l] || [];
+        w[l].push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
+        var f = d.getElementsByTagName(s)[0];
+        ids.forEach(function (i) {
+          var j = d.createElement(s);
+          j.async = true;
+          j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i;
+          f.parentNode.insertBefore(j, f);
+        });
+      })(window, document, 'script', 'dataLayer', ['GTM-KV35PS6R', 'GTM-W6CWDHVW']);
+    </script>
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
@@ -85,6 +112,21 @@
     <meta name="twitter:description" content="మన విజయాలు.. మన ఆవిష్కరణలు.. మన స్ఫూర్తిదాయక కథలు!" />
   </head>
   <body>
+    <!-- Google Tag Manager for readers without JavaScript. -->
+    <noscript
+      ><iframe
+        src="https://www.googletagmanager.com/ns.html?id=GTM-KV35PS6R"
+        height="0"
+        width="0"
+        style="display: none; visibility: hidden"
+      ></iframe
+      ><iframe
+        src="https://www.googletagmanager.com/ns.html?id=GTM-W6CWDHVW"
+        height="0"
+        width="0"
+        style="display: none; visibility: hidden"
+      ></iframe
+    ></noscript>
     <div id="root"></div>
     <!-- Portal target for dialogs, sheets and toasts (components/ui/Dialog, Toast). -->
     <div id="overlay-root"></div>

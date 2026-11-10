@@ -6,6 +6,7 @@ import { useSiteConfig } from './components/layout/NavDrawer';
 import { EPAPER_PUBLIC } from './features/epaper/api';
 import { VIDEOS_PUBLIC } from './features/public/api';
 import { PlayerHost } from './components/player/PlayerHost';
+import { usePageViews } from './utils/analytics';
 import { applyBrand, brandCss } from './utils/brand';
 import AdminLayout from './layouts/AdminLayout';
 import PublicLayout from './layouts/PublicLayout';
@@ -145,6 +146,8 @@ const OFF = <Navigate to="/admin/dashboard" replace />;
 
 export default function App() {
   const { pathname } = useLocation();
+  // Page changes inside the app, for Google Tag Manager / Analytics.
+  usePageViews();
   // Admin-set colours (Settings → Branding) theme the reader site and the CMS alike.
   const { data: config } = useSiteConfig();
   useEffect(() => {

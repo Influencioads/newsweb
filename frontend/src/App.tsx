@@ -6,6 +6,7 @@ import { useSiteConfig } from './components/layout/NavDrawer';
 import { EPAPER_PUBLIC } from './features/epaper/api';
 import { VIDEOS_PUBLIC } from './features/public/api';
 import { PlayerHost } from './components/player/PlayerHost';
+import { usePageViews } from './utils/analytics';
 import { applyBrand, brandCss } from './utils/brand';
 import AdminLayout from './layouts/AdminLayout';
 import PublicLayout from './layouts/PublicLayout';
@@ -26,6 +27,7 @@ const TrendingPage = lazy(() => import('./pages/public/TrendingPage'));
 const LocalPage = lazy(() => import('./pages/public/LocalPage'));
 const NotificationsPage = lazy(() => import('./pages/public/NotificationsPage'));
 const LoginPage = lazy(() => import('./pages/public/LoginPage'));
+const GoogleDonePage = lazy(() => import('./pages/public/GoogleDonePage'));
 const ProfilePage = lazy(() => import('./pages/public/ProfilePage'));
 const SubmitPage = lazy(() => import('./pages/public/SubmitPage'));
 const EpaperPage = lazy(() => import('./pages/public/EpaperPage'));
@@ -34,8 +36,12 @@ const MyEpaperPage = lazy(() => import('./pages/public/MyEpaperPage'));
 const epaperGate = (page: ReactElement) => (EPAPER_PUBLIC ? page : <Navigate to="/" replace />);
 const BulletinPage = lazy(() => import('./pages/public/BulletinPage'));
 const NominatePage = lazy(() => import('./features/wow/NominatePage'));
+const MyVillagePage = lazy(() => import('./features/wow/MyVillagePage'));
+const ShareVillagePage = lazy(() => import('./features/wow/ShareVillagePage'));
 const RadioPage = lazy(() => import('./features/wow/WowRadio'));
+const RadioSegmentPage = named(() => import('./features/wow/WowRadio'), 'RadioSegmentPage');
 const StoryShotsPage = lazy(() => import('./features/wow/StoryShots'));
+const ExplorePage = lazy(() => import('./features/wow/ExploreWow'));
 const ContributorApplyPage = lazy(() => import('./pages/public/ContributorApplyPage'));
 const LiveNewsPage = lazy(() => import('./pages/public/LiveNewsPage'));
 const ShortNewsPage = lazy(() => import('./pages/public/ShortNewsPage'));
@@ -97,6 +103,10 @@ const adminDiscovery = () => import('./pages/admin/DiscoveryPages');
 const AdsPage = named(adminDiscovery, 'AdsPage');
 const AnalyticsPage = named(adminDiscovery, 'AnalyticsPage');
 const HomepageSectionsPage = named(adminDiscovery, 'HomepageSectionsPage');
+const SiteContentPage = named(() => import('./pages/admin/SiteContentPage'), 'SiteContentPage');
+const HeroSlidesAdminPage = named(() => import('./pages/admin/SiteContentPage'), 'HeroSlidesAdminPage');
+const StoryShotsAdminPage = named(() => import('./pages/admin/SiteContentPage'), 'StoryShotsAdminPage');
+const SitePagesPage = named(() => import('./pages/admin/SitePagesPage'), 'SitePagesPage');
 const NotificationsAdminPage = named(adminDiscovery, 'NotificationsAdminPage');
 const PinsPage = named(adminDiscovery, 'PinsPage');
 const TrendingAdminPage = named(adminDiscovery, 'TrendingAdminPage');
@@ -136,6 +146,8 @@ const OFF = <Navigate to="/admin/dashboard" replace />;
 
 export default function App() {
   const { pathname } = useLocation();
+  // Page changes inside the app, for Google Tag Manager / Analytics.
+  usePageViews();
   // Admin-set colours (Settings → Branding) theme the reader site and the CMS alike.
   const { data: config } = useSiteConfig();
   useEffect(() => {
@@ -157,6 +169,7 @@ export default function App() {
               <Route path="/local" element={<LocalPage />} />
               <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/auth/google/done" element={<GoogleDonePage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -186,7 +199,11 @@ export default function App() {
               <Route path="/short-news" element={<ShortNewsPage />} />
               <Route path="/story-shots" element={<StoryShotsPage />} />
               <Route path="/radio" element={<RadioPage />} />
+              <Route path="/radio/:segment" element={<RadioSegmentPage />} />
+              <Route path="/explore" element={<ExplorePage />} />
               <Route path="/nominate" element={<NominatePage />} />
+              <Route path="/my-village" element={<MyVillagePage />} />
+              <Route path="/my-village/share" element={<ShareVillagePage />} />
               <Route path="/web-stories" element={<WebStoriesPage />} />
               <Route path="/author/:slug" element={<AuthorPage />} />
               <Route path="/tag/:slug" element={<TagPage />} />
@@ -233,6 +250,10 @@ export default function App() {
                 <Route path="/admin/videos" element={<VideosAdminPage />} />
                 <Route path="/admin/ads" element={<AdsPage />} />
                 <Route path="/admin/homepage" element={<HomepageSectionsPage />} />
+                <Route path="/admin/site-content" element={<SiteContentPage />} />
+                <Route path="/admin/pages" element={<SitePagesPage />} />
+                <Route path="/admin/story-shots" element={<StoryShotsAdminPage />} />
+                <Route path="/admin/hero-slides" element={<HeroSlidesAdminPage />} />
                 <Route path="/admin/notifications" element={<NotificationsAdminPage />} />
                 <Route path="/admin/taxonomy" element={<TaxonomyPage />} />
                 <Route path="/admin/media" element={<MediaPage />} />

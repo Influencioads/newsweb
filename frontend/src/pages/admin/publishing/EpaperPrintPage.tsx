@@ -6,6 +6,7 @@ import { Button, ButtonLink } from '@/components/ui/Button';
 import { QueryState, SkeletonCard } from '@/components/ui/State';
 import { EpaperSheet } from '@/features/epaper/EpaperSheet';
 import * as api from '@/features/epaper/adminApi';
+import { useLogoUrl } from '@/features/wow/siteContent';
 import { useI18n } from '@/i18n';
 import { cn } from '@/utils/cn';
 import { useDocumentTitle } from '@/utils/motion';
@@ -25,6 +26,7 @@ const PRINT_CSS = `@page { size: 1200px 1860px; margin: 0; }
 @media print { html, body { margin: 0; background: none; } }`;
 
 export function EpaperPrintPage() {
+  const logoUrl = useLogoUrl();
   const { t, language } = useI18n();
   const L = useL();
   const { date = '' } = useParams();
@@ -65,7 +67,7 @@ export function EpaperPrintPage() {
                   key={p.id}
                   className={cn('mx-auto my-4 w-[1200px] print:my-0', i < e.pages.length - 1 && 'break-after-page')}
                 >
-                  <EpaperSheet page={p} edition={e} mode="print" />
+                  <EpaperSheet logoUrl={logoUrl} page={p} edition={e} mode="print" />
                 </div>
               ))}
             </>

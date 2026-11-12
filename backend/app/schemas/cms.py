@@ -22,6 +22,8 @@ class ArticleWrite(BaseModel):
     # placement
     category_id: int | None = None
     subcategory_id: int | None = None
+    #: Up to three more sections the story is also listed in.
+    extra_category_ids: list[int] | None = Field(default=None, max_length=3)
     district_id: int | None = None
     mandal_id: int | None = None
     locality_id: int | None = None
@@ -45,6 +47,7 @@ class ArticleWrite(BaseModel):
 
     # byline and provenance
     byline_te: str | None = Field(default=None, max_length=200)
+    byline_photo_media_id: int | None = None
     author_id: int | None = None
     source_type: str = Field(
         default="own", pattern=r"^(own|agency|contributed|syndicated)$"
@@ -86,6 +89,7 @@ class ArticlePatch(BaseModel):
 
     category_id: int | None = None
     subcategory_id: int | None = None
+    extra_category_ids: list[int] | None = Field(default=None, max_length=3)
     district_id: int | None = None
     mandal_id: int | None = None
     locality_id: int | None = None
@@ -98,6 +102,7 @@ class ArticlePatch(BaseModel):
     tags: list[str] | None = Field(default=None, max_length=25)
 
     byline_te: str | None = Field(default=None, max_length=200)
+    byline_photo_media_id: int | None = None
     author_id: int | None = None
     source_type: str | None = Field(
         default=None, pattern=r"^(own|agency|contributed|syndicated)$"
@@ -200,11 +205,13 @@ class CmsArticleOut(BaseModel):
     body: dict[str, Any] | None
     category_id: int | None
     subcategory_id: int | None = None
+    extra_category_ids: list[int] = []
     district_id: int | None
     mandal_id: int | None
     locality_id: int | None = None
     author_id: int | None
     byline_te: str | None
+    byline_photo_media_id: int | None = None
     source_type: str
     source_credit: str | None
     article_type: str = ArticleType.NORMAL.value
@@ -245,6 +252,8 @@ class CmsArticleOut(BaseModel):
 
     # Resolved for the editor form; not columns.
     hero_media: CmsMediaRef | None = None
+    #: The writer's photo beside the byline ("Written by" on My Village stories).
+    byline_photo: CmsMediaRef | None = None
     gallery: list[CmsMediaRef] = []
     video: CmsVideoRef | None = None
     tags: list[CmsTagRef] = []

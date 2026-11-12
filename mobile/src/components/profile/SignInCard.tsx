@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import { ApiError } from '@/api/client';
 import * as readerApi from '@/api/reader';
 import { useI18n } from '@/lib/i18n';
+import { useSiteConfig } from '@/lib/siteContent';
 import { radius, space } from '@/lib/theme';
 import { makeStyles } from '@/lib/useTheme';
 import { useAuth } from '@/stores/auth';
@@ -30,6 +31,9 @@ export function SignInCard() {
   const { t, isTelugu } = useI18n();
   const L = (te: string, en: string) => (isTelugu ? te : en);
   const setMe = useAuth((s) => s.setMe);
+  // How the site lets people in (GET /public/config `auth`); an older API: phone and email only.
+  const auth = useSiteConfig().data?.auth;
+  const methods = { google: auth?.google ?? false, password: auth?.password ?? true };
 
   const [mode, setMode] = useState<'otp' | 'email'>('otp');
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
@@ -108,6 +112,34 @@ export function SignInCard() {
     password.length < PASSWORD_MIN ||
     (emailStep === 'register' && (name.trim().length < 2 || password !== confirm));
 
+  async function google() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await readerApi.signInWithGoogle();
+      if (res) setMe(res.me);
+    } catch (e) {
+      setError(
+        e instanceof Error && e.message === 'account_disabled'
+          ? L('ఈ ఖాతా నిలిపివేయబడింది.', 'This account has been switched off.')
+          : L('గూగుల్ సైన్-ఇన్ పూర్తి కాలేదు. మళ్లీ ప్రయత్నించండి.', 'Google sign-in did not work. Please try again.'),
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const googleButton = methods.google ? (
+    <Button
+      label={busy ? L('ఆగండి…', 'Please wait…') : L('గూగుల్‌తో సైన్ ఇన్ చేయండి', 'Sign in with Google')}
+      icon="logIn"
+      variant="secondary"
+      pending={busy}
+      onPress={() => void google()}
+      full
+    />
+  ) : null;
+
   const errorLine = error ? (
     <View style={styles.error} accessibilityRole="alert" accessibilityLiveRegion="polite">
       <T variant="bodySmall" color="breaking">
@@ -115,6 +147,25 @@ export function SignInCard() {
       </T>
     </View>
   ) : null;
+
+  // Google is the one way in: no phone or email forms.
+  if (!methods.password) {
+    return (
+      <Card padding="lg" style={styles.card}>
+        <T variant="headlineMd" weight="bold" accessibilityRole="header">
+          {t('auth.signIn')}
+        </T>
+        <T variant="bodySmall" color="muted">
+          {L(
+            'మీ గూగుల్ ఖాతాతో సైన్ ఇన్ చేయండి. కొత్తవారికి ఖాతా దానంతట అదే సృష్టించబడుతుంది.',
+            'Sign in with your Google account. New readers get an account automatically.',
+          )}
+        </T>
+        {googleButton}
+        {errorLine}
+      </Card>
+    );
+  }
 
   if (mode === 'email') {
     const register = emailStep === 'register';
@@ -198,6 +249,8 @@ export function SignInCard() {
       <T variant="headlineMd" weight="bold" accessibilityRole="header">
         {step === 'phone' ? t('auth.signIn') : t('auth.enterOtp')}
       </T>
+
+      {step === 'phone' ? googleButton : null}
 
       {step === 'phone' ? (
         <>

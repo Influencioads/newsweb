@@ -90,6 +90,21 @@ import {
   Zap,
   ZoomIn,
   ZoomOut,
+  Medal,
+  Sunrise,
+  Rocket,
+  Cpu,
+  Briefcase,
+  GalleryVerticalEnd,
+  TrendingUp,
+  Lightbulb,
+  Telescope,
+  ScrollText,
+  Ghost,
+  Award,
+  AudioLines,
+  Square,
+  HeartHandshake,
 } from 'lucide-react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 
@@ -104,6 +119,22 @@ import { CommentGlyph, ListenGlyph, PlaceGlyph, ShareGlyph, WhatsAppGlyph } from
  * (`alertCircle` → CircleAlert, `history` → RotateCcwClock, …).
  */
 const MAP = {
+  // WOW features (lib/wow.ts).
+  medal: Medal,
+  sunrise: Sunrise,
+  rocket: Rocket,
+  cpu: Cpu,
+  briefcase: Briefcase,
+  galleryVertical: GalleryVerticalEnd,
+  trendingUp: TrendingUp,
+  lightbulb: Lightbulb,
+  telescope: Telescope,
+  scrollText: ScrollText,
+  ghost: Ghost,
+  award: Award,
+  audioLines: AudioLines,
+  stop: Square,
+  heartHandshake: HeartHandshake,
   home: House,
   megaphone: Megaphone,
   mapPin: MapPin,

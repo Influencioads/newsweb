@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Bell, MapPin, Newspaper, SlidersHorizontal, UserRound } from 'lucide-react';
+import { Award, Bell, GalleryVerticalEnd, MapPin, Newspaper, SlidersHorizontal, UserRound } from 'lucide-react';
 
 import { LocationPicker, useReaderPlace, useReaderPlaceName } from '@/components/location/LocationPicker';
 import { Button, ButtonLink, IconButton, IconButtonLink } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { Dialog } from '@/components/ui/Dialog';
+import { Icon } from '@/components/ui/Icon';
 import { PageContainer } from '@/components/ui/Layout';
 import * as notificationsApi from '@/features/engagement/notificationsApi';
 import { EPAPER_PUBLIC } from '@/features/epaper/api';
+import { scriptOf, useSiteContent } from '@/features/wow/siteContent';
 import { LANGUAGE_LABELS, useI18n, useScript } from '@/i18n';
 import { useAuth } from '@/stores/auth';
 import { cn } from '@/utils/cn';
@@ -17,15 +19,16 @@ import { formatFullDate } from '@/utils/time';
 
 import { LanguageToggle } from './LanguageToggle';
 import { ReaderSettings } from './ReaderSettings';
+import { Wordmark } from './Wordmark';
 
 /**
  * Masthead — row 1 of the reader shell; scrolls away.
  *
- * Language + date (xl+) · wordmark · e-paper (md+), location, reader settings,
- * notifications (signed in), account. Every control is 44px and present at
- * every width — only text labels collapse to icons under md (the e-paper label
- * under lg, the location name under 1200px) so the md row fits its third of the
- * grid. The language
+ * A newspaper masthead, the wordmark centred between two stacked columns.
+ * From md: left — the reader's area (bold), today's date, the language switch;
+ * right — sign in / account on top, then e-paper, reader settings and
+ * notifications. Under md: wordmark first, then the language chip and one row
+ * of icon actions. Every control is 44px and present at every width. The language
  * switch stays in the chrome at every width because a reader who cannot read
  * the interface must be able to leave it: md+ shows both labels, under md a
  * single chip carries the *other* language's label in its own script. It sits
@@ -53,7 +56,7 @@ function NotificationBell() {
  * to the village; every choice applies at once. Nothing is ever detected — the
  * reader picks.
  */
-function LocationButton() {
+function LocationButton({ named = false, className }: { named?: boolean; className?: string }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const place = useReaderPlace();
@@ -61,8 +64,18 @@ function LocationButton() {
   const label = name ? `${t('reader.location')}: ${name}` : t('reader.chooseLocation');
   return (
     <>
-      <Button variant="ghost" size="sm" icon={MapPin} aria-label={label} title={label} onClick={() => setOpen(true)}>
-        <span className="hidden max-w-[9rem] truncate min-[1200px]:block">{name ?? t('reader.chooseLocation')}</span>
+      <Button
+        variant="ghost"
+        size="sm"
+        icon={MapPin}
+        aria-label={label}
+        title={label}
+        onClick={() => setOpen(true)}
+        className={cn(named && '-ml-2 font-bold text-ink', className)}
+      >
+        <span className={cn('max-w-[11rem] truncate', named ? 'block' : 'hidden min-[1200px]:block')}>
+          {name ?? t('reader.chooseLocation')}
+        </span>
       </Button>
       <Dialog
         open={open}
@@ -81,6 +94,9 @@ function LocationButton() {
 export function Masthead() {
   const { t, pick, language, setLanguage } = useI18n();
   const s = useScript();
+  const { brand } = useSiteContent();
+  const tagline = pick(brand.tagline_te, brand.tagline_en);
+  const taglineScript = scriptOf(tagline);
   const [settings, setSettings] = useState(false);
   const authStatus = useAuth((a) => a.status);
   const me = useAuth((a) => a.me);
@@ -96,28 +112,71 @@ export function Masthead() {
           From md it is the original three-column row. */}
       <PageContainer
         width="site"
-        className="grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1 py-2 md:grid-cols-3 md:py-3"
+        className="grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1 py-2 md:grid-cols-[1fr_auto_1fr] md:gap-x-6 md:py-4"
       >
-        <div className="flex items-center gap-3">
-          <LanguageToggle className="hidden md:inline-flex" />
+        {/* Left column (md+): area, date, language — stacked like a paper's dateline. */}
+        <div className="flex items-center gap-3 md:flex-col md:items-start md:gap-0.5">
+          <LocationButton named className="hidden md:inline-flex" />
+          <p className={cn(s.body, 'hidden text-meta text-ink-soft md:block')}>{formatFullDate(new Date(), language)}</p>
+          <LanguageToggle className="hidden md:mt-1 md:inline-flex" />
           <Chip as="button" lang={other} className="md:hidden" onClick={() => setLanguage(other)}>
             {LANGUAGE_LABELS[other]}
           </Chip>
-          <p className={cn(s.body, 'hidden text-meta text-muted xl:block')}>{formatFullDate(new Date(), language)}</p>
         </div>
 
         <Link
           to="/"
-          className="order-first col-span-2 flex min-w-0 flex-col items-center rounded-xl md:order-none md:col-span-1"
+          aria-label="WowIndian · వావ్ ఇండియన్"
+          className="order-first col-span-2 flex min-w-0 flex-col items-center gap-1 rounded-xl py-1 md:order-none md:col-span-1"
         >
-          <img src="/logo.webp" alt="వావ్ ఇండియన్ · WowIndian" width={960} height={257} className="h-16 w-auto md:h-20" />
-          {/* Brand line from the pitch: The Inspiring Indian — Discover. Inspire. Learn. Share. */}
-          <span lang="en" className="-mt-0.5 font-sans text-eyebrow font-bold uppercase text-wow-deep">
-            Discover · Inspire · Learn · Share
+          <Wordmark />
+          {/* Brand line (CMS → Site content), e.g. "Ordinary People. Extraordinary Stories." */}
+          <span
+            lang={taglineScript.lang}
+            className={cn(taglineScript.cls, '-mt-0.5 block whitespace-nowrap text-center text-eyebrow font-bold tracking-normal text-ink md:mt-0.5 md:text-meta md:tracking-wide lg:text-ui-sm')}
+          >
+            {tagline}
           </span>
         </Link>
 
-        <div className="flex shrink-0 items-center justify-end gap-1">
+        {/* Phone: the brand line sits centred under the wordmark; this row puts the
+            one-line Story Shots button on the left and Nominate on the right. */}
+        <div className="order-first col-span-2 flex items-center justify-between gap-2 md:hidden">
+          <Link
+            to="/story-shots"
+            aria-label={t('ui.storyShots')}
+            className="flex min-h-tap shrink-0 items-center rounded-xl"
+          >
+            <span
+              className={cn(
+                s.body,
+                'inline-flex items-center gap-1 rounded-pill bg-gradient-to-br from-wow to-wow-deep px-2.5 py-1 text-eyebrow font-bold tracking-normal text-on-wow shadow-card',
+              )}
+            >
+              <Icon icon={GalleryVerticalEnd} size="xs" className="shrink-0" />
+              <span className="whitespace-nowrap">{language === 'te' ? 'స్టోరీ షాట్స్' : 'Story Shots'}</span>
+            </span>
+          </Link>
+          <Link
+            to="/nominate"
+            aria-label={t('ui.nominate')}
+            className="flex min-h-tap shrink-0 items-center rounded-xl"
+          >
+            <span
+              className={cn(
+                s.body,
+                'inline-flex items-center gap-1 rounded-pill bg-gradient-to-br from-wow to-wow-deep px-2.5 py-1 text-eyebrow font-bold tracking-normal text-on-wow shadow-card',
+              )}
+            >
+              <Icon icon={Award} size="xs" className="shrink-0" />
+              <span className="whitespace-nowrap">{language === 'te' ? 'లోకల్ హీరోని నామినేట్ చేయండి' : 'Nominate a Local Hero'}</span>
+            </span>
+          </Link>
+        </div>
+
+        {/* Right column: one row under md; from md account on top, the rest beneath. */}
+        <div className="flex shrink-0 items-center justify-end gap-1 md:flex-col md:items-end md:gap-1">
+          <div className="flex items-center gap-1">
           {EPAPER_PUBLIC && (
           <ButtonLink
             to="/epaper"
@@ -130,20 +189,28 @@ export function Masthead() {
             <span className="hidden lg:inline">{t('nav.epaper')}</span>
           </ButtonLink>
           )}
-          <LocationButton />
+          <LocationButton className="md:hidden" />
           <IconButton icon={SlidersHorizontal} label={t('ui.readerSettings')} onClick={() => setSettings(true)} />
           {authed && <NotificationBell />}
-          {authed && me ? (
-            <IconButtonLink
-              icon={UserRound}
-              label={`${t('page.profile')} · ${pick(me.user.name_te, me.user.name_en)}`}
-              to="/profile"
-            />
-          ) : (
-            <ButtonLink to="/login" variant="ghost" size="sm" icon={UserRound} aria-label={t('nav.signIn')}>
-              <span className="hidden md:inline">{t('nav.signIn')}</span>
+          </div>
+          <div className="hidden items-center gap-1 md:flex">
+            <ButtonLink to="/story-shots" variant="wow" size="sm" icon={GalleryVerticalEnd}>
+              {t('ui.storyShots')}
             </ButtonLink>
-          )}
+            <ButtonLink to="/nominate" variant="wow" size="sm" icon={Award}>
+              {t('ui.nominate')}
+            </ButtonLink>
+          </div>
+          {/* Signed-in readers keep their profile here; there is no sign-in button in the header. */}
+          {authed && me ? (
+            <div className="md:order-first">
+              <IconButtonLink
+                icon={UserRound}
+                label={`${t('page.profile')} · ${pick(me.user.name_te, me.user.name_en)}`}
+                to="/profile"
+              />
+            </div>
+          ) : null}
         </div>
       </PageContainer>
 

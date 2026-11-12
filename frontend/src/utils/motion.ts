@@ -14,7 +14,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  */
 
 const SITE_TITLE = 'వావ్ ఇండియన్';
-const DEFAULT_TITLE = 'వావ్ ఇండియన్ · WowIndian';
+/** The home page's tab title and the site's line in Google and link previews (index.html). */
+const DEFAULT_TITLE = 'Wow Indian – సామాన్య భారతీయుల అసామాన్య విజయాలు!';
 
 /** True when the OS asks for reduced motion (or there is no window). */
 export function prefersReducedMotion(): boolean {

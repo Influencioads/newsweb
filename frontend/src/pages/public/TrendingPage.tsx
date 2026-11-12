@@ -42,7 +42,7 @@ function Rank({ n, size = 'md' }: { n: number; size?: 'lg' | 'md' }) {
     <span
       aria-hidden
       className={cn(
-        'flex shrink-0 items-center justify-center rounded-pill bg-wow-deep font-sans font-extrabold tabular-nums text-on-wow shadow-raised',
+        'flex shrink-0 items-center justify-center rounded-pill bg-gradient-to-br from-wow to-wow-deep font-sans font-extrabold tabular-nums text-on-wow shadow-raised',
         size === 'lg' ? 'h-12 w-12 text-headline-md' : 'h-9 w-9 text-ui',
       )}
     >
@@ -224,7 +224,7 @@ export default function TrendingPage() {
         <div aria-hidden className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full bg-wow/30 blur-3xl" />
         <Flame aria-hidden size={160} strokeWidth={1} className="pointer-events-none absolute -bottom-8 right-4 text-on-ink/10 md:right-10" />
         <div className="relative flex items-start gap-4">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-pill bg-wow-deep text-on-wow">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-pill bg-gradient-to-br from-wow to-wow-deep text-on-wow">
             <Icon icon={Flame} size="lg" />
           </span>
           <div className="min-w-0 space-y-1.5">

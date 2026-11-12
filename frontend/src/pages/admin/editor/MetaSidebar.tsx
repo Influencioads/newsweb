@@ -11,6 +11,7 @@ import { TagInput } from '@/components/admin/TagInput';
 import { Badge, StatusPill } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { Chip, ChipRail } from '@/components/ui/Chip';
+import { DateTimeField } from '@/components/ui/DateTimeField';
 import { Field, Input, Switch } from '@/components/ui/Field';
 import { Icon, type LucideIcon } from '@/components/ui/Icon';
 import { ErrorState, type QueryStateQuery } from '@/components/ui/State';
@@ -160,7 +161,7 @@ export function MetaSidebar({ form, set, errors, options, article, canPin }: Met
           hint={L('ఖాళీగా ఉంచితే వెంటనే ప్రచురిస్తుంది', 'Leave empty to publish immediately')}
           error={errors('scheduled_at')}
         >
-          <Input type="datetime-local" script="en" value={form.scheduledAt} onChange={(e) => set({ scheduledAt: e.target.value })} />
+          <DateTimeField value={form.scheduledAt} onChange={(scheduledAt) => set({ scheduledAt })} />
         </Field>
       </section>
 
@@ -171,7 +172,8 @@ export function MetaSidebar({ form, set, errors, options, article, canPin }: Met
           categories={options.data?.categories ?? []}
           categoryId={form.categoryId}
           subcategoryId={form.subcategoryId}
-          onChange={(c, sub) => set({ categoryId: c, subcategoryId: sub })}
+          extraIds={form.extraCategoryIds}
+          onChange={(c, sub, extra) => set({ categoryId: c, subcategoryId: sub, extraCategoryIds: extra })}
           error={errors('category_id')}
         />
         <LocationSelector

@@ -129,7 +129,7 @@ export default function ShortNewsAdmin() {
       >
         <div className="space-y-3">
           <Field
-            label={L('చిత్రంలోని శీర్షిక (ఐచ్ఛికం)', 'Headline on the image (optional)')}
+            label={L('చిత్రంలోని శీర్షిక (ఆప్షనల్)', 'Headline on the image (optional)')}
             hint={L('చూపు లేని పాఠకులకు చదివి వినిపిస్తుంది. ఈ అప్‌లోడ్‌లోని అన్ని చిత్రాలకు వర్తిస్తుంది.', 'Read aloud to blind readers. Applies to every image in this upload.')}
           >
             <Input script="te" value={alt} maxLength={500} onChange={(e) => setAlt(e.target.value)} disabled={!!progress} />

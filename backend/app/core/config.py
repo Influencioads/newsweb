@@ -68,6 +68,13 @@ class Settings(BaseSettings):
     PASSWORD_HASH_SCHEME: Literal["argon2", "bcrypt"] = "argon2"
     BCRYPT_ROUNDS: int = 12
     MAX_CONCURRENT_STAFF_SESSIONS: int = 3
+    # Sign in with Google (a Web OAuth client; redirect URI
+    # {API_URL}/api/v1/auth/google/callback). Blank: Google sign-in is off.
+    GOOGLE_OAUTH_CLIENT_ID: str = ""
+    GOOGLE_OAUTH_CLIENT_SECRET: str = ""
+    #: Password, phone-OTP and signup routes. Set false to make Google the only
+    #: way in; ignored (passwords stay on) while Google sign-in is not set up.
+    PASSWORD_LOGIN_ENABLED: bool = True
     LOGIN_MAX_ATTEMPTS: int = 5
     LOGIN_ATTEMPT_WINDOW_MINUTES: int = 15
     LOGIN_LOCKOUT_MINUTES: int = 30
@@ -238,6 +245,15 @@ class Settings(BaseSettings):
     @property
     def is_development(self) -> bool:
         return self.APP_ENV == "development"
+
+    @property
+    def google_login_enabled(self) -> bool:
+        return bool(self.GOOGLE_OAUTH_CLIENT_ID and self.GOOGLE_OAUTH_CLIENT_SECRET)
+
+    @property
+    def password_login_allowed(self) -> bool:
+        # Never lock everyone out: passwords stay on until Google is set up.
+        return self.PASSWORD_LOGIN_ENABLED or not self.google_login_enabled
 
     def assert_production_safe(self) -> list[str]:
         """Return a list of settings that must not ship to production as-is.

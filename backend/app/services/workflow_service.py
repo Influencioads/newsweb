@@ -14,6 +14,7 @@ from app.core.permissions import LEVEL_PIN_PLACEMENT, LEVEL_SELF_APPROVE
 from app.db.base import utcnow
 from app.models.content import (
     Article,
+    ArticleCategory,
     ArticleTag,
     ArticleVersion,
     Category,
@@ -48,6 +49,7 @@ _SCALARS = (
     "voice_enabled",
     "article_type",
     "hero_media_id",
+    "byline_photo_media_id",
     "video_id",
     "author_id",
 )
@@ -192,6 +194,34 @@ def _apply_gallery(db: Session, article: Article, media_ids: list[int]) -> None:
     db.flush()
 
 
+#: Besides the main section, a story may be listed in up to this many more.
+MAX_EXTRA_CATEGORIES = 3
+
+
+def _apply_extra_categories(db: Session, article: Article, category_ids: list[int]) -> None:
+    """Replace the extra sections. The main one (`category_id`) is never
+    repeated here, so picking it again is simply ignored."""
+    wanted = [
+        cid for cid in dict.fromkeys(category_ids) if cid != article.category_id
+    ][:MAX_EXTRA_CATEGORIES]
+    known = (
+        set(db.scalars(select(Category.id).where(Category.id.in_(wanted))).all())
+        if wanted
+        else set()
+    )
+    missing = [cid for cid in wanted if cid not in known]
+    if missing:
+        raise ValidationError(
+            details={"extra_category_ids": f"unknown categories: {missing}"}
+        )
+    db.execute(delete(ArticleCategory).where(ArticleCategory.article_id == article.id))
+    for position, category_id in enumerate(wanted):
+        db.add(ArticleCategory(article_id=article.id, category_id=category_id, sort=position))
+    # Autoflush is off; the response reads these rows straight back.
+    db.flush()
+    db.expire(article, ["extra_categories"])
+
+
 def apply_copy(
     article: Article, values: dict[str, Any], db: Session | None = None
 ) -> None:
@@ -226,6 +256,7 @@ def apply_copy(
         "mandal_id",
         "locality_id",
         "hero_media_id",
+        "byline_photo_media_id",
         "video_id",
     ):
         if key in values and values[key] is None:
@@ -352,6 +383,7 @@ def create(db: Session, principal: Principal, values: dict[str, Any]) -> Article
     # Placement has to land before the scope check, and the gallery needs an id,
     # so the write is split around the flush.
     gallery = values.pop("gallery_media_ids", None)
+    extra_categories = values.pop("extra_category_ids", None)
     apply_copy(article, values, db)
     if values.get("article_type") is None:
         article.article_type = _default_type(principal, article)
@@ -361,6 +393,8 @@ def create(db: Session, principal: Principal, values: dict[str, Any]) -> Article
     db.flush()
     if gallery is not None:
         _apply_gallery(db, article, gallery)
+    if extra_categories is not None:
+        _apply_extra_categories(db, article, extra_categories)
     db.add(
         WorkflowTransition(
             article_id=article.id,
@@ -398,9 +432,12 @@ def update(
         principal.require_level(LEVEL_PIN_PLACEMENT, reason="edit after approval")
     _guard_flags(db, principal, article, values)
     gallery = values.pop("gallery_media_ids", None)
+    extra_categories = values.pop("extra_category_ids", None)
     apply_copy(article, values, db)
     if gallery is not None:
         _apply_gallery(db, article, gallery)
+    if extra_categories is not None:
+        _apply_extra_categories(db, article, extra_categories)
     article.updated_by = principal.id
     article.version += 1
     if article.status == ArticleStatus.PUBLISHED:
@@ -448,6 +485,34 @@ def approver_may_self_approve(db: Session, user_id: int) -> bool:
     """Is this approver an admin, so approving their own copy was allowed?"""
     user = db.get(User, user_id)
     return user is not None and build_principal(user, "").level >= LEVEL_SELF_APPROVE
+
+
+def _usable_photo(media: Media | None) -> bool:
+    return media is not None and media.deleted_at is None and media.mime.startswith("image/")
+
+
+def _first_story_photo(db: Session, article: Article) -> Media | None:
+    """The first usable photo the story already carries: its gallery in order,
+    then the pictures placed between paragraphs."""
+    gallery = db.scalars(
+        select(Media)
+        .join(ArticleMedia, ArticleMedia.media_id == Media.id)
+        .where(ArticleMedia.article_id == article.id, ArticleMedia.role == "gallery")
+        .order_by(ArticleMedia.sort)
+    ).all()
+    for media in gallery:
+        if _usable_photo(media):
+            return media
+    for node in (article.body or {}).get("content") or []:
+        if node.get("type") != "image":
+            continue
+        try:
+            media = db.get(Media, int((node.get("attrs") or {}).get("media_id")))
+        except (TypeError, ValueError):
+            continue
+        if _usable_photo(media):
+            return media
+    return None
 
 
 def transition(
@@ -523,10 +588,23 @@ def transition(
         # photo. Asked before the trusted branch below writes anything, and of
         # the picture itself — a hero deleted from the library is no photo.
         hero = db.get(Media, article.hero_media_id) if article.hero_media_id else None
-        if hero is None or hero.deleted_at is not None or not hero.mime.startswith("image/"):
+        if not _usable_photo(hero):
+            # A story that has photos but no main image chosen leads with its
+            # first one (gallery first, then a picture inside the body), so
+            # "one main image, the rest optional" never blocks a publish.
+            hero = _first_story_photo(db, article)
+            if hero is not None:
+                article.hero_media_id = hero.id
+        if not _usable_photo(hero):
             raise ValidationError(
-                message_en="Add a hero photo before publishing: a story without a photo is never published.",
-                message_te="ప్రచురించే ముందు ప్రధాన ఫోటో జత చేయండి — ఫోటో లేని వార్త ప్రచురించబడదు.",
+                message_en=(
+                    "This story has no photo. Open it, choose a Main image under "
+                    "Pictures & video, press Save, then publish."
+                ),
+                message_te=(
+                    "ఈ కథనానికి ఫోటో లేదు. కథనాన్ని తెరిచి, చిత్రాలు & వీడియోలో ప్రధాన "
+                    "చిత్రం ఎంచుకుని, సేవ్ చేసి, తర్వాత ప్రచురించండి."
+                ),
                 details={"hero_media_id": "a usable photo is required"},
             )
         if trusted:
@@ -665,3 +743,50 @@ def _release_source_text(db: Session, article: Article) -> None:
         get_logger(__name__).exception(
             "source_text_release_failed", article_id=article.id
         )
+
+
+def publish_due(db: Session, *, limit: int = 50) -> list[int]:
+    """Publish every SCHEDULED article whose time has come (the scheduler tick).
+
+    Each goes live exactly as if the editor who scheduled it had pressed
+    Publish at that moment: the same `transition`, so notifications, pins and
+    breaking expiry all happen as usual. One that fails is logged and left
+    SCHEDULED for the next tick rather than stopping the others.
+    """
+    from app.core.logging import get_logger
+
+    log = get_logger(__name__)
+    due = db.scalars(
+        select(Article)
+        .where(
+            Article.workflow_state == WorkflowState.SCHEDULED,
+            Article.scheduled_at.is_not(None),
+            Article.scheduled_at <= utcnow(),
+            Article.deleted_at.is_(None),
+        )
+        .order_by(Article.scheduled_at)
+        .limit(limit)
+    ).all()
+    published: list[int] = []
+    for article in due:
+        # Whoever scheduled it publishes it; their scope already covered it.
+        actor_id = db.scalar(
+            select(WorkflowTransition.actor_id)
+            .where(
+                WorkflowTransition.article_id == article.id,
+                WorkflowTransition.to_state == WorkflowState.SCHEDULED,
+            )
+            .order_by(WorkflowTransition.created_at.desc())
+            .limit(1)
+        )
+        actor = db.get(User, actor_id) if actor_id else None
+        if actor is None:
+            log.warning("scheduled_publish_no_actor", article_id=article.id)
+            continue
+        try:
+            with db.begin_nested():
+                transition(db, build_principal(actor, "scheduler"), article, "publish", "scheduled time reached")
+            published.append(article.id)
+        except Exception:  # noqa: BLE001 — one bad article must not stop the rest
+            log.exception("scheduled_publish_failed", article_id=article.id)
+    return published

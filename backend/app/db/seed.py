@@ -154,10 +154,9 @@ def seed_panchayat_category(db: Session, categories: dict[str, "Category"]) -> N
 
     Kept out of `CATEGORIES` because `panchayat_service.stamp_ugc` forces every
     self-published article into this exact slug — the seed and the publish fork
-    must not be able to disagree about which row that is. Adding it to the
-    `categories` dict is all the homepage section needs: the loop below already
-    creates one per nav category, and its `min_items=3` floor keeps the section
-    hidden until three panchayat stories exist, which is right for launch.
+    must not be able to disagree about which row that is. It stays out of the
+    main navigation (and so gets no homepage block of its own); its section
+    page and the local feeds still carry the stories.
     Insert-only, like `seed_categories`: an admin's rename or reorder survives.
     """
     if panchayat_service.PANCHAYAT_CATEGORY_SLUG in categories:
@@ -168,7 +167,8 @@ def seed_panchayat_category(db: Session, categories: dict[str, "Category"]) -> N
         name_en="Panchayat News",
         sort=len(CATEGORIES),
         is_active=True,
-        show_in_nav=True,
+        # Not in the main navigation: the WOW categories are the nav (seed_content).
+        show_in_nav=False,
     )
     db.add(cat)
     categories[cat.slug] = cat

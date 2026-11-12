@@ -326,7 +326,9 @@ function Scrubber({
     Platform.OS === 'web'
       ? {
           focusable: true,
-          onKeyDown: (e: { key: string; preventDefault: () => void }) => {
+          // RN 0.88 types onKeyDown with the native event shape; on web it is a DOM KeyboardEvent.
+          onKeyDown: (event: unknown) => {
+            const e = event as { key: string; preventDefault: () => void };
             if (KEY_STEP[e.key]) onSkip(KEY_STEP[e.key]);
             else if (e.key === 'Home') onSeek(0);
             else if (e.key === 'End') onSeek(duration);

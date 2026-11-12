@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 
-import { api, setTokens } from './client';
+import { api, API_BASE, setTokens } from './client';
 import type { Me, OtpRequestResponse, Preferences, PreferencesPatch, ReaderLoginResponse } from './types';
 
 export async function requestOtp(phone: string): Promise<OtpRequestResponse> {
@@ -78,4 +79,29 @@ export async function uploadAvatar(uri: string, name = 'avatar.jpg', type = 'ima
   return (await api.post('/users/me/avatar', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })).data;
+}
+
+// --- Sign in with Google -----------------------------------------------------
+/** Where the server sends the browser back to (app.json `scheme`). */
+const GOOGLE_RETURN = 'wowindian://auth';
+
+/**
+ * Sign in with Google through the server's flow (backend
+ * app/services/google_auth_service): a browser sheet opens Google, the server
+ * sends it back to wowindian://auth with a one-use ticket, and the ticket is
+ * swapped for tokens here. Returns null when the reader closes the sheet;
+ * throws an Error whose message is the server's reason (not_staff, ...).
+ */
+export async function signInWithGoogle(): Promise<ReaderLoginResponse | null> {
+  const result = await WebBrowser.openAuthSessionAsync(`${API_BASE}/auth/google/start?target=app`, GOOGLE_RETURN);
+  if (result.type !== 'success') return null;
+  const params = new URL(result.url.replace(GOOGLE_RETURN, 'https://app.invalid/auth')).searchParams;
+  const ticket = params.get('ticket');
+  if (!ticket) throw new Error(params.get('error') || 'failed');
+  const { data } = await api.post<ReaderLoginResponse>('/auth/google/exchange', {
+    ticket,
+    device_label: `${Platform.OS} app`,
+  });
+  await setTokens(data.tokens.access_token, data.tokens.refresh_token);
+  return data;
 }

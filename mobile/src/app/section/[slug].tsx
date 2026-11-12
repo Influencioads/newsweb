@@ -1,18 +1,20 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { FlatList, RefreshControl, type ListRenderItem } from 'react-native';
+import { FlatList, RefreshControl, View, type ListRenderItem } from 'react-native';
 
 import * as publicApi from '@/api/public';
 import type { ArticleCard } from '@/api/types';
 import { LeadCard, RowCard } from '@/components/ArticleCard';
 import { EmptyState, ErrorState } from '@/components/Feedback';
 import { useI18n } from '@/lib/i18n';
+import { useSiteConfig } from '@/lib/siteContent';
 import { space } from '@/lib/theme';
 import { makeStyles, useColors } from '@/lib/useTheme';
 import { ListFooter } from '@/ui/ListFooter';
 import { Screen } from '@/ui/Screen';
 import { ScreenHeader } from '@/ui/ScreenHeader';
 import { SkeletonFeed } from '@/ui/Skeleton';
+import { T } from '@/ui/Text';
 
 /** Category feed with cursor pagination — `/public/articles?category=` (§13). */
 const keyOf = (article: ArticleCard) => article.short_id;
@@ -37,6 +39,9 @@ export default function SectionScreen() {
   // The section name only exists once the first page lands; until then the
   // navigator's generic title stands in rather than an empty bar.
   const title = category ? pick(category.name_te, category.name_en) : t('screen.section');
+  // The WOW category's one line, as the desk set it on the CMS Taxonomy page.
+  const card = useSiteConfig().data?.categories.find((c) => c.slug === slug);
+  const tagline = card ? pick(card.tagline_te ?? '', card.tagline_en ?? card.tagline_te ?? '') : '';
 
   // The first story leads the section the way the web section page does.
   const renderItem: ListRenderItem<ArticleCard> = ({ item, index }) =>
@@ -59,6 +64,22 @@ export default function SectionScreen() {
           keyExtractor={keyOf}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
+          ListHeaderComponent={
+            // The website's section heading: the "News section" label, the name, its one line.
+            <View style={styles.intro}>
+              <T variant="meta" weight="semibold" color="brand">
+                {pick('వార్తల విభాగం', 'News section')}
+              </T>
+              <T variant="headlineLg" weight="bold" accessibilityRole="header">
+                {title}
+              </T>
+              {tagline ? (
+                <T variant="bodySmall" color="inkSoft">
+                  {tagline}
+                </T>
+              ) : null}
+            </View>
+          }
           onEndReached={() => {
             if (feed.hasNextPage && !feed.isFetchingNextPage) void feed.fetchNextPage();
           }}
@@ -74,7 +95,7 @@ export default function SectionScreen() {
           refreshControl={
             <RefreshControl
               refreshing={feed.isRefetching && !feed.isFetchingNextPage}
-              onRefresh={() => feed.refetch()}
+              onRefresh={() => void feed.refetch()}
               tintColor={color.brand}
               colors={[color.brand]}
               progressBackgroundColor={color.surface}
@@ -88,4 +109,5 @@ export default function SectionScreen() {
 
 const useStyles = makeStyles(() => ({
   list: { paddingBottom: space.xl },
+  intro: { gap: space.xs, paddingHorizontal: space.lg, paddingTop: space.lg, paddingBottom: space.md },
 }));

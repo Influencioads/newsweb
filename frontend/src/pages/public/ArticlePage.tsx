@@ -18,7 +18,7 @@ import {
   type TrackMeta,
 } from '@/components/article/AudioPlayer';
 import { ReaderToolbar, ReadingProgress } from '@/components/article/ReaderToolbar';
-import { ShareSheet, ShareStrip } from '@/components/article/ShareSheet';
+import { ShareBlock, ShareSheet } from '@/components/article/ShareSheet';
 import { Badge } from '@/components/ui/Badge';
 import { Button, ButtonLink, IconButton } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -33,6 +33,7 @@ import { useReadingBeacon } from '@/features/engagement/beacon';
 import { CommentsSection } from '@/features/engagement/components/CommentsSection';
 import { EngagementBar } from '@/features/engagement/components/EngagementBar';
 import { FollowButton } from '@/features/engagement/components/FollowButton';
+import { MY_VILLAGE_PATH, MY_VILLAGE_SLUG, SHARE_VILLAGE_PATH } from '@/features/wow/myVillage';
 import { PollCard } from '@/features/epaper/PollCard';
 import * as publicApi from '@/features/public/api';
 import { extractPlainText, useTts } from '@/features/reader/tts';
@@ -463,14 +464,29 @@ export default function ArticlePage() {
                   </Card>
                 ) : null}
 
-                {/* Where the story ends: the four share paths, always in view. */}
-                <ShareStrip shortId={data.short_id} url={data.url} title={shareTitle} className="mt-7" />
+                {/* Where the story ends: WhatsApp, Facebook, Instagram, Telegram, X — always in view. */}
+                <ShareBlock className="mt-7" shortId={data.short_id} url={data.url} title={shareTitle} />
 
                 {/* Like · comment · save · share · report (§5) */}
                 <EngagementBar article={data} />
 
                 {/* §26 article-page ad, category-targeted; collapses when unfilled. */}
                 <AdSlot placement="article" category={data.category?.slug} className="mt-6" />
+
+                {/* My Village stories end with the way to the other villages (process Step 10). */}
+                {data.category?.slug === MY_VILLAGE_SLUG ? (
+                  <div className="mt-6 flex flex-wrap items-center gap-2 rounded-xl border border-wow/40 bg-wow-tint p-4">
+                    <p className={cn(s.body, 'mr-auto text-ui font-semibold text-ink')}>
+                      {pick('మై విలేజ్ – మన ఊరు.. మన వైభవం.!', 'My Village – our village, our glory!')}
+                    </p>
+                    <ButtonLink to={MY_VILLAGE_PATH} variant="secondary" size="sm">
+                      {pick('మరిన్ని గ్రామాలు చూడండి', 'Explore more villages')}
+                    </ButtonLink>
+                    <ButtonLink to={SHARE_VILLAGE_PATH} variant="wow" size="sm">
+                      {pick('మీ ఊరి కథ పంపండి', 'Share your village')}
+                    </ButtonLink>
+                  </div>
+                ) : null}
 
                 {/* Follow the threads this story belongs to (§12) */}
                 <div className="mt-6 flex flex-wrap items-center gap-2">

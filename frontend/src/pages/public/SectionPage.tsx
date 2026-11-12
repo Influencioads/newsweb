@@ -13,6 +13,7 @@ import * as publicApi from '@/features/public/api';
 import { useI18n, useScript } from '@/i18n';
 import type { ArticleCard } from '@/types/public';
 import { useDocumentTitle, useReveal } from '@/utils/motion';
+import { COMMUNITY_CATEGORIES, ContactEmail } from '@/features/wow/ContactEmail';
 
 /**
  * One news section (§5): lead + two top stories, then the latest list, with
@@ -152,7 +153,7 @@ export default function SectionPage() {
 
               {latest.length ? (
                 <section>
-                  <SectionHeader title={L('తాజా వార్తలు', 'Latest news')} tone="ink" />
+                  <SectionHeader title={L('తాజా కథనాలు', 'Latest stories')} tone="ink" />
                   <div className="grid gap-x-8 lg:grid-cols-2">
                     {latest.map((article) => (
                       <div key={article.short_id} ref={reveal}>
@@ -166,6 +167,7 @@ export default function SectionPage() {
           )}
         </QueryState>
       </div>
+      <ContactEmail kind={COMMUNITY_CATEGORIES.has(slug) ? 'community' : 'general'} className="mt-10 border-t border-rule pt-5" />
     </PageContainer>
   );
 }

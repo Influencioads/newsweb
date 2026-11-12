@@ -28,6 +28,12 @@ export interface CategoryOut {
 
 export interface NavCategoryOut extends CategoryOut {
   show_in_nav: boolean;
+  /** A WOW category card (Explore WOW, drawer, footer); edited on the Taxonomy page. */
+  in_explore?: boolean;
+  tagline_te?: string | null;
+  tagline_en?: string | null;
+  /** One of the names in features/wow/icons.ts. */
+  icon?: string | null;
 }
 
 export interface DistrictOut {
@@ -62,6 +68,8 @@ export interface ArticleCard {
   district: DistrictOut | null;
   hero: MediaOut | null;
   byline_te: string | null;
+  /** The writer's photo beside the byline ("Written by" on My Village stories). */
+  byline_photo_url?: string | null;
   is_breaking: boolean;
   is_exclusive: boolean;
   ai_generated: boolean;
@@ -151,6 +159,8 @@ export interface HomePayload {
   edition: DistrictOut | null;
   /** §3 — present only when the reader has saved a mandal. */
   mandal_block: HomeSection | null;
+  /** The hero slides the desk chose, in order (an older API sends none). */
+  hero?: ArticleCard[];
   lead: ArticleCard | null;
   secondary: ArticleCard[];
   mid_column: ArticleCard[];
@@ -307,6 +317,81 @@ export interface SiteConfig {
   districts: DistrictOut[];
   /** Admin-set #rrggbb colours; see utils/brand.ts. */
   brand?: { primary?: string; breaking?: string; accent?: string };
+  /** CMS → Site content. Absent from an older API; features/wow/siteContent.ts fills the defaults. */
+  content?: Partial<SiteContent>;
+  /** How people sign in (backend settings): Google, and whether passwords are still open. */
+  auth?: { google: boolean; password: boolean };
+}
+
+/** What CMS → Site content edits (backend app/services/site_content.py). */
+export interface SiteContent {
+  brand: { logo_url: string; tagline_te: string; tagline_en: string };
+  home: { banner_tag_te: string; banner_tag_en: string };
+  /** The home hero banner's slides, chosen in CMS → Home hero slides, in order. */
+  hero: { article_ids: number[] };
+  /** `mobile_image_url`: the picture phones show instead (blank: `image_url`). */
+  radio: { image_url: string; mobile_image_url: string; segments: RadioSegment[] };
+  story_shots: { shots: StoryShotItem[] };
+  nominate: { image_url: string; mobile_image_url: string; categories: { value: string; te: string; en: string }[] };
+  /** grievance: policy pages; contact: Contact page and categories; community: My Village and Local Hero. */
+  contact: { grievance_email: string; contact_email: string; community_email: string };
+  /** The bylines offered in the article editor (CMS → Site content → Authors). */
+  authors: { names: string[] };
+}
+
+/** A Story Shots picture uploaded in the CMS; the title and link are optional. */
+export interface StoryShotItem {
+  id: string;
+  image_url: string;
+  title_te: string;
+  title_en: string;
+  link: string;
+}
+
+export interface RadioSegment {
+  id: string;
+  te: string;
+  en: string;
+  tagline_te: string;
+  tagline_en: string;
+  icon: string;
+  tone: string;
+  /** Category slugs, tried in order; the first with stories is played. */
+  categories: string[];
+  /** Recorded episodes (MP3 / MP4 uploaded in the CMS); played instead of the stories. */
+  episodes?: RadioEpisode[];
+}
+
+/** A recorded WOW Radio episode uploaded in CMS → Site content → WOW Radio. */
+export interface RadioEpisode {
+  id: string;
+  url: string;
+  kind: 'audio' | 'video';
+  title_te: string;
+  title_en: string;
+  duration_sec: number;
+  /** The episode's thumbnail picture; blank: the WOW Radio picture. */
+  image_url?: string;
+  /** When it goes on air (UTC ISO); blank: at once. Readers never get one before its time. */
+  publish_at?: string;
+}
+
+/** A footer page (About, Privacy, ...) as CMS → Footer pages saves it. */
+export interface SitePageSection {
+  id: string;
+  heading: string;
+  body: string[];
+}
+
+export interface SitePageLanguage {
+  title: string;
+  sections: SitePageSection[];
+}
+
+export interface SitePage {
+  te: SitePageLanguage;
+  en: SitePageLanguage;
+  updated_at?: string | null;
 }
 
 /** What `GET /public/articles/{short_id}/formats` reports. */

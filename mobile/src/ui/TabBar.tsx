@@ -1,4 +1,4 @@
-import type { BottomTabBarProps } from 'expo-router/build/react-navigation/bottom-tabs';
+import type { BottomTabBarProps } from 'expo-router/tabs';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
@@ -26,7 +26,7 @@ import { AI_FEATURES } from '@/lib/features';
  */
 export const TAB_BAR_HEIGHT = 56;
 
-export function TabBar({ state, descriptors, navigation, insets }: BottomTabBarProps) {
+export function TabBar({ state, descriptors, emitter, navigateToTab, insets }: BottomTabBarProps) {
   const styles = useStyles();
   const color = useColors();
   const m = useMotion();
@@ -80,14 +80,14 @@ export function TabBar({ state, descriptors, navigation, insets }: BottomTabBarP
                 testID={options.tabBarButtonTestID}
                 style={styles.tab}
                 onPress={() => {
-                  const event = navigation.emit({
+                  const event = emitter.emit({
                     type: 'tabPress',
                     target: route.key,
                     canPreventDefault: true,
                   });
-                  if (!focused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
+                  if (!focused && !event.defaultPrevented) navigateToTab(route.key);
                 }}
-                onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
+                onLongPress={() => emitter.emit({ type: 'tabLongPress', target: route.key })}
               >
                 <View style={styles.icon}>
                   {options.tabBarIcon?.({ focused, color: tint, size: 24 })}

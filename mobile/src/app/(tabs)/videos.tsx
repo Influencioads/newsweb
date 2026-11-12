@@ -169,7 +169,7 @@ export default function VideosScreen() {
           refreshControl={
             <RefreshControl
               refreshing={hub.isRefetching}
-              onRefresh={() => hub.refetch()}
+              onRefresh={() => void hub.refetch()}
               tintColor={color.brand}
               colors={[color.brand]}
               progressBackgroundColor={color.surface}

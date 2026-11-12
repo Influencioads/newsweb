@@ -17,7 +17,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -40,7 +40,7 @@ from app.integrations.kyc import get_kyc  # noqa: E402
 from app.integrations.kyc.base import KycDecision  # noqa: E402
 from app.integrations.storage import get_private_storage, get_storage  # noqa: E402
 from app.main import app  # noqa: E402
-from app.models.content import Article  # noqa: E402
+from app.models.content import Article, Category  # noqa: E402
 from app.models.creator import CreatorSubmission  # noqa: E402
 from app.models.enums import (  # noqa: E402
     ArticleStatus,
@@ -50,6 +50,7 @@ from app.models.enums import (  # noqa: E402
     MediaType,
     RoleKey,
     ScopeType,
+    SubmissionStatus,
     UserStatus,
     Vertical,
     WorkflowState,
@@ -551,6 +552,164 @@ class TestSubmissionGates:
         user = make_reader(db, email="sub-kyc@test.local")
         with pytest.raises(ConflictError):
             self._submit(db, user)
+
+
+class TestMyVillagePhotos:
+    """Share Your Village: any signed-in reader may attach village photos to
+    their own My Village story; other sections still need approved KYC."""
+
+    def _submission(self, db: Session, user: User, slug: str | None):
+        category_id = (
+            db.scalar(select(Category.id).where(Category.slug == slug)) if slug else None
+        )
+        submission = submission_service.create_submission(
+            db,
+            user_id=user.id,
+            title_te="మై విలేజ్: పెదపూడి",
+            body_te="మా ఊరి కథ. " * 20,
+            category_id=category_id,
+            district_id=None,
+            accept_guidelines=True,
+        )
+        db.commit()
+        return submission
+
+    def _headers(self, db: Session, user: User) -> dict[str, str]:
+        _s, access, _r, _e = auth_service.create_session(db, user)
+        db.commit()
+        return {"Authorization": f"Bearer {access}"}
+
+    def test_a_reader_without_kyc_can_add_photos_to_a_village_story(
+        self, db: Session, client: TestClient
+    ) -> None:
+        user = make_reader(db, email="village-photos@test.local")
+        submission = self._submission(db, user, "my-village-story")
+        r = client.post(
+            f"/api/v1/users/me/submissions/{submission.id}/media",
+            files={"file": ("village.png", png_bytes(), "image/png")},
+            headers=self._headers(db, user),
+        )
+        assert r.status_code == 201, r.text
+        assert len(r.json()["media_ids"]) == 1
+
+    def test_a_reader_without_kyc_can_add_the_local_hero_photo(
+        self, db: Session, client: TestClient
+    ) -> None:
+        user = make_reader(db, email="hero-photo@test.local")
+        submission = self._submission(db, user, "local-hero")
+        r = client.post(
+            f"/api/v1/users/me/submissions/{submission.id}/media",
+            files={"file": ("hero.png", png_bytes(), "image/png")},
+            headers=self._headers(db, user),
+        )
+        assert r.status_code == 201, r.text
+        assert len(r.json()["media_ids"]) == 1
+
+    def test_a_guest_can_share_a_village_with_name_and_photos_and_no_phone(
+        self, db: Session, client: TestClient
+    ) -> None:
+        r = client.post(
+            "/api/v1/public/my-village/submissions",
+            data={
+                "name": "రాముడు కొండా",
+                "title_te": "మై విలేజ్: పెదపూడి (తూర్పు గోదావరి)",
+                "body_te": "మా ఊరి కథ. " * 20,
+                "accept_guidelines": "true",
+            },
+            files=[
+                ("writer_photo", ("me.png", png_bytes(), "image/png")),
+                ("photos", ("temple.png", png_bytes(), "image/png")),
+                ("photos", ("lake.png", png_bytes(), "image/png")),
+            ],
+        )
+        assert r.status_code == 201, r.text
+        submission = db.get(CreatorSubmission, r.json()["id"])
+        assert submission is not None
+        assert submission.status == SubmissionStatus.PENDING
+        assert len(submission.media_ids or []) == 2
+        guest = db.get(User, submission.user_id)
+        assert guest.name_te == "రాముడు కొండా"
+        assert guest.phone is None and guest.email is None
+        assert guest.status == UserStatus.DISABLED  # a guest can never sign in
+        assert guest.avatar_media_id is not None
+        category = db.get(Category, submission.category_id)
+        assert category.slug == "my-village-story"
+
+        # Approved, the story is "Written by" the guest, with their selfie.
+        moderator, headers = staff(db, role=RoleKey.SUPER_ADMIN, email="village-mod@test.local")
+        _sub, article = submission_service.approve_submission(
+            db, submission_id=submission.id, moderator_id=moderator.id
+        )
+        db.commit()
+        assert article.byline_te == "రాముడు కొండా"
+        assert article.byline_photo_media_id == guest.avatar_media_id
+        cms = client.get(f"/api/v1/cms/articles/{article.id}", headers=headers).json()
+        assert cms["byline_photo"]["id"] == guest.avatar_media_id
+
+        # The editor can change the name and the photo from the CMS.
+        photo = client.post(
+            "/api/v1/cms/media",
+            files={"file": ("writer.png", png_bytes(), "image/png")},
+            headers=headers,
+        ).json()
+        r = client.patch(
+            f"/api/v1/cms/articles/{article.id}",
+            json={"byline_te": "కొండా రాముడు", "byline_photo_media_id": photo["id"]},
+            headers=headers,
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["byline_photo"]["id"] == photo["id"]
+
+        # Readers see both on the story.
+        db.refresh(article)
+        article.status = ArticleStatus.PUBLISHED
+        article.workflow_state = WorkflowState.PUBLISHED
+        article.published_at = utcnow()
+        db.commit()
+        story = client.get(f"/api/v1/public/articles/{article.short_id}").json()
+        assert story["byline_te"] == "కొండా రాముడు"
+        assert story["byline_photo_url"]
+
+        # And the photo can be taken off again.
+        r = client.patch(
+            f"/api/v1/cms/articles/{article.id}",
+            json={"byline_photo_media_id": None},
+            headers=headers,
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["byline_photo"] is None
+
+    def test_a_guest_still_needs_a_name(self, client: TestClient) -> None:
+        r = client.post(
+            "/api/v1/public/my-village/submissions",
+            data={"name": "", "title_te": "మై విలేజ్: పెదపూడి", "body_te": "మా ఊరి కథ. " * 20, "accept_guidelines": "true"},
+        )
+        assert r.status_code == 422, r.text
+
+    def test_the_honeypot_stores_nothing(self, db: Session, client: TestClient) -> None:
+        before = db.scalar(select(func.count(CreatorSubmission.id)))
+        r = client.post(
+            "/api/v1/public/my-village/submissions",
+            data={
+                "name": "Bot Bot",
+                "title_te": "మై విలేజ్: పెదపూడి",
+                "body_te": "మా ఊరి కథ. " * 20,
+                "accept_guidelines": "true",
+                "website": "http://spam.example",
+            },
+        )
+        assert r.status_code == 201
+        assert db.scalar(select(func.count(CreatorSubmission.id))) == before
+
+    def test_other_sections_still_need_kyc(self, db: Session, client: TestClient) -> None:
+        user = make_reader(db, email="other-photos@test.local")
+        submission = self._submission(db, user, None)
+        r = client.post(
+            f"/api/v1/users/me/submissions/{submission.id}/media",
+            files={"file": ("photo.png", png_bytes(), "image/png")},
+            headers=self._headers(db, user),
+        )
+        assert r.status_code == 409, r.text
 
 
 # --------------------------------------------------------------------------- #

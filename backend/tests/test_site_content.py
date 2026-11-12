@@ -177,6 +177,31 @@ class TestBlocks:
             assert r.status_code == 422, bad
         assert client.delete("/api/v1/cms/site-content/radio", headers=admin).status_code == 200
 
+    def test_scheduled_radio_episodes_wait_for_their_time(self, client: TestClient, admin: dict) -> None:
+        def episode(ep_id: str, publish_at: str) -> dict:
+            return {"id": ep_id, "url": f"/media/radio/{ep_id}.mp3", "publish_at": publish_at}
+
+        segment = {
+            "id": "night", "te": "రాత్రి", "en": "Night", "icon": "sparkles", "tone": "blue", "categories": ["mystery"],
+            "episodes": [
+                episode("now", ""),
+                episode("past", "2020-01-01T05:30:00+05:30"),
+                episode("later", "2099-01-01T10:00:00Z"),
+            ],
+        }
+        ok = client.put("/api/v1/cms/site-content/radio", json={"segments": [segment]}, headers=admin)
+        assert ok.status_code == 200, ok.text
+        # Stored in UTC, whatever zone it was sent in.
+        assert ok.json()["segments"][0]["episodes"][1]["publish_at"] == "2020-01-01T00:00+00:00"
+        public = client.get("/api/v1/public/config").json()["content"]["radio"]["segments"][0]["episodes"]
+        assert [e["id"] for e in public] == ["now", "past"], "a future episode stays hidden from readers"
+        cms = client.get("/api/v1/cms/site-content", headers=admin).json()["values"]["radio"]["segments"][0]["episodes"]
+        assert [e["id"] for e in cms] == ["now", "past", "later"], "the CMS sees everything"
+
+        bad = {**segment, "episodes": [episode("x", "tomorrow morning")]}
+        assert client.put("/api/v1/cms/site-content/radio", json={"segments": [bad]}, headers=admin).status_code == 422
+        assert client.delete("/api/v1/cms/site-content/radio", headers=admin).status_code == 200
+
     def test_story_shots_are_their_own_uploads(self, client: TestClient, admin: dict) -> None:
         assert client.get("/api/v1/public/config").json()["content"]["story_shots"] == {"shots": []}
         shot = {"id": "s1", "image_url": "/media/shot-1.webp", "title_en": "Village fair", "link": "/section/mystery"}

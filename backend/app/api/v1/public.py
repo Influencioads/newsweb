@@ -216,7 +216,7 @@ def get_config(response: Response, db: Session = Depends(get_db)) -> SiteConfigO
             DistrictOut.model_validate(d) for d in article_repo.active_districts(db)
         ],
         brand=settings_service.brand_colors(db),
-        content=site_content.blocks(db),
+        content=site_content.public_blocks(db),
         auth={"google": settings.google_login_enabled, "password": settings.password_login_allowed},
     )
 

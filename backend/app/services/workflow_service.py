@@ -743,3 +743,50 @@ def _release_source_text(db: Session, article: Article) -> None:
         get_logger(__name__).exception(
             "source_text_release_failed", article_id=article.id
         )
+
+
+def publish_due(db: Session, *, limit: int = 50) -> list[int]:
+    """Publish every SCHEDULED article whose time has come (the scheduler tick).
+
+    Each goes live exactly as if the editor who scheduled it had pressed
+    Publish at that moment: the same `transition`, so notifications, pins and
+    breaking expiry all happen as usual. One that fails is logged and left
+    SCHEDULED for the next tick rather than stopping the others.
+    """
+    from app.core.logging import get_logger
+
+    log = get_logger(__name__)
+    due = db.scalars(
+        select(Article)
+        .where(
+            Article.workflow_state == WorkflowState.SCHEDULED,
+            Article.scheduled_at.is_not(None),
+            Article.scheduled_at <= utcnow(),
+            Article.deleted_at.is_(None),
+        )
+        .order_by(Article.scheduled_at)
+        .limit(limit)
+    ).all()
+    published: list[int] = []
+    for article in due:
+        # Whoever scheduled it publishes it; their scope already covered it.
+        actor_id = db.scalar(
+            select(WorkflowTransition.actor_id)
+            .where(
+                WorkflowTransition.article_id == article.id,
+                WorkflowTransition.to_state == WorkflowState.SCHEDULED,
+            )
+            .order_by(WorkflowTransition.created_at.desc())
+            .limit(1)
+        )
+        actor = db.get(User, actor_id) if actor_id else None
+        if actor is None:
+            log.warning("scheduled_publish_no_actor", article_id=article.id)
+            continue
+        try:
+            with db.begin_nested():
+                transition(db, build_principal(actor, "scheduler"), article, "publish", "scheduled time reached")
+            published.append(article.id)
+        except Exception:  # noqa: BLE001 — one bad article must not stop the rest
+            log.exception("scheduled_publish_failed", article_id=article.id)
+    return published

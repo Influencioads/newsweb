@@ -688,6 +688,35 @@ class TestDashboard:
         assert now_live.json()["scheduled_at"] is None
         assert client.get(f"/api/v1/public/articles/{short_id}").status_code == 200
 
+    def test_the_scheduler_publishes_at_the_time(self, client: TestClient, db: Session) -> None:
+        """A scheduled story goes live by itself once its time passes, and not before."""
+        from datetime import timezone
+
+        from app.models.content import Article
+        from app.services import workflow_service
+
+        author = staff_headers(db, role=RoleKey.SUB_EDITOR, email="h-author@test.example.com")
+        chief = staff_headers(db, role=RoleKey.EDITOR_IN_CHIEF, email="h-chief@test.example.com")
+        aid = client.post("/api/v1/cms/articles", json={
+            "title_te": "సమయానికి వచ్చే కథనం", "body": body_doc(BODY_TE), "hero_media_id": hero_id(db),
+        }, headers=author).json()["id"]
+        client.post(f"/api/v1/cms/articles/{aid}/submit", json={}, headers=author)
+        client.post(f"/api/v1/cms/articles/{aid}/approve", json={}, headers=chief)
+        future = (utcnow() + timedelta(minutes=30)).astimezone(timezone.utc).isoformat()
+        short_id = client.post(f"/api/v1/cms/articles/{aid}/publish", json={"scheduled_at": future}, headers=chief).json()["short_id"]
+
+        assert aid not in workflow_service.publish_due(db), "not before its time"
+        assert client.get(f"/api/v1/public/articles/{short_id}").status_code == 404
+
+        db.get(Article, aid).scheduled_at = utcnow() - timedelta(minutes=1)
+        db.commit()
+        assert workflow_service.publish_due(db) == [aid]
+        db.commit()
+        article = db.get(Article, aid)
+        assert article.workflow_state == WorkflowState.PUBLISHED and article.published_at is not None
+        assert client.get(f"/api/v1/public/articles/{short_id}").status_code == 200
+        assert workflow_service.publish_due(db) == [], "only once"
+
 
 # --------------------------------------------------------------------------- #
 # §8 / §9 — placement chosen on the article form

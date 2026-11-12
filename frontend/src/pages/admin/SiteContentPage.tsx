@@ -19,6 +19,7 @@ import { useI18n } from '@/i18n';
 import { useAuth } from '@/stores/auth';
 import type { RadioEpisode, RadioSegment, SiteContent, StoryShotItem } from '@/types/public';
 
+import { toLocalInput } from './editor/form';
 import { ImageField, moveItem, ownMediaPath, RowActions, slugify, uniqueSlug } from './siteContentShared';
 import { useL } from './useL';
 
@@ -469,6 +470,11 @@ function RadioEpisodes({
                   <p className="min-w-0 flex-1 truncate font-sans text-ui-sm font-semibold text-ink">
                     {i + 1}. {ep.title_en || ep.title_te || L('శీర్షిక ఇంకా లేదు', 'No title yet')}
                     {ep.duration_sec ? <span className="ml-2 font-normal text-muted">{clock(ep.duration_sec)}</span> : null}
+                    {ep.publish_at && new Date(ep.publish_at) > new Date() ? (
+                      <Badge tone="exclusive" size="xs" className="ml-2">
+                        {L('షెడ్యూల్', 'Scheduled')} · {new Date(ep.publish_at).toLocaleString()}
+                      </Badge>
+                    ) : null}
                   </p>
                   {!disabled ? (
                     <RowActions
@@ -493,6 +499,18 @@ function RadioEpisodes({
                   onEn={(title_en) => patch(i, { title_en })}
                   disabled={disabled}
                 />
+                <Field
+                  label={L('ప్రసార సమయం', 'Goes on air at')}
+                  hint={L('ఖాళీగా ఉంచితే వెంటనే. ఆ సమయం వచ్చే వరకు పాఠకులకు కనిపించదు.', 'Leave empty for now. Readers do not see it until this time.')}
+                >
+                  <Input
+                    type="datetime-local"
+                    script="en"
+                    value={toLocalInput(ep.publish_at || null)}
+                    disabled={disabled}
+                    onChange={(e) => patch(i, { publish_at: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+                  />
+                </Field>
                 <div className="space-y-1.5">
                   <p className="font-sans text-ui-sm font-semibold text-ink">
                     {L('థంబ్‌నెయిల్ చిత్రం', 'Thumbnail picture')}{' '}

@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError as PydanticError, field_validator
@@ -124,6 +124,23 @@ class RadioEpisode(_Block):
     duration_sec: int = Field(default=0, ge=0, le=24 * 3600)
     #: The episode's thumbnail picture, uploaded in the CMS; blank: the WOW Radio picture.
     image_url: str = Field(default="", max_length=500)
+    #: When it goes on air, as a UTC ISO time; blank: at once. Until then
+    #: readers do not see it (public_blocks); the CMS always does.
+    publish_at: str = Field(default="", max_length=40)
+
+    @field_validator("publish_at")
+    @classmethod
+    def _when(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            return ""
+        try:
+            when = datetime.fromisoformat(v.replace("Z", "+00:00"))
+        except ValueError as err:
+            raise ValueError("must be a date and time") from err
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=timezone.utc)
+        return when.astimezone(timezone.utc).isoformat(timespec="minutes")
 
     @field_validator("image_url")
     @classmethod
@@ -452,6 +469,17 @@ def blocks(db: Session) -> dict[str, dict[str, Any]]:
             out[name] = model.model_validate(stored or {}).model_dump()
         except PydanticError:
             out[name] = model().model_dump()
+    return out
+
+
+def public_blocks(db: Session) -> dict[str, dict[str, Any]]:
+    """What readers get: every block, less WOW Radio episodes whose
+    `publish_at` is still in the future."""
+    out = blocks(db)
+    now = datetime.now(timezone.utc).isoformat(timespec="minutes")
+    for segment in out["radio"]["segments"]:
+        # Both sides are UTC ISO strings of one shape, so they compare as text.
+        segment["episodes"] = [e for e in segment["episodes"] if not e.get("publish_at") or e["publish_at"] <= now]
     return out
 
 

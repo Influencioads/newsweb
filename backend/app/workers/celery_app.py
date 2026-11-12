@@ -39,6 +39,13 @@ celery.conf.update(timezone="Asia/Kolkata", enable_utc=True, task_track_started=
 celery.conf.task_routes = {"crawl.*": {"queue": "ingest"}}
 
 celery.conf.beat_schedule = {
+    # Scheduled articles go live within a minute of their time. A tick still
+    # queued when the next is due expires; the next one does the same work.
+    "articles-publish-due": {
+        "task": "articles.publish_due",
+        "schedule": 60.0,
+        "options": {"expires": 55},
+    },
     "epaper-scheduler": {"task": "epaper.schedule", "schedule": 300.0},
     "epaper-audio": {"task": "epaper.audio", "schedule": 600.0},
     # Push delivery and scheduled campaigns: a sent alert reaches phones on

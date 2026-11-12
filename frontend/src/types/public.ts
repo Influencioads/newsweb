@@ -372,6 +372,8 @@ export interface RadioEpisode {
   duration_sec: number;
   /** The episode's thumbnail picture; blank: the WOW Radio picture. */
   image_url?: string;
+  /** When it goes on air (UTC ISO); blank: at once. Readers never get one before its time. */
+  publish_at?: string;
 }
 
 /** A footer page (About, Privacy, ...) as CMS → Footer pages saves it. */

@@ -198,7 +198,7 @@ export interface SiteContent {
   story_shots: { shots: StoryShotItem[] };
   /** The Nominate banner picture (blank: a Local Hero photo) and the form's hero categories. */
   nominate: { image_url: string; mobile_image_url: string; categories: { value: string; te: string; en: string }[] };
-  contact: { grievance_email: string };
+  contact: { grievance_email: string; contact_email: string; community_email: string };
 }
 
 export interface SiteRadioSegment {

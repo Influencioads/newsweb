@@ -19,6 +19,7 @@ import {
   SHARE_VILLAGE_PATH,
   SPECIALITIES,
 } from './myVillage';
+import { ContactEmail } from './ContactEmail';
 import { fetchVillageStories, TINTS, VillageCard } from './MyVillageStory';
 
 /**
@@ -158,6 +159,7 @@ export default function MyVillagePage() {
           </p>
         )}
       </section>
+      <ContactEmail kind="community" className="mt-10 border-t border-rule pt-5" />
     </PageContainer>
   );
 }

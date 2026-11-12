@@ -18,6 +18,7 @@ import { cn } from '@/utils/cn';
 import { useDocumentTitle } from '@/utils/motion';
 
 import { LOCAL_HERO_SLUG } from './categories';
+import { ContactEmail } from './ContactEmail';
 import { DEFAULT_CONTENT } from './siteContent';
 
 /**
@@ -499,6 +500,7 @@ export default function NominatePage() {
           </Card>
         </aside>
       </div>
+      <ContactEmail kind="community" className="mt-10 border-t border-rule pt-5" />
     </PageContainer>
   );
 }

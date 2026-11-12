@@ -34,7 +34,7 @@ export const DEFAULT_CONTENT: SiteContent = {
   },
   story_shots: { shots: [] },
   nominate: { image_url: '', mobile_image_url: '', categories: HERO_CATEGORIES.map((c) => ({ ...c })) },
-  contact: { grievance_email: 'grievance@example.com' },
+  contact: { grievance_email: 'grievance@example.com', contact_email: 'contact@wowindian.com', community_email: 'info@wowindian.com' },
 };
 
 export function useSiteConfig() {

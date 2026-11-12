@@ -352,11 +352,16 @@ class Authors(_Block):
 
 
 class Contact(_Block):
-    """Where the "Email the Grievance Officer" button on every policy page goes."""
+    """The site's email addresses: the "Email the Grievance Officer" button on
+    every policy page, the general address (Contact page and category pages)
+    and the one for My Village and Local Hero."""
 
     grievance_email: str = Field(default="grievance@example.com", max_length=200)
+    contact_email: str = Field(default="contact@wowindian.com", max_length=200)
+    #: My Village, Share Your Village, Local Hero and their category pages.
+    community_email: str = Field(default="info@wowindian.com", max_length=200)
 
-    @field_validator("grievance_email")
+    @field_validator("grievance_email", "contact_email", "community_email")
     @classmethod
     def _email(cls, v: str) -> str:
         if not _EMAIL.fullmatch(v):

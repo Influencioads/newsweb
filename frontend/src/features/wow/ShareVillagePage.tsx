@@ -28,6 +28,7 @@ import {
   SPECIALITIES,
   STORY_PROMPTS,
 } from './myVillage';
+import { ContactEmail } from './ContactEmail';
 import { SelfieCamera } from './SelfieCamera';
 
 /**
@@ -917,6 +918,7 @@ export default function ShareVillagePage() {
           )}
         </div>
       </Card>
+      <ContactEmail kind="community" className="mt-6" />
     </PageContainer>
   );
 }

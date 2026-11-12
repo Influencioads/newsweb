@@ -967,12 +967,36 @@ function ContactCard({ payload, canManage }: { payload: cmsApi.SiteContentPayloa
   return (
     <Section
       title={L('సంప్రదింపు', 'Contact')}
-      subtitle={L(
-        'ప్రతి పాలసీ పేజీలోని "గ్రీవెన్స్ అధికారికి రాయండి" బటన్ ఈ చిరునామాకు వెళ్తుంది',
-        'The "Email the Grievance Officer" button on every policy page goes to this address',
-      )}
+      subtitle={L('సైట్‌లో కనిపించే ఈమెయిల్ చిరునామాలు', 'The email addresses shown on the site')}
     >
-      <Field label={L('గ్రీవెన్స్ ఈమెయిల్', 'Grievance email')}>
+      <Field
+        label={L('సంప్రదింపు ఈమెయిల్', 'Contact email')}
+        hint={L('సంప్రదించండి పేజీ, అన్ని విభాగాల పేజీలు', 'The Contact page and every category page')}
+      >
+        <Input
+          type="email"
+          script="en"
+          value={draft.contact_email}
+          disabled={!canManage}
+          onChange={(e) => setDraft({ ...draft, contact_email: e.target.value })}
+        />
+      </Field>
+      <Field
+        label={L('మై విలేజ్ / లోకల్ హీరో ఈమెయిల్', 'My Village / Local Hero email')}
+        hint={L('మై విలేజ్, మీ ఊరి కథ పంపండి, నామినేట్, లోకల్ హీరో పేజీలు', 'My Village, Share Your Village, Nominate and Local Hero pages')}
+      >
+        <Input
+          type="email"
+          script="en"
+          value={draft.community_email}
+          disabled={!canManage}
+          onChange={(e) => setDraft({ ...draft, community_email: e.target.value })}
+        />
+      </Field>
+      <Field
+        label={L('గ్రీవెన్స్ ఈమెయిల్', 'Grievance email')}
+        hint={L('ప్రతి పాలసీ పేజీలోని "గ్రీవెన్స్ అధికారికి రాయండి" బటన్', 'The "Email the Grievance Officer" button on every policy page')}
+      >
         <Input
           type="email"
           script="en"

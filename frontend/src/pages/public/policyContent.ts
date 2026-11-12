@@ -65,15 +65,31 @@ export const PAGES: Record<string, PolicyEntry> = {
     te: {
       title: 'సంప్రదించండి',
       sections: [
-        { id: 'editorial', heading: 'సంపాదకీయ విభాగం', body: ['సంపాదకీయ విభాగం: editor@example.com'] },
-        { id: 'advertising', heading: 'ప్రకటనల విభాగం', body: ['ప్రకటనల విభాగం: ads@example.com'] },
+        {
+          id: 'general',
+          heading: 'సాధారణ సంప్రదింపు',
+          body: ['వార్తా విభాగాలు, సంపాదకీయ విభాగం, ప్రకటనల గురించి: contact@wowindian.com'],
+        },
+        {
+          id: 'community',
+          heading: 'మై విలేజ్ & లోకల్ హీరో',
+          body: ['మీ ఊరి కథ లేదా లోకల్ హీరో గురించి: info@wowindian.com'],
+        },
       ],
     },
     en: {
       title: 'Contact',
       sections: [
-        { id: 'editorial', heading: 'Editorial desk', body: ['Editorial desk: editor@example.com'] },
-        { id: 'advertising', heading: 'Advertising', body: ['Advertising: ads@example.com'] },
+        {
+          id: 'general',
+          heading: 'General enquiries',
+          body: ['News sections, the editorial desk and advertising: contact@wowindian.com'],
+        },
+        {
+          id: 'community',
+          heading: 'My Village & Local Hero',
+          body: ['About your village story or a local hero: info@wowindian.com'],
+        },
       ],
     },
   },

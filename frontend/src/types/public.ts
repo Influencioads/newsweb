@@ -333,7 +333,8 @@ export interface SiteContent {
   radio: { image_url: string; mobile_image_url: string; segments: RadioSegment[] };
   story_shots: { shots: StoryShotItem[] };
   nominate: { image_url: string; mobile_image_url: string; categories: { value: string; te: string; en: string }[] };
-  contact: { grievance_email: string };
+  /** grievance: policy pages; contact: Contact page and categories; community: My Village and Local Hero. */
+  contact: { grievance_email: string; contact_email: string; community_email: string };
   /** The bylines offered in the article editor (CMS → Site content → Authors). */
   authors: { names: string[] };
 }

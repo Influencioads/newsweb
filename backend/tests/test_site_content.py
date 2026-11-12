@@ -255,6 +255,15 @@ class TestBlocks:
         )
         assert good.status_code == 200
 
+    def test_contact_and_community_emails(self, client: TestClient, admin: dict) -> None:
+        # A block saved before these fields existed still gets the defaults.
+        contact = client.get("/api/v1/public/config").json()["content"]["contact"]
+        assert contact["contact_email"] == "contact@wowindian.com"
+        assert contact["community_email"] == "info@wowindian.com"
+        for field in ("contact_email", "community_email"):
+            bad = client.put("/api/v1/cms/site-content/contact", json={field: "nope"}, headers=admin)
+            assert bad.status_code == 422, field
+
 
 class TestPages:
     PAGE = {

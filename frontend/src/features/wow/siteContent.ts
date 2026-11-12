@@ -81,7 +81,7 @@ export const DEFAULT_CONTENT: SiteContent = {
       { value: 'other', te: 'ఇతరులు', en: 'Other' },
     ],
   },
-  contact: { grievance_email: 'grievance@example.com', contact_email: 'contact@wowindian.com', community_email: 'info@wowindian.com' },
+  contact: { grievance_email: 'info@wowindian.com', contact_email: 'contact@wowindian.com', community_email: 'info@wowindian.com' },
   authors: { names: ['సాయి మాసుల', 'అజయ్ మారుతి', 'ch.రాకేష్'] },
 };
 

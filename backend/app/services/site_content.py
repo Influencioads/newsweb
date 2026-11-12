@@ -373,7 +373,7 @@ class Contact(_Block):
     every policy page, the general address (Contact page and category pages)
     and the one for My Village and Local Hero."""
 
-    grievance_email: str = Field(default="grievance@example.com", max_length=200)
+    grievance_email: str = Field(default="info@wowindian.com", max_length=200)
     contact_email: str = Field(default="contact@wowindian.com", max_length=200)
     #: My Village, Share Your Village, Local Hero and their category pages.
     community_email: str = Field(default="info@wowindian.com", max_length=200)

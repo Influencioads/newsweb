@@ -165,12 +165,15 @@ export const PAGES: Record<string, PolicyEntry> = {
         {
           id: 'timelines',
           heading: 'పరిష్కార గడువు',
-          body: ['IT Rules 2021 ప్రకారం ఫిర్యాదులను 24 గంటల్లో స్వీకరించి, 30 రోజుల్లో పరిష్కరిస్తాం.'],
+          body: [
+            'IT Rules 2021 ప్రకారం ఫిర్యాదులను 24 గంటల్లో స్వీకరించి, 30 రోజుల్లో పరిష్కరిస్తాం.',
+            'ఈమెయిల్: contact@wowindian.com',
+          ],
         },
         {
           id: 'officer',
           heading: 'అధికారి వివరాలు',
-          body: ['గ్రీవెన్స్ అధికారి పేరు మరియు సంప్రదింపు వివరాలు: [క్లయింట్ ద్వారా పూరించాలి]'],
+          body: ['గ్రీవెన్స్ అధికారి ఈమెయిల్: info@wowindian.com'],
         },
       ],
     },
@@ -180,12 +183,15 @@ export const PAGES: Record<string, PolicyEntry> = {
         {
           id: 'timelines',
           heading: 'Response times',
-          body: ['Under IT Rules 2021 we acknowledge complaints within 24 hours and resolve them within 30 days.'],
+          body: [
+            'Under IT Rules 2021 we acknowledge complaints within 24 hours and resolve them within 30 days.',
+            'Email: contact@wowindian.com',
+          ],
         },
         {
           id: 'officer',
           heading: 'Officer details',
-          body: ['Grievance Officer name and contact details: [to be completed by the publisher]'],
+          body: ['Grievance Officer email: info@wowindian.com'],
         },
       ],
     },

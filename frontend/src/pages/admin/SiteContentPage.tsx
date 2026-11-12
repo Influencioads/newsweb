@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { useConfirm } from '@/components/ui/Dialog';
+import { DateTimeField } from '@/components/ui/DateTimeField';
 import { Field, Input, Select } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
 import { QueryState } from '@/components/ui/State';
@@ -503,12 +504,10 @@ function RadioEpisodes({
                   label={L('ప్రసార సమయం', 'Goes on air at')}
                   hint={L('ఖాళీగా ఉంచితే వెంటనే. ఆ సమయం వచ్చే వరకు పాఠకులకు కనిపించదు.', 'Leave empty for now. Readers do not see it until this time.')}
                 >
-                  <Input
-                    type="datetime-local"
-                    script="en"
+                  <DateTimeField
                     value={toLocalInput(ep.publish_at || null)}
                     disabled={disabled}
-                    onChange={(e) => patch(i, { publish_at: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+                    onChange={(v) => patch(i, { publish_at: v ? new Date(v).toISOString() : '' })}
                   />
                 </Field>
                 <div className="space-y-1.5">
